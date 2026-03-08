@@ -37,7 +37,9 @@ export function QuickOpenPanel({
         </button>
       </div>
       <input
+        aria-label="Quick open file"
         className="search-input"
+        type="search"
         placeholder="Type a file name..."
         value={query}
         onChange={(event) => onChangeQuery(event.target.value)}

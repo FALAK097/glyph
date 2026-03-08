@@ -105,7 +105,6 @@ In progress:
 
 Not started:
 
-- global search
 - themes
 - export
 - drag-and-drop image import
@@ -183,5 +182,5 @@ Not started:
 
 1. Replace the textarea editor with a markdown-aware editing layer.
 2. Improve note creation and folder creation flows inside the palette/settings model.
-3. Expand the theme system with more families and tighter editor styling.
+3. Expand the theme system with more families and tighter command-palette-style navigation.
 4. Add packaging so the web app can ship real downloads.

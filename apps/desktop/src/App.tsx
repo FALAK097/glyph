@@ -22,6 +22,35 @@ type FlatFile = {
   relativePath: string;
 };
 
+function normalizePath(filePath: string) {
+  return filePath.replace(/\\/g, "/");
+}
+
+function getRelativePath(filePath: string, rootPath: string | null) {
+  if (!rootPath) {
+    return filePath.split(/[\\/]/).at(-1) ?? filePath;
+  }
+
+  const normalizedFilePath = normalizePath(filePath);
+  const normalizedRootPath = normalizePath(rootPath).replace(/\/+$/, "");
+
+  if (normalizedFilePath.startsWith(`${normalizedRootPath}/`)) {
+    return normalizedFilePath.slice(normalizedRootPath.length + 1);
+  }
+
+  return normalizedFilePath.split("/").at(-1) ?? normalizedFilePath;
+}
+
+function isFileInsideWorkspace(filePath: string, rootPath: string | null) {
+  if (!rootPath) {
+    return false;
+  }
+
+  const normalizedFilePath = normalizePath(filePath);
+  const normalizedRootPath = normalizePath(rootPath).replace(/\/+$/, "");
+  return normalizedFilePath.startsWith(`${normalizedRootPath}/`);
+}
+
 function flattenFiles(nodes: DirectoryNode[], rootPath: string | null): FlatFile[] {
   const items: FlatFile[] = [];
 
@@ -30,7 +59,7 @@ function flattenFiles(nodes: DirectoryNode[], rootPath: string | null): FlatFile
       items.push({
         path: node.path,
         name: node.name,
-        relativePath: rootPath ? node.path.replace(`${rootPath}/`, "") : node.name
+        relativePath: getRelativePath(node.path, rootPath)
       });
       continue;
     }
@@ -85,6 +114,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [previewTheme, setPreviewTheme] = useState<string | null>(null);
+  const [isWorkspaceMode, setIsWorkspaceMode] = useState(true);
 
   const files = useMemo(() => flattenFiles(tree, rootPath), [rootPath, tree]);
 
@@ -97,6 +127,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
       const workspace = await typist.openDefaultWorkspace();
       if (workspace) {
         setWorkspace(workspace);
+        setIsWorkspaceMode(true);
       }
     };
 
@@ -136,7 +167,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
   useEffect(() => {
     const query = paletteQuery.trim().toLowerCase();
 
-    if (!query || query.startsWith("theme")) {
+    if (!isWorkspaceMode || !query || query.startsWith("theme")) {
       setSearchResults([]);
       return;
     }
@@ -147,7 +178,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
     }, 120);
 
     return () => window.clearTimeout(timer);
-  }, [paletteQuery, typist]);
+  }, [isWorkspaceMode, paletteQuery, typist]);
 
   useEffect(() => {
     if (!settings) {
@@ -171,13 +202,14 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
   const openFile = async (filePath: string) => {
     const file = await typist.readFile(filePath);
     setActiveFile(file);
+    setIsWorkspaceMode(isFileInsideWorkspace(file.path, rootPath));
     const nextSettings = await typist.getSettings();
     setSettings(nextSettings);
     setIsPaletteOpen(false);
   };
 
   const createNote = async () => {
-    const baseDir = rootPath ?? settings?.defaultWorkspacePath ?? null;
+    const baseDir = isWorkspaceMode ? rootPath : settings?.defaultWorkspacePath ?? null;
 
     if (!baseDir) {
       return;
@@ -185,6 +217,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
 
     const file = await typist.createFile(baseDir, `note-${Date.now()}.md`);
     setActiveFile(file);
+    setIsWorkspaceMode(true);
     const nextSettings = await typist.getSettings();
     setSettings(nextSettings);
     setIsPaletteOpen(false);
@@ -335,6 +368,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
         const file = await typist.openDocument();
         if (file) {
           setActiveFile(file);
+          setIsWorkspaceMode(false);
         }
         return;
       }
@@ -343,6 +377,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
         const workspace = await typist.openFolder();
         if (workspace) {
           setWorkspace(workspace);
+          setIsWorkspaceMode(true);
         }
         return;
       }
@@ -414,6 +449,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
           const workspace = await typist.openFolder(nextSettings.defaultWorkspacePath);
           if (workspace) {
             setWorkspace(workspace);
+            setIsWorkspaceMode(true);
           }
         }}
         onChangeMode={async (mode: ThemeMode) => {

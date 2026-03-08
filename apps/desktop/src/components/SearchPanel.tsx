@@ -35,7 +35,9 @@ export function SearchPanel({
         </button>
       </div>
       <input
+        aria-label="Search workspace"
         className="search-input"
+        type="search"
         placeholder="Search markdown files..."
         value={query}
         onChange={(event) => onChangeQuery(event.target.value)}

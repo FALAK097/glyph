@@ -20,6 +20,7 @@ const devServerUrl = "http://127.0.0.1:5173";
 let mainWindow: BrowserWindow | null = null;
 let activeWatcher: ReturnType<typeof watch> | null = null;
 let activeWorkspaceRoot: string | null = null;
+let searchableFilesCache: string[] = [];
 
 function isMarkdownFile(fileName: string) {
   return fileName.endsWith(".md") || fileName.endsWith(".markdown");
@@ -153,8 +154,8 @@ async function openWorkspace(dirPath: string): Promise<WorkspaceSnapshot> {
   activeWorkspaceRoot = dirPath;
 
   const tree = await buildDirectoryTree(dirPath);
-  const files = await collectMarkdownFiles(tree);
-  const activeFilePath = files[0] ?? null;
+  searchableFilesCache = await collectMarkdownFiles(tree);
+  const activeFilePath = searchableFilesCache[0] ?? null;
   const activeFile = activeFilePath ? await readMarkdownFile(activeFilePath, true) : null;
 
   if (activeWatcher) {
@@ -175,6 +176,7 @@ async function openWorkspace(dirPath: string): Promise<WorkspaceSnapshot> {
     }
 
     const nextTree = await buildDirectoryTree(dirPath);
+    searchableFilesCache = await collectMarkdownFiles(nextTree);
     mainWindow.webContents.send("workspace:changed", {
       rootPath: dirPath,
       tree: nextTree,
@@ -194,18 +196,20 @@ async function searchWorkspace(query: string): Promise<SearchResult[]> {
     return [];
   }
 
-  const tree = await buildDirectoryTree(activeWorkspaceRoot);
-  const files = await collectMarkdownFiles(tree);
   const needle = query.toLowerCase();
   const results: SearchResult[] = [];
 
-  for (const filePath of files) {
+  for (const filePath of searchableFilesCache) {
+    if (results.length >= 50) {
+      break;
+    }
+
     const content = await fs.readFile(filePath, "utf8");
     const lines = content.split(/\r?\n/);
 
-    lines.forEach((lineContent, index) => {
+    for (const [index, lineContent] of lines.entries()) {
       if (!lineContent.toLowerCase().includes(needle)) {
-        return;
+        continue;
       }
 
       results.push({
@@ -214,10 +218,14 @@ async function searchWorkspace(query: string): Promise<SearchResult[]> {
         line: index + 1,
         snippet: lineContent.trim().slice(0, 180)
       });
-    });
+
+      if (results.length >= 50) {
+        break;
+      }
+    }
   }
 
-  return results.slice(0, 50);
+  return results;
 }
 
 async function showOpenDialog(kind: "file" | "directory"): Promise<FileOpenResult | null> {
@@ -273,7 +281,7 @@ async function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
-      sandbox: false
+      sandbox: true
     }
   });
 
@@ -285,7 +293,16 @@ async function createWindow() {
     console.error("Preload failed:", preloadPath, error);
   });
 
-  await loadRenderer(mainWindow);
+  try {
+    await loadRenderer(mainWindow);
+  } catch (error) {
+    console.error("Renderer bootstrap failed:", error);
+    await mainWindow.loadURL(
+      `data:text/html,${encodeURIComponent(
+        "<!doctype html><meta charset='utf-8'><style>body{font-family:system-ui;padding:24px;line-height:1.5}</style><h1>Typist could not start the renderer.</h1><p>Check the dev server logs and restart <code>pnpm dev:desktop</code>.</p>"
+      )}`
+    );
+  }
 
   const menu = Menu.buildFromTemplate([
     {
@@ -391,7 +408,9 @@ ipcMain.handle("settings:get", async () => loadSettings());
 
 ipcMain.handle("settings:update", async (_event, patch: Partial<AppSettings>) => updateSettings(patch));
 
-app.whenReady().then(createWindow);
+app.whenReady().then(createWindow).catch((error) => {
+  console.error("Failed to create initial window:", error);
+});
 
 app.on("window-all-closed", async () => {
   if (activeWatcher) {
@@ -405,6 +424,10 @@ app.on("window-all-closed", async () => {
 
 app.on("activate", async () => {
   if (BrowserWindow.getAllWindows().length === 0) {
-    await createWindow();
+    try {
+      await createWindow();
+    } catch (error) {
+      console.error("Failed to recreate window on activate:", error);
+    }
   }
 });

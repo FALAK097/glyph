@@ -18,14 +18,13 @@
     "@tiptap/starter-kit": "^3.20.1",
     "chokidar": "^4.0.3",
     "electron": "^35.0.0",
-    "marked": "^17.0.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "turndown": "^7.2.2",
-    "turndown-plugin-gfm": "^1.0.2",
+    "tiptap-markdown": "^0.9.0",
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.2.1",
     "@types/node": "^22.13.10",
     "@types/react": "^19.0.11",
     "@types/react-dom": "^19.0.4",
@@ -34,6 +33,7 @@
     "eslint": "^9.21.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
+    "tailwindcss": "^4.2.1",
     "typescript": "^5.8.2",
     "vite": "^6.2.0",
     "wait-on": "^8.0.3"

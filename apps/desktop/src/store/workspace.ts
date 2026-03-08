@@ -17,6 +17,7 @@ type WorkspaceState = {
   }) => void;
   setTree: (tree: DirectoryNode[]) => void;
   setActiveFile: (file: FileDocument | null) => void;
+  updateActiveFile: (file: FileDocument) => void;
   updateDraftContent: (content: string) => void;
   markSaved: (file: FileDocument) => void;
   setSaving: (isSaving: boolean) => void;
@@ -50,15 +51,18 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       isDirty: false,
       lastSavedAt: activeFile ? Date.now() : null
     }),
+  updateActiveFile: (activeFile) => set({ activeFile }),
   updateDraftContent: (draftContent) => set({ draftContent, isDirty: true }),
   markSaved: (activeFile) =>
-    set({
+    set((state) => ({
       activeFile,
-      draftContent: activeFile.content,
+      // Only update draft content if it's not currently dirty.
+      // This prevents the editor from resetting the cursor if the user is typing while it saves.
+      draftContent: state.isDirty ? state.draftContent : activeFile.content,
       isDirty: false,
       isSaving: false,
       lastSavedAt: Date.now()
-    }),
+    })),
   setSaving: (isSaving) => set({ isSaving }),
   setError: (error) => set({ error })
 }));

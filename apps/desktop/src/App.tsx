@@ -5,7 +5,7 @@ import { SettingsPanel } from "./components/SettingsPanel";
 import { Sidebar } from "./components/Sidebar";
 import type { AppSettings, DirectoryNode, SearchResult, ThemeMode } from "./shared/workspace";
 import { useWorkspaceStore } from "./store/workspace";
-import { applyTheme, themes } from "./theme/themes";
+import { applyTheme } from "./theme/themes";
 
 type PaletteItem = {
   id: string;
@@ -14,7 +14,7 @@ type PaletteItem = {
   hint?: string;
   shortcut?: string;
   section: string;
-  kind: "command" | "file" | "theme";
+  kind: "command" | "file";
   onSelect: () => void;
   onPreview?: () => void;
 };
@@ -108,6 +108,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
     setWorkspace,
     setTree,
     setActiveFile,
+    updateActiveFile,
     updateDraftContent,
     markSaved,
     setSaving,
@@ -117,10 +118,10 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [paletteQuery, setPaletteQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [previewTheme, setPreviewTheme] = useState<string | null>(null);
   const [isWorkspaceMode, setIsWorkspaceMode] = useState(true);
   const deferredPaletteQuery = useDeferredValue(paletteQuery);
 
@@ -130,26 +131,58 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
     return text ? text.split(/\s+/).length : 0;
   }, [draftContent]);
   const readingTime = Math.max(1, Math.round(wordCount / 200));
-  const activeTheme = useMemo(
-    () => themes.find((theme) => theme.id === (previewTheme ?? settings?.themeId)) ?? themes[0],
-    [previewTheme, settings?.themeId]
-  );
 
   useEffect(() => {
     const boot = async () => {
       const nextSettings = await typist.getSettings();
       setSettings(nextSettings);
-      applyTheme(nextSettings.themeId, nextSettings.themeMode);
+      applyTheme(nextSettings.themeMode);
 
-      const workspace = await typist.openDefaultWorkspace();
-      if (workspace) {
-        setWorkspace(workspace);
-        setIsWorkspaceMode(true);
+      const target = await typist.getPendingExternalPath();
+      if (target) {
+        if (target.isDirectory) {
+          const workspace = await typist.openFolder(target.path);
+          if (workspace) {
+            setWorkspace(workspace);
+            setIsWorkspaceMode(true);
+          }
+        } else {
+          // It's a file, open default workspace then load this file
+          const workspace = await typist.openDefaultWorkspace();
+          if (workspace) {
+            setWorkspace(workspace);
+          }
+          const file = await typist.readFile(target.path);
+          setActiveFile(file);
+          setIsWorkspaceMode(false);
+        }
+      } else {
+        const workspace = await typist.openDefaultWorkspace();
+        if (workspace) {
+          setWorkspace(workspace);
+          setIsWorkspaceMode(true);
+        }
       }
     };
 
     void boot();
-  }, [setWorkspace, typist]);
+  }, [setWorkspace, setActiveFile, typist]);
+
+  useEffect(() => {
+    return typist.onExternalFile(async (target) => {
+      if (target.isDirectory) {
+        const workspace = await typist.openFolder(target.path);
+        if (workspace) {
+          setWorkspace(workspace);
+          setIsWorkspaceMode(true);
+        }
+      } else {
+        const file = await typist.readFile(target.path);
+        setActiveFile(file);
+        setIsWorkspaceMode(false);
+      }
+    });
+  }, [setActiveFile, setWorkspace, typist]);
 
   useEffect(() => {
     return typist.onWorkspaceChanged(async ({ tree: nextTree, changedPath }) => {
@@ -157,10 +190,10 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
 
       if (changedPath === activeFile?.path && !isDirty) {
         const refreshedFile = await typist.readFile(changedPath);
-        setActiveFile(refreshedFile);
+        updateActiveFile(refreshedFile);
       }
     });
-  }, [activeFile?.path, isDirty, setActiveFile, setTree, typist]);
+  }, [activeFile?.path, isDirty, updateActiveFile, setTree, typist]);
 
   useEffect(() => {
     if (!activeFile || !isDirty || isSaving) {
@@ -170,7 +203,22 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
     const timer = window.setTimeout(async () => {
       setSaving(true);
       try {
-        const savedFile = await typist.saveFile(activeFile.path, draftContent);
+        let currentPath = activeFile.path;
+        let finalFile = activeFile;
+        const isUntitled = activeFile.name.startsWith("Untitled-");
+        
+        if (isUntitled && draftContent.trim().length > 0) {
+          const firstLine = draftContent.split(/\r?\n/)[0]?.replace(/^#+\s*/, "").trim() || "Untitled";
+          const safeName = firstLine.replace(/[^a-zA-Z0-9-_\s]/g, "").trim().substring(0, 50);
+          if (safeName && safeName !== "Untitled") {
+            const newName = `${safeName}.md`;
+            finalFile = await typist.renameFile(currentPath, newName);
+            currentPath = finalFile.path;
+            updateActiveFile(finalFile);
+          }
+        }
+
+        const savedFile = await typist.saveFile(currentPath, draftContent);
         markSaved(savedFile);
       } catch (saveError) {
         setSaving(false);
@@ -179,7 +227,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
     }, 800);
 
     return () => window.clearTimeout(timer);
-  }, [activeFile?.path, draftContent, isDirty, isSaving, markSaved, setError, setSaving, typist]);
+  }, [activeFile?.path, draftContent, isDirty, isSaving, markSaved, setError, setSaving, setActiveFile, typist]);
 
   useEffect(() => {
     if (!isPaletteOpen) {
@@ -207,13 +255,8 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
       return;
     }
 
-    if (previewTheme) {
-      applyTheme(previewTheme, settings.themeMode);
-      return;
-    }
-
-    applyTheme(settings.themeId, settings.themeMode);
-  }, [previewTheme, settings]);
+    applyTheme(settings.themeMode);
+  }, [settings]);
 
   const saveSettings = useCallback(async (patch: Partial<AppSettings>) => {
     const next = await typist.updateSettings(patch);
@@ -237,7 +280,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
       return;
     }
 
-    const file = await typist.createFile(baseDir, `note-${Date.now()}.md`);
+    const file = await typist.createFile(baseDir, `Untitled-${Date.now()}.md`);
     setActiveFile(file);
     setIsWorkspaceMode(true);
     const nextSettings = await typist.getSettings();
@@ -256,104 +299,166 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
     await openFile(files[nextIndex].path);
   }, [currentFileIndex, files, openFile]);
 
-  const cycleTheme = useCallback(async () => {
-    if (!settings) {
+  const handleDeleteFile = useCallback(async (filePath: string) => {
+    if (!confirm("Are you sure you want to delete this note? This action cannot be undone.")) {
       return;
     }
 
-    const currentIndex = themes.findIndex((theme) => theme.id === settings.themeId);
-    const nextTheme = themes[(currentIndex + 1 + themes.length) % themes.length];
-    await saveSettings({ themeId: nextTheme.id });
-  }, [saveSettings, settings]);
+    try {
+      await typist.deleteFile(filePath);
+      
+      // If we deleted the active file, clear it
+      if (activeFile?.path === filePath) {
+        setActiveFile(null);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete file");
+    }
+  }, [activeFile?.path, setActiveFile, setError, typist]);
+
+  const handleRenameFile = useCallback(async (filePath: string, newName: string) => {
+    if (!newName.trim()) {
+      return;
+    }
+
+    try {
+      const renamedFile = await typist.renameFile(filePath, newName);
+      if (activeFile?.path === filePath) {
+        setActiveFile(renamedFile);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to rename file");
+    }
+  }, [activeFile?.path, setActiveFile, setError, typist]);
 
   const paletteItems = useMemo<PaletteItem[]>(() => {
     const query = paletteQuery.trim().toLowerCase();
     const items: PaletteItem[] = [];
 
-    if (!query) {
-      items.push(
-        {
-          id: "new-note",
-          title: "New note",
-          subtitle: "Create a fresh markdown note in your workspace",
-          hint: "Action",
-          shortcut: "Cmd N",
-          section: "Actions",
-          kind: "command",
-          onSelect: () => void createNote()
-        },
-        {
-          id: "previous-note",
-          title: "Previous note",
-          subtitle: "Jump to the note just before the current one",
-          hint: "Navigate",
-          shortcut: "Ctrl Shift [",
-          section: "Actions",
-          kind: "command",
-          onSelect: () => void moveNote(-1)
-        },
-        {
-          id: "next-note",
-          title: "Next note",
-          subtitle: "Move forward through notes in the workspace",
-          hint: "Navigate",
-          shortcut: "Ctrl Shift ]",
-          section: "Actions",
-          kind: "command",
-          onSelect: () => void moveNote(1)
-        },
-        {
-          id: "settings",
-          title: "Settings",
-          subtitle: "Adjust workspace defaults and visual themes",
-          hint: "Panel",
-          shortcut: "Cmd ,",
-          section: "Actions",
-          kind: "command",
-          onSelect: () => {
-            setIsSettingsOpen(true);
-            setIsPaletteOpen(false);
-          }
-        }
-      );
-    }
-
-    if (query.includes("theme") || query.includes("aura") || query.includes("night") || query.includes("ayu") || query.includes("forest")) {
-      items.push({
-        id: "cycle-theme",
-        title: "Cycle theme",
-        subtitle: "Move to the next theme family",
-        hint: "Theme",
-        shortcut: "Shift T",
-        section: "Themes",
+    const baseCommands: PaletteItem[] = [
+      {
+        id: "new-note",
+        title: "New note",
+        subtitle: "Create a fresh markdown note",
+        shortcut: "⇧⌘S",
+        section: "Actions",
         kind: "command",
-        onSelect: () => void cycleTheme()
-      });
-
-      themes.forEach((theme) => {
-        const modeLabel = settings?.themeMode ?? "light";
-        items.push({
-          id: `theme-${theme.id}`,
-          title: `Use theme: ${theme.name}`,
-          subtitle: `${modeLabel}:${theme.id}`,
-          hint: "Preview",
-          section: "Themes",
-          kind: "theme",
-          onPreview: () => setPreviewTheme(theme.id),
-          onSelect: async () => {
-            setPreviewTheme(null);
-            await saveSettings({ themeId: theme.id });
-            setIsPaletteOpen(false);
+        onSelect: () => void createNote()
+      },
+      {
+        id: "open-file",
+        title: "Open File",
+        subtitle: "Open an existing markdown file",
+        shortcut: "⌘O",
+        section: "Actions",
+        kind: "command",
+        onSelect: async () => {
+          const file = await typist.openDocument();
+          if (file) {
+            setActiveFile(file);
+            setIsWorkspaceMode(false);
           }
-        });
+          setIsPaletteOpen(false);
+        }
+      },
+      {
+        id: "open-folder",
+        title: "Open Folder",
+        subtitle: "Open a folder as a workspace",
+        section: "Actions",
+        kind: "command",
+        onSelect: async () => {
+          const workspace = await typist.openFolder();
+          if (workspace) {
+            setWorkspace(workspace);
+            setIsWorkspaceMode(true);
+          }
+          setIsPaletteOpen(false);
+        }
+      },
+      {
+        id: "previous-note",
+        title: "Previous note",
+        subtitle: "Jump to previous note",
+        shortcut: "⌥↑",
+        section: "Actions",
+        kind: "command",
+        onSelect: () => { void moveNote(-1); setIsPaletteOpen(false); }
+      },
+      {
+        id: "next-note",
+        title: "Next note",
+        subtitle: "Jump to next note",
+        shortcut: "⌥↓",
+        section: "Actions",
+        kind: "command",
+        onSelect: () => { void moveNote(1); setIsPaletteOpen(false); }
+      },
+      {
+        id: "settings",
+        title: "Settings",
+        subtitle: "Adjust workspace defaults",
+        shortcut: "⌘,",
+        section: "Actions",
+        kind: "command",
+        onSelect: () => {
+          setIsSettingsOpen(true);
+          setIsPaletteOpen(false);
+        }
+      },
+      {
+        id: "theme-light",
+        title: "Theme: Light",
+        subtitle: "Switch to light mode",
+        section: "Theme",
+        kind: "command",
+        onSelect: () => {
+          void saveSettings({ themeMode: "light" });
+          setIsPaletteOpen(false);
+        }
+      },
+      {
+        id: "theme-dark",
+        title: "Theme: Dark",
+        subtitle: "Switch to dark mode",
+        section: "Theme",
+        kind: "command",
+        onSelect: () => {
+          void saveSettings({ themeMode: "dark" });
+          setIsPaletteOpen(false);
+        }
+      },
+      {
+        id: "theme-system",
+        title: "Theme: System",
+        subtitle: "Sync theme with system",
+        section: "Theme",
+        kind: "command",
+        onSelect: () => {
+          void saveSettings({ themeMode: "system" });
+          setIsPaletteOpen(false);
+        }
+      }
+    ];
+
+    if (!query) {
+      items.push(...baseCommands);
+    } else {
+      const isThemeQuery = query.startsWith("theme");
+      const filterQuery = isThemeQuery ? query.replace(/^theme\s*/, "").trim() : query;
+
+      const matchedCommands = baseCommands.filter((cmd) => {
+        if (isThemeQuery && cmd.section !== "Theme") return false;
+        return cmd.title.toLowerCase().includes(filterQuery) || 
+               (cmd.subtitle && cmd.subtitle.toLowerCase().includes(filterQuery));
       });
+      items.push(...matchedCommands);
     }
 
     const matchingFiles = files.filter((file) => {
       if (!query) {
         return false;
       }
-
       return `${file.name} ${file.relativePath}`.toLowerCase().includes(query);
     });
 
@@ -382,50 +487,112 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
     });
 
     return items;
-  }, [createNote, cycleTheme, files, moveNote, openFile, paletteQuery, saveSettings, searchResults, settings]);
+  }, [createNote, files, moveNote, openFile, paletteQuery, saveSettings, searchResults, setActiveFile, setIsWorkspaceMode, setWorkspace]);
 
   useEffect(() => {
     if (!isPaletteOpen) {
-      setPreviewTheme(null);
       setPaletteQuery("");
       setSelectedIndex(0);
       return;
     }
 
     setSelectedIndex(0);
-  }, [isPaletteOpen]);
+  }, [isPaletteOpen, paletteQuery]);
 
-  useEffect(() => {
-    const candidate = paletteItems[selectedIndex];
-    candidate?.onPreview?.();
-  }, [paletteItems, selectedIndex]);
+  const parseShortcut = (keys: string): { meta: boolean; alt: boolean; shift: boolean; key: string } | null => {
+    const parts = keys.trim().split(/\s+/);
+    if (parts.length === 0) return null;
+    
+    const key = parts[parts.length - 1].toLowerCase();
+    return {
+      meta: keys.includes("⌘"),
+      alt: keys.includes("⌥"),
+      shift: keys.includes("⇧"),
+      key
+    };
+  };
+
+  const matchShortcut = (event: KeyboardEvent, shortcut: string): boolean => {
+    const parsed = parseShortcut(shortcut);
+    if (!parsed) return false;
+    
+    const eventKey = event.key.toLowerCase();
+    const keyMatch = parsed.key === eventKey || 
+      (parsed.key === " " && event.key === " ") ||
+      (parsed.key === "p" && eventKey === "p") ||
+      (parsed.key === "s" && eventKey === "s") ||
+      (parsed.key === "o" && eventKey === "o");
+    
+    const modifierMatch = 
+      (!!event.metaKey || !!event.ctrlKey) === parsed.meta &&
+      !!event.altKey === parsed.alt &&
+      !!event.shiftKey === parsed.shift;
+    
+    return keyMatch && modifierMatch;
+  };
 
   useEffect(() => {
     const onKeyDown = async (event: KeyboardEvent) => {
-      const modifier = event.metaKey || event.ctrlKey;
+      if (!settings?.shortcuts) return;
 
       if (event.key === "Escape") {
         setIsPaletteOpen(false);
         setIsSettingsOpen(false);
-        setPreviewTheme(null);
         return;
       }
 
-      if (modifier && event.key.toLowerCase() === "p") {
+      const shortcut = settings.shortcuts.find(s => matchShortcut(event, s.keys));
+      
+      if (shortcut) {
         event.preventDefault();
-        setIsPaletteOpen((value) => !value);
-        return;
-      }
-
-      if (modifier && event.key === ",") {
-        event.preventDefault();
-        setIsSettingsOpen((value) => !value);
-        return;
-      }
-
-      if (event.shiftKey && !modifier && event.key.toLowerCase() === "t") {
-        event.preventDefault();
-        void cycleTheme();
+        
+        switch (shortcut.id) {
+          case "command-palette":
+            setIsPaletteOpen((value) => !value);
+            break;
+          case "settings":
+            setIsSettingsOpen((value) => !value);
+            break;
+          case "new-note":
+            void createNote();
+            break;
+          case "open-file": {
+            const file = await typist.openDocument();
+            if (file) {
+              setActiveFile(file);
+              setIsWorkspaceMode(false);
+            }
+            break;
+          }
+          case "open-folder": {
+            const workspace = await typist.openFolder();
+            if (workspace) {
+              setWorkspace(workspace);
+              setIsWorkspaceMode(true);
+            }
+            break;
+          }
+          case "save":
+            if (activeFile) {
+              setSaving(true);
+              try {
+                const savedFile = await typist.saveFile(activeFile.path, draftContent);
+                markSaved(savedFile);
+              } catch (saveError) {
+                console.error("Manual save failed:", saveError);
+                setError(getErrorMessage(saveError));
+              } finally {
+                setSaving(false);
+              }
+            }
+            break;
+          case "previous-note":
+            void moveNote(-1);
+            break;
+          case "next-note":
+            void moveNote(1);
+            break;
+        }
         return;
       }
 
@@ -440,25 +607,11 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
         void moveNote(1);
         return;
       }
-
-      if (modifier && event.key.toLowerCase() === "s" && activeFile) {
-        event.preventDefault();
-        setSaving(true);
-        try {
-          const savedFile = await typist.saveFile(activeFile.path, draftContent);
-          markSaved(savedFile);
-        } catch (saveError) {
-          console.error("Manual save failed:", saveError);
-          setError(getErrorMessage(saveError));
-        } finally {
-          setSaving(false);
-        }
-      }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeFile, draftContent, markSaved, setError, setSaving, typist]);
+  }, [settings, activeFile, draftContent, markSaved, setError, setSaving, typist, createNote, moveNote, setActiveFile, setWorkspace]);
 
   useEffect(() => {
     return typist.onCommand(async (command) => {
@@ -520,24 +673,40 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
         tree={tree}
         activePath={activeFile?.path ?? null}
         recentFiles={settings?.recentFiles ?? []}
-        activeThemeName={activeTheme.name}
         noteCount={files.length}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         onOpenFile={(filePath) => void openFile(filePath)}
         onCreateNote={() => void createNote()}
         onOpenPalette={() => setIsPaletteOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onDeleteFile={handleDeleteFile}
+        onRenameFile={handleRenameFile}
       />
-      <main className="workspace-shell single-pane">
+      <main className={`workspace-shell single-pane relative transition-all duration-200 ${isSidebarCollapsed ? 'ml-0' : ''}`}>
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 z-10 w-full max-w-md px-4 mb-6">
+          <button 
+            className="flex items-center justify-between w-full px-3 py-1.5 bg-transparent border border-border rounded-md text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors shadow-sm"
+            onClick={() => setIsPaletteOpen(true)}
+          >
+            <div className="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-70"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <span className="text-base">Search typist</span>
+            </div>
+            <span className="font-mono text-xs opacity-60">⌘P</span>
+          </button>
+        </div>
         {error ? <div className="error-banner">{error}</div> : null}
         <MarkdownEditor
           content={draftContent}
           fileName={activeFile?.name ?? null}
           filePath={activeFile?.path ?? null}
           saveStateLabel={saveStateLabel}
-          themeName={activeTheme.name}
           wordCount={wordCount}
           readingTime={readingTime}
           onChange={updateDraftContent}
+          onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          isSidebarCollapsed={isSidebarCollapsed}
         />
       </main>
       <CommandPalette
@@ -548,7 +717,6 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
         onChangeQuery={setPaletteQuery}
         onClose={() => {
           setIsPaletteOpen(false);
-          setPreviewTheme(null);
         }}
         onHoverItem={setSelectedIndex}
         onMove={(direction) => {
@@ -580,8 +748,8 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
         onChangeMode={async (mode: ThemeMode) => {
           await saveSettings({ themeMode: mode });
         }}
-        onChangeTheme={async (themeId) => {
-          await saveSettings({ themeId });
+        onChangeShortcuts={async (shortcuts) => {
+          await saveSettings({ shortcuts });
         }}
       />
     </div>

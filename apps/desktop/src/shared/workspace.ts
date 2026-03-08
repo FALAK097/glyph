@@ -43,13 +43,24 @@ export type SearchResult = {
   snippet: string;
 };
 
-export type ThemeMode = "light" | "dark";
+export type ThemeMode = "light" | "dark" | "system";
+
+export type ShortcutSetting = {
+  id: string;
+  keys: string;
+};
 
 export type AppSettings = {
   defaultWorkspacePath: string;
   themeId: string;
   themeMode: ThemeMode;
   recentFiles: string[];
+  shortcuts: ShortcutSetting[];
 };
 
 export type AppCommand = "open-file" | "open-folder" | "save" | "new-file" | "new-folder" | "search" | "quick-open";
+
+export type ExternalFileTarget = {
+  path: string;
+  isDirectory: boolean;
+};

@@ -22,6 +22,7 @@ let activeWatcher: ReturnType<typeof watch> | null = null;
 let activeWorkspaceRoot: string | null = null;
 let searchableFilesCache: string[] = [];
 let settingsUpdatePromise: Promise<AppSettings> | null = null;
+let pendingExternalPath: string | null = null;
 
 function isMarkdownFile(fileName: string) {
   return fileName.endsWith(".md") || fileName.endsWith(".markdown");
@@ -35,17 +36,29 @@ function getDefaultWorkspacePath() {
   return path.join(app.getPath("documents"), "Typist");
 }
 
+const DEFAULT_SHORTCUTS = [
+  { id: "command-palette", keys: "⌘ P" },
+  { id: "new-note", keys: "⇧ ⌘ S" },
+  { id: "open-file", keys: "⌘ O" },
+  { id: "open-folder", keys: "⇧ ⌘ O" },
+  { id: "save", keys: "⌘ S" },
+  { id: "settings", keys: "⌘ ," },
+  { id: "previous-note", keys: "⌥ ↑" },
+  { id: "next-note", keys: "⌥ ↓" },
+];
+
 function getDefaultSettings(): AppSettings {
   return {
     defaultWorkspacePath: getDefaultWorkspacePath(),
     themeId: "aura",
     themeMode: "light",
-    recentFiles: []
+    recentFiles: [],
+    shortcuts: DEFAULT_SHORTCUTS
   };
 }
 
 function isThemeMode(value: unknown): value is AppSettings["themeMode"] {
-  return value === "light" || value === "dark";
+  return value === "light" || value === "dark" || value === "system";
 }
 
 function sanitizeSettings(input: unknown): AppSettings {
@@ -64,7 +77,8 @@ function sanitizeSettings(input: unknown): AppSettings {
         : defaults.defaultWorkspacePath,
     themeId: typeof candidate.themeId === "string" && candidate.themeId.trim().length > 0 ? candidate.themeId : defaults.themeId,
     themeMode: isThemeMode(candidate.themeMode) ? candidate.themeMode : defaults.themeMode,
-    recentFiles: Array.isArray(candidate.recentFiles) ? candidate.recentFiles.filter((entry): entry is string => typeof entry === "string") : defaults.recentFiles
+    recentFiles: Array.isArray(candidate.recentFiles) ? candidate.recentFiles.filter((entry): entry is string => typeof entry === "string") : defaults.recentFiles,
+    shortcuts: Array.isArray(candidate.shortcuts) ? candidate.shortcuts.filter((s): s is { id: string; keys: string } => typeof s?.id === "string" && typeof s?.keys === "string") : defaults.shortcuts
   };
 }
 
@@ -108,8 +122,16 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
     nextPatch.recentFiles = candidate.recentFiles;
   }
 
+  if ("shortcuts" in candidate) {
+    if (!Array.isArray(candidate.shortcuts) || candidate.shortcuts.some((s) => typeof s?.id !== "string" || typeof s?.keys !== "string")) {
+      throw new Error("shortcuts must be an array of { id: string, keys: string }.");
+    }
+
+    nextPatch.shortcuts = candidate.shortcuts;
+  }
+
   const invalidKeys = Object.keys(candidate).filter(
-    (key) => !["defaultWorkspacePath", "themeId", "themeMode", "recentFiles"].includes(key)
+    (key) => !["defaultWorkspacePath", "themeId", "themeMode", "recentFiles", "shortcuts"].includes(key)
   );
 
   if (invalidKeys.length > 0) {
@@ -459,6 +481,19 @@ ipcMain.handle("workspace:createFile", async (_event, parentDir: string, fileNam
   return readMarkdownFile(targetPath, true);
 });
 
+ipcMain.handle("workspace:renameFile", async (_event, oldPath: string, newName: string) => {
+  const hasMarkdownExt = newName.endsWith(".md") || newName.endsWith(".markdown");
+  const normalizedFileName = hasMarkdownExt ? newName : `${newName}.md`;
+  const newPath = path.join(path.dirname(oldPath), normalizedFileName);
+  await fs.rename(oldPath, newPath);
+  return readMarkdownFile(newPath, true);
+});
+
+ipcMain.handle("workspace:deleteFile", async (_event, targetPath: string) => {
+  await fs.unlink(targetPath);
+  return targetPath;
+});
+
 ipcMain.handle("workspace:createFolder", async (_event, parentDir: string, folderName: string) => {
   await fs.mkdir(path.join(parentDir, folderName), { recursive: false });
 
@@ -488,7 +523,48 @@ ipcMain.handle("settings:update", async (_event, patch: unknown) => {
   return updateSettings(sanitizedPatch);
 });
 
-app.whenReady().then(createWindow).catch((error) => {
+async function getExternalPathTarget(targetPath: string) {
+  try {
+    const stat = await fs.stat(targetPath);
+    return { path: targetPath, isDirectory: stat.isDirectory() };
+  } catch (err) {
+    return null;
+  }
+}
+
+ipcMain.handle("app:getPendingExternalPath", async () => {
+  if (!pendingExternalPath) return null;
+  const target = pendingExternalPath;
+  pendingExternalPath = null;
+  return getExternalPathTarget(target);
+});
+
+app.on("open-file", async (event, filePath) => {
+  event.preventDefault();
+  
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+    const target = await getExternalPathTarget(filePath);
+    if (target) {
+      mainWindow.webContents.send("app:open-external", target);
+    }
+  } else {
+    pendingExternalPath = filePath;
+  }
+});
+
+app.whenReady().then(async () => {
+  if (process.platform !== "darwin") {
+    const args = process.argv.slice(1);
+    const target = args.find((arg) => arg !== "." && !arg.startsWith("-") && !arg.includes("node_modules"));
+    if (target) {
+      pendingExternalPath = path.resolve(target);
+    }
+  }
+
+  await createWindow();
+}).catch((error) => {
   console.error("Failed to create initial window:", error);
 });
 

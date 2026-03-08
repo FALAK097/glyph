@@ -7,7 +7,8 @@ import type {
   FileOpenResult,
   SearchResult,
   WorkspaceChangeEvent,
-  WorkspaceSnapshot
+  WorkspaceSnapshot,
+  ExternalFileTarget
 } from "../src/shared/workspace.js";
 
 async function invokeWithRetry<T>(channel: string, ...args: unknown[]) {
@@ -50,6 +51,12 @@ const api = {
   createFile(parentDir: string, fileName: string) {
     return invokeWithRetry<FileDocument>("workspace:createFile", parentDir, fileName);
   },
+  renameFile(oldPath: string, newName: string) {
+    return invokeWithRetry<FileDocument>("workspace:renameFile", oldPath, newName);
+  },
+  deleteFile(targetPath: string) {
+    return invokeWithRetry<string>("workspace:deleteFile", targetPath);
+  },
   createFolder(parentDir: string, folderName: string) {
     return invokeWithRetry<WorkspaceSnapshot["tree"]>("workspace:createFolder", parentDir, folderName);
   },
@@ -82,6 +89,20 @@ const api = {
 
     return () => {
       ipcRenderer.removeListener("app:command", wrapped);
+    };
+  },
+  getPendingExternalPath() {
+    return invokeWithRetry<ExternalFileTarget | null>("app:getPendingExternalPath");
+  },
+  onExternalFile(listener: (target: ExternalFileTarget) => void) {
+    const wrapped = (_event: Electron.IpcRendererEvent, target: ExternalFileTarget) => {
+      listener(target);
+    };
+
+    ipcRenderer.on("app:open-external", wrapped);
+
+    return () => {
+      ipcRenderer.removeListener("app:open-external", wrapped);
     };
   }
 };

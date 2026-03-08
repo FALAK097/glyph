@@ -7,7 +7,7 @@ type CommandPaletteItem = {
   hint?: string;
   shortcut?: string;
   section: string;
-  kind: "command" | "file" | "theme";
+  kind: "command" | "file";
   onSelect: () => void;
   onPreview?: () => void;
 };
@@ -26,8 +26,7 @@ type CommandPaletteProps = {
 
 const paletteIcons: Record<CommandPaletteItem["kind"], string> = {
   command: "⌘",
-  file: "#",
-  theme: "◐"
+  file: "#"
 };
 
 export function CommandPalette({
@@ -89,27 +88,18 @@ export function CommandPalette({
   return (
     <section className="modal-shell" role="presentation" onMouseDown={onClose}>
       <div
-        className="modal-card palette-card"
+        className="modal-card palette-card max-w-xl mx-auto mt-[10vh] bg-background border border-border rounded-xl shadow-xl overflow-hidden flex flex-col"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="command-palette-title"
         onMouseDown={(event) => event.stopPropagation()}
+        style={{ padding: 0 }}
       >
-        <div className="palette-header">
-          <div>
-            <p className="panel-label">Command Palette</p>
-            <h2 id="command-palette-title">Move fast without losing context</h2>
-          </div>
-          <button className="icon-button" type="button" aria-label="Close command palette" onClick={onClose}>
-            Esc
-          </button>
-        </div>
-        <div className="palette-input-row">
+        <div className="flex items-center px-4 py-3 border-b border-border bg-muted/30">
           <input
             ref={inputRef}
-            className="palette-input"
+            className="w-full bg-transparent border-none outline-none text-base text-foreground placeholder:text-muted-foreground"
             aria-label="Search files, commands, and themes"
-            placeholder="Search files, commands, themes, and text"
+            placeholder="Search files, commands, and themes..."
             value={query}
             onChange={(event) => onChangeQuery(event.target.value)}
             onKeyDown={(event) => {
@@ -134,59 +124,49 @@ export function CommandPalette({
               }
             }}
           />
-          <div className="palette-shortcut-cluster" aria-hidden="true">
-            <span className="shortcut-key">↑</span>
-            <span className="shortcut-key">↓</span>
-            <span className="shortcut-key">↵</span>
-          </div>
         </div>
-        <div className="palette-list" role="listbox" aria-label="Command palette results">
-          {sections.length === 0 ? (
-            <div className="palette-empty">
-              <p>No results yet</p>
-              <span>Try a file name, "theme", or a word inside your notes.</span>
+        <div className="palette-list p-2 max-h-[350px] overflow-y-auto" role="listbox" aria-label="Command palette results">
+          {items.length === 0 ? (
+            <div className="palette-empty py-8 text-center text-sm text-muted-foreground">
+              <p>No results found.</p>
             </div>
           ) : (
-            sections.map((section) => (
-              <div key={section.title} className="palette-section">
-                <p className="palette-section-title">{section.title}</p>
-                {section.items.map(({ item, index }) => (
-                  <button
-                    key={item.id}
-                    ref={(element) => {
-                      itemRefs.current[index] = element;
-                    }}
-                    className={`palette-item ${selectedIndex === index ? "is-active" : ""}`}
-                    type="button"
-                    role="option"
-                    aria-selected={selectedIndex === index}
-                    onMouseEnter={() => {
-                      onHoverItem(index);
-                      item.onPreview?.();
-                    }}
-                    onClick={item.onSelect}
-                  >
-                    <div className="palette-item-leading">
-                      <span className={`palette-item-icon is-${item.kind}`}>{paletteIcons[item.kind]}</span>
-                      <div className="palette-item-copy">
-                        <span className="palette-item-title">{item.title}</span>
-                        {item.subtitle ? <small>{item.subtitle}</small> : null}
-                      </div>
-                    </div>
-                    <div className="palette-item-trailing">
-                      {item.hint ? <span className="palette-item-hint">{item.hint}</span> : null}
-                      {item.shortcut ? <span className="palette-item-shortcut">{item.shortcut}</span> : null}
-                    </div>
-                  </button>
-                ))}
-              </div>
+            items.map((item, index) => (
+              <button
+                key={item.id}
+                ref={(element) => {
+                  itemRefs.current[index] = element;
+                }}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                  selectedIndex === index ? "bg-accent text-accent-foreground" : "text-foreground hover:bg-muted"
+                }`}
+                type="button"
+                role="option"
+                aria-selected={selectedIndex === index}
+                onMouseEnter={() => {
+                  onHoverItem(index);
+                  item.onPreview?.();
+                }}
+                onClick={item.onSelect}
+              >
+                <div className="flex flex-col text-left">
+                  <span className="font-medium">{item.title}</span>
+                  {item.subtitle && (
+                    <span className={`text-xs mt-0.5 ${selectedIndex === index ? "text-accent-foreground opacity-80" : "text-muted-foreground"}`}>{item.subtitle}</span>
+                  )}
+                </div>
+                {item.shortcut ? (
+                  <div className="flex gap-1">
+                    {item.shortcut.split('').map((char, i) => (
+                      <kbd key={i} className="px-1.5 py-0.5 text-[10px] font-sans font-medium bg-background border border-border rounded text-muted-foreground shadow-sm">
+                        {char}
+                      </kbd>
+                    ))}
+                  </div>
+                ) : null}
+              </button>
             ))
           )}
-        </div>
-        <div className="palette-footer">
-          <span>Enter to open</span>
-          <span>Arrow keys to navigate</span>
-          <span>Esc to close</span>
         </div>
       </div>
     </section>

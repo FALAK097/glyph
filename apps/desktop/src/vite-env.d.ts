@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import type { AppCommand, AppSettings, FileDocument, FileOpenResult, SearchResult, WorkspaceChangeEvent, WorkspaceSnapshot } from "./shared/workspace";
+import type { AppCommand, AppSettings, FileDocument, FileOpenResult, SearchResult, WorkspaceChangeEvent, WorkspaceSnapshot, ExternalFileTarget } from "./shared/workspace";
 
 declare global {
   interface Window {
@@ -12,12 +12,16 @@ declare global {
       readFile: (filePath: string) => Promise<FileDocument>;
       saveFile: (filePath: string, content: string) => Promise<FileDocument>;
       createFile: (parentDir: string, fileName: string) => Promise<FileDocument>;
+      renameFile: (oldPath: string, newName: string) => Promise<FileDocument>;
+      deleteFile: (targetPath: string) => Promise<string>;
       createFolder: (parentDir: string, folderName: string) => Promise<WorkspaceSnapshot["tree"]>;
       searchWorkspace: (query: string) => Promise<SearchResult[]>;
       getSettings: () => Promise<AppSettings>;
       updateSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>;
       onWorkspaceChanged: (listener: (event: WorkspaceChangeEvent) => void) => () => void;
       onCommand: (listener: (command: AppCommand) => void) => () => void;
+      getPendingExternalPath: () => Promise<ExternalFileTarget | null>;
+      onExternalFile: (listener: (target: ExternalFileTarget) => void) => () => void;
     };
   }
 }

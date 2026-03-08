@@ -97,9 +97,9 @@ Shipped now:
 
 In progress:
 
-- stronger markdown fidelity and richer inline shortcuts
-- better file and folder creation UX
-- better OS-level open-with integration
+- [X] stronger markdown fidelity and richer inline shortcuts
+- [X] better file and folder creation UX
+- [X] better OS-level open-with integration
 
 Not started:
 
@@ -134,7 +134,7 @@ Not started:
 - [X] File switching
 - [X] Save file
 - [X] Watch external file changes
-- [ ] Finder / Explorer open-with integration
+- [X] Finder / Explorer open-with integration
 - [ ] Better empty and loading states
 
 ### Phase 2: Editor
@@ -143,12 +143,12 @@ Not started:
 - [X] TipTap-based editor surface
 - [X] Autosave
 - [X] New file flow
-- [ ] Better new note flow without prompt
+- [X] Better new note flow without prompt
 - [ ] New folder flow inside command palette
-- [ ] Stronger inline markdown shortcut behavior
+- [X] Stronger inline markdown shortcut behavior
 - [ ] Better insertion and selection behavior
 - [ ] Drag-and-drop image support
-- [ ] Rich keyboard formatting shortcuts
+- [X] Rich keyboard formatting shortcuts
 
 ### Phase 3: Power Features
 

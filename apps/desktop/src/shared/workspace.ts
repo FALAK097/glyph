@@ -43,4 +43,4 @@ export type SearchResult = {
   snippet: string;
 };
 
-export type AppCommand = "open-file" | "open-folder" | "save" | "new-file" | "new-folder" | "search";
+export type AppCommand = "open-file" | "open-folder" | "save" | "new-file" | "new-folder" | "search" | "quick-open";

@@ -1,10 +1,36 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { EditorPane } from "./components/EditorPane";
 import { MarkdownPreview } from "./components/MarkdownPreview";
+import { QuickOpenPanel } from "./components/QuickOpenPanel";
 import { SearchPanel } from "./components/SearchPanel";
 import { Sidebar } from "./components/Sidebar";
-import type { SearchResult } from "./shared/workspace";
+import type { DirectoryNode, SearchResult } from "./shared/workspace";
 import { useWorkspaceStore } from "./store/workspace";
+
+type QuickOpenItem = {
+  path: string;
+  name: string;
+  relativePath: string;
+};
+
+function flattenFiles(nodes: DirectoryNode[], rootPath: string | null): QuickOpenItem[] {
+  const items: QuickOpenItem[] = [];
+
+  for (const node of nodes) {
+    if (node.type === "file") {
+      items.push({
+        path: node.path,
+        name: node.name,
+        relativePath: rootPath ? node.path.replace(`${rootPath}/`, "") : node.name
+      });
+      continue;
+    }
+
+    items.push(...flattenFiles(node.children, rootPath));
+  }
+
+  return items;
+}
 
 export function App() {
   const typist = window.typist;
@@ -50,6 +76,24 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isQuickOpenOpen, setIsQuickOpenOpen] = useState(false);
+  const [quickOpenQuery, setQuickOpenQuery] = useState("");
+
+  const quickOpenItems = useMemo(() => {
+    const files = flattenFiles(tree, rootPath);
+    const needle = quickOpenQuery.trim().toLowerCase();
+
+    if (!needle) {
+      return files.slice(0, 30);
+    }
+
+    return files
+      .filter((item) => {
+        const candidate = `${item.name} ${item.relativePath}`.toLowerCase();
+        return candidate.includes(needle);
+      })
+      .slice(0, 30);
+  }, [quickOpenQuery, rootPath, tree]);
 
   useEffect(() => {
     return typist.onWorkspaceChanged(async ({ tree: nextTree, changedPath }) => {
@@ -129,6 +173,11 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
     return () => window.clearTimeout(timer);
   }, [activeFile?.path, draftContent, isDirty, isSaving]);
 
+  const closeTransientPanels = () => {
+    setIsSearchOpen(false);
+    setIsQuickOpenOpen(false);
+  };
+
   const handleOpenFolder = async () => {
     if (!confirmDiscardChanges()) {
       return;
@@ -138,9 +187,10 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
       const workspace = await typist.openFolder();
       if (workspace) {
         setWorkspace(workspace);
-        setIsSearchOpen(false);
         setSearchQuery("");
         setSearchResults([]);
+        setQuickOpenQuery("");
+        closeTransientPanels();
       }
     } catch (openError) {
       setError(openError instanceof Error ? openError.message : "Unable to open folder.");
@@ -160,7 +210,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
           tree: [],
           activeFile: file
         });
-        setIsSearchOpen(false);
+        closeTransientPanels();
       }
     } catch (openError) {
       setError(openError instanceof Error ? openError.message : "Unable to open file.");
@@ -179,6 +229,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
     try {
       const file = await typist.readFile(filePath);
       setActiveFile(file);
+      closeTransientPanels();
     } catch (openError) {
       setError(openError instanceof Error ? openError.message : "Unable to read file.");
     }
@@ -186,6 +237,10 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
 
   const handleOpenSearchResult = async (result: SearchResult) => {
     await handleFileOpen(result.path);
+  };
+
+  const handleOpenQuickItem = async (item: QuickOpenItem) => {
+    await handleFileOpen(item.path);
   };
 
   const resolveCurrentDirectory = () => {
@@ -273,7 +328,14 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
 
       if (event.key.toLowerCase() === "f" && event.shiftKey) {
         event.preventDefault();
+        setIsQuickOpenOpen(false);
         setIsSearchOpen(true);
+      }
+
+      if (event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        setIsSearchOpen(false);
+        setIsQuickOpenOpen(true);
       }
     };
 
@@ -309,7 +371,14 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
       }
 
       if (command === "search") {
+        setIsQuickOpenOpen(false);
         setIsSearchOpen(true);
+        return;
+      }
+
+      if (command === "quick-open") {
+        setIsSearchOpen(false);
+        setIsQuickOpenOpen(true);
       }
     });
   }, [activeFile, draftContent, isDirty, rootPath, typist]);
@@ -350,12 +419,21 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
             <p className="hero-eyebrow">Minimal Markdown Workspace</p>
             <h1>Typist</h1>
             <p className="hero-copy">
-              The desktop app now supports workspace browsing, markdown editing, live preview, autosave, and global
-              search while the richer inline editor is still in progress.
+              The desktop app now supports workspace browsing, quick open, markdown editing, live preview, autosave,
+              and global search while the richer inline editor is still in progress.
             </p>
           </div>
           <div className="hero-actions">
-            <button className="secondary-button" onClick={() => setIsSearchOpen(true)} type="button">
+            <button className="secondary-button" onClick={() => {
+              setIsSearchOpen(false);
+              setIsQuickOpenOpen(true);
+            }} type="button">
+              Quick Open
+            </button>
+            <button className="secondary-button" onClick={() => {
+              setIsQuickOpenOpen(false);
+              setIsSearchOpen(true);
+            }} type="button">
               Search
             </button>
             <button className="secondary-button" onClick={handleCreateFile} type="button">
@@ -373,6 +451,14 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
           </div>
         </header>
         {error ? <div className="error-banner">{error}</div> : null}
+        <QuickOpenPanel
+          query={quickOpenQuery}
+          items={quickOpenItems}
+          isOpen={isQuickOpenOpen}
+          onChangeQuery={setQuickOpenQuery}
+          onClose={() => setIsQuickOpenOpen(false)}
+          onOpenItem={handleOpenQuickItem}
+        />
         <SearchPanel
           query={searchQuery}
           results={searchResults}

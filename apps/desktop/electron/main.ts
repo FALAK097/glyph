@@ -113,6 +113,13 @@ async function createWindow() {
           click: () => {
             mainWindow?.webContents.send("app:command", "search" satisfies AppCommand);
           }
+        },
+        {
+          label: "Quick Open",
+          accelerator: "CmdOrCtrl+P",
+          click: () => {
+            mainWindow?.webContents.send("app:command", "quick-open" satisfies AppCommand);
+          }
         }
       ]
     },

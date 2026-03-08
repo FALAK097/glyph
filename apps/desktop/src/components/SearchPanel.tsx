@@ -35,7 +35,6 @@ export function SearchPanel({
         </button>
       </div>
       <input
-        autoFocus
         className="search-input"
         placeholder="Search markdown files..."
         value={query}

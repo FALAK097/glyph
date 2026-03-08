@@ -107,6 +107,7 @@ typist/
 - browse files in a sidebar
 - edit markdown source
 - live preview rendered markdown
+- quick open with `Cmd/Ctrl+P`
 - global workspace search with `Cmd/Ctrl+Shift+F`
 - autosave
 - create new files and folders

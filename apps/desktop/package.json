@@ -12,6 +12,8 @@
     "lint": "eslint . --ext ts,tsx"
   },
   "dependencies": {
+    "@toast-ui/editor": "^3.2.2",
+    "@toast-ui/react-editor": "^3.2.3",
     "chokidar": "^4.0.3",
     "electron": "^35.0.0",
     "react": "^19.0.0",

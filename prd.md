@@ -80,19 +80,19 @@ Shipped now:
 
 - desktop/web monorepo split
 - Electron desktop shell with preload IPC
+- default workspace rooted at `Documents/Typist`
 - desktop file open and folder open
-- recursive markdown sidebar
-- markdown preview
-- editable markdown source pane
+- recursive notes sidebar
+- recent files in sidebar
+- single-pane markdown-aware editor surface
 - save flow
 - autosave
 - file watching and safe refresh
-- unsaved-change protection
-- native menu commands
-- new file / new folder flows
-- basic markdown formatting toolbar
-- global workspace search with result snippets
-- quick open with `Cmd/Ctrl+P`
+- native command palette with `Cmd/Ctrl+P`
+- new note / previous note / next note commands
+- global search and file search through palette
+- theme switching and theme preview through palette
+- persisted settings for workspace path and theme mode
 - desktop dev startup hardened with renderer retry + preload failure fallback
 - standalone web landing page
 - placeholder download buttons
@@ -130,11 +130,12 @@ Not started:
 
 - [X] Electron shell and preload bridge
 - [X] React desktop renderer
+- [X] Default `Documents/Typist` workspace
 - [X] Open markdown file
 - [X] Open markdown folder
 - [X] Recursive sidebar explorer
+- [X] Recent files in sidebar
 - [X] File switching
-- [X] Live markdown preview
 - [X] Save file
 - [X] Watch external file changes
 - [ ] Finder / Explorer open-with integration
@@ -142,13 +143,12 @@ Not started:
 
 ### Phase 2: Editor
 
-- [X] Editable markdown source pane
+- [X] Single-pane markdown-aware editor
 - [X] Autosave
-- [X] Basic formatting toolbar
 - [X] New file flow
-- [X] New folder flow
-- [ ] Replace textarea with markdown-aware editor abstraction
-- [ ] Inline WYSIWYG editing
+- [ ] Better new note flow without prompt
+- [ ] New folder flow inside command palette
+- [ ] Stronger inline markdown shortcut behavior
 - [ ] Better insertion and selection behavior
 - [ ] Drag-and-drop image support
 - [ ] Rich keyboard formatting shortcuts
@@ -158,7 +158,8 @@ Not started:
 - [X] Global search
 - [ ] Themes
 - [X] Quick open
-- [ ] Command palette
+- [X] Command palette
+- [ ] Saved command history / smarter ranking
 - [ ] Export markdown
 - [ ] Export PDF
 
@@ -181,6 +182,6 @@ Not started:
 ## Next Up
 
 1. Replace the textarea editor with a markdown-aware editing layer.
-2. Add a fuller command palette on top of quick open and search.
-3. Improve creation flows with real dialogs instead of prompts.
+2. Improve note creation and folder creation flows inside the palette/settings model.
+3. Expand the theme system with more families and tighter editor styling.
 4. Add packaging so the web app can ship real downloads.

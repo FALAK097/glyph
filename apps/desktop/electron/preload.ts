@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type {
   AppCommand,
+  AppSettings,
   FileDocument,
   FileOpenResult,
   SearchResult,
@@ -14,6 +15,9 @@ const api = {
   },
   openFolder(dirPath?: string) {
     return ipcRenderer.invoke("workspace:openFolder", dirPath) as Promise<WorkspaceSnapshot | null>;
+  },
+  openDefaultWorkspace() {
+    return ipcRenderer.invoke("workspace:openDefault") as Promise<WorkspaceSnapshot | null>;
   },
   openDocument() {
     return ipcRenderer.invoke("workspace:openDocument") as Promise<FileDocument | null>;
@@ -32,6 +36,12 @@ const api = {
   },
   searchWorkspace(query: string) {
     return ipcRenderer.invoke("workspace:search", query) as Promise<SearchResult[]>;
+  },
+  getSettings() {
+    return ipcRenderer.invoke("settings:get") as Promise<AppSettings>;
+  },
+  updateSettings(patch: Partial<AppSettings>) {
+    return ipcRenderer.invoke("settings:update", patch) as Promise<AppSettings>;
   },
   onWorkspaceChanged(listener: (event: WorkspaceChangeEvent) => void) {
     const wrapped = (_event: Electron.IpcRendererEvent, payload: WorkspaceChangeEvent) => {

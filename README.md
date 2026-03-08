@@ -102,16 +102,18 @@ typist/
 
 ## Current Desktop Capabilities
 
+- default notes workspace in `Documents/Typist`
 - open markdown files
 - open markdown folders
-- browse files in a sidebar
-- edit markdown source
-- live preview rendered markdown
+- browse notes in a sidebar
+- see recently opened files in the sidebar
+- edit notes in a single-pane markdown-aware editor
 - quick open with `Cmd/Ctrl+P`
-- global workspace search with `Cmd/Ctrl+Shift+F`
+- search files, commands, and themes through the command palette
 - autosave
-- create new files and folders
-- basic formatting toolbar
+- create new notes
+- switch and preview themes
+- change the default workspace folder from settings
 
 ## Current Web Capabilities
 
@@ -121,5 +123,5 @@ typist/
 ## Notes
 
 - Desktop packaging is not implemented yet, so the web download links are placeholders.
-- The desktop editor is still textarea-based; richer inline editing is the next major step.
+- The desktop app is now moving toward a Typora-style single-surface editor, but it still needs more polish around note creation flows and richer markdown behaviors.
 - I validated the repo with `pnpm typecheck`, `pnpm build`, and React Doctor, but I have not visually verified the running UI from this environment.

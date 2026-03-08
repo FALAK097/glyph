@@ -3,137 +3,93 @@ import { watch } from "chokidar";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { AppCommand, DirectoryNode, FileOpenResult, SearchResult, WorkspaceSnapshot } from "../src/shared/workspace.js";
+import type {
+  AppCommand,
+  AppSettings,
+  DirectoryNode,
+  FileOpenResult,
+  SearchResult,
+  WorkspaceSnapshot
+} from "../src/shared/workspace.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const isDev = !app.isPackaged;
+const devServerUrl = "http://127.0.0.1:5173";
 
 let mainWindow: BrowserWindow | null = null;
 let activeWatcher: ReturnType<typeof watch> | null = null;
 let activeWorkspaceRoot: string | null = null;
-const devServerUrl = "http://127.0.0.1:5173";
 
 function isMarkdownFile(fileName: string) {
   return fileName.endsWith(".md") || fileName.endsWith(".markdown");
 }
 
-async function loadRenderer(window: BrowserWindow) {
-  if (!isDev) {
-    await window.loadFile(path.join(__dirname, "../dist/index.html"));
-    return;
-  }
+function getSettingsPath() {
+  return path.join(app.getPath("userData"), "settings.json");
+}
 
-  const maxAttempts = 20;
+function getDefaultWorkspacePath() {
+  return path.join(app.getPath("documents"), "Typist");
+}
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    try {
-      await window.loadURL(devServerUrl);
-      return;
-    } catch (error) {
-      if (attempt === maxAttempts) {
-        throw error;
-      }
+function getDefaultSettings(): AppSettings {
+  return {
+    defaultWorkspacePath: getDefaultWorkspacePath(),
+    themeId: "aura",
+    themeMode: "light",
+    recentFiles: []
+  };
+}
 
-      await new Promise((resolve) => setTimeout(resolve, 350));
-    }
+async function loadSettings(): Promise<AppSettings> {
+  const settingsPath = getSettingsPath();
+
+  try {
+    const raw = await fs.readFile(settingsPath, "utf8");
+    return {
+      ...getDefaultSettings(),
+      ...JSON.parse(raw)
+    } satisfies AppSettings;
+  } catch {
+    return getDefaultSettings();
   }
 }
 
-async function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 920,
-    minWidth: 980,
-    minHeight: 700,
-    titleBarStyle: "hiddenInset",
-    backgroundColor: "#f5f2eb",
-    webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
-      contextIsolation: true,
-      sandbox: false
-    }
-  });
-
-  mainWindow.webContents.on("did-fail-load", (_event, code, description, validatedUrl) => {
-    console.error("Renderer load failed:", { code, description, validatedUrl });
-  });
-
-  mainWindow.webContents.on("preload-error", (_event, preloadPath, error) => {
-    console.error("Preload failed:", preloadPath, error);
-  });
-
-  await loadRenderer(mainWindow);
-
-  const menu = Menu.buildFromTemplate([
-    {
-      label: "File",
-      submenu: [
-        {
-          label: "New File",
-          accelerator: "CmdOrCtrl+N",
-          click: () => {
-            mainWindow?.webContents.send("app:command", "new-file" satisfies AppCommand);
-          }
-        },
-        {
-          label: "New Folder",
-          accelerator: "CmdOrCtrl+Shift+N",
-          click: () => {
-            mainWindow?.webContents.send("app:command", "new-folder" satisfies AppCommand);
-          }
-        },
-        { type: "separator" },
-        {
-          label: "Open File",
-          accelerator: "CmdOrCtrl+O",
-          click: () => {
-            mainWindow?.webContents.send("app:command", "open-file" satisfies AppCommand);
-          }
-        },
-        {
-          label: "Open Folder",
-          accelerator: "CmdOrCtrl+Shift+O",
-          click: () => {
-            mainWindow?.webContents.send("app:command", "open-folder" satisfies AppCommand);
-          }
-        },
-        { type: "separator" },
-        {
-          label: "Save",
-          accelerator: "CmdOrCtrl+S",
-          click: () => {
-            mainWindow?.webContents.send("app:command", "save" satisfies AppCommand);
-          }
-        },
-        { type: "separator" },
-        {
-          label: "Global Search",
-          accelerator: "CmdOrCtrl+Shift+F",
-          click: () => {
-            mainWindow?.webContents.send("app:command", "search" satisfies AppCommand);
-          }
-        },
-        {
-          label: "Quick Open",
-          accelerator: "CmdOrCtrl+P",
-          click: () => {
-            mainWindow?.webContents.send("app:command", "quick-open" satisfies AppCommand);
-          }
-        }
-      ]
-    },
-    {
-      label: "View",
-      submenu: [{ role: "reload" }, { role: "toggleDevTools" }]
-    }
-  ]);
-
-  Menu.setApplicationMenu(menu);
+async function saveSettings(nextSettings: AppSettings) {
+  await fs.mkdir(path.dirname(getSettingsPath()), { recursive: true });
+  await fs.writeFile(getSettingsPath(), JSON.stringify(nextSettings, null, 2), "utf8");
+  return nextSettings;
 }
 
-async function readMarkdownFile(filePath: string) {
+async function updateSettings(patch: Partial<AppSettings>) {
+  const current = await loadSettings();
+  return saveSettings({
+    ...current,
+    ...patch
+  });
+}
+
+async function recordRecentFile(filePath: string) {
+  const settings = await loadSettings();
+  const recentFiles = [filePath, ...settings.recentFiles.filter((entry) => entry !== filePath)].slice(0, 8);
+  await saveSettings({
+    ...settings,
+    recentFiles
+  });
+}
+
+async function ensureWorkspace(dirPath: string) {
+  await fs.mkdir(dirPath, { recursive: true });
+}
+
+async function readMarkdownFile(filePath: string, recordRecent = false) {
   const content = await fs.readFile(filePath, "utf8");
+
+  if (recordRecent) {
+    await recordRecentFile(filePath);
+  }
+
   return {
     path: filePath,
     name: path.basename(filePath),
@@ -153,7 +109,7 @@ async function buildDirectoryTree(dirPath: string): Promise<DirectoryNode[]> {
     return left.name.localeCompare(right.name);
   });
 
-  const nodes = await Promise.all(
+  return Promise.all(
     sorted
       .filter((entry) => entry.isDirectory() || isMarkdownFile(entry.name))
       .map(async (entry) => {
@@ -175,8 +131,6 @@ async function buildDirectoryTree(dirPath: string): Promise<DirectoryNode[]> {
         };
       })
   );
-
-  return nodes;
 }
 
 async function collectMarkdownFiles(nodes: DirectoryNode[]): Promise<string[]> {
@@ -195,11 +149,13 @@ async function collectMarkdownFiles(nodes: DirectoryNode[]): Promise<string[]> {
 }
 
 async function openWorkspace(dirPath: string): Promise<WorkspaceSnapshot> {
+  await ensureWorkspace(dirPath);
   activeWorkspaceRoot = dirPath;
+
   const tree = await buildDirectoryTree(dirPath);
   const files = await collectMarkdownFiles(tree);
   const activeFilePath = files[0] ?? null;
-  const activeFile = activeFilePath ? await readMarkdownFile(activeFilePath) : null;
+  const activeFile = activeFilePath ? await readMarkdownFile(activeFilePath, true) : null;
 
   if (activeWatcher) {
     await activeWatcher.close();
@@ -214,11 +170,7 @@ async function openWorkspace(dirPath: string): Promise<WorkspaceSnapshot> {
   });
 
   activeWatcher.on("all", async (_eventName, changedPath) => {
-    if (!mainWindow) {
-      return;
-    }
-
-    if (!isMarkdownFile(changedPath)) {
+    if (!mainWindow || !isMarkdownFile(changedPath)) {
       return;
     }
 
@@ -290,9 +242,94 @@ async function showOpenDialog(kind: "file" | "directory"): Promise<FileOpenResul
   };
 }
 
-ipcMain.handle("dialog:open", async (_event, kind: "file" | "directory") =>
-  showOpenDialog(kind)
-);
+async function loadRenderer(window: BrowserWindow) {
+  if (!isDev) {
+    await window.loadFile(path.join(__dirname, "../dist/index.html"));
+    return;
+  }
+
+  for (let attempt = 1; attempt <= 20; attempt += 1) {
+    try {
+      await window.loadURL(devServerUrl);
+      return;
+    } catch (error) {
+      if (attempt === 20) {
+        throw error;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    }
+  }
+}
+
+async function createWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1420,
+    height: 920,
+    minWidth: 980,
+    minHeight: 700,
+    titleBarStyle: "hiddenInset",
+    backgroundColor: "#f8f6f1",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      sandbox: false
+    }
+  });
+
+  mainWindow.webContents.on("did-fail-load", (_event, code, description, validatedUrl) => {
+    console.error("Renderer load failed:", { code, description, validatedUrl });
+  });
+
+  mainWindow.webContents.on("preload-error", (_event, preloadPath, error) => {
+    console.error("Preload failed:", preloadPath, error);
+  });
+
+  await loadRenderer(mainWindow);
+
+  const menu = Menu.buildFromTemplate([
+    {
+      label: "File",
+      submenu: [
+        {
+          label: "New Note",
+          accelerator: "CmdOrCtrl+N",
+          click: () => mainWindow?.webContents.send("app:command", "new-file" satisfies AppCommand)
+        },
+        {
+          label: "Open File",
+          accelerator: "CmdOrCtrl+O",
+          click: () => mainWindow?.webContents.send("app:command", "open-file" satisfies AppCommand)
+        },
+        {
+          label: "Open Folder",
+          accelerator: "CmdOrCtrl+Shift+O",
+          click: () => mainWindow?.webContents.send("app:command", "open-folder" satisfies AppCommand)
+        },
+        { type: "separator" },
+        {
+          label: "Save",
+          accelerator: "CmdOrCtrl+S",
+          click: () => mainWindow?.webContents.send("app:command", "save" satisfies AppCommand)
+        },
+        { type: "separator" },
+        {
+          label: "Command Palette",
+          accelerator: "CmdOrCtrl+P",
+          click: () => mainWindow?.webContents.send("app:command", "quick-open" satisfies AppCommand)
+        }
+      ]
+    },
+    {
+      label: "View",
+      submenu: [{ role: "reload" }, { role: "toggleDevTools" }]
+    }
+  ]);
+
+  Menu.setApplicationMenu(menu);
+}
+
+ipcMain.handle("dialog:open", async (_event, kind: "file" | "directory") => showOpenDialog(kind));
 
 ipcMain.handle("workspace:openFolder", async (_event, dirPath?: string) => {
   let resolvedPath = dirPath;
@@ -309,20 +346,23 @@ ipcMain.handle("workspace:openFolder", async (_event, dirPath?: string) => {
   return openWorkspace(resolvedPath);
 });
 
-ipcMain.handle("workspace:openFile", async (_event, filePath: string) =>
-  readMarkdownFile(filePath)
-);
+ipcMain.handle("workspace:openDefault", async () => {
+  const settings = await loadSettings();
+  return openWorkspace(settings.defaultWorkspacePath);
+});
+
+ipcMain.handle("workspace:openFile", async (_event, filePath: string) => readMarkdownFile(filePath, true));
 
 ipcMain.handle("workspace:saveFile", async (_event, filePath: string, content: string) => {
   await fs.writeFile(filePath, content, "utf8");
-  return readMarkdownFile(filePath);
+  return readMarkdownFile(filePath, false);
 });
 
 ipcMain.handle("workspace:createFile", async (_event, parentDir: string, fileName: string) => {
   const normalizedFileName = fileName.endsWith(".md") ? fileName : `${fileName}.md`;
   const targetPath = path.join(parentDir, normalizedFileName);
   await fs.writeFile(targetPath, "", { flag: "wx" });
-  return readMarkdownFile(targetPath);
+  return readMarkdownFile(targetPath, true);
 });
 
 ipcMain.handle("workspace:createFolder", async (_event, parentDir: string, folderName: string) => {
@@ -337,15 +377,19 @@ ipcMain.handle("workspace:createFolder", async (_event, parentDir: string, folde
 
 ipcMain.handle("workspace:search", async (_event, query: string) => searchWorkspace(query));
 
-ipcMain.handle("workspace:openDocument", async (_event) => {
+ipcMain.handle("workspace:openDocument", async () => {
   const selection = await showOpenDialog("file");
 
   if (!selection) {
     return null;
   }
 
-  return readMarkdownFile(selection.path);
+  return readMarkdownFile(selection.path, true);
 });
+
+ipcMain.handle("settings:get", async () => loadSettings());
+
+ipcMain.handle("settings:update", async (_event, patch: Partial<AppSettings>) => updateSettings(patch));
 
 app.whenReady().then(createWindow);
 

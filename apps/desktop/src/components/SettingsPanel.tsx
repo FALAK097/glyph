@@ -1,11 +1,6 @@
 import type { AppSettings, ShortcutSetting, ThemeMode } from "../shared/workspace";
 import { useState, useEffect, useRef } from "react";
-
-type Shortcut = {
-  id: string;
-  label: string;
-  keys: string;
-};
+import { DEFAULT_SHORTCUTS, canonicalizeShortcut, mergeShortcutSettings } from "../shared/shortcuts";
 
 
 function CustomSelect({ value, onChange, options }: { value: string, onChange: (val: string) => void, options: { value: string, label: string }[] }) {
@@ -50,18 +45,6 @@ function CustomSelect({ value, onChange, options }: { value: string, onChange: (
   );
 }
 
-const DEFAULT_SHORTCUTS: Shortcut[] = [
-  { id: "command-palette", label: "Command Palette", keys: "⌘ P" },
-  { id: "new-note", label: "New Note", keys: "⇧ ⌘ S" },
-  { id: "open-file", label: "Open File", keys: "⌘ O" },
-  { id: "open-folder", label: "Open Folder", keys: "⇧ ⌘ O" },
-  { id: "save", label: "Save", keys: "⌘ S" },
-  { id: "settings", label: "Settings", keys: "⌘ ," },
-  { id: "previous-note", label: "Previous Note", keys: "⌥ ↑" },
-  { id: "next-note", label: "Next Note", keys: "⌥ ↓" },
-  { id: "toggle-sidebar", label: "Toggle Sidebar", keys: "⌘ B" },
-];
-
 type SettingsPanelProps = {
   isOpen: boolean;
   settings: AppSettings | null;
@@ -80,20 +63,15 @@ export function SettingsPanel({
   onChangeShortcuts
 }: SettingsPanelProps) {
   const [activeTab, setActiveTab] = useState("general");
-  const [shortcuts, setShortcuts] = useState<Shortcut[]>(DEFAULT_SHORTCUTS);
+  const [shortcuts, setShortcuts] = useState(DEFAULT_SHORTCUTS);
   const [editingShortcut, setEditingShortcut] = useState<string | null>(null);
   const [capturedKeys, setCapturedKeys] = useState<string>("");
   const [shortcutFilter, setShortcutFilter] = useState("");
+  const [shortcutError, setShortcutError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (settings?.shortcuts && settings.shortcuts.length > 0) {
-      const merged = DEFAULT_SHORTCUTS.map((defaultShortcut) => {
-        const saved = settings.shortcuts.find((s) => s.id === defaultShortcut.id);
-        return saved ? { ...defaultShortcut, keys: saved.keys } : defaultShortcut;
-      });
-      setShortcuts(merged);
-    }
+    setShortcuts(mergeShortcutSettings(settings?.shortcuts));
   }, [settings]);
 
   useEffect(() => {
@@ -107,11 +85,37 @@ export function SettingsPanel({
     if (e.metaKey || e.ctrlKey) parts.push("⌘");
     if (e.altKey) parts.push("⌥");
     if (e.shiftKey) parts.push("⇧");
-    const key = e.key.toUpperCase();
-    if (!["META", "CONTROL", "ALT", "SHIFT", " "].includes(key)) {
-      parts.push(key === " " ? "Space" : key);
+    const key = e.key;
+    if (!["Meta", "Control", "Alt", "Shift"].includes(key)) {
+      parts.push(key);
     }
-    return parts.join(" ");
+    return canonicalizeShortcut(parts.join(" ")) ?? parts.join(" ");
+  };
+
+  const commitShortcutChange = (shortcutId: string, nextKeys: string) => {
+    const normalizedKeys = canonicalizeShortcut(nextKeys);
+
+    if (!normalizedKeys) {
+      setShortcutError("Shortcut must include at least one non-modifier key.");
+      return false;
+    }
+
+    const conflict = shortcuts.find(
+      (shortcut) => shortcut.id !== shortcutId && canonicalizeShortcut(shortcut.keys) === normalizedKeys
+    );
+
+    if (conflict) {
+      setShortcutError(`${normalizedKeys} is already assigned to ${conflict.label}.`);
+      return false;
+    }
+
+    const updated = shortcuts.map((shortcut) =>
+      shortcut.id === shortcutId ? { ...shortcut, keys: normalizedKeys } : shortcut
+    );
+    setShortcuts(updated);
+    onChangeShortcuts(updated.map(({ id, keys }) => ({ id, keys })));
+    setShortcutError(null);
+    return true;
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -120,15 +124,14 @@ export function SettingsPanel({
     if (e.key === "Escape") {
       setEditingShortcut(null);
       setCapturedKeys("");
+      setShortcutError(null);
       return;
     }
     if (e.key === "Enter") {
       if (capturedKeys && editingShortcut) {
-        const updated = shortcuts.map(s => 
-          s.id === editingShortcut ? { ...s, keys: capturedKeys } : s
-        );
-        setShortcuts(updated);
-        onChangeShortcuts(updated.map(({ id, keys }) => ({ id, keys })));
+        if (!commitShortcutChange(editingShortcut, capturedKeys)) {
+          return;
+        }
       }
       setEditingShortcut(null);
       setCapturedKeys("");
@@ -137,18 +140,13 @@ export function SettingsPanel({
     setCapturedKeys(formatKeyCombo(e));
   };
 
-  const handleShortcutChange = (shortcutId: string, newKeys: string) => {
-    const updated = shortcuts.map(s => 
-      s.id === shortcutId ? { ...s, keys: newKeys } : s
-    );
-    setShortcuts(updated);
-    onChangeShortcuts(updated.map(({ id, keys }) => ({ id, keys })));
-  };
-
   const handleReset = () => {
     setShortcuts(DEFAULT_SHORTCUTS);
     onChangeShortcuts(DEFAULT_SHORTCUTS.map(({ id, keys }) => ({ id, keys })));
     setShortcutFilter("");
+    setCapturedKeys("");
+    setEditingShortcut(null);
+    setShortcutError(null);
   };
 
   if (!isOpen || !settings) {
@@ -292,7 +290,7 @@ export function SettingsPanel({
                           onKeyDown={handleKeyDown}
                           onBlur={() => {
                             if (capturedKeys && editingShortcut) {
-                              handleShortcutChange(editingShortcut, capturedKeys);
+                              commitShortcutChange(editingShortcut, capturedKeys);
                             }
                             setEditingShortcut(null);
                             setCapturedKeys("");
@@ -303,7 +301,11 @@ export function SettingsPanel({
                       ) : (
                         <button
                           className="px-2 py-1 bg-muted/50 hover:bg-muted rounded text-xs font-mono transition-colors min-w-[80px] text-center border border-border/50 hover:border-border"
-                          onClick={() => setEditingShortcut(shortcut.id)}
+                          onClick={() => {
+                            setEditingShortcut(shortcut.id);
+                            setCapturedKeys(shortcut.keys);
+                            setShortcutError(null);
+                          }}
                         >
                           {shortcut.keys}
                         </button>
@@ -316,6 +318,7 @@ export function SettingsPanel({
                      </div>
                   )}
                 </div>
+                {shortcutError ? <p className="mt-3 text-sm text-destructive">{shortcutError}</p> : null}
               </div>
             </div>
           )}

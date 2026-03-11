@@ -3,7 +3,9 @@ import { CommandPalette } from "./components/CommandPalette";
 import { MarkdownEditor } from "./components/MarkdownEditor";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { Sidebar } from "./components/Sidebar";
-import type { AppSettings, DirectoryNode, SearchResult, ThemeMode } from "./shared/workspace";
+import type { DragPosition, SidebarTopLevelNode } from "./components/Sidebar";
+import { getShortcutDisplay, matchShortcut, mergeShortcutSettings } from "./shared/shortcuts";
+import type { AppSettings, DirectoryNode, FileDocument, SearchResult, SidebarItemSetting, ThemeMode, WorkspaceSnapshot } from "./shared/workspace";
 import { useWorkspaceStore } from "./store/workspace";
 import { applyTheme } from "./theme/themes";
 
@@ -27,6 +29,10 @@ type FlatFile = {
 
 function normalizePath(filePath: string) {
   return filePath.replace(/\\/g, "/");
+}
+
+function getBaseName(filePath: string) {
+  return filePath.split(/[\\/]/).at(-1) ?? filePath;
 }
 
 function getRelativePath(filePath: string, rootPath: string | null) {
@@ -71,6 +77,121 @@ function flattenFiles(nodes: DirectoryNode[], rootPath: string | null): FlatFile
   }
 
   return items;
+}
+
+function toSidebarItemSetting(node: DirectoryNode): SidebarItemSetting {
+  return {
+    kind: node.type,
+    path: node.path
+  };
+}
+
+function orderSidebarNodes(nodes: DirectoryNode[], orderedItems: SidebarItemSetting[]): DirectoryNode[] {
+  const remaining = new Map(nodes.map((node) => [node.path, node]));
+  const ordered: DirectoryNode[] = [];
+
+  for (const item of orderedItems) {
+    const match = remaining.get(item.path);
+    if (!match || match.type !== item.kind) {
+      continue;
+    }
+
+    ordered.push(match);
+    remaining.delete(item.path);
+  }
+
+  return [...ordered, ...remaining.values()];
+}
+
+function reorderSidebarNodes(nodes: DirectoryNode[], sourcePath: string, targetPath: string, position: DragPosition): DirectoryNode[] {
+  const sourceIndex = nodes.findIndex((node) => node.path === sourcePath);
+  const targetIndex = nodes.findIndex((node) => node.path === targetPath);
+
+  if (sourceIndex === -1 || targetIndex === -1 || sourceIndex === targetIndex) {
+    return nodes;
+  }
+
+  const nextNodes = [...nodes];
+  const [sourceNode] = nextNodes.splice(sourceIndex, 1);
+  const adjustedTargetIndex = nextNodes.findIndex((node) => node.path === targetPath);
+  const insertIndex = position === "before" ? adjustedTargetIndex : adjustedTargetIndex + 1;
+  nextNodes.splice(insertIndex, 0, sourceNode);
+  return nextNodes;
+}
+
+function upsertSidebarFolder(nodes: DirectoryNode[], workspace: WorkspaceSnapshot): DirectoryNode[] {
+  const nextFolder: DirectoryNode = {
+    type: "directory",
+    name: getBaseName(workspace.rootPath),
+    path: workspace.rootPath,
+    children: workspace.tree
+  };
+
+  const nextNodes = nodes.filter(
+    (node) => !(node.type === "file" && isFileInsideWorkspace(node.path, workspace.rootPath))
+  );
+  const existingIndex = nextNodes.findIndex((node) => node.type === "directory" && node.path === workspace.rootPath);
+
+  if (existingIndex === -1) {
+    return [...nextNodes, nextFolder];
+  }
+
+  return nextNodes.map((node, index) => (index === existingIndex ? nextFolder : node));
+}
+
+function upsertSidebarFile(nodes: DirectoryNode[], file: Pick<FileDocument, "path" | "name">): DirectoryNode[] {
+  const isCoveredByFolder = nodes.some(
+    (node) => node.type === "directory" && isFileInsideWorkspace(file.path, node.path)
+  );
+
+  if (isCoveredByFolder) {
+    return nodes.filter((node) => !(node.type === "file" && node.path === file.path));
+  }
+
+  const nextFile: DirectoryNode = {
+    type: "file",
+    name: file.name,
+    path: file.path
+  };
+
+  const existingIndex = nodes.findIndex((node) => node.type === "file" && node.path === file.path);
+  if (existingIndex === -1) {
+    return [...nodes, nextFile];
+  }
+
+  return nodes.map((node, index) => (index === existingIndex ? nextFile : node));
+}
+
+function removeSidebarPath(nodes: DirectoryNode[], targetPath: string): DirectoryNode[] {
+  return nodes.flatMap<DirectoryNode>((node) => {
+    if (node.path === targetPath) {
+      return [];
+    }
+
+    if (node.type === "directory") {
+      return [{ ...node, children: removeSidebarPath(node.children, targetPath) }];
+    }
+
+    return [node];
+  });
+}
+
+function renameSidebarFile(nodes: DirectoryNode[], oldPath: string, renamedFile: Pick<FileDocument, "path" | "name">): DirectoryNode[] {
+  return nodes.map((node) => {
+    if (node.type === "directory") {
+      return { ...node, children: renameSidebarFile(node.children, oldPath, renamedFile) };
+    }
+
+    if (node.path !== oldPath) {
+      return node;
+    }
+
+    return {
+      type: "file",
+      path: renamedFile.path,
+      name: renamedFile.name
+    };
+  });
 }
 
 function getErrorMessage(error: unknown) {
@@ -123,6 +244,9 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isWorkspaceMode, setIsWorkspaceMode] = useState(true);
+  const [sidebarNodes, setSidebarNodes] = useState<DirectoryNode[]>([]);
+  const [expandedFolderPaths, setExpandedFolderPaths] = useState<string[]>([]);
+  const [hasHydratedSidebar, setHasHydratedSidebar] = useState(false);
   const deferredPaletteQuery = useDeferredValue(paletteQuery);
 
   const files = useMemo(() => flattenFiles(tree, rootPath), [rootPath, tree]);
@@ -132,11 +256,47 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
   }, [draftContent]);
   const readingTime = Math.max(1, Math.round(wordCount / 200));
 
+  const visibleSidebarNodes = useMemo<SidebarTopLevelNode[]>(() => {
+    const expanded = new Set(expandedFolderPaths);
+    return sidebarNodes.map((node) => ({
+      node,
+      isExpanded: node.type === "directory" ? expanded.has(node.path) : true
+    }));
+  }, [expandedFolderPaths, sidebarNodes]);
+
+  const persistedSidebar = useMemo(() => ({
+    items: sidebarNodes.map(toSidebarItemSetting),
+    expandedFolders: expandedFolderPaths
+  }), [expandedFolderPaths, sidebarNodes]);
+
+  const restoreSidebarNodes = useCallback(async (items: SidebarItemSetting[]) => {
+    const resolved = await Promise.all(items.map((item) => typist.getSidebarNode(item.kind, item.path)));
+    return resolved.filter((node): node is DirectoryNode => node !== null);
+  }, [typist]);
+
+  const syncWorkspace = useCallback((workspace: WorkspaceSnapshot) => {
+    setWorkspace(workspace);
+    setSidebarNodes((prev) => upsertSidebarFolder(prev, workspace));
+    setExpandedFolderPaths((prev) => (prev.includes(workspace.rootPath) ? prev : [...prev, workspace.rootPath]));
+  }, [setWorkspace]);
+
+  const syncOpenedFile = useCallback(async (file: FileDocument) => {
+    setActiveFile(file);
+    setIsWorkspaceMode(isFileInsideWorkspace(file.path, rootPath));
+    setSidebarNodes((prev) => upsertSidebarFile(prev, file));
+    const nextSettings = await typist.getSettings();
+    setSettings(nextSettings);
+    setIsPaletteOpen(false);
+  }, [rootPath, setActiveFile, typist]);
+
   useEffect(() => {
     const boot = async () => {
       const nextSettings = await typist.getSettings();
       setSettings(nextSettings);
       applyTheme(nextSettings.themeMode);
+
+      let nextSidebarNodes = orderSidebarNodes(await restoreSidebarNodes(nextSettings.sidebar.items), nextSettings.sidebar.items);
+      const nextExpandedFolders = new Set(nextSettings.sidebar.expandedFolders);
 
       const target = await typist.getPendingExternalPath();
       if (target) {
@@ -145,48 +305,58 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
           if (workspace) {
             setWorkspace(workspace);
             setIsWorkspaceMode(true);
+            nextSidebarNodes = upsertSidebarFolder(nextSidebarNodes, workspace);
+            nextExpandedFolders.add(workspace.rootPath);
           }
         } else {
-          // It's a file, open default workspace then load this file
           const workspace = await typist.openDefaultWorkspace();
           if (workspace) {
             setWorkspace(workspace);
+            nextSidebarNodes = upsertSidebarFolder(nextSidebarNodes, workspace);
+            nextExpandedFolders.add(workspace.rootPath);
           }
           const file = await typist.readFile(target.path);
           setActiveFile(file);
-          setIsWorkspaceMode(false);
+          setIsWorkspaceMode(Boolean(workspace && isFileInsideWorkspace(file.path, workspace.rootPath)));
+          nextSidebarNodes = upsertSidebarFile(nextSidebarNodes, file);
         }
       } else {
         const workspace = await typist.openDefaultWorkspace();
         if (workspace) {
           setWorkspace(workspace);
           setIsWorkspaceMode(true);
+          nextSidebarNodes = upsertSidebarFolder(nextSidebarNodes, workspace);
+          nextExpandedFolders.add(workspace.rootPath);
         }
       }
+
+      setSidebarNodes(nextSidebarNodes);
+      setExpandedFolderPaths(Array.from(nextExpandedFolders));
+      setHasHydratedSidebar(true);
     };
 
     void boot();
-  }, [setWorkspace, setActiveFile, typist]);
+  }, [restoreSidebarNodes, setActiveFile, setWorkspace, typist]);
 
   useEffect(() => {
     return typist.onExternalFile(async (target) => {
       if (target.isDirectory) {
         const workspace = await typist.openFolder(target.path);
         if (workspace) {
-          setWorkspace(workspace);
+          syncWorkspace(workspace);
           setIsWorkspaceMode(true);
         }
       } else {
         const file = await typist.readFile(target.path);
-        setActiveFile(file);
-        setIsWorkspaceMode(false);
+        await syncOpenedFile(file);
       }
     });
-  }, [setActiveFile, setWorkspace, typist]);
+  }, [syncOpenedFile, syncWorkspace, typist]);
 
   useEffect(() => {
-    return typist.onWorkspaceChanged(async ({ tree: nextTree, changedPath }) => {
+    return typist.onWorkspaceChanged(async ({ rootPath: changedRootPath, tree: nextTree, changedPath }) => {
       setTree(nextTree);
+      setSidebarNodes((prev) => upsertSidebarFolder(prev, { rootPath: changedRootPath, tree: nextTree, activeFile: null }));
 
       if (changedPath === activeFile?.path && !isDirty) {
         const refreshedFile = await typist.readFile(changedPath);
@@ -213,6 +383,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
           if (safeName && safeName !== "Untitled") {
             const newName = `${safeName}.md`;
             finalFile = await typist.renameFile(currentPath, newName);
+            setSidebarNodes((prev) => upsertSidebarFile(renameSidebarFile(prev, currentPath, finalFile), finalFile));
             currentPath = finalFile.path;
             updateActiveFile(finalFile);
           }
@@ -264,14 +435,24 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
     return next;
   }, [typist]);
 
+  useEffect(() => {
+    if (!settings || !hasHydratedSidebar) {
+      return;
+    }
+
+    const currentSidebar = JSON.stringify(persistedSidebar);
+    const savedSidebar = JSON.stringify(settings.sidebar);
+    if (currentSidebar === savedSidebar) {
+      return;
+    }
+
+    void saveSettings({ sidebar: persistedSidebar });
+  }, [hasHydratedSidebar, persistedSidebar, saveSettings, settings]);
+
   const openFile = useCallback(async (filePath: string) => {
     const file = await typist.readFile(filePath);
-    setActiveFile(file);
-    setIsWorkspaceMode(isFileInsideWorkspace(file.path, rootPath));
-    const nextSettings = await typist.getSettings();
-    setSettings(nextSettings);
-    setIsPaletteOpen(false);
-  }, [rootPath, setActiveFile, typist]);
+    await syncOpenedFile(file);
+  }, [syncOpenedFile, typist]);
 
   const createNote = useCallback(async () => {
     const baseDir = isWorkspaceMode ? rootPath : settings?.defaultWorkspacePath ?? null;
@@ -283,6 +464,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
     const file = await typist.createFile(baseDir, `Untitled-${Date.now()}.md`);
     setActiveFile(file);
     setIsWorkspaceMode(true);
+    setSidebarNodes((prev) => upsertSidebarFile(prev, file));
     const nextSettings = await typist.getSettings();
     setSettings(nextSettings);
     setIsPaletteOpen(false);
@@ -302,6 +484,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
   const handleDeleteFile = useCallback(async (filePath: string) => {
     try {
       await typist.deleteFile(filePath);
+      setSidebarNodes((prev) => removeSidebarPath(prev, filePath));
       
       // If we deleted the active file, clear it
       if (activeFile?.path === filePath) {
@@ -319,6 +502,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
 
     try {
       const renamedFile = await typist.renameFile(filePath, newName);
+      setSidebarNodes((prev) => upsertSidebarFile(renameSidebarFile(prev, filePath, renamedFile), renamedFile));
       if (activeFile?.path === filePath) {
         setActiveFile(renamedFile);
       }
@@ -327,48 +511,19 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
     }
   }, [activeFile?.path, setActiveFile, setError, typist]);
 
-  const getShortcutById = (id: string): string | undefined => {
-    if (!settings?.shortcuts) return undefined;
-    return settings.shortcuts.find(s => s.id === id)?.keys;
-  };
+  const handleToggleFolder = useCallback((folderPath: string) => {
+    setExpandedFolderPaths((prev) => (
+      prev.includes(folderPath)
+        ? prev.filter((path) => path !== folderPath)
+        : [...prev, folderPath]
+    ));
+  }, []);
 
-  const getShortcutDisplay = (id: string): string | undefined => {
-    const keys = getShortcutById(id);
-    if (!keys) return undefined;
-    return keys.replace(/\s+/g, '');
-  };
+  const handleReorderNodes = useCallback((sourcePath: string, targetPath: string, position: DragPosition) => {
+    setSidebarNodes((prev) => reorderSidebarNodes(prev, sourcePath, targetPath, position));
+  }, []);
 
-  const parseShortcut = (keys: string): { meta: boolean; alt: boolean; shift: boolean; key: string } | null => {
-    const parts = keys.trim().split(/\s+/);
-    if (parts.length === 0) return null;
-    
-    const key = parts[parts.length - 1].toLowerCase();
-    return {
-      meta: keys.includes("⌘"),
-      alt: keys.includes("⌥"),
-      shift: keys.includes("⇧"),
-      key
-    };
-  };
-
-  const matchShortcut = (event: KeyboardEvent, shortcut: string): boolean => {
-    const parsed = parseShortcut(shortcut);
-    if (!parsed) return false;
-    
-    const eventKey = event.key.toLowerCase();
-    const keyMatch = parsed.key === eventKey || 
-      (parsed.key === " " && event.key === " ") ||
-      (parsed.key === "p" && eventKey === "p") ||
-      (parsed.key === "s" && eventKey === "s") ||
-      (parsed.key === "o" && eventKey === "o") || (parsed.key === "b" && eventKey === "b");
-    
-    const modifierMatch = 
-      (!!event.metaKey || !!event.ctrlKey) === parsed.meta &&
-      !!event.altKey === parsed.alt &&
-      !!event.shiftKey === parsed.shift;
-    
-    return keyMatch && modifierMatch;
-  };
+  const shortcuts = useMemo(() => mergeShortcutSettings(settings?.shortcuts), [settings?.shortcuts]);
 
   const paletteItems = useMemo<PaletteItem[]>(() => {
     const query = paletteQuery.trim().toLowerCase();
@@ -379,7 +534,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
         id: "new-note",
         title: "New note",
         subtitle: "Create a fresh markdown note",
-        shortcut: getShortcutDisplay("new-note"),
+        shortcut: getShortcutDisplay(shortcuts, "new-note"),
         section: "Actions",
         kind: "command",
         onSelect: () => void createNote()
@@ -388,14 +543,13 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
         id: "open-file",
         title: "Open File",
         subtitle: "Open an existing markdown file",
-        shortcut: getShortcutDisplay("open-file"),
+        shortcut: getShortcutDisplay(shortcuts, "open-file"),
         section: "Actions",
         kind: "command",
         onSelect: async () => {
           const file = await typist.openDocument();
           if (file) {
-            setActiveFile(file);
-            setIsWorkspaceMode(false);
+            await syncOpenedFile(file);
           }
           setIsPaletteOpen(false);
         }
@@ -404,13 +558,13 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
         id: "open-folder",
         title: "Open Folder",
         subtitle: "Open a folder as a workspace",
-        shortcut: getShortcutDisplay("open-folder"),
+        shortcut: getShortcutDisplay(shortcuts, "open-folder"),
         section: "Actions",
         kind: "command",
         onSelect: async () => {
           const workspace = await typist.openFolder();
           if (workspace) {
-            setWorkspace(workspace);
+            syncWorkspace(workspace);
             setIsWorkspaceMode(true);
           }
           setIsPaletteOpen(false);
@@ -420,7 +574,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
         id: "previous-note",
         title: "Previous note",
         subtitle: "Jump to previous note",
-        shortcut: getShortcutDisplay("previous-note"),
+        shortcut: getShortcutDisplay(shortcuts, "previous-note"),
         section: "Actions",
         kind: "command",
         onSelect: () => { void moveNote(-1); setIsPaletteOpen(false); }
@@ -429,7 +583,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
         id: "next-note",
         title: "Next note",
         subtitle: "Jump to next note",
-        shortcut: getShortcutDisplay("next-note"),
+        shortcut: getShortcutDisplay(shortcuts, "next-note"),
         section: "Actions",
         kind: "command",
         onSelect: () => { void moveNote(1); setIsPaletteOpen(false); }
@@ -438,7 +592,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
         id: "settings",
         title: "Settings",
         subtitle: "Adjust workspace defaults",
-        shortcut: getShortcutDisplay("settings"),
+        shortcut: getShortcutDisplay(shortcuts, "settings"),
         section: "Actions",
         kind: "command",
         onSelect: () => {
@@ -527,7 +681,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
     });
 
     return items;
-  }, [createNote, files, moveNote, openFile, paletteQuery, saveSettings, searchResults, setActiveFile, setIsWorkspaceMode, setWorkspace]);
+  }, [createNote, files, moveNote, openFile, paletteQuery, saveSettings, searchResults, shortcuts, syncOpenedFile, syncWorkspace]);
 
   useEffect(() => {
     if (!isPaletteOpen) {
@@ -541,88 +695,96 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
 
   useEffect(() => {
     const onKeyDown = async (event: KeyboardEvent) => {
-      if (!settings?.shortcuts) return;
+      // Check if the target is an editable input/textarea to allow normal text editing
+      const target = event.target as HTMLElement;
+      const isEditableInput = target && (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target.isContentEditable
+      );
 
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !isEditableInput) {
         setIsPaletteOpen(false);
         setIsSettingsOpen(false);
         return;
       }
 
-      const shortcut = settings.shortcuts.find(s => matchShortcut(event, s.keys));
-      
-      if (shortcut) {
-        event.preventDefault();
+      // Skip shortcut processing when in an editable input field
+      if (!isEditableInput) {
+        const shortcut = shortcuts.find((entry) => matchShortcut(event, entry.keys));
         
-        switch (shortcut.id) {
-          case "command-palette":
-            setIsPaletteOpen((value) => !value);
-            break;
-          case "settings":
-            setIsSettingsOpen((value) => !value);
-            break;
-          case "new-note":
-            void createNote();
-            break;
-          case "open-file": {
-            const file = await typist.openDocument();
-            if (file) {
-              setActiveFile(file);
-              setIsWorkspaceMode(false);
-            }
-            break;
-          }
-          case "open-folder": {
-            const workspace = await typist.openFolder();
-            if (workspace) {
-              setWorkspace(workspace);
-              setIsWorkspaceMode(true);
-            }
-            break;
-          }
-          case "save":
-            if (activeFile) {
-              setSaving(true);
-              try {
-                const savedFile = await typist.saveFile(activeFile.path, draftContent);
-                markSaved(savedFile);
-              } catch (saveError) {
-                console.error("Manual save failed:", saveError);
-                setError(getErrorMessage(saveError));
-              } finally {
-                setSaving(false);
+        if (shortcut) {
+          event.preventDefault();
+          
+          switch (shortcut.id) {
+            case "command-palette":
+              setIsPaletteOpen((value) => !value);
+              break;
+            case "settings":
+              setIsSettingsOpen((value) => !value);
+              break;
+            case "new-note":
+              void createNote();
+              break;
+            case "open-file": {
+              const file = await typist.openDocument();
+              if (file) {
+                await syncOpenedFile(file);
               }
+              break;
             }
-            break;
-          case "previous-note":
-            void moveNote(-1);
-            break;
-          case "toggle-sidebar":
-            setIsSidebarCollapsed((prev) => !prev);
-            break;
-          case "next-note":
-            void moveNote(1);
-            break;
+            case "open-folder": {
+              const workspace = await typist.openFolder();
+              if (workspace) {
+                syncWorkspace(workspace);
+                setIsWorkspaceMode(true);
+              }
+              break;
+            }
+            case "save":
+              if (activeFile) {
+                setSaving(true);
+                try {
+                  const savedFile = await typist.saveFile(activeFile.path, draftContent);
+                  markSaved(savedFile);
+                } catch (saveError) {
+                  console.error("Manual save failed:", saveError);
+                  setError(getErrorMessage(saveError));
+                } finally {
+                  setSaving(false);
+                }
+              }
+              break;
+            case "previous-note":
+              void moveNote(-1);
+              break;
+            case "toggle-sidebar":
+              setIsSidebarCollapsed((prev) => !prev);
+              break;
+            case "next-note":
+              void moveNote(1);
+              break;
+          }
+          return;
         }
-        return;
-      }
 
-      if (event.ctrlKey && event.shiftKey && event.key === "[") {
-        event.preventDefault();
-        void moveNote(-1);
-        return;
-      }
+        if (event.ctrlKey && event.shiftKey && event.key === "[") {
+          event.preventDefault();
+          void moveNote(-1);
+          return;
+        }
 
-      if (event.ctrlKey && event.shiftKey && event.key === "]") {
-        event.preventDefault();
-        void moveNote(1);
-        return;
+        if (event.ctrlKey && event.shiftKey && event.key === "]") {
+          event.preventDefault();
+          void moveNote(1);
+          return;
+        }
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [settings, activeFile, draftContent, markSaved, setError, setSaving, typist, createNote, moveNote, setActiveFile, setWorkspace]);
+  }, [shortcuts, activeFile, draftContent, markSaved, setError, setSaving, typist, createNote, moveNote, syncOpenedFile, syncWorkspace]);
 
   useEffect(() => {
     return typist.onCommand(async (command) => {
@@ -644,8 +806,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
       if (command === "open-file") {
         const file = await typist.openDocument();
         if (file) {
-          setActiveFile(file);
-          setIsWorkspaceMode(false);
+          await syncOpenedFile(file);
         }
         return;
       }
@@ -653,7 +814,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
       if (command === "open-folder") {
         const workspace = await typist.openFolder();
         if (workspace) {
-          setWorkspace(workspace);
+          syncWorkspace(workspace);
           setIsWorkspaceMode(true);
         }
         return;
@@ -672,7 +833,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
         }
       }
     });
-  }, [activeFile, createNote, draftContent, markSaved, setActiveFile, setError, setSaving, setWorkspace, typist]);
+  }, [activeFile, createNote, draftContent, markSaved, setError, setSaving, syncOpenedFile, syncWorkspace, typist]);
 
   const saveStateLabel = isSaving
     ? "Saving..."
@@ -685,18 +846,14 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
   return (
     <div className={`app-shell ${isSidebarCollapsed ? 'collapsed' : ''}`}>
       <Sidebar
-        rootPath={rootPath}
-        tree={tree}
+        tree={visibleSidebarNodes}
         activePath={activeFile?.path ?? null}
-        noteCount={files.length}
         isCollapsed={isSidebarCollapsed}
-        onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         onOpenFile={(filePath) => void openFile(filePath)}
-        onCreateNote={() => void createNote()}
-        onOpenPalette={() => setIsPaletteOpen(true)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
         onDeleteFile={handleDeleteFile}
         onRenameFile={handleRenameFile}
+        onToggleFolder={handleToggleFolder}
+        onReorderNodes={handleReorderNodes}
       />
       <main className={`workspace-shell single-pane relative transition-all duration-200 ${isSidebarCollapsed ? 'ml-0' : ''}`}>
         <div className="absolute top-[13px] left-1/2 -translate-x-1/2 z-10 w-full max-w-md px-4">
@@ -708,7 +865,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
               <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-70"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
               <span className="text-base">Search typist</span>
             </div>
-            <span className="font-mono text-xs opacity-60">{getShortcutDisplay("command-palette") ?? "⌘P"}</span>
+            <span className="font-mono text-xs opacity-60">{getShortcutDisplay(shortcuts, "command-palette") ?? "⌘P"}</span>
           </button>
         </div>
         {error ? <div className="error-banner">{error}</div> : null}
@@ -723,8 +880,9 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
           onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           isSidebarCollapsed={isSidebarCollapsed}
           onCreateNote={() => void createNote()}
-          toggleSidebarShortcut={getShortcutDisplay("toggle-sidebar")}
-          newNoteShortcut={getShortcutDisplay("new-note")}
+          toggleSidebarShortcut={getShortcutDisplay(shortcuts, "toggle-sidebar")}
+          newNoteShortcut={getShortcutDisplay(shortcuts, "new-note")}
+          onOpenSettings={() => setIsSettingsOpen(true)}
         />
       </main>
       <CommandPalette
@@ -759,7 +917,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
           const nextSettings = await saveSettings({ defaultWorkspacePath: selection.path });
           const workspace = await typist.openFolder(nextSettings.defaultWorkspacePath);
           if (workspace) {
-            setWorkspace(workspace);
+            syncWorkspace(workspace);
             setIsWorkspaceMode(true);
           }
         }}

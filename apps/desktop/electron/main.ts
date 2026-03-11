@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
 import { watch } from "chokidar";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -11,6 +11,7 @@ import type {
   SearchResult,
   WorkspaceSnapshot
 } from "../src/shared/workspace.js";
+import { DEFAULT_SHORTCUTS, canonicalizeShortcut, mergeShortcutSettings, toElectronAccelerator } from "../src/shared/shortcuts.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -36,30 +37,122 @@ function getDefaultWorkspacePath() {
   return path.join(app.getPath("documents"), "Typist");
 }
 
-const DEFAULT_SHORTCUTS = [
-  { id: "command-palette", keys: "⌘ P" },
-  { id: "new-note", keys: "⇧ ⌘ S" },
-  { id: "open-file", keys: "⌘ O" },
-  { id: "open-folder", keys: "⇧ ⌘ O" },
-  { id: "save", keys: "⌘ S" },
-  { id: "settings", keys: "⌘ ," },
-  { id: "previous-note", keys: "⌥ ↑" },
-  { id: "next-note", keys: "⌥ ↓" },
-  { id: "toggle-sidebar", keys: "⌘ B" },
-];
-
 function getDefaultSettings(): AppSettings {
   return {
     defaultWorkspacePath: getDefaultWorkspacePath(),
     themeId: "aura",
     themeMode: "light",
     recentFiles: [],
-    shortcuts: DEFAULT_SHORTCUTS
+    shortcuts: DEFAULT_SHORTCUTS,
+    sidebar: {
+      items: [],
+      expandedFolders: []
+    }
+  };
+}
+
+function normalizeSidebarState(sidebar: Partial<AppSettings["sidebar"]> | undefined) {
+  const items = Array.isArray(sidebar?.items)
+    ? sidebar.items.filter(
+        (entry): entry is AppSettings["sidebar"]["items"][number] =>
+          (entry?.kind === "file" || entry?.kind === "directory") && typeof entry.path === "string" && entry.path.trim().length > 0
+      )
+    : [];
+
+  const expandedFolders = Array.isArray(sidebar?.expandedFolders)
+    ? sidebar.expandedFolders.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    : [];
+
+  return {
+    items,
+    expandedFolders: Array.from(new Set(expandedFolders))
   };
 }
 
 function isThemeMode(value: unknown): value is AppSettings["themeMode"] {
   return value === "light" || value === "dark" || value === "system";
+}
+
+function normalizeShortcutSettings(shortcuts: AppSettings["shortcuts"] | undefined) {
+  return mergeShortcutSettings(shortcuts).map(({ id, keys }) => ({ id, keys }));
+}
+
+function validateShortcutSettings(shortcuts: AppSettings["shortcuts"]) {
+  const normalized = normalizeShortcutSettings(shortcuts);
+  const seen = new Map<string, string>();
+
+  for (const shortcut of normalized) {
+    const key = canonicalizeShortcut(shortcut.keys);
+    if (!key) {
+      throw new Error(`Invalid shortcut for ${shortcut.id}.`);
+    }
+
+    const duplicate = seen.get(key);
+    if (duplicate && duplicate !== shortcut.id) {
+      throw new Error(`Duplicate shortcut assigned to ${duplicate} and ${shortcut.id}.`);
+    }
+
+    seen.set(key, shortcut.id);
+  }
+
+  return normalized;
+}
+
+function buildApplicationMenu(shortcuts: AppSettings["shortcuts"]) {
+  const resolvedShortcuts = normalizeShortcutSettings(shortcuts);
+  const getAccelerator = (id: string) => {
+    const keys = resolvedShortcuts.find((shortcut) => shortcut.id === id)?.keys;
+    return keys ? toElectronAccelerator(keys) : undefined;
+  };
+
+  return Menu.buildFromTemplate([
+    {
+      label: "File",
+      submenu: [
+        {
+          label: "New Note",
+          accelerator: getAccelerator("new-note"),
+          click: () => mainWindow?.webContents.send("app:command", "new-file" satisfies AppCommand)
+        },
+        {
+          label: "Open File",
+          accelerator: getAccelerator("open-file"),
+          click: () => mainWindow?.webContents.send("app:command", "open-file" satisfies AppCommand)
+        },
+        {
+          label: "Open Folder",
+          accelerator: getAccelerator("open-folder"),
+          click: () => mainWindow?.webContents.send("app:command", "open-folder" satisfies AppCommand)
+        },
+        { type: "separator" },
+        {
+          label: "Save",
+          accelerator: getAccelerator("save"),
+          click: () => mainWindow?.webContents.send("app:command", "save" satisfies AppCommand)
+        },
+        { type: "separator" },
+        {
+          label: "Toggle Sidebar",
+          accelerator: getAccelerator("toggle-sidebar"),
+          click: () => mainWindow?.webContents.send("app:command", "toggle-sidebar" satisfies AppCommand)
+        },
+        { type: "separator" },
+        {
+          label: "Command Palette",
+          accelerator: getAccelerator("command-palette"),
+          click: () => mainWindow?.webContents.send("app:command", "quick-open" satisfies AppCommand)
+        }
+      ]
+    },
+    {
+      label: "View",
+      submenu: [{ role: "reload" }, { role: "toggleDevTools" }]
+    }
+  ]);
+}
+
+function refreshApplicationMenu(shortcuts: AppSettings["shortcuts"]) {
+  Menu.setApplicationMenu(buildApplicationMenu(shortcuts));
 }
 
 async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSettings> {
@@ -71,7 +164,6 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
 
   const candidate = input as Partial<AppSettings>;
   
-  // Filter recent files to only include existing files
   let validRecentFiles: string[] = [];
   if (Array.isArray(candidate.recentFiles)) {
     for (const filePath of candidate.recentFiles) {
@@ -86,6 +178,32 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
     }
   }
 
+  const validSidebar = normalizeSidebarState(candidate.sidebar);
+  const validSidebarItems: AppSettings["sidebar"]["items"] = [];
+
+  for (const item of validSidebar.items) {
+    try {
+      const stats = await fs.stat(item.path);
+      if ((item.kind === "file" && stats.isFile()) || (item.kind === "directory" && stats.isDirectory())) {
+        validSidebarItems.push(item);
+      }
+    } catch {
+      // Skip sidebar entries that no longer exist.
+    }
+  }
+
+  const validExpandedFolders: string[] = [];
+  for (const folderPath of validSidebar.expandedFolders) {
+    try {
+      const stats = await fs.stat(folderPath);
+      if (stats.isDirectory()) {
+        validExpandedFolders.push(folderPath);
+      }
+    } catch {
+      // Skip folders that no longer exist.
+    }
+  }
+
   return {
     defaultWorkspacePath:
       typeof candidate.defaultWorkspacePath === "string" && candidate.defaultWorkspacePath.trim().length > 0
@@ -94,7 +212,13 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
     themeId: typeof candidate.themeId === "string" && candidate.themeId.trim().length > 0 ? candidate.themeId : defaults.themeId,
     themeMode: isThemeMode(candidate.themeMode) ? candidate.themeMode : defaults.themeMode,
     recentFiles: validRecentFiles,
-    shortcuts: Array.isArray(candidate.shortcuts) ? candidate.shortcuts.filter((s): s is { id: string; keys: string } => typeof s?.id === "string" && typeof s?.keys === "string") : defaults.shortcuts
+    shortcuts: Array.isArray(candidate.shortcuts)
+      ? normalizeShortcutSettings(candidate.shortcuts.filter((s): s is { id: string; keys: string } => typeof s?.id === "string" && typeof s?.keys === "string"))
+      : defaults.shortcuts,
+    sidebar: {
+      items: validSidebarItems,
+      expandedFolders: Array.from(new Set(validExpandedFolders))
+    }
   };
 }
 
@@ -143,11 +267,19 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
       throw new Error("shortcuts must be an array of { id: string, keys: string }.");
     }
 
-    nextPatch.shortcuts = candidate.shortcuts;
+    nextPatch.shortcuts = validateShortcutSettings(candidate.shortcuts);
+  }
+
+  if ("sidebar" in candidate) {
+    if (!candidate.sidebar || typeof candidate.sidebar !== "object" || Array.isArray(candidate.sidebar)) {
+      throw new Error("sidebar must be an object.");
+    }
+
+    nextPatch.sidebar = normalizeSidebarState(candidate.sidebar as Partial<AppSettings["sidebar"]>);
   }
 
   const invalidKeys = Object.keys(candidate).filter(
-    (key) => !["defaultWorkspacePath", "themeId", "themeMode", "recentFiles", "shortcuts"].includes(key)
+    (key) => !["defaultWorkspacePath", "themeId", "themeMode", "recentFiles", "shortcuts", "sidebar"].includes(key)
   );
 
   if (invalidKeys.length > 0) {
@@ -218,6 +350,37 @@ async function readMarkdownFile(filePath: string, recordRecent = false) {
     name: path.basename(filePath),
     content
   };
+}
+
+async function getSidebarNode(kind: "file" | "directory", targetPath: string): Promise<DirectoryNode | null> {
+  try {
+    const stats = await fs.stat(targetPath);
+
+    if (kind === "file") {
+      if (!stats.isFile() || !isMarkdownFile(targetPath)) {
+        return null;
+      }
+
+      return {
+        type: "file",
+        name: path.basename(targetPath),
+        path: targetPath
+      };
+    }
+
+    if (!stats.isDirectory()) {
+      return null;
+    }
+
+    return {
+      type: "directory",
+      name: path.basename(targetPath),
+      path: targetPath,
+      children: await buildDirectoryTree(targetPath)
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function buildDirectoryTree(dirPath: string): Promise<DirectoryNode[]> {
@@ -434,52 +597,8 @@ async function createWindow() {
     );
   }
 
-  const menu = Menu.buildFromTemplate([
-    {
-      label: "File",
-      submenu: [
-        {
-          label: "New Note",
-          accelerator: "CmdOrCtrl+N",
-          click: () => mainWindow?.webContents.send("app:command", "new-file" satisfies AppCommand)
-        },
-        {
-          label: "Open File",
-          accelerator: "CmdOrCtrl+O",
-          click: () => mainWindow?.webContents.send("app:command", "open-file" satisfies AppCommand)
-        },
-        {
-          label: "Open Folder",
-          accelerator: "CmdOrCtrl+Shift+O",
-          click: () => mainWindow?.webContents.send("app:command", "open-folder" satisfies AppCommand)
-        },
-        { type: "separator" },
-        {
-          label: "Save",
-          accelerator: "CmdOrCtrl+S",
-          click: () => mainWindow?.webContents.send("app:command", "save" satisfies AppCommand)
-        },
-        { type: "separator" },
-        {
-          label: "Toggle Sidebar",
-          accelerator: "CmdOrCtrl+B",
-          click: () => mainWindow?.webContents.send("app:command", "toggle-sidebar" satisfies AppCommand)
-        },
-        { type: "separator" },
-        {
-          label: "Command Palette",
-          accelerator: "CmdOrCtrl+P",
-          click: () => mainWindow?.webContents.send("app:command", "quick-open" satisfies AppCommand)
-        }
-      ]
-    },
-    {
-      label: "View",
-      submenu: [{ role: "reload" }, { role: "toggleDevTools" }]
-    }
-  ]);
-
-  Menu.setApplicationMenu(menu);
+  const settings = await loadSettings();
+  refreshApplicationMenu(settings.shortcuts);
 }
 
 ipcMain.handle("dialog:open", async (_event, kind: "file" | "directory") => showOpenDialog(kind));
@@ -543,6 +662,8 @@ ipcMain.handle("workspace:createFolder", async (_event, parentDir: string, folde
 
 ipcMain.handle("workspace:search", async (_event, query: string) => searchWorkspace(query));
 
+ipcMain.handle("sidebar:getNode", async (_event, kind: "file" | "directory", targetPath: string) => getSidebarNode(kind, targetPath));
+
 ipcMain.handle("workspace:openDocument", async () => {
   const selection = await showOpenDialog("file");
 
@@ -557,7 +678,13 @@ ipcMain.handle("settings:get", async () => loadSettings());
 
 ipcMain.handle("settings:update", async (_event, patch: unknown) => {
   const sanitizedPatch = sanitizeSettingsPatch(patch);
-  return updateSettings(sanitizedPatch);
+  const nextSettings = await updateSettings(sanitizedPatch);
+  refreshApplicationMenu(nextSettings.shortcuts);
+  return nextSettings;
+});
+
+ipcMain.handle("app:revealInFinder", async (_event, targetPath: string) => {
+  return shell.showItemInFolder(targetPath);
 });
 
 async function getExternalPathTarget(targetPath: string) {

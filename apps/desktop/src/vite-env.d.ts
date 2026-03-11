@@ -16,11 +16,13 @@ declare global {
       deleteFile: (targetPath: string) => Promise<string>;
       createFolder: (parentDir: string, folderName: string) => Promise<WorkspaceSnapshot["tree"]>;
       searchWorkspace: (query: string) => Promise<SearchResult[]>;
+      getSidebarNode: (kind: "file" | "directory", targetPath: string) => Promise<WorkspaceSnapshot["tree"][number] | null>;
       getSettings: () => Promise<AppSettings>;
       updateSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>;
       onWorkspaceChanged: (listener: (event: WorkspaceChangeEvent) => void) => () => void;
       onCommand: (listener: (command: AppCommand) => void) => () => void;
       getPendingExternalPath: () => Promise<ExternalFileTarget | null>;
+      revealInFinder: (targetPath: string) => Promise<boolean>;
       onExternalFile: (listener: (target: ExternalFileTarget) => void) => () => void;
     };
   }

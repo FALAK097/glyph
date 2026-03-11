@@ -63,6 +63,9 @@ const api = {
   searchWorkspace(query: string) {
     return invokeWithRetry<SearchResult[]>("workspace:search", query);
   },
+  getSidebarNode(kind: "file" | "directory", targetPath: string) {
+    return invokeWithRetry<WorkspaceSnapshot["tree"][number] | null>("sidebar:getNode", kind, targetPath);
+  },
   getSettings() {
     return invokeWithRetry<AppSettings>("settings:get");
   },
@@ -93,6 +96,9 @@ const api = {
   },
   getPendingExternalPath() {
     return invokeWithRetry<ExternalFileTarget | null>("app:getPendingExternalPath");
+  },
+  revealInFinder(targetPath: string) {
+    return invokeWithRetry<boolean>("app:revealInFinder", targetPath);
   },
   onExternalFile(listener: (target: ExternalFileTarget) => void) {
     const wrapped = (_event: Electron.IpcRendererEvent, target: ExternalFileTarget) => {

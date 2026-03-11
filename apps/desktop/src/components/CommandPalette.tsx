@@ -103,6 +103,11 @@ export function CommandPalette({
             value={query}
             onChange={(event) => onChangeQuery(event.target.value)}
             onKeyDown={(event) => {
+              // Allow Cmd+A for select all
+              if ((event.metaKey || event.ctrlKey) && event.key === "a") {
+                return;
+              }
+
               if (event.key === "ArrowDown") {
                 event.preventDefault();
                 onMove(1);

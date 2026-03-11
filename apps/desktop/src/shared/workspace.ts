@@ -50,12 +50,23 @@ export type ShortcutSetting = {
   keys: string;
 };
 
+export type SidebarItemSetting = {
+  kind: "file" | "directory";
+  path: string;
+};
+
+export type SidebarState = {
+  items: SidebarItemSetting[];
+  expandedFolders: string[];
+};
+
 export type AppSettings = {
   defaultWorkspacePath: string;
   themeId: string;
   themeMode: ThemeMode;
   recentFiles: string[];
   shortcuts: ShortcutSetting[];
+  sidebar: SidebarState;
 };
 
 export type AppCommand = "open-file" | "open-folder" | "save" | "new-file" | "new-folder" | "search" | "quick-open" | "toggle-sidebar";

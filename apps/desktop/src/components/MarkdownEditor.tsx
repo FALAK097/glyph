@@ -26,6 +26,7 @@ type MarkdownEditorProps = {
   onCreateNote?: () => void;
   toggleSidebarShortcut?: string;
   newNoteShortcut?: string;
+  onOpenSettings?: () => void;
 };
 
 export function MarkdownEditor({
@@ -40,9 +41,11 @@ export function MarkdownEditor({
   isSidebarCollapsed,
   onCreateNote,
   toggleSidebarShortcut,
-  newNoteShortcut
+  newNoteShortcut,
+  onOpenSettings
 }: MarkdownEditorProps) {
   const lastSyncedMarkdown = useRef(content);
+  const toastTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -111,13 +114,36 @@ export function MarkdownEditor({
   }, [content, editor]);
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [toast, setToast] = useState<{ title: string; description: string } | null>(null);
+
+  const showToast = (title: string, description: string) => {
+    if (toastTimeoutRef.current) {
+      window.clearTimeout(toastTimeoutRef.current);
+    }
+
+    setToast({ title, description });
+    toastTimeoutRef.current = window.setTimeout(() => {
+      setToast(null);
+      toastTimeoutRef.current = null;
+    }, 2000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) {
+        window.clearTimeout(toastTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleCopyPath = async () => {
     if (filePath) {
       try {
         await navigator.clipboard.writeText(filePath);
+        showToast("Path copied to clipboard", "");
       } catch (err) {
         console.error("Failed to copy path:", err);
+        showToast("Failed to copy path", "");
       }
     }
   };
@@ -126,17 +152,25 @@ export function MarkdownEditor({
     if (content) {
       try {
         await navigator.clipboard.writeText(content);
+        showToast("Copied as Markdown", "");
       } catch (err) {
         console.error("Failed to copy content:", err);
+        showToast("Failed to copy content", "");
       }
     }
   };
 
-  const handleOpenExternal = () => {
+  const handleOpenExternal = async () => {
     if (filePath && window.typist) {
-      // The file is already on disk, we can use shell.openPath if available
-      // For now, we'll just show an alert that this feature requires implementation
-      console.log("Open external for:", filePath);
+      try {
+        const didReveal = await window.typist.revealInFinder(filePath);
+        if (!didReveal) {
+          showToast("Could not open in Finder", "");
+        }
+      } catch (err) {
+        console.error("Failed to open in Finder:", err);
+        showToast("Could not open in Finder", "");
+      }
     }
   };
 
@@ -181,8 +215,8 @@ export function MarkdownEditor({
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
             </button>
           </div>
-          <div>
-            <span className="text-sm font-medium text-foreground truncate max-w-[300px]">
+          <div className="min-w-0 max-w-[300px]">
+            <span className="text-sm font-medium text-foreground truncate block">
               {fileName?.replace(/\.(md|markdown)$/i, "") ?? "Untitled"}
             </span>
           </div>
@@ -195,6 +229,15 @@ export function MarkdownEditor({
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
           </button>
+          {onOpenSettings && (
+            <button 
+              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors" 
+              title="Settings"
+              onClick={onOpenSettings}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/></svg>
+            </button>
+          )}
           
           {isMenuOpen && (
             <>
@@ -221,7 +264,16 @@ export function MarkdownEditor({
                   onClick={() => { handleOpenExternal(); setIsMenuOpen(false); }}
                   disabled={!filePath}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-70"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 48 48" className="shrink-0">
+                    <path fill="#e1e1e1" d="M40.056 40.98H8.944A3.95 3.95 0 0 1 5 37.036V9.964A3.95 3.95 0 0 1 8.944 6.02h31.112A3.95 3.95 0 0 1 44 9.964v27.072a3.95 3.95 0 0 1-3.944 3.944Z" />
+                    <path fill="#e1e1e1" d="M38.992 6.04H26.32a.086.086 0 0 0-.081.056 51.745 51.745 0 0 0-2.399 8.354 49.15 49.15 0 0 0-1.026 8.46c-.002.05.037.09.087.09h3.819c.4 0 .79.17 1.06.47.27.3.4.7.36 1.1-.277 2.908-.28 5.855.02 8.764.005.05.052.088.102.078 2.307-.44 5.265-1.464 8.028-3.783.43-.35 1.06-.29 1.41.13.36.42.3 1.05-.12 1.41-3.138 2.623-6.501 3.757-9.08 4.235-.045.008-.074.051-.067.096.276 1.831.676 3.652 1.18 5.435.01.039.044.065.083.065h9.222A4.084 4.084 0 0 0 43 36.917V10.048a4.008 4.008 0 0 0-4.008-4.008ZM34.15 17.95a1 1 0 0 1-2 0V14.7a1 1 0 1 1 2 0v3.25Z" />
+                    <path fill="#00b7f9" d="M32.15 17.95V14.7a1 1 0 1 1 2 0v3.25a1 1 0 1 1-2 0Z" />
+                    <path fill="#00b7f9" d="M37.58 31.17c-3.17 2.65-6.57 3.78-9.16 4.25.28 1.88.69 3.75 1.21 5.58H9.003A4.003 4.003 0 0 1 5 36.997V10.053A4.017 4.017 0 0 1 9.013 6.04H26.26a50.1 50.1 0 0 0-2.42 8.41c-.56 2.81-.91 5.68-1.03 8.55h3.91c.4 0 .79.17 1.06.47.27.3.4.7.36 1.1-.28 2.94-.28 5.92.03 8.86 2.32-.43 5.32-1.45 8.12-3.8.43-.35 1.06-.29 1.41.13.36.42.3 1.05-.12 1.41Z" />
+                    <path fill="#00a0d1" d="M29.63 41a50.689 50.689 0 0 1-1.21-5.58c-.09-.59-.17-1.19-.23-1.78-.01-.07-.01-.14-.02-.21-.31-2.94-.31-5.92-.03-8.86.04-.4-.09-.8-.36-1.1-.27-.3-.66-.47-1.06-.47h-3.91c.12-2.87.47-5.74 1.03-8.55a50.1 50.1 0 0 1 2.42-8.41c.08-.21.16-.41.24-.62l-1.86-.73c-.17.45-.34.9-.5 1.35a46.49 46.49 0 0 0-2.26 8.02c-.63 3.11-.99 6.29-1.09 9.47-.01.39.13.76.41 1.04.26.27.64.43 1.03.43h3.86c-.24 2.89-.21 5.81.09 8.69.01.05.01.11.02.16.07.61.14 1.22.24 1.82.26 1.8.64 3.58 1.11 5.33.26.95.54 1.88.86 2.81l1.9-.65A39.35 39.35 0 0 1 29.63 41Z" />
+                    <path fill="#37474f" d="M37.58 31.17c-3.17 2.65-6.57 3.78-9.16 4.25-.73.13-1.4.21-1.98.25-.56.05-1.04.06-1.41.06-6.41 0-10.91-3.19-12.55-4.56a1.004 1.004 0 1 1 1.28-1.54c1.47 1.24 5.51 4.1 11.27 4.1.31 0 .7-.01 1.15-.04.57-.04 1.24-.12 1.99-.26 2.32-.43 5.32-1.45 8.12-3.8.43-.35 1.06-.29 1.41.13.36.42.3 1.05-.12 1.41Z" />
+                    <path fill="#37474f" d="M15.826 18.95a1 1 0 0 1-1-1v-3.248a1 1 0 1 1 2 0v3.248a1 1 0 0 1-1 1Z" />
+                    <path fill="#37474f" d="M34.15 14.7v3.25a1 1 0 1 1-2 0V14.7a1 1 0 1 1 2 0Z" />
+                  </svg>
                   Open in Finder
                 </button>
                 <button 
@@ -247,6 +299,22 @@ export function MarkdownEditor({
         </div>
         <p className="editor-status">{saveStateLabel}</p>
       </div>
+      {toast ? (
+        <div className="toast-card" role="status" aria-live="polite">
+          <div className="toast-icon" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <path d="m9 12 2 2 4-4" />
+            </svg>
+          </div>
+          <div className="toast-copy">
+            <p className="toast-title">{toast.title}</p>
+            {toast.description && (
+              <p className="toast-description">{toast.description}</p>
+            )}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

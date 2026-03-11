@@ -11,6 +11,7 @@ import TaskList from "@tiptap/extension-task-list";
 import StarterKit from "@tiptap/starter-kit";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { Markdown } from "tiptap-markdown";
+import html2pdf from "html2pdf.js";
 import { SlashCommand } from "./SlashCommand";
 
 type MarkdownEditorProps = {
@@ -27,6 +28,12 @@ type MarkdownEditorProps = {
   toggleSidebarShortcut?: string;
   newNoteShortcut?: string;
   onOpenSettings?: () => void;
+  onOpenCommandPalette?: () => void;
+  commandPaletteShortcut?: string;
+  onNavigateBack?: () => void;
+  onNavigateForward?: () => void;
+  canGoBack?: boolean;
+  canGoForward?: boolean;
 };
 
 export function MarkdownEditor({
@@ -42,7 +49,13 @@ export function MarkdownEditor({
   onCreateNote,
   toggleSidebarShortcut,
   newNoteShortcut,
-  onOpenSettings
+  onOpenSettings,
+  onOpenCommandPalette,
+  commandPaletteShortcut,
+  onNavigateBack,
+  onNavigateForward,
+  canGoBack,
+  canGoForward
 }: MarkdownEditorProps) {
   const lastSyncedMarkdown = useRef(content);
   const toastTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
@@ -174,22 +187,46 @@ export function MarkdownEditor({
     }
   };
 
-  const handleExport = () => {
-    // Export to PDF would require additional libraries like html2pdf or jspdf
-    // For now, we'll just copy to clipboard as a workaround
-    handleCopy();
-    alert("Content copied to clipboard. PDF export coming soon!");
+  const handleExportPDF = async () => {
+    if (!editor || !fileName) {
+      showToast("Could not export PDF", "No file name available");
+      return;
+    }
+
+    try {
+      const element = document.querySelector(".tiptap-editor") as HTMLElement | null;
+      if (!element) {
+        showToast("Could not export PDF", "Editor content not found");
+        return;
+      }
+
+      const filename = fileName.replace(/\.md$/i, ".pdf");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      const pdf = (html2pdf() as any).set({
+        margin: 10,
+        filename,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { orientation: "portrait", unit: "mm", format: "a4" }
+      });
+      void pdf.from(element).save();
+      showToast("PDF exported successfully", `Saved as ${filename}`);
+    } catch (err) {
+      console.error("Failed to export PDF:", err);
+      showToast("Failed to export PDF", err instanceof Error ? err.message : "Unknown error");
+    }
   };
 
   return (
     <section className="editor-shell">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border/40">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center px-4 py-2 border-b border-border/40 gap-2">
+        {/* Left: toolbar + title */}
+        <div className="flex items-center gap-1 flex-shrink-0 min-w-0">
           {onToggleSidebar && (
             <button
-              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors mr-1"
+              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors flex-shrink-0"
               onClick={onToggleSidebar}
-               title={isSidebarCollapsed ? `Show Sidebar (${toggleSidebarShortcut ?? "⌘B"})` : `Hide Sidebar (${toggleSidebarShortcut ?? "⌘B"})`}
+              title={isSidebarCollapsed ? `Show Sidebar (${toggleSidebarShortcut ?? "⌘B"})` : `Hide Sidebar (${toggleSidebarShortcut ?? "⌘B"})`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 {isSidebarCollapsed ? (
@@ -200,28 +237,68 @@ export function MarkdownEditor({
               </svg>
             </button>
           )}
-          <div className="flex items-center gap-1 mr-2">
-            <button className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors opacity-50" title="Back">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-            </button>
-            <button className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors opacity-50" title="Forward">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-            </button>
-            <button 
-              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors" 
-              onClick={onCreateNote}
-               title={`New Note (${newNoteShortcut ?? "⌘N"})`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-            </button>
-          </div>
-          <div className="min-w-0 max-w-[300px]">
-            <span className="text-sm font-medium text-foreground truncate block">
-              {fileName?.replace(/\.(md|markdown)$/i, "") ?? "Untitled"}
-            </span>
-          </div>
+          <button
+            disabled={!canGoBack}
+            onClick={onNavigateBack}
+            className={`p-1.5 rounded transition-colors flex-shrink-0 ${
+              canGoBack
+                ? 'text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer'
+                : 'text-muted-foreground/40 cursor-not-allowed opacity-40'
+            }`}
+            title="Back"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <button
+            disabled={!canGoForward}
+            onClick={onNavigateForward}
+            className={`p-1.5 rounded transition-colors flex-shrink-0 ${
+              canGoForward
+                ? 'text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer'
+                : 'text-muted-foreground/40 cursor-not-allowed opacity-40'
+            }`}
+            title="Forward"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <button
+            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors flex-shrink-0"
+            onClick={onCreateNote}
+            title={`New Note (${newNoteShortcut ?? "⌘N"})`}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+          </button>
+          {fileName && (
+            <>
+              <span className="text-border/60 text-xs flex-shrink-0 mx-0.5">·</span>
+              <span
+                className="text-sm font-medium text-foreground truncate max-w-[180px]"
+                title={fileName.replace(/\.(md|markdown)$/i, "")}
+              >
+                {fileName.replace(/\.(md|markdown)$/i, "")}
+              </span>
+            </>
+          )}
         </div>
-        <div className="flex items-center gap-1 relative">
+
+        {/* Center: search bar */}
+        {onOpenCommandPalette && (
+          <div className="flex-1 flex justify-center px-2 min-w-0">
+            <button
+              className="flex items-center justify-between w-full max-w-sm px-3 py-1.5 bg-transparent border border-border rounded-md text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors shadow-sm"
+              onClick={onOpenCommandPalette}
+            >
+              <div className="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-60 flex-shrink-0"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <span>Search typist</span>
+              </div>
+              <span className="font-mono text-xs opacity-50 ml-4 flex-shrink-0">{commandPaletteShortcut ?? "⌘P"}</span>
+            </button>
+          </div>
+        )}
+
+        {/* Right: actions */}
+        <div className="flex items-center gap-1 relative flex-shrink-0">
           <button 
             className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors" 
             title="More options"
@@ -278,7 +355,7 @@ export function MarkdownEditor({
                 </button>
                 <button 
                   className="w-full flex items-center gap-2 text-left px-3 py-1.5 text-sm text-foreground hover:bg-accent hover:text-accent-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={() => { handleExport(); setIsMenuOpen(false); }}
+                  onClick={() => { void handleExportPDF(); setIsMenuOpen(false); }}
                   disabled={!content}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-70"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><polyline points="9 15 12 18 15 15"/><line x1="12" y1="11" x2="12" y2="18"/></svg>
@@ -292,12 +369,13 @@ export function MarkdownEditor({
       <div className="editor-canvas">
         <EditorContent editor={editor} />
       </div>
-      <div className="editor-footer">
-        <div className="editor-metrics">
+      <div className="absolute bottom-6 right-10 flex items-center gap-3 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur-sm border border-border shadow-sm z-10 pointer-events-none">
+        <div className="flex items-center gap-2 text-muted-foreground text-xs">
           <span>{wordCount} words</span>
           <span>{readingTime} min read</span>
         </div>
-        <p className="editor-status">{saveStateLabel}</p>
+        <div className="w-[1px] h-3 bg-border" />
+        <p className="text-xs font-medium text-foreground m-0">{saveStateLabel}</p>
       </div>
       {toast ? (
         <div className="toast-card" role="status" aria-live="polite">

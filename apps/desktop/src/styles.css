@@ -165,7 +165,8 @@ html, body {
 
 /* Base Layout without bubbles */
 .app-shell {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
   transition: grid-template-columns 200ms ease;
@@ -181,7 +182,7 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  padding: 44px 18px 18px; /* Extra top padding for macOS traffic lights */
+  padding: 0 18px 18px; /* No extra top padding - header handles spacing */
   background-color: var(--sidebar);
   color: var(--sidebar-foreground);
   border-right: 1px solid var(--border);
@@ -272,7 +273,9 @@ html, body {
 }
 
 .sidebar-node .group {
-  /* Don't use overflow: hidden here as it clips the menu */
+  /* Dropdown uses position:fixed so overflow:hidden is safe here */
+  overflow: hidden;
+  min-width: 0;
 }
 
 .sidebar-directory {
@@ -319,13 +322,16 @@ html, body {
 .workspace-shell {
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100%;
+  overflow: hidden;
   position: relative;
   background-color: var(--background);
 }
 
 .editor-shell {
   flex: 1;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -366,8 +372,24 @@ html, body {
 
 .editor-canvas {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   position: relative;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.editor-canvas::-webkit-scrollbar {
+  display: none;
+}
+
+.sidebar-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.sidebar-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .tiptap-editor {
@@ -575,16 +597,7 @@ html, body {
 }
 
 /* Footer Metrics (Bottom Right) */
-.editor-footer {
-  position: absolute;
-  bottom: 24px;
-  right: 40px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  z-index: 10;
-  background: var(--background);
-}
+/* The footer is now styled with Tailwind directly in MarkdownEditor.tsx */
 
 .toast-card {
   position: fixed;
@@ -659,27 +672,6 @@ html, body {
 .toast-dismiss:hover {
   background: var(--accent);
   color: var(--accent-foreground);
-}
-
-.editor-status {
-  margin: 0;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--secondary);
-  color: var(--secondary-foreground);
-  font-size: 0.75rem;
-  font-weight: 500;
-  border: 1px solid var(--border);
-}
-
-.editor-metrics {
-  display: flex;
-  gap: 8px;
-}
-
-.editor-metrics span {
-  font-size: 0.75rem;
-  color: var(--muted-foreground);
 }
 
 /* Modals */

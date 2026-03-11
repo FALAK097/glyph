@@ -10,6 +10,9 @@ type WorkspaceState = {
   isSaving: boolean;
   lastSavedAt: number | null;
   error: string | null;
+  // Navigation history
+  navigationHistory: string[];
+  navigationIndex: number;
   setWorkspace: (payload: {
     rootPath: string;
     tree: DirectoryNode[];
@@ -22,9 +25,15 @@ type WorkspaceState = {
   markSaved: (file: FileDocument) => void;
   setSaving: (isSaving: boolean) => void;
   setError: (message: string | null) => void;
+  // Navigation history methods
+  pushHistory: (filePath: string) => void;
+  canGoBack: () => boolean;
+  canGoForward: () => boolean;
+  goBack: () => string | null;
+  goForward: () => string | null;
 };
 
-export const useWorkspaceStore = create<WorkspaceState>((set) => ({
+export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   rootPath: null,
   tree: [],
   activeFile: null,
@@ -33,6 +42,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   isSaving: false,
   lastSavedAt: null,
   error: null,
+  navigationHistory: [],
+  navigationIndex: -1,
   setWorkspace: ({ rootPath, tree, activeFile }) =>
     set({
       rootPath,
@@ -41,7 +52,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       draftContent: activeFile?.content ?? "",
       isDirty: false,
       lastSavedAt: activeFile ? Date.now() : null,
-      error: null
+      error: null,
+      navigationHistory: activeFile ? [activeFile.path] : [],
+      navigationIndex: activeFile ? 0 : -1
     }),
   setTree: (tree) => set({ tree }),
   setActiveFile: (activeFile) =>
@@ -64,5 +77,54 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
       lastSavedAt: Date.now()
     })),
   setSaving: (isSaving) => set({ isSaving }),
-  setError: (error) => set({ error })
+  setError: (error) => set({ error }),
+  pushHistory: (filePath) => {
+    set((state) => {
+      // If we're not at the end of history, remove forward entries
+      const newHistory = state.navigationHistory.slice(0, state.navigationIndex + 1);
+      
+      // Don't add duplicate consecutive entries
+      if (newHistory[newHistory.length - 1] === filePath) {
+        return state;
+      }
+      
+      newHistory.push(filePath);
+      
+      // Limit history to 50 entries
+      if (newHistory.length > 50) {
+        newHistory.shift();
+      }
+      
+      return {
+        navigationHistory: newHistory,
+        navigationIndex: newHistory.length - 1
+      };
+    });
+  },
+  canGoBack: () => {
+    const state = get();
+    return state.navigationIndex > 0;
+  },
+  canGoForward: () => {
+    const state = get();
+    return state.navigationIndex < state.navigationHistory.length - 1;
+  },
+  goBack: () => {
+    const state = get();
+    if (state.navigationIndex > 0) {
+      const newIndex = state.navigationIndex - 1;
+      set({ navigationIndex: newIndex });
+      return state.navigationHistory[newIndex];
+    }
+    return null;
+  },
+  goForward: () => {
+    const state = get();
+    if (state.navigationIndex < state.navigationHistory.length - 1) {
+      const newIndex = state.navigationIndex + 1;
+      set({ navigationIndex: newIndex });
+      return state.navigationHistory[newIndex];
+    }
+    return null;
+  }
 }));

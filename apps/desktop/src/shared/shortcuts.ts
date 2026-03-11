@@ -9,7 +9,9 @@ export type ShortcutId =
   | "settings"
   | "previous-note"
   | "next-note"
-  | "toggle-sidebar";
+  | "toggle-sidebar"
+  | "navigate-back"
+  | "navigate-forward";
 
 export type ShortcutDefinition = ShortcutSetting & {
   id: ShortcutId;
@@ -41,7 +43,9 @@ export const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
   { id: "settings", label: "Settings", keys: "⌘ ," },
   { id: "previous-note", label: "Previous Note", keys: "⌥ ↑" },
   { id: "next-note", label: "Next Note", keys: "⌥ ↓" },
-  { id: "toggle-sidebar", label: "Toggle Sidebar", keys: "⌘ B" }
+  { id: "toggle-sidebar", label: "Toggle Sidebar", keys: "⌘ B" },
+  { id: "navigate-back", label: "Navigate Back", keys: "⌘ [" },
+  { id: "navigate-forward", label: "Navigate Forward", keys: "⌘ ]" }
 ];
 
 const MODIFIER_TOKENS = new Set(["⌘", "⌥", "⇧"]);

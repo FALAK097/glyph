@@ -18,6 +18,14 @@ const __dirname = path.dirname(__filename);
 const isDev = !app.isPackaged;
 const devServerUrl = "http://127.0.0.1:5173";
 
+// Set app name early
+app.setName("Typist");
+app.setAppUserModelId("com.typist.app");
+
+const iconPath = isDev
+  ? path.join(__dirname, "../public/icon-128x128.svg")
+  : path.join(__dirname, "../public/icon-128x128.svg");
+
 let mainWindow: BrowserWindow | null = null;
 let activeWatcher: ReturnType<typeof watch> | null = null;
 let activeWorkspaceRoot: string | null = null;
@@ -569,6 +577,7 @@ async function createWindow() {
     height: 920,
     minWidth: 980,
     minHeight: 700,
+    icon: iconPath,
     titleBarStyle: "hiddenInset",
     backgroundColor: "#f8f6f1",
     webPreferences: {

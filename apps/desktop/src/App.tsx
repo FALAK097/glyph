@@ -233,7 +233,12 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
     updateDraftContent,
     markSaved,
     setSaving,
-    setError
+    setError,
+    pushHistory,
+    canGoBack,
+    canGoForward,
+    goBack,
+    goForward
   } = useWorkspaceStore();
 
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -452,7 +457,8 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
   const openFile = useCallback(async (filePath: string) => {
     const file = await typist.readFile(filePath);
     await syncOpenedFile(file);
-  }, [syncOpenedFile, typist]);
+    pushHistory(filePath);
+  }, [syncOpenedFile, typist, pushHistory]);
 
   const createNote = useCallback(async () => {
     const baseDir = isWorkspaceMode ? rootPath : settings?.defaultWorkspacePath ?? null;
@@ -472,14 +478,30 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
 
   const currentFileIndex = files.findIndex((item) => item.path === activeFile?.path);
 
-  const moveNote = useCallback(async (direction: 1 | -1) => {
-    if (currentFileIndex === -1 || files.length === 0) {
-      return;
-    }
+   const moveNote = useCallback(async (direction: 1 | -1) => {
+     if (currentFileIndex === -1 || files.length === 0) {
+       return;
+     }
 
-    const nextIndex = (currentFileIndex + direction + files.length) % files.length;
-    await openFile(files[nextIndex].path);
-  }, [currentFileIndex, files, openFile]);
+     const nextIndex = (currentFileIndex + direction + files.length) % files.length;
+     await openFile(files[nextIndex].path);
+   }, [currentFileIndex, files, openFile]);
+
+   const navigateBack = useCallback(async () => {
+     const prevPath = goBack();
+     if (prevPath) {
+       const file = await typist.readFile(prevPath);
+       setActiveFile(file);
+     }
+   }, [goBack, typist, setActiveFile]);
+
+   const navigateForward = useCallback(async () => {
+     const nextPath = goForward();
+     if (nextPath) {
+       const file = await typist.readFile(nextPath);
+       setActiveFile(file);
+     }
+   }, [goForward, typist, setActiveFile]);
 
   const handleDeleteFile = useCallback(async (filePath: string) => {
     try {
@@ -579,27 +601,45 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
         kind: "command",
         onSelect: () => { void moveNote(-1); setIsPaletteOpen(false); }
       },
-      {
-        id: "next-note",
-        title: "Next note",
-        subtitle: "Jump to next note",
-        shortcut: getShortcutDisplay(shortcuts, "next-note"),
-        section: "Actions",
-        kind: "command",
-        onSelect: () => { void moveNote(1); setIsPaletteOpen(false); }
-      },
-      {
-        id: "settings",
-        title: "Settings",
-        subtitle: "Adjust workspace defaults",
-        shortcut: getShortcutDisplay(shortcuts, "settings"),
-        section: "Actions",
-        kind: "command",
-        onSelect: () => {
-          setIsSettingsOpen(true);
-          setIsPaletteOpen(false);
-        }
-      },
+       {
+         id: "next-note",
+         title: "Next note",
+         subtitle: "Jump to next note",
+         shortcut: getShortcutDisplay(shortcuts, "next-note"),
+         section: "Actions",
+         kind: "command",
+         onSelect: () => { void moveNote(1); setIsPaletteOpen(false); }
+       },
+       {
+         id: "navigate-back",
+         title: "Navigate Back",
+         subtitle: "Go to previous file in history",
+         shortcut: getShortcutDisplay(shortcuts, "navigate-back"),
+         section: "Navigation",
+         kind: "command",
+         onSelect: () => { void navigateBack(); setIsPaletteOpen(false); }
+       },
+       {
+         id: "navigate-forward",
+         title: "Navigate Forward",
+         subtitle: "Go to next file in history",
+         shortcut: getShortcutDisplay(shortcuts, "navigate-forward"),
+         section: "Navigation",
+         kind: "command",
+         onSelect: () => { void navigateForward(); setIsPaletteOpen(false); }
+       },
+       {
+         id: "settings",
+         title: "Settings",
+         subtitle: "Adjust workspace defaults",
+         shortcut: getShortcutDisplay(shortcuts, "settings"),
+         section: "Actions",
+         kind: "command",
+         onSelect: () => {
+           setIsSettingsOpen(true);
+           setIsPaletteOpen(false);
+         }
+       },
       {
         id: "theme-light",
         title: "Theme: Light",
@@ -681,7 +721,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
     });
 
     return items;
-  }, [createNote, files, moveNote, openFile, paletteQuery, saveSettings, searchResults, shortcuts, syncOpenedFile, syncWorkspace]);
+  }, [createNote, files, moveNote, openFile, paletteQuery, saveSettings, searchResults, shortcuts, syncOpenedFile, syncWorkspace, navigateBack, navigateForward]);
 
   useEffect(() => {
     if (!isPaletteOpen) {
@@ -764,6 +804,12 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
             case "next-note":
               void moveNote(1);
               break;
+            case "navigate-back":
+              void navigateBack();
+              break;
+            case "navigate-forward":
+              void navigateForward();
+              break;
           }
           return;
         }
@@ -784,7 +830,7 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [shortcuts, activeFile, draftContent, markSaved, setError, setSaving, typist, createNote, moveNote, syncOpenedFile, syncWorkspace]);
+  }, [shortcuts, activeFile, draftContent, markSaved, setError, setSaving, typist, createNote, moveNote, syncOpenedFile, syncWorkspace, navigateBack, navigateForward]);
 
   useEffect(() => {
     return typist.onCommand(async (command) => {
@@ -856,18 +902,6 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
         onReorderNodes={handleReorderNodes}
       />
       <main className={`workspace-shell single-pane relative transition-all duration-200 ${isSidebarCollapsed ? 'ml-0' : ''}`}>
-        <div className="absolute top-[13px] left-1/2 -translate-x-1/2 z-10 w-full max-w-md px-4">
-          <button 
-            className="flex items-center justify-between w-full px-3 py-1.5 bg-transparent border border-border rounded-md text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors shadow-sm"
-            onClick={() => setIsPaletteOpen(true)}
-          >
-            <div className="flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-70"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-              <span className="text-base">Search typist</span>
-            </div>
-            <span className="font-mono text-xs opacity-60">{getShortcutDisplay(shortcuts, "command-palette") ?? "⌘P"}</span>
-          </button>
-        </div>
         {error ? <div className="error-banner">{error}</div> : null}
         <MarkdownEditor
           content={draftContent}
@@ -883,6 +917,12 @@ function DesktopApp({ typist }: { typist: NonNullable<Window["typist"]> }) {
           toggleSidebarShortcut={getShortcutDisplay(shortcuts, "toggle-sidebar")}
           newNoteShortcut={getShortcutDisplay(shortcuts, "new-note")}
           onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenCommandPalette={() => setIsPaletteOpen(true)}
+          commandPaletteShortcut={getShortcutDisplay(shortcuts, "command-palette") ?? "⌘P"}
+          onNavigateBack={() => void navigateBack()}
+          onNavigateForward={() => void navigateForward()}
+          canGoBack={canGoBack()}
+          canGoForward={canGoForward()}
         />
       </main>
       <CommandPalette

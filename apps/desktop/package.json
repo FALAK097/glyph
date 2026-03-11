@@ -2,7 +2,21 @@
   "name": "@typist/desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "Typist desktop markdown editor.",
+  "description": "Typist - A minimal markdown viewer and editor for macOS and Windows. Browse local notes, edit markdown fast, and read rendered documents in a focused desktop workspace.",
+  "author": "Falak Gala",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/FALAK097/typist.git"
+  },
+  "keywords": [
+    "markdown",
+    "editor",
+    "notes",
+    "desktop",
+    "electron",
+    "minimal",
+    "productivity"
+  ],
   "main": "dist-electron/electron/main.js",
   "type": "module",
   "scripts": {
@@ -28,6 +42,7 @@
     "@tiptap/suggestion": "^3.20.1",
     "chokidar": "^4.0.3",
     "electron": "^35.0.0",
+    "html2pdf.js": "^0.14.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tippy.js": "^6.3.7",

@@ -3,45 +3,20 @@ import { useState, useEffect, useRef } from "react";
 import { DEFAULT_SHORTCUTS, canonicalizeShortcut, mergeShortcutSettings } from "../shared/shortcuts";
 
 
-function CustomSelect({ value, onChange, options }: { value: string, onChange: (val: string) => void, options: { value: string, label: string }[] }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const current = options.find(o => o.value === value) || options[0];
-  
+function CustomSelect({ value, onChange, options }: { value: string; onChange: (val: string) => void; options: { value: string; label: string }[] }) {
   return (
-    <div className="relative">
-      <button 
-        type="button"
-        className="flex items-center justify-between w-[120px] bg-background border border-border rounded-md pl-3 pr-2 py-1.5 text-sm font-medium hover:bg-muted/50 transition-colors cursor-pointer outline-none focus:ring-2 focus:ring-primary/20"
-        onClick={() => setIsOpen(!isOpen)}
-        onBlur={() => setTimeout(() => setIsOpen(false), 200)}
-      >
-        <span>{current.label}</span>
-        <svg className="h-4 w-4 text-muted-foreground ml-2 pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-        </svg>
-      </button>
-      {isOpen && (
-        <div className="absolute right-0 z-50 w-[120px] mt-1 bg-background border border-border rounded-md shadow-lg overflow-hidden py-1">
-          {options.map((option) => (
-            <div 
-              key={option.value}
-              className={`px-3 py-1.5 text-sm cursor-pointer hover:bg-muted/50 transition-colors flex items-center justify-between ${value === option.value ? 'text-foreground' : 'text-muted-foreground'}`}
-              onClick={() => {
-                onChange(option.value);
-                setIsOpen(false);
-              }}
-            >
-              <span>{option.label}</span>
-              {value === option.value && (
-                <svg className="h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                </svg>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+    <select
+      aria-label="Theme mode"
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      className="w-[120px] bg-background border border-border rounded-md px-3 py-1.5 text-sm font-medium focus:ring-2 focus:ring-primary/20"
+    >
+      {options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
   );
 }
 

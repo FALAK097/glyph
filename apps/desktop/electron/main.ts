@@ -344,7 +344,11 @@ async function readMarkdownFile(filePath: string, recordRecent = false) {
     // Check if file exists first
     await fs.access(filePath);
   } catch (err) {
-    throw new Error(`File not found: ${filePath}`);
+    const code = typeof err === "object" && err && "code" in err ? String((err as { code?: unknown }).code) : "";
+    if (code === "ENOENT") {
+      throw new Error(`File not found: ${filePath}`);
+    }
+    throw err;
   }
 
   const content = await fs.readFile(filePath, "utf8");
@@ -632,6 +636,26 @@ ipcMain.handle("workspace:openDefault", async () => {
   return openWorkspace(settings.defaultWorkspacePath);
 });
 
+function assertBasename(name: string) {
+  if (path.basename(name) !== name) {
+    throw new Error("Names must not contain path separators.");
+  }
+}
+
+function assertWithinWorkspace(targetPath: string) {
+  if (!activeWorkspaceRoot) {
+    throw new Error("No workspace is open.");
+  }
+
+  const root = path.resolve(activeWorkspaceRoot);
+  const resolved = path.resolve(targetPath);
+  const relative = path.relative(root, resolved);
+
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error("Path is outside the active workspace.");
+  }
+}
+
 ipcMain.handle("workspace:openFile", async (_event, filePath: string) => readMarkdownFile(filePath, true));
 
 ipcMain.handle("workspace:saveFile", async (_event, filePath: string, content: string) => {
@@ -640,6 +664,8 @@ ipcMain.handle("workspace:saveFile", async (_event, filePath: string, content: s
 });
 
 ipcMain.handle("workspace:createFile", async (_event, parentDir: string, fileName: string) => {
+  assertWithinWorkspace(parentDir);
+  assertBasename(fileName);
   const normalizedFileName = fileName.endsWith(".md") ? fileName : `${fileName}.md`;
   const targetPath = path.join(parentDir, normalizedFileName);
   await fs.writeFile(targetPath, "", { flag: "wx" });
@@ -647,6 +673,8 @@ ipcMain.handle("workspace:createFile", async (_event, parentDir: string, fileNam
 });
 
 ipcMain.handle("workspace:renameFile", async (_event, oldPath: string, newName: string) => {
+  assertWithinWorkspace(oldPath);
+  assertBasename(newName);
   const hasMarkdownExt = newName.endsWith(".md") || newName.endsWith(".markdown");
   const normalizedFileName = hasMarkdownExt ? newName : `${newName}.md`;
   const newPath = path.join(path.dirname(oldPath), normalizedFileName);
@@ -655,11 +683,14 @@ ipcMain.handle("workspace:renameFile", async (_event, oldPath: string, newName: 
 });
 
 ipcMain.handle("workspace:deleteFile", async (_event, targetPath: string) => {
+  assertWithinWorkspace(targetPath);
   await fs.unlink(targetPath);
   return targetPath;
 });
 
 ipcMain.handle("workspace:createFolder", async (_event, parentDir: string, folderName: string) => {
+  assertWithinWorkspace(parentDir);
+  assertBasename(folderName);
   await fs.mkdir(path.join(parentDir, folderName), { recursive: false });
 
   if (!activeWorkspaceRoot) {
@@ -693,7 +724,7 @@ ipcMain.handle("settings:update", async (_event, patch: unknown) => {
 });
 
 ipcMain.handle("app:revealInFinder", async (_event, targetPath: string) => {
-  return shell.showItemInFolder(targetPath);
+  shell.showItemInFolder(targetPath);
 });
 
 async function getExternalPathTarget(targetPath: string) {

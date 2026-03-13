@@ -6,6 +6,7 @@ import Suggestion, {
 } from "@tiptap/suggestion";
 import { ReactRenderer } from "@tiptap/react";
 import tippy, { type Instance, type Props } from "tippy.js";
+import "tippy.js/dist/tippy.css";
 import { SlashCommandList, type SlashCommandItem, type SlashCommandListHandle } from "./SlashCommandList";
 
 type CommandKey =

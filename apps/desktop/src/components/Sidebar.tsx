@@ -71,8 +71,17 @@ function TreeNode({
   }, [dropPosition]);
 
   const handleRenameSubmit = () => {
-    if (renameValue.trim() && renameValue !== node.name.replace(/\.(md|markdown)$/i, "")) {
-      onRenameFile(node.path, renameValue);
+    const trimmed = renameValue.trim();
+    if (!trimmed) {
+      setIsRenaming(false);
+      return;
+    }
+
+    const currentName = node.name;
+    const baseName = currentName.replace(/\.(md|markdown)$/i, "");
+
+    if (trimmed !== currentName && trimmed !== baseName) {
+      onRenameFile(node.path, trimmed);
     }
     setIsRenaming(false);
   };

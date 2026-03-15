@@ -1,11 +1,10 @@
 import type { LogoProps } from "../types/logo";
 import { GlyphLogoMark } from "./icons";
 
-export const Logo = ({ size = 128, showText = false }: LogoProps) => {
+export const Logo = ({ size = 128 }: LogoProps) => {
   return (
-    <div className="flex items-center gap-2 font-semibold text-current">
+    <div className="flex items-center gap-2.5 font-semibold text-current">
       <GlyphLogoMark size={size} className="text-current" />
-      {showText ? <span className="text-sm">Glyph</span> : null}
     </div>
   );
 };

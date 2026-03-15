@@ -33,11 +33,11 @@ export const Sidebar = ({
     return (
       <aside className="flex flex-col h-full w-20 bg-sidebar border-r border-border items-center pt-3">
         {/* macOS drag area - centered logo with traffic light clearance */}
-        <div className="h-16 flex items-center justify-center flex-shrink-0 w-full" style={{ WebkitAppRegion: "drag" } as any}>
-          <div style={{ WebkitAppRegion: "no-drag" } as any} className="flex items-center justify-center">
-            <Logo size={20} />
-          </div>
-        </div>
+         <div className="h-16 flex items-center justify-center flex-shrink-0 w-full" style={{ WebkitAppRegion: "drag" } as any}>
+           <div style={{ WebkitAppRegion: "no-drag" } as any} className="flex items-center justify-center">
+             <Logo size={32} />
+           </div>
+         </div>
         <div className="flex-1" />
       </aside>
     );
@@ -46,12 +46,12 @@ export const Sidebar = ({
   // Expanded state: full sidebar with integrated header drag area
   return (
     <aside className="flex flex-col h-full w-[280px] bg-sidebar border-r border-border">
-      {/* Header with macOS drag area - centered logo with traffic light clearance */}
-      <div className="flex items-center justify-center min-h-12 border-b border-border/40 flex-shrink-0 bg-sidebar" style={{ WebkitAppRegion: "drag" } as any}>
-        <div style={{ WebkitAppRegion: "no-drag" } as any}>
-          <Logo size={20} showText={true} />
-        </div>
-      </div>
+       {/* Header with macOS drag area - centered logo with traffic light clearance */}
+       <div className="flex items-center justify-center min-h-16 border-b border-border/40 flex-shrink-0 bg-sidebar" style={{ WebkitAppRegion: "drag" } as any}>
+         <div style={{ WebkitAppRegion: "no-drag" } as any}>
+           <Logo size={32} showText={true} />
+         </div>
+       </div>
 
       {/* Scrollable content area */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden py-3 min-h-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">

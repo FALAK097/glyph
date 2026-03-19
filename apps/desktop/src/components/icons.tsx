@@ -4,7 +4,6 @@ import {
   ArrowLeft01Icon as ArrowLeft01Svg,
   ArrowRight01Icon as ArrowRight01Svg,
   ArrowRight02Icon as ArrowRight02Svg,
-  ArrowUpRight01Icon as ArrowUpRight01Svg,
   ArrowUp01Icon as ArrowUp01Svg,
   ArrowDown01Icon as ArrowDown01Svg,
   Cancel01Icon as Cancel01Svg,
@@ -17,6 +16,7 @@ import {
   FolderOpenIcon as FolderOpenSvg,
   KeyboardIcon as KeyboardSvg,
   Link01Icon as Link01Svg,
+  LinkSquare01Icon as LinkSquare01Svg,
   MoreHorizontalIcon as MoreHorizontalSvg,
   MoreVerticalIcon as MoreVerticalSvg,
   PanelLeftIcon as HugePanelLeftIcon,
@@ -53,7 +53,7 @@ export const PanelLeftIcon = (props: IconProps) => <HugeIcon icon={HugePanelLeft
 export const PanelRightIcon = (props: IconProps) => <HugeIcon icon={HugePanelRightIcon} {...props} />;
 export const ArrowLeftIcon = (props: IconProps) => <HugeIcon icon={ArrowLeft01Svg} {...props} />;
 export const ArrowRightIcon = (props: IconProps) => <HugeIcon icon={ArrowRight02Svg} {...props} />;
-export const ExternalLinkIcon = (props: IconProps) => <HugeIcon icon={ArrowUpRight01Svg} {...props} />;
+export const ExternalLinkIcon = (props: IconProps) => <HugeIcon icon={LinkSquare01Svg} {...props} />;
 export const ArrowUpIcon = (props: IconProps) => <HugeIcon icon={ArrowUp01Svg} {...props} />;
 export const ArrowDownIcon = (props: IconProps) => <HugeIcon icon={ArrowDown01Svg} {...props} />;
 export const UnfoldMoreIcon = (props: IconProps) => <HugeIcon icon={UnfoldMoreSvg} {...props} />;

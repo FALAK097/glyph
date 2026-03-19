@@ -81,15 +81,24 @@ Shipped now:
 - default workspace rooted at `Documents/Glyph`
 - desktop file open and folder open
 - recursive notes sidebar
+- collapsible sidebar with full-hide mode
 - recent files in sidebar
 - single-pane TipTap editor surface
 - save flow
 - autosave
+- first edit in an empty window auto-creates a backing note
 - file watching and safe refresh
 - native command palette with `Cmd/Ctrl+P`
 - new note / previous note / next note commands
+- editor history navigation
 - global search and file search through palette
 - theme switching and theme preview through palette
+- richer markdown editing for links, images, and tables
+- slash actions for table, link, and image insertion
+- local image picker flow inside the editor
+- clickable inter-note markdown links inside the workspace
+- image delete affordance for selected images
+- markdown and PDF export
 - persisted settings for workspace path and theme mode
 - desktop dev startup hardened with renderer retry + preload failure fallback
 - standalone web landing page
@@ -100,16 +109,7 @@ In progress:
 - [X] stronger markdown fidelity and richer inline shortcuts
 - [X] better file and folder creation UX
 - [X] better OS-level open-with integration
-
-Not started:
-
-- export
-- drag-and-drop image import
-- syntax highlighting
-- mermaid
-- math
-- quick open / command palette
-- packaging and installers
+- [ ] final editor interaction polish for link and media affordances
 
 ## Phase Plan
 
@@ -144,15 +144,22 @@ Not started:
 - [X] Autosave
 - [X] New file flow
 - [X] Better new note flow without prompt
-- [ ] New folder flow inside command palette
+- [X] New folder flow inside command palette
 - [X] Stronger inline markdown shortcut behavior
 - [X] Better insertion and selection behavior
+- [X] Table insertion with adjustable rows and columns
+- [X] Table row/column management controls
+- [X] Link and image slash insertion flows
+- [X] Local image file picking
 - [ ] Drag-and-drop image support
 - [X] Rich keyboard formatting shortcuts
 - [ ] Provide copy icon for code blocks
 - [ ] Provide copy icon for table
 - [X] Provide delete icon for images
 - [X] Open interlinked md files within editor
+- [ ] Highlight text
+- [ ] Scroll and cursor reset polish when jumping between linked docs
+- [ ] TOC
 - [ ] Improve markdown task-list shortcut conversion (`- [ ]`, `- [x]`)
 
 ### Phase 3: Power Features
@@ -162,15 +169,14 @@ Not started:
 - [X] Quick open
 - [X] Command palette
 - [ ] Saved command history / smarter ranking
-- [ ] Export markdown
-- [ ] Export PDF
+- [X] Export markdown
+- [X] Export PDF
 
 ### Phase 4: Polish
 
 - [ ] Typography refinement
-- [ ] Better code block presentation
 - [ ] Motion and interaction polish
-- [ ] Settings UI
+- [X] Settings UI
 - [ ] Final desktop UX pass
 - [ ] Reduce renderer bundle size with targeted code splitting
 

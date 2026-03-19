@@ -67,6 +67,21 @@ function stripLocalLinkSuffix(target: string) {
   return target.slice(0, match.index);
 }
 
+function normalizePathForComparison(targetPath: string) {
+  return path.normalize(targetPath).toLowerCase();
+}
+
+function isMarkdownReference(target: string) {
+  const normalizedTarget = stripLocalLinkSuffix(target).toLowerCase();
+  return (
+    normalizedTarget.endsWith(".md") ||
+    normalizedTarget.endsWith(".markdown") ||
+    (!path.extname(normalizedTarget) &&
+      !normalizedTarget.includes(".") &&
+      normalizedTarget.length > 0)
+  );
+}
+
 async function resolveExistingFilePath(targetPath: string) {
   const candidates = [targetPath];
 
@@ -83,6 +98,40 @@ async function resolveExistingFilePath(targetPath: string) {
     } catch {
       continue;
     }
+  }
+
+  return null;
+}
+
+async function resolveWorkspaceMarkdownTarget(target: string) {
+  if (!activeWorkspaceRoot || !isMarkdownReference(target)) {
+    return null;
+  }
+
+  const localTarget = stripLocalLinkSuffix(target);
+  const workspaceRelativePath = path.join(activeWorkspaceRoot, localTarget);
+  const workspaceRelativeMatch = await resolveExistingFilePath(workspaceRelativePath);
+  if (workspaceRelativeMatch) {
+    return workspaceRelativeMatch;
+  }
+
+  const normalizedTarget = normalizePathForComparison(localTarget);
+  const normalizedBaseName = normalizePathForComparison(path.basename(localTarget));
+  const matches = searchableFilesCache.filter((filePath) => {
+    const normalizedFilePath = normalizePathForComparison(filePath);
+    const normalizedRelativePath = normalizePathForComparison(
+      path.relative(activeWorkspaceRoot as string, filePath),
+    );
+
+    return (
+      normalizedFilePath === normalizedTarget ||
+      normalizedRelativePath === normalizedTarget ||
+      normalizePathForComparison(path.basename(filePath)) === normalizedBaseName
+    );
+  });
+
+  if (matches.length === 1) {
+    return matches[0];
   }
 
   return null;
@@ -125,23 +174,27 @@ async function resolveLinkTarget(
     };
   }
 
-  if (/^[\w-]+(?:\.[\w-]+)+(?:[/?#].*)?$/i.test(trimmed)) {
-    return { kind: "external", target: `https://${trimmed}` };
-  }
-
   const localTarget = stripLocalLinkSuffix(trimmed);
   const resolvedPath = path.isAbsolute(localTarget)
     ? path.normalize(localTarget)
     : currentFilePath
       ? path.resolve(path.dirname(currentFilePath), localTarget)
-      : null;
+      : activeWorkspaceRoot
+        ? path.resolve(activeWorkspaceRoot, localTarget)
+        : null;
 
   if (!resolvedPath) {
     return null;
   }
 
-  const existingPath = await resolveExistingFilePath(resolvedPath);
+  const existingPath =
+    (await resolveExistingFilePath(resolvedPath)) ??
+    (await resolveWorkspaceMarkdownTarget(trimmed));
   if (!existingPath) {
+    if (/^[\w-]+(?:\.[\w-]+)+(?:[/?#].*)?$/i.test(trimmed)) {
+      return { kind: "external", target: `https://${trimmed}` };
+    }
+
     return null;
   }
 

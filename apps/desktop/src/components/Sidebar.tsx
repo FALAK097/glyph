@@ -38,22 +38,7 @@ export const Sidebar = ({
   };
 
   if (isCollapsed) {
-    return (
-      <aside className="flex flex-col h-full w-20 bg-sidebar border-r border-border items-center pt-3">
-        <div
-          className="h-20 flex items-center justify-center flex-shrink-0 w-full"
-          style={{ WebkitAppRegion: "drag" } as any}
-        >
-          <div
-            style={{ WebkitAppRegion: "no-drag" } as any}
-            className="flex items-center justify-center"
-          >
-            <LogoComponent size={120} />
-          </div>
-        </div>
-        <div className="flex-1" />
-      </aside>
-    );
+    return null;
   }
 
   return (

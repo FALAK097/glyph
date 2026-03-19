@@ -40,6 +40,7 @@ import {
   CheckCircleIcon,
   CopyIcon,
   DotsHorizontalIcon,
+  ExternalLinkIcon,
   FileDownIcon,
   GearIcon,
   LinkIcon,
@@ -51,7 +52,10 @@ import {
   TrashIcon,
 } from "./icons";
 
-import type { MarkdownEditorProps, MarkdownEditorToast } from "../types/markdown-editor";
+import type {
+  MarkdownEditorProps,
+  MarkdownEditorToast,
+} from "../types/markdown-editor";
 
 const LINK_IMAGE_PATTERN = /(!?)\[([^\]]+)\]\(([^)]+)\)$/;
 type EditorActionType = "insert-table" | "insert-link" | "insert-image";
@@ -80,6 +84,12 @@ type ImageControlsState = {
   top: number;
 };
 
+type HoveredLinkState = {
+  href: string;
+  left: number;
+  top: number;
+};
+
 type TableControlsState = {
   active: boolean;
   canDeleteRow: boolean;
@@ -102,7 +112,10 @@ const normalizeLinkTarget = (value: string) => {
     return "";
   }
 
-  if (/^[a-z]+:/i.test(trimmed) && !/^(https?:\/\/|file:\/\/|glyph-local:\/\/)/i.test(trimmed)) {
+  if (
+    /^[a-z]+:/i.test(trimmed) &&
+    !/^(https?:\/\/|file:\/\/|glyph-local:\/\/)/i.test(trimmed)
+  ) {
     return "";
   }
 
@@ -201,6 +214,7 @@ export const MarkdownEditor = ({
 }: MarkdownEditorProps) => {
   const lastSyncedMarkdown = useRef(content);
   const isAutoConvertingRef = useRef(false);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const tableControlsRef = useRef<TableControlsState>({
     active: false,
     canDeleteRow: false,
@@ -210,13 +224,30 @@ export const MarkdownEditor = ({
   const toastTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(
     null,
   );
+  const hoveredLinkHideTimeoutRef = useRef<ReturnType<
+    typeof window.setTimeout
+  > | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [toast, setToast] = useState<MarkdownEditorToast | null>(null);
-  const [activeDialog, setActiveDialog] = useState<EditorActionType | null>(null);
-  const [tableForm, setTableForm] = useState<TableFormState>({ rows: "3", cols: "3" });
-  const [linkForm, setLinkForm] = useState<LinkFormState>({ text: "", href: "" });
-  const [imageForm, setImageForm] = useState<ImageFormState>({ alt: "", src: "" });
-  const [imageControls, setImageControls] = useState<ImageControlsState | null>(null);
+  const [activeDialog, setActiveDialog] = useState<EditorActionType | null>(
+    null,
+  );
+  const [tableForm, setTableForm] = useState<TableFormState>({
+    rows: "3",
+    cols: "3",
+  });
+  const [linkForm, setLinkForm] = useState<LinkFormState>({
+    text: "",
+    href: "",
+  });
+  const [imageForm, setImageForm] = useState<ImageFormState>({
+    alt: "",
+    src: "",
+  });
+  const [imageControls, setImageControls] = useState<ImageControlsState | null>(
+    null,
+  );
+  const [hoveredLink, setHoveredLink] = useState<HoveredLinkState | null>(null);
   const [tableControls, setTableControls] = useState<TableControlsState>({
     active: false,
     canDeleteRow: false,
@@ -234,6 +265,23 @@ export const MarkdownEditor = ({
       setToast(null);
       toastTimeoutRef.current = null;
     }, 2000);
+  };
+
+  const clearHoveredLinkHideTimeout = () => {
+    if (!hoveredLinkHideTimeoutRef.current) {
+      return;
+    }
+
+    window.clearTimeout(hoveredLinkHideTimeoutRef.current);
+    hoveredLinkHideTimeoutRef.current = null;
+  };
+
+  const scheduleHoveredLinkHide = () => {
+    clearHoveredLinkHideTimeout();
+    hoveredLinkHideTimeoutRef.current = window.setTimeout(() => {
+      setHoveredLink(null);
+      hoveredLinkHideTimeoutRef.current = null;
+    }, 140);
   };
 
   const openLinkExternally = (href: string) => {
@@ -399,30 +447,30 @@ export const MarkdownEditor = ({
         class: [
           "tiptap-editor",
           "mx-auto max-w-[800px] px-10 py-5 pb-20 text-[15px] leading-[1.7] text-foreground outline-none",
-       "[&>p]:mb-4",
-            "[&>ul]:mb-4 [&>ol]:mb-4 [&>blockquote]:mb-4 [&>hr]:my-8",
-            "[&>pre]:mb-4 [&>pre]:rounded-lg [&>pre]:overflow-auto",
-            "[&>h1]:mt-10 [&>h1]:mb-3 [&>h1]:text-3xl [&>h1]:font-semibold [&>h1]:leading-tight",
-           "[&>h2]:mt-8 [&>h2]:mb-3 [&>h2]:text-2xl [&>h2]:font-semibold [&>h2]:leading-tight",
-           "[&>h3]:mt-7 [&>h3]:mb-2 [&>h3]:text-xl [&>h3]:font-semibold [&>h3]:leading-tight",
-           "[&>h4]:mt-6 [&>h4]:mb-2 [&>h4]:text-lg [&>h4]:font-semibold [&>h4]:leading-tight",
-           "[&>ul]:list-disc [&>ol]:list-decimal [&>ul]:pl-6 [&>ol]:pl-6",
-           "[&>ul[data-type='taskList']]:list-none [&>ul[data-type='taskList']]:pl-0",
-           "[&>ul[data-type='taskList']_li]:flex [&>ul[data-type='taskList']_li]:gap-2.5 [&>ul[data-type='taskList']_li]:items-start",
-           "[&>ul[data-type='taskList']_li>label]:inline-flex [&>ul[data-type='taskList']_li>label]:items-center [&>ul[data-type='taskList']_li>label]:mt-0.5 [&>ul[data-type='taskList']_li>label]:shrink-0 [&>ul[data-type='taskList']_li>label]:cursor-pointer",
-           "[&>ul[data-type='taskList']_li>label>input]:mt-0.5 [&>ul[data-type='taskList']_li>label>input]:cursor-pointer",
-           "[&>ul[data-type='taskList']_li>div]:flex-1",
-           "[&>blockquote]:pl-4 [&>blockquote]:border-l-2 [&>blockquote]:border-border [&>blockquote]:text-muted-foreground",
-           "[&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded-md [&_code]:bg-muted [&_code]:font-mono [&_code]:text-[0.875em]",
-           "[&>pre]:mb-4 [&>pre]:rounded-lg [&>pre]:overflow-auto",
-           "[&>pre_code]:p-0 [&>pre_code]:bg-transparent [&>pre_code]:color-inherit",
-           "[&_a]:font-medium [&_a]:underline [&_a]:underline-offset-2 [&_a]:cursor-pointer",
-           "[&_.tableWrapper]:my-5 [&_.tableWrapper]:overflow-x-auto",
-           "[&_.tableWrapper_table]:w-full [&_.tableWrapper_table]:border-collapse [&_.tableWrapper_table]:border-spacing-0 [&_.tableWrapper_table]:min-w-[440px]",
-           "[&_.tableWrapper_th]:bg-muted [&_.tableWrapper_th]:font-semibold",
-           "[&_.tableWrapper_th]:border [&_.tableWrapper_th]:border-border [&_.tableWrapper_th]:px-3 [&_.tableWrapper_th]:py-2 [&_.tableWrapper_th]:align-top",
-           "[&_.tableWrapper_td]:border [&_.tableWrapper_td]:border-border [&_.tableWrapper_td]:px-3 [&_.tableWrapper_td]:py-2 [&_.tableWrapper_td]:align-top",
-           "[&>img]:max-w-full [&>img]:h-auto [&>img]:rounded-xl",
+          "[&>p]:mb-4",
+          "[&>ul]:mb-4 [&>ol]:mb-4 [&>blockquote]:mb-4 [&>hr]:my-8",
+          "[&>pre]:mb-4 [&>pre]:rounded-lg [&>pre]:overflow-auto",
+          "[&>h1]:mt-10 [&>h1]:mb-3 [&>h1]:text-3xl [&>h1]:font-semibold [&>h1]:leading-tight",
+          "[&>h2]:mt-8 [&>h2]:mb-3 [&>h2]:text-2xl [&>h2]:font-semibold [&>h2]:leading-tight",
+          "[&>h3]:mt-7 [&>h3]:mb-2 [&>h3]:text-xl [&>h3]:font-semibold [&>h3]:leading-tight",
+          "[&>h4]:mt-6 [&>h4]:mb-2 [&>h4]:text-lg [&>h4]:font-semibold [&>h4]:leading-tight",
+          "[&>ul]:list-disc [&>ol]:list-decimal [&>ul]:pl-6 [&>ol]:pl-6",
+          "[&>ul[data-type='taskList']]:list-none [&>ul[data-type='taskList']]:pl-0",
+          "[&>ul[data-type='taskList']_li]:flex [&>ul[data-type='taskList']_li]:gap-2.5 [&>ul[data-type='taskList']_li]:items-start",
+          "[&>ul[data-type='taskList']_li>label]:inline-flex [&>ul[data-type='taskList']_li>label]:items-center [&>ul[data-type='taskList']_li>label]:mt-0.5 [&>ul[data-type='taskList']_li>label]:shrink-0 [&>ul[data-type='taskList']_li>label]:cursor-pointer",
+          "[&>ul[data-type='taskList']_li>label>input]:mt-0.5 [&>ul[data-type='taskList']_li>label>input]:cursor-pointer",
+          "[&>ul[data-type='taskList']_li>div]:flex-1",
+          "[&>blockquote]:pl-4 [&>blockquote]:border-l-2 [&>blockquote]:border-border [&>blockquote]:text-muted-foreground",
+          "[&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded-md [&_code]:bg-muted [&_code]:font-mono [&_code]:text-[0.875em]",
+          "[&>pre]:mb-4 [&>pre]:rounded-lg [&>pre]:overflow-auto",
+          "[&>pre_code]:p-0 [&>pre_code]:bg-transparent [&>pre_code]:color-inherit",
+          "[&_a]:font-medium [&_a]:underline [&_a]:underline-offset-2 [&_a]:cursor-pointer",
+          "[&_.tableWrapper]:my-5 [&_.tableWrapper]:overflow-x-auto",
+          "[&_.tableWrapper_table]:w-full [&_.tableWrapper_table]:border-collapse [&_.tableWrapper_table]:border-spacing-0 [&_.tableWrapper_table]:min-w-[440px]",
+          "[&_.tableWrapper_th]:bg-muted [&_.tableWrapper_th]:font-semibold",
+          "[&_.tableWrapper_th]:border [&_.tableWrapper_th]:border-border [&_.tableWrapper_th]:px-3 [&_.tableWrapper_th]:py-2 [&_.tableWrapper_th]:align-top",
+          "[&_.tableWrapper_td]:border [&_.tableWrapper_td]:border-border [&_.tableWrapper_td]:px-3 [&_.tableWrapper_td]:py-2 [&_.tableWrapper_td]:align-top",
+          "[&>img]:max-w-full [&>img]:h-auto [&>img]:rounded-xl",
         ].join(" "),
         spellcheck: "true",
       },
@@ -451,8 +499,46 @@ export const MarkdownEditor = ({
         return true;
       },
       handleDOMEvents: {
+        mouseover: (_view, event) => {
+          const target = event.target;
+          const link =
+            target instanceof HTMLElement ? target.closest("a") : null;
+
+          if (!link) {
+            return false;
+          }
+
+          const href = link.getAttribute("href");
+          if (!href) {
+            return false;
+          }
+
+          clearHoveredLinkHideTimeout();
+          const rect = link.getBoundingClientRect();
+          setHoveredLink({
+            href,
+            left: rect.right + 8,
+            top: rect.top + rect.height / 2,
+          });
+          return false;
+        },
+        mouseout: (_view, event) => {
+          const nextTarget =
+            event.relatedTarget instanceof HTMLElement
+              ? event.relatedTarget
+              : null;
+
+          if (nextTarget?.closest("[data-link-hover-affordance='true']")) {
+            return false;
+          }
+
+          scheduleHoveredLinkHide();
+          return false;
+        },
         scroll: () => {
           setImageControls(null);
+          clearHoveredLinkHideTimeout();
+          setHoveredLink(null);
           return false;
         },
       },
@@ -492,7 +578,20 @@ export const MarkdownEditor = ({
   }, [content, editor]);
 
   useEffect(() => {
+    if (!filePath) {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = 0;
+      }
+    });
+  }, [filePath]);
+
+  useEffect(() => {
     return () => {
+      clearHoveredLinkHideTimeout();
       if (toastTimeoutRef.current) {
         window.clearTimeout(toastTimeoutRef.current);
       }
@@ -537,9 +636,15 @@ export const MarkdownEditor = ({
       }
     };
 
-    window.addEventListener("glyph:editor-action", handleEditorAction as EventListener);
+    window.addEventListener(
+      "glyph:editor-action",
+      handleEditorAction as EventListener,
+    );
     return () => {
-      window.removeEventListener("glyph:editor-action", handleEditorAction as EventListener);
+      window.removeEventListener(
+        "glyph:editor-action",
+        handleEditorAction as EventListener,
+      );
     };
   }, [editor]);
 
@@ -566,8 +671,14 @@ export const MarkdownEditor = ({
       return;
     }
 
-    const rows = Math.min(12, Math.max(2, Number.parseInt(tableForm.rows, 10) || 3));
-    const cols = Math.min(8, Math.max(1, Number.parseInt(tableForm.cols, 10) || 3));
+    const rows = Math.min(
+      12,
+      Math.max(2, Number.parseInt(tableForm.rows, 10) || 3),
+    );
+    const cols = Math.min(
+      8,
+      Math.max(1, Number.parseInt(tableForm.cols, 10) || 3),
+    );
 
     editor
       .chain()
@@ -691,11 +802,15 @@ export const MarkdownEditor = ({
     try {
       // Get markdown content from editor using the Markdown extension
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const markdown = (editor as any).storage.markdown.getMarkdown?.() || editor.getHTML();
+      const markdown =
+        (editor as any).storage.markdown.getMarkdown?.() || editor.getHTML();
       const filename = fileName.replace(/\.(md|markdown)$/i, ".pdf");
 
       if (window.glyph) {
-        const absolutePath = await window.glyph.exportMarkdownToPDF(markdown, filename);
+        const absolutePath = await window.glyph.exportMarkdownToPDF(
+          markdown,
+          filename,
+        );
         showToast("PDF exported successfully", `Saved as ${filename}`);
 
         // Auto-open PDF if setting is enabled
@@ -714,9 +829,15 @@ export const MarkdownEditor = ({
     }
   };
 
+  const isMacLike = navigator.platform.includes("Mac");
+  const headerPaddingClass =
+    isSidebarCollapsed && isMacLike ? "pl-20 pr-4" : "px-4";
+
   return (
     <section className="relative h-full min-h-0 flex flex-col bg-background">
-      <div className="flex items-center px-4 py-2 border-b border-border/40 gap-2">
+      <div
+        className={`flex items-center py-2 border-b border-border/40 gap-2 ${headerPaddingClass}`}
+      >
         {/* Left: toolbar + title */}
         <div className="flex items-center gap-1 flex-shrink-0 min-w-0">
           {onToggleSidebar && (
@@ -934,8 +1055,13 @@ export const MarkdownEditor = ({
         </div>
       </div>
       <div
+        ref={scrollContainerRef}
         className="flex-1 min-h-0 overflow-y-auto relative [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-        onScroll={() => setImageControls(null)}
+        onScroll={() => {
+          setImageControls(null);
+          clearHoveredLinkHideTimeout();
+          setHoveredLink(null);
+        }}
       >
         {tableControls.active ? (
           <div className="pointer-events-none absolute top-4 right-6 z-20">
@@ -997,6 +1123,31 @@ export const MarkdownEditor = ({
             </div>
           </div>
         ) : null}
+        {hoveredLink ? (
+          <div
+            className="fixed z-30"
+            data-link-hover-affordance="true"
+            onMouseEnter={clearHoveredLinkHideTimeout}
+            onMouseLeave={scheduleHoveredLinkHide}
+            style={{
+              left: hoveredLink.left,
+              top: hoveredLink.top,
+              transform: "translateY(-50%)",
+            }}
+          >
+            <Button
+              data-link-hover-affordance="true"
+              variant="ghost"
+              size="icon-xs"
+              type="button"
+              className="pointer-events-auto text-[var(--editor-link)] hover:bg-transparent hover:opacity-80"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => void handleLinkActivation(hoveredLink.href)}
+            >
+              <ExternalLinkIcon size={12} />
+            </Button>
+          </div>
+        ) : null}
         {imageControls ? (
           <div
             className="fixed z-30"
@@ -1029,12 +1180,16 @@ export const MarkdownEditor = ({
           {saveStateLabel}
         </p>
       </div>
-      <Dialog open={activeDialog === "insert-table"} onOpenChange={(open) => !open && setActiveDialog(null)}>
+      <Dialog
+        open={activeDialog === "insert-table"}
+        onOpenChange={(open) => !open && setActiveDialog(null)}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Insert Table</DialogTitle>
             <DialogDescription>
-              Start with the right shape, then use the table controls to add or remove rows and columns anytime.
+              Start with the right shape, then use the table controls to add or
+              remove rows and columns anytime.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -1045,7 +1200,12 @@ export const MarkdownEditor = ({
                 max={12}
                 type="number"
                 value={tableForm.rows}
-                onChange={(event) => setTableForm((current) => ({ ...current, rows: event.target.value }))}
+                onChange={(event) =>
+                  setTableForm((current) => ({
+                    ...current,
+                    rows: event.target.value,
+                  }))
+                }
               />
             </label>
             <label className="grid gap-2 text-sm">
@@ -1055,12 +1215,21 @@ export const MarkdownEditor = ({
                 max={8}
                 type="number"
                 value={tableForm.cols}
-                onChange={(event) => setTableForm((current) => ({ ...current, cols: event.target.value }))}
+                onChange={(event) =>
+                  setTableForm((current) => ({
+                    ...current,
+                    cols: event.target.value,
+                  }))
+                }
               />
             </label>
           </div>
           <DialogFooter>
-            <Button variant="outline" type="button" onClick={() => setActiveDialog(null)}>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => setActiveDialog(null)}
+            >
               Cancel
             </Button>
             <Button type="button" onClick={handleInsertTable}>
@@ -1069,12 +1238,16 @@ export const MarkdownEditor = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <Dialog open={activeDialog === "insert-link"} onOpenChange={(open) => !open && setActiveDialog(null)}>
+      <Dialog
+        open={activeDialog === "insert-link"}
+        onOpenChange={(open) => !open && setActiveDialog(null)}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Insert Link</DialogTitle>
             <DialogDescription>
-              Paste a URL and Glyph will normalize bare domains like `example.com` to `https://` automatically.
+              Paste a URL and Glyph will normalize bare domains like
+              `example.com` to `https://` automatically.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
@@ -1082,7 +1255,12 @@ export const MarkdownEditor = ({
               <span className="font-medium text-foreground">Label</span>
               <Input
                 value={linkForm.text}
-                onChange={(event) => setLinkForm((current) => ({ ...current, text: event.target.value }))}
+                onChange={(event) =>
+                  setLinkForm((current) => ({
+                    ...current,
+                    text: event.target.value,
+                  }))
+                }
                 placeholder="Open site"
               />
             </label>
@@ -1090,13 +1268,22 @@ export const MarkdownEditor = ({
               <span className="font-medium text-foreground">URL</span>
               <Input
                 value={linkForm.href}
-                onChange={(event) => setLinkForm((current) => ({ ...current, href: event.target.value }))}
+                onChange={(event) =>
+                  setLinkForm((current) => ({
+                    ...current,
+                    href: event.target.value,
+                  }))
+                }
                 placeholder="https://example.com"
               />
             </label>
           </div>
           <DialogFooter>
-            <Button variant="outline" type="button" onClick={() => setActiveDialog(null)}>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => setActiveDialog(null)}
+            >
               Cancel
             </Button>
             <Button type="button" onClick={handleInsertLink}>
@@ -1105,12 +1292,16 @@ export const MarkdownEditor = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <Dialog open={activeDialog === "insert-image"} onOpenChange={(open) => !open && setActiveDialog(null)}>
+      <Dialog
+        open={activeDialog === "insert-image"}
+        onOpenChange={(open) => !open && setActiveDialog(null)}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Insert Image</DialogTitle>
             <DialogDescription>
-              Paste an image URL or choose a local file. Local images are served through Glyph so they render reliably while editing.
+              Paste an image URL or choose a local file. Local images are served
+              through Glyph so they render reliably while editing.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
@@ -1118,7 +1309,12 @@ export const MarkdownEditor = ({
               <span className="font-medium text-foreground">Alt text</span>
               <Input
                 value={imageForm.alt}
-                onChange={(event) => setImageForm((current) => ({ ...current, alt: event.target.value }))}
+                onChange={(event) =>
+                  setImageForm((current) => ({
+                    ...current,
+                    alt: event.target.value,
+                  }))
+                }
                 placeholder="Team logo"
               />
             </label>
@@ -1126,13 +1322,19 @@ export const MarkdownEditor = ({
               <span className="font-medium text-foreground">Image source</span>
               <Input
                 value={imageForm.src}
-                onChange={(event) => setImageForm((current) => ({ ...current, src: event.target.value }))}
+                onChange={(event) =>
+                  setImageForm((current) => ({
+                    ...current,
+                    src: event.target.value,
+                  }))
+                }
                 placeholder="https://example.com/logo.png"
               />
             </label>
             <div className="rounded-xl border border-border/70 bg-muted/30 p-3">
               <p className="m-0 text-xs text-muted-foreground">
-                Local images open a native file picker and avoid broken `file://` previews.
+                Local images open a native file picker and avoid broken
+                `file://` previews.
               </p>
               <Button
                 className="mt-3"
@@ -1155,7 +1357,11 @@ export const MarkdownEditor = ({
             ) : null}
           </div>
           <DialogFooter>
-            <Button variant="outline" type="button" onClick={() => setActiveDialog(null)}>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => setActiveDialog(null)}
+            >
               Cancel
             </Button>
             <Button type="button" onClick={handleInsertImage}>

@@ -17,19 +17,23 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   return (
     <TooltipProvider>
       <div
-        className={`h-screen overflow-hidden grid transition-[grid-template-columns] duration-200 ${controller.isSidebarCollapsed ? "grid-cols-[80px_minmax(0,1fr)]" : "grid-cols-[280px_minmax(0,1fr)]"
+        className={`h-screen overflow-hidden grid transition-[grid-template-columns] duration-200 ${controller.isSidebarCollapsed ? "grid-cols-[0_minmax(0,1fr)]" : "grid-cols-[280px_minmax(0,1fr)]"
           }`}
       >
-        <Sidebar
-          tree={controller.visibleSidebarNodes}
-          activePath={controller.activeFile?.path ?? null}
-          isCollapsed={controller.isSidebarCollapsed}
-          onOpenFile={(filePath) => void controller.openFile(filePath)}
-          onDeleteFile={controller.handleDeleteFile}
-          onRenameFile={controller.handleRenameFile}
-          onToggleFolder={controller.handleToggleFolder}
-          onReorderNodes={controller.handleReorderNodes}
-        />
+        {controller.isSidebarCollapsed ? (
+          <div aria-hidden="true" className="w-0 min-w-0 overflow-hidden" />
+        ) : (
+          <Sidebar
+            tree={controller.visibleSidebarNodes}
+            activePath={controller.activeFile?.path ?? null}
+            isCollapsed={controller.isSidebarCollapsed}
+            onOpenFile={(filePath) => void controller.openFile(filePath)}
+            onDeleteFile={controller.handleDeleteFile}
+            onRenameFile={controller.handleRenameFile}
+            onToggleFolder={controller.handleToggleFolder}
+            onReorderNodes={controller.handleReorderNodes}
+          />
+        )}
         <main className="relative h-full min-h-0 overflow-hidden bg-background">
           {controller.error ? (
             <div className="mx-10 mt-4 mb-2 px-4 py-3 rounded-lg bg-destructive text-destructive-foreground text-sm">

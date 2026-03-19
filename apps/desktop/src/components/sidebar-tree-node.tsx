@@ -155,7 +155,7 @@ export const SidebarTreeNode = ({
     <div className={`group relative flex items-center min-w-0 overflow-hidden mb-0.5 border-transparent ${containerClassName}`} {...dragHandlers}>
       <div
         className={`flex items-center rounded-md mx-1 flex-1 min-w-0 ${
-          activePath === node.path ? "bg-sidebar-accent text-sidebar-accent-foreground" : "hover:bg-sidebar-accent/50"
+          activePath === node.path ? "bg-sidebar-accent text-sidebar-accent-foreground" : ""
         }`}
         style={{ paddingLeft: `${depth * 14 + 8}px`, paddingRight: "4px", paddingTop: "6px", paddingBottom: "6px" }}
       >
@@ -181,7 +181,7 @@ export const SidebarTreeNode = ({
           <Button
             variant="ghost"
             size="sm"
-            className="h-auto flex-1 min-w-0 justify-start px-0 py-0 text-left truncate text-sm hover:bg-transparent"
+            className="h-auto flex-1 min-w-0 justify-start bg-transparent px-0 py-0 text-left truncate text-sm hover:!bg-transparent dark:hover:!bg-transparent aria-expanded:!bg-transparent dark:aria-expanded:!bg-transparent"
             onClick={() => onOpenFile(node.path)}
             type="button"
           >
@@ -196,7 +196,7 @@ export const SidebarTreeNode = ({
                     ref={menuButtonRef}
                     variant="ghost"
                     size="icon-xs"
-                    className="text-muted-foreground hover:text-foreground hover:bg-muted rounded opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto focus-visible:pointer-events-auto"
+                    className="rounded bg-transparent text-muted-foreground opacity-0 transition-opacity pointer-events-none group-hover:pointer-events-auto group-hover:opacity-100 hover:text-foreground hover:!bg-transparent dark:hover:!bg-transparent aria-expanded:!bg-transparent dark:aria-expanded:!bg-transparent focus-visible:opacity-100 focus-visible:!bg-transparent"
                     onClick={handleMenuToggle}
                     type="button"
                   >

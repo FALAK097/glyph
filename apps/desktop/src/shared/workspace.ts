@@ -36,6 +36,19 @@ export type FileOpenResult = {
   path: string;
 };
 
+export type DialogKind = "file" | "directory" | "image" | "any-file";
+
+export type AssetSelection = {
+  path: string;
+  name: string;
+  url: string;
+};
+
+export type ResolvedLinkTarget = {
+  kind: "markdown-file" | "file" | "external";
+  target: string;
+};
+
 export type SearchResult = {
   path: string;
   name: string;

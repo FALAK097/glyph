@@ -20,6 +20,7 @@ type WorkspaceState = {
   }) => void;
   setTree: (tree: DirectoryNode[]) => void;
   setActiveFile: (file: FileDocument | null) => void;
+  attachActiveFile: (file: FileDocument) => void;
   updateActiveFile: (file: FileDocument) => void;
   updateDraftContent: (content: string) => void;
   markSaved: (file: FileDocument) => void;
@@ -64,6 +65,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       isDirty: false,
       lastSavedAt: activeFile ? Date.now() : null
     }),
+  attachActiveFile: (activeFile) =>
+    set((state) => ({
+      activeFile,
+      draftContent: state.draftContent,
+      isDirty: state.isDirty,
+      lastSavedAt: state.lastSavedAt
+    })),
   updateActiveFile: (activeFile) => set({ activeFile }),
   updateDraftContent: (draftContent) => set({ draftContent, isDirty: true }),
   markSaved: (activeFile) =>

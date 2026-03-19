@@ -180,6 +180,10 @@ const runCommand = ({
 }) => {
   editor.chain().focus().deleteRange(range).run();
 
+  const dispatchEditorAction = (type: "insert-table" | "insert-link" | "insert-image") => {
+    window.dispatchEvent(new CustomEvent("glyph:editor-action", { detail: { type } }));
+  };
+
   switch (props.id) {
     case "h1":
       editor.chain().focus().toggleHeading({ level: 1 }).run();
@@ -209,18 +213,10 @@ const runCommand = ({
       editor.chain().focus().toggleCode().run();
       return;
     case "table":
-      editor
-        .chain()
-        .focus()
-        .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
-        .run();
+      dispatchEditorAction("insert-table");
       return;
     case "image":
-      editor
-        .chain()
-        .focus()
-        .insertContent("![alt text](https://example.com/image.png)")
-        .run();
+      dispatchEditorAction("insert-image");
       return;
     case "bold":
       editor.chain().focus().toggleBold().run();
@@ -232,11 +228,7 @@ const runCommand = ({
       editor.chain().focus().toggleStrike().run();
       return;
     case "link":
-      editor
-        .chain()
-        .focus()
-        .insertContent("[link text](https://example.com)")
-        .run();
+      dispatchEditorAction("insert-link");
       return;
     case "rule":
       editor.chain().focus().setHorizontalRule().run();

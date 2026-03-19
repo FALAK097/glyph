@@ -83,9 +83,9 @@ export const CommandPalette = ({
         <div className="px-4 py-3 border-b border-border/30 bg-background">
           <Input
             ref={inputRef}
-            className="border-0 bg-transparent shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/50 h-10"
+            className="border-0 bg-transparent shadow-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/50 h-10"
             aria-label="Search files, commands, and sessions"
-            placeholder="Search files, commands, and sessions"
+            placeholder="Search files, commands, and sessions…"
             value={query}
             onChange={(event) => onChangeQuery(event.target.value)}
             onKeyDown={(event) => {
@@ -120,7 +120,7 @@ export const CommandPalette = ({
         {/* Results container */}
         <div
           ref={scrollContainerRef}
-          className="overflow-y-auto max-h-[380px] scrollbar-none"
+          className="max-h-[380px] overflow-y-auto scrollbar-hide"
           role="listbox"
           aria-label="Command palette results"
         >

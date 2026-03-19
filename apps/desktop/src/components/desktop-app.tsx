@@ -51,6 +51,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
             newNoteShortcut={getShortcutDisplay(controller.shortcuts, "new-note")}
             onOpenSettings={() => controller.setIsSettingsOpen(true)}
             onOpenCommandPalette={() => controller.setIsPaletteOpen(true)}
+            onOpenLinkedFile={(path) => void controller.openFile(path)}
             commandPaletteShortcut={getShortcutDisplay(controller.shortcuts, "command-palette") ?? "⌘P"}
             onNavigateBack={() => void controller.navigateBack()}
             onNavigateForward={() => void controller.navigateForward()}
@@ -90,4 +91,3 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     </TooltipProvider>
   );
 };
-

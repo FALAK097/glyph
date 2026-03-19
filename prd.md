@@ -146,9 +146,14 @@ Not started:
 - [X] Better new note flow without prompt
 - [ ] New folder flow inside command palette
 - [X] Stronger inline markdown shortcut behavior
-- [ ] Better insertion and selection behavior
+- [X] Better insertion and selection behavior
 - [ ] Drag-and-drop image support
 - [X] Rich keyboard formatting shortcuts
+- [ ] Provide copy icon for code blocks
+- [ ] Provide copy icon for table
+- [X] Provide delete icon for images
+- [X] Open interlinked md files within editor
+- [ ] Improve markdown task-list shortcut conversion (`- [ ]`, `- [x]`)
 
 ### Phase 3: Power Features
 
@@ -167,6 +172,7 @@ Not started:
 - [ ] Motion and interaction polish
 - [ ] Settings UI
 - [ ] Final desktop UX pass
+- [ ] Reduce renderer bundle size with targeted code splitting
 
 ### Phase 5: Distribution
 
@@ -175,10 +181,4 @@ Not started:
 - [ ] Windows `.exe`
 - [ ] File associations
 - [ ] Replace web placeholder download links with real artifacts
-
-## Next Up
-
-1. Improve markdown round-tripping fidelity and inline shortcut behavior in TipTap.
-2. Improve note creation and folder creation flows inside the palette/settings model.
-3. Expand the theme system with more families and tighter command-palette-style navigation.
-4. Add packaging so the web app can ship real downloads.
+- [ ] Create landing page with all this information and make it ready for production release

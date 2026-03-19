@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 import type { DragPosition, SidebarTopLevelNode } from "@/types/sidebar";
 
@@ -35,6 +35,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     setWorkspace,
     setTree,
     setActiveFile,
+    attachActiveFile,
     updateActiveFile,
     updateDraftContent,
     markSaved,
@@ -58,6 +59,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
   const [sidebarNodes, setSidebarNodes] = useState<DirectoryNode[]>([]);
   const [expandedFolderPaths, setExpandedFolderPaths] = useState<string[]>([]);
   const [hasHydratedSidebar, setHasHydratedSidebar] = useState(false);
+  const draftFileCreationRef = useRef<Promise<FileDocument | null> | null>(null);
   const deferredPaletteQuery = useDeferredValue(paletteQuery);
 
   const files = useMemo(() => flattenFiles(tree, rootPath), [rootPath, tree]);
@@ -281,6 +283,49 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     setSettings(nextSettings);
     setIsPaletteOpen(false);
   }, [isWorkspaceMode, rootPath, setActiveFile, settings?.defaultWorkspacePath, glyph]);
+
+  const ensureActiveDraftFile = useCallback(async () => {
+    if (activeFile) {
+      return activeFile;
+    }
+
+    if (draftFileCreationRef.current) {
+      return draftFileCreationRef.current;
+    }
+
+    const baseDir = isWorkspaceMode ? rootPath : settings?.defaultWorkspacePath ?? null;
+    if (!baseDir) {
+      return null;
+    }
+
+    const createPromise = (async () => {
+      const file = await glyph.createFile(baseDir, `Untitled-${Date.now()}.md`);
+      attachActiveFile(file);
+      setIsWorkspaceMode(true);
+      setSidebarNodes((prev) => upsertSidebarFile(prev, file));
+      const nextSettings = await glyph.getSettings();
+      setSettings(nextSettings);
+      return file;
+    })();
+
+    draftFileCreationRef.current = createPromise;
+
+    try {
+      return await createPromise;
+    } finally {
+      draftFileCreationRef.current = null;
+    }
+  }, [activeFile, attachActiveFile, glyph, isWorkspaceMode, rootPath, settings?.defaultWorkspacePath]);
+
+  const handleDraftChange = useCallback((nextContent: string) => {
+    updateDraftContent(nextContent);
+
+    if (!activeFile && nextContent.trim().length > 0) {
+      void ensureActiveDraftFile().catch((error: unknown) => {
+        setError(getErrorMessage(error));
+      });
+    }
+  }, [activeFile, ensureActiveDraftFile, setError, updateDraftContent]);
 
   const currentFileIndex = files.findIndex((item) => item.path === activeFile?.path);
 
@@ -767,9 +812,8 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     setSelectedIndex,
     settings,
     shortcuts,
-    updateDraftContent,
+    updateDraftContent: handleDraftChange,
     visibleSidebarNodes,
     wordCount
   };
 };
-

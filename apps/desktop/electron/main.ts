@@ -1,13 +1,16 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, shell } from "electron";
 import { watch } from "chokidar";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import type {
   AppCommand,
+  AssetSelection,
   AppSettings,
+  DialogKind,
   DirectoryNode,
   FileOpenResult,
+  ResolvedLinkTarget,
   SearchResult,
   WorkspaceSnapshot,
 } from "../src/shared/workspace.js";
@@ -22,6 +25,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const isDev = !app.isPackaged;
 const devServerUrl = "http://127.0.0.1:5173";
+const localAssetProtocol = "glyph-local";
 
 // Set app name early
 app.setName("Glyph");
@@ -48,6 +52,103 @@ function getSettingsPath() {
 
 function getDefaultWorkspacePath() {
   return path.join(app.getPath("documents"), "Glyph");
+}
+
+function buildLocalAssetUrl(targetPath: string) {
+  return `${localAssetProtocol}://asset?path=${encodeURIComponent(targetPath)}`;
+}
+
+function stripLocalLinkSuffix(target: string) {
+  const match = target.match(/[?#]/);
+  if (!match || match.index === undefined) {
+    return target;
+  }
+
+  return target.slice(0, match.index);
+}
+
+async function resolveExistingFilePath(targetPath: string) {
+  const candidates = [targetPath];
+
+  if (!path.extname(targetPath)) {
+    candidates.push(`${targetPath}.md`, `${targetPath}.markdown`);
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const stats = await fs.stat(candidate);
+      if (stats.isFile()) {
+        return candidate;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
+async function resolveLinkTarget(
+  currentFilePath: string | null,
+  href: string,
+): Promise<ResolvedLinkTarget | null> {
+  const trimmed = href.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return { kind: "external", target: trimmed };
+  }
+
+  if (trimmed.startsWith("#")) {
+    return null;
+  }
+
+  if (trimmed.startsWith(`${localAssetProtocol}://`)) {
+    const target = new URL(trimmed).searchParams.get("path");
+    if (!target) {
+      return null;
+    }
+
+    return {
+      kind: isMarkdownFile(target) ? "markdown-file" : "file",
+      target: path.normalize(target),
+    };
+  }
+
+  if (trimmed.startsWith("file://")) {
+    const target = fileURLToPath(trimmed);
+    return {
+      kind: isMarkdownFile(target) ? "markdown-file" : "file",
+      target,
+    };
+  }
+
+  if (/^[\w-]+(?:\.[\w-]+)+(?:[/?#].*)?$/i.test(trimmed)) {
+    return { kind: "external", target: `https://${trimmed}` };
+  }
+
+  const localTarget = stripLocalLinkSuffix(trimmed);
+  const resolvedPath = path.isAbsolute(localTarget)
+    ? path.normalize(localTarget)
+    : currentFilePath
+      ? path.resolve(path.dirname(currentFilePath), localTarget)
+      : null;
+
+  if (!resolvedPath) {
+    return null;
+  }
+
+  const existingPath = await resolveExistingFilePath(resolvedPath);
+  if (!existingPath) {
+    return null;
+  }
+
+  return {
+    kind: isMarkdownFile(existingPath) ? "markdown-file" : "file",
+    target: existingPath,
+  };
 }
 
 function getDefaultSettings(): AppSettings {
@@ -664,16 +765,18 @@ async function searchWorkspace(query: string): Promise<SearchResult[]> {
 }
 
 async function showOpenDialog(
-  kind: "file" | "directory",
+  kind: DialogKind,
 ): Promise<FileOpenResult | null> {
   const properties: Array<"openFile" | "openDirectory" | "createDirectory"> =
-    kind === "file" ? ["openFile"] : ["openDirectory", "createDirectory"];
+    kind === "directory" ? ["openDirectory", "createDirectory"] : ["openFile"];
 
   const result = await dialog.showOpenDialog({
     properties,
     filters:
       kind === "file"
         ? [{ name: "Markdown", extensions: ["md", "markdown"] }]
+        : kind === "image"
+          ? [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg", "avif"] }]
         : undefined,
   });
 
@@ -682,8 +785,21 @@ async function showOpenDialog(
   }
 
   return {
-    kind,
+    kind: kind === "directory" ? "directory" : "file",
     path: result.filePaths[0],
+  };
+}
+
+async function pickAsset(kind: "image" | "any-file"): Promise<AssetSelection | null> {
+  const selection = await showOpenDialog(kind);
+  if (!selection) {
+    return null;
+  }
+
+  return {
+    path: selection.path,
+    name: path.basename(selection.path),
+    url: kind === "image" ? buildLocalAssetUrl(selection.path) : pathToFileURL(selection.path).href,
   };
 }
 
@@ -753,8 +869,18 @@ async function createWindow() {
   refreshApplicationMenu(settings.shortcuts);
 }
 
-ipcMain.handle("dialog:open", async (_event, kind: "file" | "directory") =>
+ipcMain.handle("dialog:open", async (_event, kind: DialogKind) =>
   showOpenDialog(kind),
+);
+
+ipcMain.handle("asset:pick", async (_event, kind: "image" | "any-file") =>
+  pickAsset(kind),
+);
+
+ipcMain.handle(
+  "app:resolveLinkTarget",
+  async (_event, currentFilePath: string | null, href: string) =>
+    resolveLinkTarget(currentFilePath, href),
 );
 
 ipcMain.handle("workspace:openFolder", async (_event, dirPath?: string) => {
@@ -904,18 +1030,32 @@ ipcMain.handle("app:openExternal", async (_event, inputPath: string) => {
     throw new Error("Invalid path provided.");
   }
 
-  const normalizedPath = path.normalize(inputPath.trim());
-  
-  if (!path.isAbsolute(normalizedPath)) {
-    throw new Error("Path must be absolute.");
-  }
-
-  if (normalizedPath.includes("\0")) {
+  const rawInput = inputPath.trim();
+  if (rawInput.includes("\0")) {
     throw new Error("Path contains invalid characters.");
   }
 
-  if (/^(http|https|file|data|javascript):/i.test(normalizedPath)) {
-    throw new Error("URL schemes are not permitted.");
+  if (/^https?:\/\//i.test(rawInput) || /^file:\/\//i.test(rawInput)) {
+    await shell.openExternal(rawInput);
+    return;
+  }
+
+  if (rawInput.startsWith(`${localAssetProtocol}://`)) {
+    const target = new URL(rawInput).searchParams.get("path");
+    if (!target) {
+      throw new Error("Local asset path is missing.");
+    }
+
+    const normalizedTarget = path.normalize(target);
+    await fs.access(normalizedTarget);
+    await shell.openPath(normalizedTarget);
+    return;
+  }
+
+  const normalizedPath = path.normalize(rawInput);
+
+  if (!path.isAbsolute(normalizedPath)) {
+    throw new Error("Path must be absolute.");
   }
 
   try {
@@ -1026,6 +1166,16 @@ app.on("open-file", async (event, filePath) => {
 app
   .whenReady()
   .then(async () => {
+    protocol.handle(localAssetProtocol, (request) => {
+      const target = new URL(request.url).searchParams.get("path");
+      if (!target) {
+        return new Response("Missing local asset path.", { status: 400 });
+      }
+
+      const normalizedTarget = path.normalize(target);
+      return net.fetch(pathToFileURL(normalizedTarget).toString());
+    });
+
     if (process.platform !== "darwin") {
       const args = process.argv.slice(1);
       const target = args.find(

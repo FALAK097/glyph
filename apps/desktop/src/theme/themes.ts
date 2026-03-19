@@ -1,6 +1,12 @@
 import type { ThemeMode } from "../shared/workspace";
 
 export function applyTheme(mode: ThemeMode) {
+  try {
+    localStorage.setItem("glyph.theme", mode);
+  } catch {
+    // Ignore storage access errors (private mode / sandbox restrictions).
+  }
+
   if (mode === "system") {
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     if (prefersDark) {

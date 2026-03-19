@@ -1,56 +1,71 @@
 :root {
-  --background: oklch(0.98 0.015 30);
-  --foreground: oklch(0.22 0.02 30);
-  --card: oklch(0.98 0.015 30);
-  --card-foreground: oklch(0.22 0.02 30);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.22 0.02 30);
-  --primary: oklch(0.22 0.02 30);
+  --background: oklch(0.9900 0 0);
+  --foreground: oklch(0 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0 0 0);
+  --popover: oklch(0.9900 0 0);
+  --popover-foreground: oklch(0 0 0);
+  --primary: oklch(0 0 0);
   --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.96 0.02 30);
-  --secondary-foreground: oklch(0.22 0.02 30);
-  --muted: oklch(0.94 0.02 30);
-  --muted-foreground: oklch(0.55 0.02 30);
-  --accent: oklch(0.92 0.04 30);
-  --accent-foreground: oklch(0.22 0.02 30);
-  --destructive: oklch(0.577 0.245 27.325);
+  --secondary: oklch(0.9400 0 0);
+  --secondary-foreground: oklch(0 0 0);
+  --muted: oklch(0.9700 0 0);
+  --muted-foreground: oklch(0.4400 0 0);
+  --accent: oklch(0.9400 0 0);
+  --accent-foreground: oklch(0 0 0);
+  --destructive: oklch(0.6300 0.1900 23.0300);
   --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.88 0.02 30);
-  --input: oklch(0.88 0.02 30);
-  --ring: oklch(0.22 0.02 30);
-  --radius: 0.75rem;
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --font-serif: 'Playfair Display', Georgia, serif;
-  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px oklch(0 0 0 / 0.1), 0 2px 4px -2px oklch(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px oklch(0 0 0 / 0.1), 0 4px 6px -4px oklch(0 0 0 / 0.1);
-  --shadow-xl: 0 20px 25px -5px oklch(0 0 0 / 0.1), 0 8px 10px -6px oklch(0 0 0 / 0.1);
+  --border: oklch(0.9200 0 0);
+  --input: oklch(0.9400 0 0);
+  --ring: oklch(0 0 0);
+  --radius: 0.5rem;
+  --font-sans: "Geist", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-serif: Georgia, serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --shadow-2xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.09);
+  --shadow-xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.09);
+  --shadow-sm: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 1px 2px -1px hsl(0 0% 0% / 0.18);
+  --shadow: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 1px 2px -1px hsl(0 0% 0% / 0.18);
+  --shadow-md: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 2px 4px -1px hsl(0 0% 0% / 0.18);
+  --shadow-lg: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 4px 6px -1px hsl(0 0% 0% / 0.18);
+  --shadow-xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 8px 10px -1px hsl(0 0% 0% / 0.18);
+  --shadow-2xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.45);
+  --glow-1: color-mix(in oklch, var(--foreground) 12%, transparent);
+  --glow-2: color-mix(in oklch, var(--foreground) 6%, transparent);
+  color-scheme: light;
 }
 
 .dark {
-  --background: oklch(0.145 0.015 285);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.18 0.02 285);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.22 0.02 285);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.22 0.02 30);
-  --secondary: oklch(0.27 0.02 285);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.27 0.02 285);
-  --muted-foreground: oklch(0.7 0.02 285);
-  --accent: oklch(0.35 0.06 285);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.3 0.02 285);
-  --input: oklch(0.3 0.02 285);
-  --ring: oklch(0.55 0.02 285);
-  --shadow-sm: 0 1px 2px 0 oklch(0 0 0 / 0.3);
-  --shadow-md: 0 4px 6px -1px oklch(0 0 0 / 0.3), 0 2px 4px -2px oklch(0 0 0 / 0.3);
-  --shadow-lg: 0 10px 15px -3px oklch(0 0 0 / 0.4), 0 4px 6px -4px oklch(0 0 0 / 0.4);
-  --shadow-xl: 0 20px 25px -5px oklch(0 0 0 / 0.4), 0 8px 10px -6px oklch(0 0 0 / 0.4);
+  --background: oklch(0 0 0);
+  --foreground: oklch(1 0 0);
+  --card: oklch(0.1400 0 0);
+  --card-foreground: oklch(1 0 0);
+  --popover: oklch(0.1800 0 0);
+  --popover-foreground: oklch(1 0 0);
+  --primary: oklch(1 0 0);
+  --primary-foreground: oklch(0 0 0);
+  --secondary: oklch(0.2500 0 0);
+  --secondary-foreground: oklch(1 0 0);
+  --muted: oklch(0.2300 0 0);
+  --muted-foreground: oklch(0.7200 0 0);
+  --accent: oklch(0.3200 0 0);
+  --accent-foreground: oklch(1 0 0);
+  --destructive: oklch(0.6900 0.2000 23.9100);
+  --destructive-foreground: oklch(0 0 0);
+  --border: oklch(0.2600 0 0);
+  --input: oklch(0.3200 0 0);
+  --ring: oklch(0.7200 0 0);
+  --shadow-2xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.09);
+  --shadow-xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.09);
+  --shadow-sm: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 1px 2px -1px hsl(0 0% 0% / 0.18);
+  --shadow: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 1px 2px -1px hsl(0 0% 0% / 0.18);
+  --shadow-md: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 2px 4px -1px hsl(0 0% 0% / 0.18);
+  --shadow-lg: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 4px 6px -1px hsl(0 0% 0% / 0.18);
+  --shadow-xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.18), 0px 8px 10px -1px hsl(0 0% 0% / 0.18);
+  --shadow-2xl: 0px 1px 2px 0px hsl(0 0% 0% / 0.45);
+  --glow-1: color-mix(in oklch, var(--foreground) 18%, transparent);
+  --glow-2: color-mix(in oklch, var(--foreground) 10%, transparent);
+  color-scheme: dark;
 }
 
 * {
@@ -78,6 +93,25 @@ a {
   text-decoration: none;
 }
 
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: 1rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--foreground);
+  color: var(--background);
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transform: translateY(-200%);
+  transition: transform 0.2s ease;
+  z-index: 20;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
 .landing-shell {
   min-height: 100vh;
   position: relative;
@@ -99,21 +133,25 @@ a {
   width: 200%;
   height: 200%;
   background: 
-    radial-gradient(circle at 20% 20%, oklch(0.8 0.1 280 / 0.08) 0%, transparent 50%),
-    radial-gradient(circle at 80% 80%, oklch(0.6 0.15 30 / 0.06) 0%, transparent 50%);
+    radial-gradient(circle at 20% 20%, var(--glow-1) 0%, transparent 55%),
+    radial-gradient(circle at 80% 80%, var(--glow-2) 0%, transparent 55%);
   animation: float 20s ease-in-out infinite;
-}
-
-.dark .landing-bg::before {
-  background: 
-    radial-gradient(circle at 20% 20%, oklch(0.6 0.15 280 / 0.12) 0%, transparent 50%),
-    radial-gradient(circle at 80% 80%, oklch(0.5 0.1 30 / 0.08) 0%, transparent 50%);
 }
 
 @keyframes float {
   0%, 100% { transform: translate(0, 0) rotate(0deg); }
   33% { transform: translate(2%, 2%) rotate(1deg); }
   66% { transform: translate(-1%, 1%) rotate(-1deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-bg::before,
+  .landing-badge-dot {
+    animation: none;
+  }
+  .skip-link {
+    transition: none;
+  }
 }
 
 /* Header */
@@ -161,7 +199,7 @@ a {
   height: 40px;
   border-radius: 0.5rem;
   color: var(--foreground);
-  transition: all 0.2s ease;
+  transition: color 0.2s ease, transform 0.2s ease;
 }
 
 .landing-github:hover {
@@ -185,7 +223,7 @@ a {
   color: var(--foreground);
   cursor: pointer;
   border: none;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
 
 .theme-toggle:hover {
@@ -224,7 +262,7 @@ a {
 .landing-badge-dot {
   width: 8px;
   height: 8px;
-  background: oklch(0.6 0.15 150);
+  background: color-mix(in oklch, var(--foreground) 70%, transparent);
   border-radius: 50%;
   animation: pulse 2s ease-in-out infinite;
 }
@@ -240,17 +278,11 @@ a {
   letter-spacing: -0.04em;
   line-height: 1.1;
   margin-bottom: 1.5rem;
-  background: linear-gradient(135deg, var(--foreground) 0%, oklch(0.5 0.1 30) 100%);
+  background: linear-gradient(135deg, var(--foreground) 0%, var(--muted-foreground) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-}
-
-.dark .landing-hero h1 {
-  background: linear-gradient(135deg, var(--foreground) 0%, oklch(0.7 0.1 280) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  text-wrap: balance;
 }
 
 .landing-hero-subtitle {
@@ -277,7 +309,7 @@ a {
   border-radius: 0.75rem;
   font-size: 1rem;
   font-weight: 500;
-  transition: all 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
   cursor: pointer;
 }
 
@@ -331,6 +363,7 @@ a {
   font-weight: 700;
   letter-spacing: -0.03em;
   margin-bottom: 1rem;
+  text-wrap: balance;
 }
 
 .landing-features-header p {
@@ -353,7 +386,7 @@ a {
   padding: 2rem;
   position: relative;
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
 }
 
 .bento-card:hover {
@@ -369,11 +402,7 @@ a {
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, oklch(0.5 0.1 30 / 0.3), transparent);
-}
-
-.dark .bento-card::before {
-  background: linear-gradient(90deg, transparent, oklch(0.5 0.1 280 / 0.3), transparent);
+  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--foreground) 30%, transparent), transparent);
 }
 
 .bento-card-icon {

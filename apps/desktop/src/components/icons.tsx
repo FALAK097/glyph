@@ -4,6 +4,7 @@ import {
   ArrowLeft01Icon as ArrowLeft01Svg,
   ArrowRight01Icon as ArrowRight01Svg,
   ArrowRight02Icon as ArrowRight02Svg,
+  ArrowUpRight01Icon as ArrowUpRight01Svg,
   ArrowUp01Icon as ArrowUp01Svg,
   ArrowDown01Icon as ArrowDown01Svg,
   Cancel01Icon as Cancel01Svg,
@@ -20,7 +21,7 @@ import {
   MoreVerticalIcon as MoreVerticalSvg,
   PanelLeftIcon as HugePanelLeftIcon,
   PanelRightIcon as HugePanelRightIcon,
-  PencilIcon as PencilSvg,
+  PencilEdit02Icon as PencilEdit02Svg,
   Search01Icon as Search01Svg,
   Settings01Icon as Settings01Svg,
   UnfoldMoreIcon as UnfoldMoreSvg,
@@ -45,13 +46,14 @@ export const ChevronRightIcon = (props: IconProps) => <HugeIcon icon={ArrowRight
 export const FolderIcon = (props: IconProps) => <HugeIcon icon={Folder01Svg} {...props} />;
 export const FileIcon = (props: IconProps) => <HugeIcon icon={File01Svg} {...props} />;
 export const MoreVerticalIcon = (props: IconProps) => <HugeIcon icon={MoreVerticalSvg} {...props} />;
-export const PencilIcon = (props: IconProps) => <HugeIcon icon={PencilSvg} {...props} />;
+export const PencilIcon = (props: IconProps) => <HugeIcon icon={PencilEdit02Svg} {...props} />;
 export const TrashIcon = (props: IconProps) => <HugeIcon icon={Delete02Svg} {...props} />;
 
 export const PanelLeftIcon = (props: IconProps) => <HugeIcon icon={HugePanelLeftIcon} {...props} />;
 export const PanelRightIcon = (props: IconProps) => <HugeIcon icon={HugePanelRightIcon} {...props} />;
 export const ArrowLeftIcon = (props: IconProps) => <HugeIcon icon={ArrowLeft01Svg} {...props} />;
 export const ArrowRightIcon = (props: IconProps) => <HugeIcon icon={ArrowRight02Svg} {...props} />;
+export const ExternalLinkIcon = (props: IconProps) => <HugeIcon icon={ArrowUpRight01Svg} {...props} />;
 export const ArrowUpIcon = (props: IconProps) => <HugeIcon icon={ArrowUp01Svg} {...props} />;
 export const ArrowDownIcon = (props: IconProps) => <HugeIcon icon={ArrowDown01Svg} {...props} />;
 export const UnfoldMoreIcon = (props: IconProps) => <HugeIcon icon={UnfoldMoreSvg} {...props} />;

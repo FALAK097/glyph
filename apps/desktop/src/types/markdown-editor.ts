@@ -13,6 +13,7 @@ export type MarkdownEditorProps = {
   newNoteShortcut?: string;
   onOpenSettings?: () => void;
   onOpenCommandPalette?: () => void;
+  onOpenLinkedFile?: (path: string) => void;
   commandPaletteShortcut?: string;
   onNavigateBack?: () => void;
   onNavigateForward?: () => void;

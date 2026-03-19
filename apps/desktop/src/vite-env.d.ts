@@ -2,9 +2,12 @@
 
 import type {
   AppCommand,
+  AssetSelection,
   AppSettings,
+  DialogKind,
   FileDocument,
   FileOpenResult,
+  ResolvedLinkTarget,
   SearchResult,
   WorkspaceChangeEvent,
   WorkspaceSnapshot,
@@ -14,9 +17,12 @@ import type {
 declare global {
   interface Window {
     glyph?: {
-      openDialog: (
-        kind: "file" | "directory",
-      ) => Promise<FileOpenResult | null>;
+      openDialog: (kind: DialogKind) => Promise<FileOpenResult | null>;
+      pickAsset: (kind: "image" | "any-file") => Promise<AssetSelection | null>;
+      resolveLinkTarget: (
+        currentFilePath: string | null,
+        href: string,
+      ) => Promise<ResolvedLinkTarget | null>;
       openFolder: (dirPath?: string) => Promise<WorkspaceSnapshot | null>;
       openDefaultWorkspace: () => Promise<WorkspaceSnapshot | null>;
       openDocument: () => Promise<FileDocument | null>;

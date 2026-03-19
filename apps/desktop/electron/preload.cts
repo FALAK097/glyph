@@ -3,9 +3,12 @@ const { contextBridge, ipcRenderer } =
 
 import type {
   AppCommand,
+  AssetSelection,
   AppSettings,
+  DialogKind,
   FileDocument,
   FileOpenResult,
+  ResolvedLinkTarget,
   SearchResult,
   WorkspaceChangeEvent,
   WorkspaceSnapshot,
@@ -31,8 +34,18 @@ async function invokeWithRetry<T>(channel: string, ...args: unknown[]) {
 }
 
 const api = {
-  openDialog(kind: "file" | "directory") {
+  openDialog(kind: DialogKind) {
     return invokeWithRetry<FileOpenResult | null>("dialog:open", kind);
+  },
+  pickAsset(kind: "image" | "any-file") {
+    return invokeWithRetry<AssetSelection | null>("asset:pick", kind);
+  },
+  resolveLinkTarget(currentFilePath: string | null, href: string) {
+    return invokeWithRetry<ResolvedLinkTarget | null>(
+      "app:resolveLinkTarget",
+      currentFilePath,
+      href,
+    );
   },
   openFolder(dirPath?: string) {
     return invokeWithRetry<WorkspaceSnapshot | null>(

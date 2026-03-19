@@ -10,10 +10,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-import { Logo } from "./logo";
 import { SidebarTreeNode } from "./sidebar-tree-node";
 
 import type { SidebarDeleteTarget, SidebarProps } from "../types/sidebar";
+import { LogoComponent } from "./logo-component";
 
 export const Sidebar = ({
   tree,
@@ -48,7 +48,7 @@ export const Sidebar = ({
             style={{ WebkitAppRegion: "no-drag" } as any}
             className="flex items-center justify-center"
           >
-            <Logo size={120} />
+            <LogoComponent size={120} />
           </div>
         </div>
         <div className="flex-1" />
@@ -63,7 +63,7 @@ export const Sidebar = ({
         style={{ WebkitAppRegion: "drag" } as any}
       >
         <div style={{ WebkitAppRegion: "no-drag" } as any}>
-          <Logo size={120} />
+          <LogoComponent size={120} />
         </div>
       </div>
 

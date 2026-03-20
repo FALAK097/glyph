@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/FALAK097/glyph/compare/v0.2.0...v0.2.1) (2026-03-20)
+
+
+### Bug Fixes
+
+* **release:** backfill packaged app and release workflow fixes ([ac65a6f](https://github.com/FALAK097/glyph/commit/ac65a6f6d5bf2a70d5251a927d33e0967a833da6))
+
 ## [0.2.0](https://github.com/FALAK097/glyph/compare/v0.1.0...v0.2.0) (2026-03-20)
 
 

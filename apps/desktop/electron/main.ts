@@ -499,6 +499,9 @@ function buildApplicationMenu(shortcuts: AppSettings["shortcuts"]) {
     const keys = resolvedShortcuts.find((shortcut) => shortcut.id === id)?.keys;
     return keys ? toElectronAccelerator(keys) : undefined;
   };
+  const viewSubmenu: Electron.MenuItemConstructorOptions[] = isDev
+    ? [{ role: "reload" }, { role: "forceReload" }, { role: "toggleDevTools" }]
+    : [{ role: "togglefullscreen" }];
 
   const menuTemplate: Electron.MenuItemConstructorOptions[] = [
     {
@@ -557,7 +560,7 @@ function buildApplicationMenu(shortcuts: AppSettings["shortcuts"]) {
     },
     {
       label: "View",
-      submenu: [{ role: "reload" }, { role: "toggleDevTools" }],
+      submenu: viewSubmenu,
     },
   ];
 
@@ -1115,6 +1118,7 @@ async function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
+      devTools: isDev,
       sandbox: true,
     },
   });

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/FALAK097/glyph/compare/v0.2.1...v0.2.2) (2026-03-20)
+
+
+### Bug Fixes
+
+* **desktop:** load packaged assets with relative paths ([9e3aee7](https://github.com/FALAK097/glyph/commit/9e3aee75ebe7d45189ccbc02798b050083d3a037))
+
 ## [0.2.1](https://github.com/FALAK097/glyph/compare/v0.2.0...v0.2.1) (2026-03-20)
 
 

@@ -12,7 +12,7 @@ export function flattenFiles(nodes: DirectoryNode[], rootPath: string | null): F
       items.push({
         path: node.path,
         name: node.name,
-        relativePath: getRelativePath(node.path, rootPath)
+        relativePath: getRelativePath(node.path, rootPath),
       });
       continue;
     }

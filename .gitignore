@@ -3,6 +3,10 @@ dist
 dist-electron
 apps/*/dist
 apps/*/dist-electron
+apps/*/release
+apps/*/dist/**
+apps/*/dist-electron/**
+apps/*/release/**
 .DS_Store
 .turbo
 *.log

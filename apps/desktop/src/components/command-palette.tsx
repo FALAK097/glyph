@@ -14,14 +14,17 @@ export const CommandPalette = ({
   onClose,
   onHoverItem,
   onMove,
-  onSelect
+  onSelect,
 }: CommandPaletteProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const sections = useMemo(() => {
-    const groups: Array<{ title: string; items: Array<{ item: CommandPaletteItem; index: number }> }> = [];
+    const groups: Array<{
+      title: string;
+      items: Array<{ item: CommandPaletteItem; index: number }>;
+    }> = [];
 
     items.forEach((item, index) => {
       const group = groups.at(-1);
@@ -29,7 +32,7 @@ export const CommandPalette = ({
       if (!group || group.title !== item.section) {
         groups.push({
           title: item.section,
-          items: [{ item, index }]
+          items: [{ item, index }],
         });
         return;
       }
@@ -54,31 +57,33 @@ export const CommandPalette = ({
     }
 
     itemRefs.current[selectedIndex]?.scrollIntoView({
-      block: "nearest"
+      block: "nearest",
     });
   }, [isOpen, selectedIndex]);
 
-  const handleOpenChange = useCallback((open: boolean) => {
-    if (!open) {
-      onClose();
-    }
-  }, [onClose]);
+  const handleOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open) {
+        onClose();
+      }
+    },
+    [onClose],
+  );
 
   if (!isOpen) {
     return null;
   }
 
   return (
-    <Dialog
-      open={isOpen}
-      onOpenChange={handleOpenChange}
-    >
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent
         showCloseButton={false}
         aria-labelledby="command-palette-title"
         className="w-[90%] max-w-lg p-0 overflow-hidden border-border/50"
       >
-        <h2 id="command-palette-title" className="sr-only">Command Palette</h2>
+        <h2 id="command-palette-title" className="sr-only">
+          Command Palette
+        </h2>
         {/* Search input */}
         <div className="px-4 py-3 border-b border-border/30 bg-background">
           <Input
@@ -163,11 +168,13 @@ export const CommandPalette = ({
                         <div className="flex flex-col text-left min-w-0 flex-1">
                           <span className="font-medium text-sm">{item.title}</span>
                           {item.subtitle ? (
-                            <span className={`text-xs mt-0.5 truncate ${
-                              selectedIndex === index
-                                ? "text-foreground/60"
-                                : "text-muted-foreground"
-                            }`}>
+                            <span
+                              className={`text-xs mt-0.5 truncate ${
+                                selectedIndex === index
+                                  ? "text-foreground/60"
+                                  : "text-muted-foreground"
+                              }`}
+                            >
                               {item.subtitle}
                             </span>
                           ) : null}

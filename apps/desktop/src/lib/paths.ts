@@ -11,7 +11,9 @@ export function isPathInside(targetPath: string, parentPath: string): boolean {
   const normalizedTarget = normalizePath(targetPath).toLowerCase();
   const normalizedParent = normalizePath(parentPath).replace(/\/+$/, "").toLowerCase();
 
-  return normalizedTarget === normalizedParent || normalizedTarget.startsWith(`${normalizedParent}/`);
+  return (
+    normalizedTarget === normalizedParent || normalizedTarget.startsWith(`${normalizedParent}/`)
+  );
 }
 
 export function getBaseName(filePath: string): string {

@@ -3,11 +3,7 @@ import type { DragEvent, MouseEvent, ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getDisplayFileName } from "@/lib/paths";
 
 import {
@@ -47,14 +43,10 @@ export const SidebarTreeNode = ({
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [dropPosition, setDropPosition] = useState<DragPosition | null>(null);
-  const [menuCoords, setMenuCoords] =
-    useState<SidebarTreeNodeMenuCoords | null>(null);
+  const [menuCoords, setMenuCoords] = useState<SidebarTreeNodeMenuCoords | null>(null);
   const renameInputRef = useRef<HTMLInputElement | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
-  const displayFileName = useMemo(
-    () => getDisplayFileName(node.name),
-    [node.name],
-  );
+  const displayFileName = useMemo(() => getDisplayFileName(node.name), [node.name]);
   const isFolderExpanded = isExpanded ?? localIsExpanded;
 
   const containerClassName = useMemo(() => {
@@ -86,8 +78,7 @@ export const SidebarTreeNode = ({
     }
 
     const currentName = node.name;
-    const baseName =
-      node.type === "file" ? getDisplayFileName(currentName) : currentName;
+    const baseName = node.type === "file" ? getDisplayFileName(currentName) : currentName;
 
     if (trimmed !== currentName && trimmed !== baseName) {
       onRenameFile(node.path, trimmed);
@@ -120,9 +111,7 @@ export const SidebarTreeNode = ({
 
           event.preventDefault();
           const bounds = event.currentTarget.getBoundingClientRect();
-          setDropPosition(
-            event.clientY < bounds.top + bounds.height / 2 ? "before" : "after",
-          );
+          setDropPosition(event.clientY < bounds.top + bounds.height / 2 ? "before" : "after");
         },
         onDragLeave: () => setDropPosition(null),
         onDrop: (event: DragEvent<HTMLDivElement>) => {
@@ -145,17 +134,15 @@ export const SidebarTreeNode = ({
 
     return (
       <>
-        <Button
+        <button
           aria-label={ariaLabel}
-          className="fixed inset-0 z-40 h-auto w-auto rounded-none bg-transparent hover:bg-transparent"
+          className="fixed inset-0 z-40 cursor-default bg-transparent outline-none"
           onClick={(event) => {
             event.stopPropagation();
             setShowMenu(false);
           }}
           type="button"
           tabIndex={-1}
-          variant="ghost"
-          size="sm"
         />
         <div
           className="fixed z-50 w-[142px] rounded-md border border-border bg-popover py-1 shadow-lg"
@@ -169,12 +156,9 @@ export const SidebarTreeNode = ({
 
   if (node.type === "directory") {
     return (
-      <div
-        className={`group relative mb-1 border-transparent ${containerClassName}`}
-        {...dragHandlers}
-      >
+      <div className={`relative mb-1 border-transparent ${containerClassName}`} {...dragHandlers}>
         <div
-          className="mx-1 flex min-w-0 items-center rounded-md transition-colors hover:bg-sidebar-accent/50"
+          className="group/folder-row mx-1 flex min-w-0 items-center rounded-md text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
           style={{
             paddingLeft: `${depth * 14 + 6}px`,
             paddingRight: "4px",
@@ -185,7 +169,7 @@ export const SidebarTreeNode = ({
           <Button
             variant="ghost"
             size="sm"
-            className={`h-auto min-w-0 flex-1 justify-start gap-2 rounded-md bg-transparent px-0 py-1 text-left hover:!bg-transparent ${
+            className={`h-auto min-w-0 flex-1 cursor-pointer justify-start gap-2 rounded-md bg-transparent px-0 py-1 text-left hover:!bg-transparent ${
               draggable ? "cursor-grab active:cursor-grabbing" : ""
             }`}
             onClick={() => {
@@ -201,12 +185,12 @@ export const SidebarTreeNode = ({
             <span className="relative flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground">
               <FolderIcon
                 size={14}
-                className="transition-all duration-150 group-hover:scale-90 group-hover:opacity-0"
+                className="transition-all duration-150 ease-out group-hover/folder-row:scale-90 group-hover/folder-row:opacity-0 group-hover/folder-row:text-sidebar-accent-foreground/75"
               />
               <ChevronRightIcon
                 size={12}
-                className={`absolute transition-all duration-150 group-hover:opacity-100 ${
-                  isFolderExpanded ? "rotate-90 opacity-0" : "opacity-0"
+                className={`absolute opacity-0 transition-all duration-150 ease-out group-hover/folder-row:opacity-100 ${
+                  isFolderExpanded ? "rotate-90" : ""
                 }`}
               />
             </span>
@@ -228,9 +212,7 @@ export const SidebarTreeNode = ({
                 }}
               />
             ) : (
-              <span className="min-w-0 truncate font-medium text-foreground">
-                {node.name}
-              </span>
+              <span className="min-w-0 truncate font-medium text-foreground">{node.name}</span>
             )}
           </Button>
           {!isRenaming ? (
@@ -241,7 +223,7 @@ export const SidebarTreeNode = ({
                     ref={menuButtonRef}
                     variant="ghost"
                     size="icon-xs"
-                    className="pointer-events-none rounded bg-transparent text-muted-foreground opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 hover:text-foreground hover:!bg-transparent focus-visible:opacity-100 focus-visible:!bg-transparent"
+                    className="pointer-events-none rounded bg-transparent text-muted-foreground opacity-0 transition-opacity group-hover/folder-row:pointer-events-auto group-hover/folder-row:opacity-100 hover:text-foreground hover:!bg-transparent focus-visible:opacity-100 focus-visible:!bg-transparent"
                     onClick={handleMenuToggle}
                     type="button"
                   >
@@ -254,8 +236,9 @@ export const SidebarTreeNode = ({
           ) : null}
         </div>
 
-        {isFolderExpanded
-          ? node.children.map((child) => (
+        {isFolderExpanded ? (
+          <div className="mt-1">
+            {node.children.map((child) => (
               <SidebarTreeNode
                 key={child.path}
                 node={child}
@@ -268,8 +251,9 @@ export const SidebarTreeNode = ({
                 onRenameFile={onRenameFile}
                 onToggleFolder={onToggleFolder}
               />
-            ))
-          : null}
+            ))}
+          </div>
+        ) : null}
 
         {renderMenu(
           <>
@@ -314,14 +298,14 @@ export const SidebarTreeNode = ({
 
   return (
     <div
-      className={`group relative mb-0.5 flex min-w-0 items-center overflow-hidden border-transparent ${containerClassName}`}
+      className={`group/file-row relative mb-0.5 flex min-w-0 items-center overflow-hidden border-transparent ${containerClassName}`}
       {...dragHandlers}
     >
       <div
-        className={`mx-1 flex min-w-0 flex-1 items-center rounded-md ${
+        className={`mx-1 flex min-w-0 flex-1 cursor-pointer items-center rounded-md transition-colors ${
           activePath === node.path
             ? "bg-sidebar-accent text-sidebar-accent-foreground"
-            : ""
+            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
         }`}
         style={{
           paddingLeft: `${depth * 14 + 8}px`,
@@ -330,7 +314,14 @@ export const SidebarTreeNode = ({
           paddingBottom: "6px",
         }}
       >
-        <FileIcon size={12} className="mr-2 shrink-0 text-muted-foreground" />
+        <FileIcon
+          size={12}
+          className={`mr-2 shrink-0 transition-colors ${
+            activePath === node.path
+              ? "text-sidebar-accent-foreground/70"
+              : "text-muted-foreground group-hover/file-row:text-sidebar-accent-foreground/70"
+          }`}
+        />
         {isRenaming ? (
           <Input
             ref={renameInputRef}
@@ -352,7 +343,7 @@ export const SidebarTreeNode = ({
           <Button
             variant="ghost"
             size="sm"
-            className="h-auto min-w-0 flex-1 justify-start truncate bg-transparent px-0 py-0 text-left text-sm hover:!bg-transparent"
+            className="h-auto min-w-0 flex-1 cursor-pointer justify-start truncate bg-transparent px-0 py-0 text-left text-sm hover:!bg-transparent"
             onClick={() => onOpenFile(node.path)}
             type="button"
           >
@@ -367,7 +358,7 @@ export const SidebarTreeNode = ({
                   ref={menuButtonRef}
                   variant="ghost"
                   size="icon-xs"
-                  className="pointer-events-none rounded bg-transparent text-muted-foreground opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 hover:text-foreground hover:!bg-transparent focus-visible:opacity-100 focus-visible:!bg-transparent"
+                  className="pointer-events-none rounded bg-transparent text-muted-foreground opacity-0 transition-opacity group-hover/file-row:pointer-events-auto group-hover/file-row:opacity-100 hover:text-foreground hover:!bg-transparent focus-visible:opacity-100 focus-visible:!bg-transparent"
                   onClick={handleMenuToggle}
                   type="button"
                 >

@@ -12,4 +12,3 @@ export type QuickOpenPanelProps = {
   onClose: () => void;
   onOpenItem: (item: QuickOpenItem) => void;
 };
-

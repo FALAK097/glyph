@@ -1,29 +1,33 @@
 {
   "name": "@glyph/desktop",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "description": "Glyph - A minimal markdown viewer and editor for macOS and Windows. Browse local notes, edit markdown fast, and read rendered documents in a focused desktop workspace.",
+  "keywords": [
+    "desktop",
+    "editor",
+    "electron",
+    "markdown",
+    "minimal",
+    "notes",
+    "productivity"
+  ],
   "author": "Falak Gala",
   "repository": {
     "type": "git",
     "url": "https://github.com/FALAK097/glyph.git"
   },
-  "keywords": [
-    "markdown",
-    "editor",
-    "notes",
-    "desktop",
-    "electron",
-    "minimal",
-    "productivity"
-  ],
-  "main": "dist-electron/electron/main.js",
   "type": "module",
+  "main": "dist-electron/electron/main.js",
   "scripts": {
-    "dev": "concurrently -k \"vite\" \"tsc -p electron/tsconfig.json --watch\" \"wait-on http-get://127.0.0.1:5173 dist-electron/electron/main.js && electron .\"",
+    "dev": "concurrently -k \"vite\" \"tsc -p electron/tsconfig.json --watch\" \"wait-on http-get://127.0.0.1:5173 dist-electron/electron/main.js && node scripts/launch-dev-electron.mjs\"",
     "build": "tsc -p electron/tsconfig.json && vite build",
+    "dist": "pnpm run build && electron-builder --publish never",
+    "release": "pnpm run build && electron-builder --publish always",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",
-    "lint": "eslint . --ext ts,tsx"
+    "lint": "oxlint .",
+    "fmt": "oxfmt . '!dist/**' '!dist-electron/**' '!release/**'",
+    "fmt:check": "oxfmt . '!dist/**' '!dist-electron/**' '!release/**' --check"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
@@ -31,6 +35,7 @@
     "@hugeicons/core-free-icons": "^4.0.0",
     "@hugeicons/react": "^1.1.6",
     "@tiptap/core": "^3.20.1",
+    "@tiptap/extension-code-block-lowlight": "^3.20.1",
     "@tiptap/extension-image": "^3.20.1",
     "@tiptap/extension-link": "^3.20.1",
     "@tiptap/extension-placeholder": "^3.20.1",
@@ -47,8 +52,10 @@
     "chokidar": "^4.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "electron": "^35.0.0",
+    "electron-updater": "^6.6.2",
+    "highlight.js": "^11.11.1",
     "html2pdf.js": "^0.14.0",
+    "lowlight": "^3.3.0",
     "marked": "^17.0.4",
     "pdfkit": "^0.17.2",
     "react": "^19.0.0",
@@ -57,10 +64,7 @@
     "tippy.js": "^6.3.7",
     "tiptap-markdown": "^0.9.0",
     "tw-animate-css": "^1.4.0",
-    "zustand": "^5.0.3",
-    "@tiptap/extension-code-block-lowlight": "^3.20.1",
-    "highlight.js": "^11.11.1",
-    "lowlight": "^3.3.0"
+    "zustand": "^5.0.3"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.1",
@@ -70,13 +74,84 @@
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.2",
-    "eslint": "^9.21.0",
-    "eslint-plugin-react-hooks": "^5.2.0",
-    "eslint-plugin-react-refresh": "^0.4.19",
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.12",
     "shadcn": "^4.0.6",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.8.2",
     "vite": "^6.2.0",
     "wait-on": "^8.0.3"
-  }
+  },
+  "build": {
+    "appId": "com.falakgala.glyph",
+    "productName": "Glyph",
+    "artifactName": "Glyph-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "dist-electron/electron/main.js"
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "public/icon.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "dmg": {
+      "artifactName": "Glyph-${version}-mac.${ext}"
+    },
+    "win": {
+      "icon": "public/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "Glyph-${version}-windows.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "FALAK097",
+        "repo": "glyph"
+      }
+    ],
+    "fileAssociations": [
+      {
+        "ext": "md",
+        "name": "Markdown Document",
+        "description": "Markdown document",
+        "role": "Editor"
+      },
+      {
+        "ext": "mdx",
+        "name": "MDX Document",
+        "description": "MDX document",
+        "role": "Editor"
+      },
+      {
+        "ext": "markdown",
+        "name": "Markdown File",
+        "description": "Markdown file",
+        "role": "Editor"
+      }
+    ]
+  },
+  "productName": "Glyph"
 }

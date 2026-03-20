@@ -27,12 +27,8 @@ export const Sidebar = ({
   onToggleFolder,
   onReorderNodes,
 }: SidebarProps) => {
-  const [nodeToDelete, setNodeToDelete] = useState<SidebarDeleteTarget | null>(
-    null,
-  );
-  const [folderToRemove, setFolderToRemove] = useState<SidebarRemoveTarget | null>(
-    null,
-  );
+  const [nodeToDelete, setNodeToDelete] = useState<SidebarDeleteTarget | null>(null);
+  const [folderToRemove, setFolderToRemove] = useState<SidebarRemoveTarget | null>(null);
   const [draggedPath, setDraggedPath] = useState<string | null>(null);
 
   const handleConfirmDelete = () => {
@@ -123,25 +119,15 @@ export const Sidebar = ({
               <DialogTitle>Delete Note</DialogTitle>
               <DialogDescription>
                 Are you sure you want to delete{" "}
-                <span className="font-semibold text-foreground">
-                  "{nodeToDelete.name}"
-                </span>
-                ? This action cannot be undone.
+                <span className="font-semibold text-foreground">"{nodeToDelete.name}"</span>? This
+                action cannot be undone.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button
-                variant="outline"
-                type="button"
-                onClick={() => setNodeToDelete(null)}
-              >
+              <Button variant="outline" type="button" onClick={() => setNodeToDelete(null)}>
                 Cancel
               </Button>
-              <Button
-                variant="destructive"
-                type="button"
-                onClick={handleConfirmDelete}
-              >
+              <Button variant="destructive" type="button" onClick={handleConfirmDelete}>
                 Delete
               </Button>
             </DialogFooter>
@@ -162,24 +148,16 @@ export const Sidebar = ({
               <DialogTitle>Remove Folder From Glyph</DialogTitle>
               <DialogDescription>
                 Remove{" "}
-                <span className="font-semibold text-foreground">
-                  "{folderToRemove.name}"
-                </span>{" "}
-                from Glyph? This only removes it from the sidebar and does not delete anything from your device.
+                <span className="font-semibold text-foreground">"{folderToRemove.name}"</span> from
+                Glyph? This only removes it from the sidebar and does not delete anything from your
+                device.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button
-                variant="outline"
-                type="button"
-                onClick={() => setFolderToRemove(null)}
-              >
+              <Button variant="outline" type="button" onClick={() => setFolderToRemove(null)}>
                 Cancel
               </Button>
-              <Button
-                type="button"
-                onClick={handleConfirmRemove}
-              >
+              <Button type="button" onClick={handleConfirmRemove}>
                 Remove
               </Button>
             </DialogFooter>

@@ -34,10 +34,12 @@ type Feature = {
   description: string;
   className: string;
   tone: string;
+  compactHeight?: boolean;
+  emphasis?: "default" | "media";
   image?: {
     src: string;
     alt: string;
-    frame?: "wide" | "compact";
+    frame?: "wide" | "compact" | "panel";
   };
   themes?: boolean;
 };
@@ -50,6 +52,7 @@ const features: Feature[] = [
       "Open entire directories and manage your markdown library in one focused editor designed for long-form writing.",
     className: "md:col-span-8",
     tone: "feature-card--paper",
+    emphasis: "media",
     image: {
       src: "/demo.png",
       alt: "Glyph interface preview",
@@ -63,6 +66,7 @@ const features: Feature[] = [
       "Your notes stay on your device. No accounts, no forced sync, and no cloud dependency between you and your files.",
     className: "md:col-span-4",
     tone: "feature-card--ink",
+    compactHeight: true,
   },
   {
     eyebrow: "Native",
@@ -75,7 +79,8 @@ const features: Feature[] = [
   {
     eyebrow: "Discovery",
     title: "Search Everything",
-    description: "Search all your markdown files in one place and find the exact note you need in seconds.",
+    description:
+      "Search all your markdown files in one place and find the exact note you need in seconds.",
     className: "md:col-span-4",
     tone: "feature-card--white",
   },
@@ -92,12 +97,12 @@ const features: Feature[] = [
     title: "Keyboard Shortcuts",
     description:
       "Built for speed, with fast navigation and commands that keep your hands on the keyboard.",
-    className: "md:col-span-5",
+    className: "md:col-span-6",
     tone: "feature-card--paper",
     image: {
       src: "/keyboard-shortcut.png",
       alt: "Glyph keyboard shortcuts interface preview",
-      frame: "compact",
+      frame: "wide",
     },
   },
   {
@@ -105,12 +110,12 @@ const features: Feature[] = [
     title: "Syntax Highlighting",
     description:
       "Readable markdown structure and code blocks make it easier to scan, edit, and stay oriented while writing.",
-    className: "md:col-span-7",
+    className: "md:col-span-6",
     tone: "feature-card--white",
     image: {
       src: "/syntax-highlighting.png",
       alt: "Glyph syntax highlighting preview",
-      frame: "compact",
+      frame: "wide",
     },
   },
   {
@@ -127,12 +132,16 @@ const features: Feature[] = [
 type ProductShotProps = {
   src: string;
   alt: string;
-  frame?: "wide" | "compact";
+  frame?: "wide" | "compact" | "panel";
 };
 
 function ProductShot({ src, alt, frame = "compact" }: ProductShotProps) {
   return (
-    <div className={`product-shot ${frame === "wide" ? "product-shot--wide" : ""}`}>
+    <div
+      className={`product-shot ${
+        frame === "wide" ? "product-shot--wide" : frame === "panel" ? "product-shot--panel" : ""
+      }`}
+    >
       <img src={src} alt={alt} width="2880" height="1800" className="product-shot__image" />
     </div>
   );
@@ -160,11 +169,14 @@ export function App() {
           </a>
 
           <div className="flex w-full items-center justify-center gap-2 sm:w-auto sm:justify-end">
-            <a href="/downloads/glyph-macos.dmg" className="download-button">
+            <a href="https://github.com/FALAK097/glyph/releases/latest" className="download-button">
               <AppleIcon />
               Download for macOS
             </a>
-            <a href="/downloads/glyph-windows.exe" className="download-button download-button--secondary">
+            <a
+              href="https://github.com/FALAK097/glyph/releases/latest"
+              className="download-button download-button--secondary"
+            >
               <WindowsIcon />
               Download for Windows
             </a>
@@ -177,12 +189,14 @@ export function App() {
           <span className="hero-kicker">The Interface of Thought</span>
           <h1 id="main-content" className="hero-display mt-6 max-w-[10ch] text-balance">
             Designed for
-            <span className="hero-display__break">the <em>discerning</em></span>
+            <span className="hero-display__break">
+              the <em>discerning</em>
+            </span>
             writer.
           </h1>
           <p className="hero-body mt-7 max-w-2xl text-balance">
-            Glyph strips away digital noise, leaving only your words, your folders, and a
-            reading experience built for clarity.
+            Glyph strips away digital noise, leaving only your words, your folders, and a reading
+            experience built for clarity.
           </p>
         </div>
       </header>
@@ -195,16 +209,28 @@ export function App() {
             return (
               <article
                 key={feature.title}
-                className={`${feature.className} ${feature.tone} feature-card flex flex-col justify-between`}
+                className={`${feature.className} ${feature.tone} feature-card ${
+                  feature.compactHeight ? "feature-card--compact" : ""
+                } ${feature.emphasis === "media" ? "feature-card--media" : ""} flex flex-col justify-between`}
               >
-                <div className="max-w-md">
-                  <span className={`feature-card__eyebrow ${darkCard ? "feature-card__eyebrow--dark" : ""}`}>
+                <div className={feature.emphasis === "media" ? "max-w-none" : "max-w-md"}>
+                  <span
+                    className={`feature-card__eyebrow ${darkCard ? "feature-card__eyebrow--dark" : ""}`}
+                  >
                     {feature.eyebrow}
                   </span>
-                  <h2 className={`feature-card__title ${darkCard ? "feature-card__title--dark" : ""}`}>
+                  <h2
+                    className={`feature-card__title ${darkCard ? "feature-card__title--dark" : ""} ${
+                      feature.emphasis === "media" ? "feature-card__title--media" : ""
+                    }`}
+                  >
                     {feature.title}
                   </h2>
-                  <p className={`feature-card__description ${darkCard ? "feature-card__description--dark" : ""}`}>
+                  <p
+                    className={`feature-card__description ${
+                      darkCard ? "feature-card__description--dark" : ""
+                    } ${feature.emphasis === "media" ? "feature-card__description--media" : ""}`}
+                  >
                     {feature.title === "Open Source" ? (
                       <>
                         <a
@@ -236,8 +262,16 @@ export function App() {
 
                 {feature.themes ? (
                   <div className="mt-12 grid gap-5 sm:grid-cols-2">
-                    <ProductShot src="/light-theme.png" alt="Glyph light theme preview" frame="wide" />
-                    <ProductShot src="/dark-theme.png" alt="Glyph dark theme preview" frame="wide" />
+                    <ProductShot
+                      src="/light-theme.png"
+                      alt="Glyph light theme preview"
+                      frame="wide"
+                    />
+                    <ProductShot
+                      src="/dark-theme.png"
+                      alt="Glyph dark theme preview"
+                      frame="wide"
+                    />
                   </div>
                 ) : null}
               </article>

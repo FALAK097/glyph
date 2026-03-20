@@ -1,9 +1,4 @@
-import {
-  Extension,
-  nodeInputRule,
-  textblockTypeInputRule,
-  wrappingInputRule,
-} from "@tiptap/core";
+import { Extension, nodeInputRule, textblockTypeInputRule, wrappingInputRule } from "@tiptap/core";
 
 const HEADING_LEVELS = [1, 2, 3, 4];
 

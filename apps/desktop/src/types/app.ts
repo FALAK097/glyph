@@ -7,4 +7,3 @@ export type FlatFile = {
 export type DesktopAppProps = {
   glyph: NonNullable<Window["glyph"]>;
 };
-

@@ -2,9 +2,11 @@
 
 import type {
   AppCommand,
+  AppInfo,
   AssetSelection,
   AppSettings,
   DialogKind,
+  UpdateState,
   FileDocument,
   FileOpenResult,
   ResolvedLinkTarget,
@@ -28,16 +30,10 @@ declare global {
       openDocument: () => Promise<FileDocument | null>;
       readFile: (filePath: string) => Promise<FileDocument>;
       saveFile: (filePath: string, content: string) => Promise<FileDocument>;
-      createFile: (
-        parentDir: string,
-        fileName: string,
-      ) => Promise<FileDocument>;
+      createFile: (parentDir: string, fileName: string) => Promise<FileDocument>;
       renameFile: (oldPath: string, newName: string) => Promise<FileDocument>;
       deleteFile: (targetPath: string) => Promise<string>;
-      createFolder: (
-        parentDir: string,
-        folderName: string,
-      ) => Promise<WorkspaceSnapshot["tree"]>;
+      createFolder: (parentDir: string, folderName: string) => Promise<WorkspaceSnapshot["tree"]>;
       searchWorkspace: (query: string) => Promise<SearchResult[]>;
       getSidebarNode: (
         kind: "file" | "directory",
@@ -45,21 +41,20 @@ declare global {
       ) => Promise<WorkspaceSnapshot["tree"][number] | null>;
       getSettings: () => Promise<AppSettings>;
       updateSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>;
-      onWorkspaceChanged: (
-        listener: (event: WorkspaceChangeEvent) => void,
-      ) => () => void;
+      getAppInfo: () => Promise<AppInfo>;
+      getUpdateState: () => Promise<UpdateState>;
+      checkForUpdates: () => Promise<UpdateState>;
+      downloadUpdate: () => Promise<UpdateState>;
+      installUpdate: () => Promise<void>;
+      onWorkspaceChanged: (listener: (event: WorkspaceChangeEvent) => void) => () => void;
       onCommand: (listener: (command: AppCommand) => void) => () => void;
       getPendingExternalPath: () => Promise<ExternalFileTarget | null>;
       revealInFinder: (targetPath: string) => Promise<boolean>;
-      onExternalFile: (
-        listener: (target: ExternalFileTarget) => void,
-      ) => () => void;
+      onExternalFile: (listener: (target: ExternalFileTarget) => void) => () => void;
+      onUpdateStateChange: (listener: (state: UpdateState) => void) => () => void;
       openExternal: (path: string) => Promise<void>;
 
-      exportMarkdownToPDF: (
-        markdown: string,
-        filename: string,
-      ) => Promise<string>;
+      exportMarkdownToPDF: (markdown: string, filename: string) => Promise<string>;
     };
   }
 }

@@ -3,24 +3,27 @@
   "version": "0.1.0",
   "private": true,
   "description": "Glyph - A minimal markdown viewer and editor for macOS and Windows landing page",
+  "keywords": [
+    "download",
+    "editor",
+    "landing",
+    "markdown",
+    "minimal",
+    "notes"
+  ],
   "author": "Falak Gala",
   "repository": {
     "type": "git",
     "url": "https://github.com/FALAK097/glyph.git"
   },
-  "keywords": [
-    "markdown",
-    "editor",
-    "notes",
-    "landing",
-    "download",
-    "minimal"
-  ],
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "oxlint .",
+    "fmt": "oxfmt . '!dist/**'",
+    "fmt:check": "oxfmt . '!dist/**' --check"
   },
   "dependencies": {
     "lucide-react": "^0.577.0",

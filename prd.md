@@ -104,6 +104,14 @@ Shipped now:
 - standalone web landing page
 - placeholder download buttons
 
+Release readiness now in progress:
+
+- electron-builder packaging metadata and release scripts
+- Electron auto-update plumbing for packaged builds
+- app version surfaced from Electron runtime into the renderer
+- GitHub Actions CI + tagged desktop release workflow
+- automated root `CHANGELOG.md` via Release Please
+
 ## Phase Plan
 
 ### Phase 0: Foundation
@@ -175,9 +183,19 @@ Shipped now:
 
 ### Phase 5: Distribution
 
-- [ ] Electron Builder setup
+- [X] Electron Builder setup
 - [ ] macOS `.dmg`
 - [ ] Windows `.exe`
-- [ ] File associations
-- [ ] Replace web placeholder download links with real artifacts
+- [X] File associations
+- [X] Replace web placeholder download links with real artifacts
 - [ ] Create landing page with all this information and make it ready for production release
+
+### Phase 6: Release Readiness
+
+- [X] Wire `electron-updater` for packaged macOS and Windows builds
+- [X] Surface app version in Settings from runtime metadata
+- [X] Show update CTA in desktop header when a release is available
+- [X] Automate versioning and root `CHANGELOG.md` from commits
+- [X] Publish tagged releases from GitHub Actions
+- [ ] Add Homebrew distribution flow for macOS
+- [ ] Deploy landing page on Vercel for production subdomain

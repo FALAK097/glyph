@@ -3,10 +3,21 @@ import { useDeferredValue, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
-import { DEFAULT_SHORTCUTS, canonicalizeShortcut, mergeShortcutSettings, MODIFIER_TOKENS } from "../shared/shortcuts";
+import {
+  DEFAULT_SHORTCUTS,
+  canonicalizeShortcut,
+  mergeShortcutSettings,
+  MODIFIER_TOKENS,
+} from "../shared/shortcuts";
 
 import type { ThemeMode } from "../shared/workspace";
 import type { SettingsPanelProps } from "../types/settings-panel";
@@ -15,11 +26,12 @@ import { GearIcon, SearchIcon, ShortcutIcon } from "./icons";
 export const SettingsPanel = ({
   isOpen,
   settings,
+  appInfo,
   onClose,
   onChooseFolder,
   onChangeMode,
   onChangeShortcuts,
-  onChangeAutoOpenPDF
+  onChangeAutoOpenPDF,
 }: SettingsPanelProps) => {
   const [activeTab, setActiveTab] = useState("general");
   const [shortcuts, setShortcuts] = useState(DEFAULT_SHORTCUTS);
@@ -72,7 +84,8 @@ export const SettingsPanel = ({
     }
 
     const conflict = shortcuts.find(
-      (shortcut) => shortcut.id !== shortcutId && canonicalizeShortcut(shortcut.keys) === normalizedKeys
+      (shortcut) =>
+        shortcut.id !== shortcutId && canonicalizeShortcut(shortcut.keys) === normalizedKeys,
     );
 
     if (conflict) {
@@ -82,7 +95,7 @@ export const SettingsPanel = ({
     }
 
     const updated = shortcuts.map((shortcut) =>
-      shortcut.id === shortcutId ? { ...shortcut, keys: normalizedKeys } : shortcut
+      shortcut.id === shortcutId ? { ...shortcut, keys: normalizedKeys } : shortcut,
     );
     setShortcuts(updated);
     onChangeShortcuts(updated.map(({ id, keys }) => ({ id, keys })));
@@ -133,7 +146,9 @@ export const SettingsPanel = ({
       return true;
     }
 
-    return shortcut.label.toLowerCase().includes(filter) || shortcut.keys.toLowerCase().includes(filter);
+    return (
+      shortcut.label.toLowerCase().includes(filter) || shortcut.keys.toLowerCase().includes(filter)
+    );
   });
 
   return (
@@ -149,7 +164,9 @@ export const SettingsPanel = ({
         aria-labelledby="settings-dialog-title"
         className="max-w-[calc(100%-2rem)] gap-0 overflow-hidden p-0 sm:max-w-[900px] md:grid md:h-[550px] md:max-h-[85vh] md:grid-cols-[240px_1fr]"
       >
-        <h2 id="settings-dialog-title" className="sr-only">Settings</h2>
+        <h2 id="settings-dialog-title" className="sr-only">
+          Settings
+        </h2>
         <div className="border-b border-border bg-muted/30 p-4 md:border-b-0 md:border-r md:border-border md:py-4 md:px-4 md:flex md:flex-col md:justify-between">
           <div className="space-y-8 md:mt-4">
             <div>
@@ -182,7 +199,9 @@ export const SettingsPanel = ({
           <div className="hidden px-3 text-xs text-muted-foreground/60 md:block">
             Glyph Desktop
             <br />
-            v1.0.0
+            {appInfo
+              ? `v${appInfo.version}${appInfo.isPackaged ? "" : " (dev)"}`
+              : "Version unavailable"}
           </div>
         </div>
 
@@ -196,37 +215,39 @@ export const SettingsPanel = ({
                   <div className="flex flex-col justify-between gap-4 border-b border-border/40 py-4 sm:flex-row sm:items-center sm:gap-8">
                     <div className="shrink-0 space-y-1">
                       <p className="text-sm font-medium">Default notes folder</p>
-                      <p className="text-xs text-muted-foreground">Where your new notes will be saved</p>
+                      <p className="text-xs text-muted-foreground">
+                        Where your new notes will be saved
+                      </p>
                     </div>
-                     <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
-                       <Tooltip>
-                         <TooltipTrigger asChild>
-                           <div
-                             className="truncate rounded bg-muted/30 px-2 py-1 font-mono text-xs text-muted-foreground"
-                           >
-                             {settings.defaultWorkspacePath}
-                           </div>
-                         </TooltipTrigger>
-                         <TooltipContent side="bottom">
-                           {settings.defaultWorkspacePath}
-                         </TooltipContent>
-                       </Tooltip>
-                       <Button
-                         variant="outline"
-                         size="sm"
-                         className="shrink-0"
-                         type="button"
-                         onClick={onChooseFolder}
-                       >
-                         Change
-                       </Button>
-                     </div>
+                    <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="truncate rounded bg-muted/30 px-2 py-1 font-mono text-xs text-muted-foreground">
+                            {settings.defaultWorkspacePath}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          {settings.defaultWorkspacePath}
+                        </TooltipContent>
+                      </Tooltip>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0"
+                        type="button"
+                        onClick={onChooseFolder}
+                      >
+                        Change
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="flex flex-col justify-between gap-4 border-b border-border/40 py-4 sm:flex-row sm:items-center sm:gap-8">
                     <div className="shrink-0 space-y-1">
                       <p className="text-sm font-medium">Appearance</p>
-                      <p className="text-xs text-muted-foreground">Customise how Glyph looks on your device</p>
+                      <p className="text-xs text-muted-foreground">
+                        Customise how Glyph looks on your device
+                      </p>
                     </div>
                     <Select
                       value={settings.themeMode}
@@ -340,7 +361,9 @@ export const SettingsPanel = ({
                   No shortcuts found matching "{shortcutFilter}"
                 </div>
               ) : null}
-              {shortcutError ? <p className="mt-3 text-sm text-destructive">{shortcutError}</p> : null}
+              {shortcutError ? (
+                <p className="mt-3 text-sm text-destructive">{shortcutError}</p>
+              ) : null}
             </div>
           ) : null}
         </div>

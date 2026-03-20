@@ -38,14 +38,14 @@ const buttonVariants = cva(
       variant: "default",
       size: "default",
     },
-  }
-)
+  },
+);
 
 export type ButtonProps = ButtonPrimitive.Props & VariantProps<typeof buttonVariants>;
 
 const ButtonInner = (
   { className, variant = "default", size = "default", ...props }: ButtonProps,
-  ref: ForwardedRef<HTMLButtonElement>
+  ref: ForwardedRef<HTMLButtonElement>,
 ) => {
   return (
     <ButtonPrimitive
@@ -54,11 +54,11 @@ const ButtonInner = (
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />
-  )
-}
+  );
+};
 
-const Button = forwardRef<HTMLButtonElement, ButtonProps>(ButtonInner)
+const Button = forwardRef<HTMLButtonElement, ButtonProps>(ButtonInner);
 
-Button.displayName = "Button"
+Button.displayName = "Button";
 
-export { Button, buttonVariants }
+export { Button, buttonVariants };

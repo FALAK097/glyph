@@ -12,4 +12,3 @@ export type EditorPaneProps = {
   onChange: (value: string) => void;
   onSave: () => void;
 };
-

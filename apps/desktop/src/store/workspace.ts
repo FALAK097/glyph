@@ -55,7 +55,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       lastSavedAt: activeFile ? Date.now() : null,
       error: null,
       navigationHistory: activeFile ? [activeFile.path] : [],
-      navigationIndex: activeFile ? 0 : -1
+      navigationIndex: activeFile ? 0 : -1,
     }),
   setTree: (tree) => set({ tree }),
   setActiveFile: (activeFile) =>
@@ -63,14 +63,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       activeFile,
       draftContent: activeFile?.content ?? "",
       isDirty: false,
-      lastSavedAt: activeFile ? Date.now() : null
+      lastSavedAt: activeFile ? Date.now() : null,
     }),
   attachActiveFile: (activeFile) =>
     set((state) => ({
       activeFile,
       draftContent: state.draftContent,
       isDirty: state.isDirty,
-      lastSavedAt: state.lastSavedAt
+      lastSavedAt: state.lastSavedAt,
     })),
   updateActiveFile: (activeFile) => set({ activeFile }),
   updateDraftContent: (draftContent) => set({ draftContent, isDirty: true }),
@@ -82,7 +82,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       draftContent: state.isDirty ? state.draftContent : activeFile.content,
       isDirty: false,
       isSaving: false,
-      lastSavedAt: Date.now()
+      lastSavedAt: Date.now(),
     })),
   setSaving: (isSaving) => set({ isSaving }),
   setError: (error) => set({ error }),
@@ -90,22 +90,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set((state) => {
       // If we're not at the end of history, remove forward entries
       const newHistory = state.navigationHistory.slice(0, state.navigationIndex + 1);
-      
+
       // Don't add duplicate consecutive entries
       if (newHistory[newHistory.length - 1] === filePath) {
         return state;
       }
-      
+
       newHistory.push(filePath);
-      
+
       // Limit history to 50 entries
       if (newHistory.length > 50) {
         newHistory.shift();
       }
-      
+
       return {
         navigationHistory: newHistory,
-        navigationIndex: newHistory.length - 1
+        navigationIndex: newHistory.length - 1,
       };
     });
   },
@@ -134,5 +134,5 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return state.navigationHistory[newIndex];
     }
     return null;
-  }
+  },
 }));

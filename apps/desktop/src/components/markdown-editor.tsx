@@ -27,11 +27,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 import { SlashCommand } from "./slash-command";
 import {
@@ -52,10 +48,8 @@ import {
   TrashIcon,
 } from "./icons";
 
-import type {
-  MarkdownEditorProps,
-  MarkdownEditorToast,
-} from "../types/markdown-editor";
+import type { MarkdownEditorProps, MarkdownEditorToast } from "../types/markdown-editor";
+import type { UpdateState } from "../shared/workspace";
 
 const LINK_IMAGE_PATTERN = /(!?)\[([^\]]+)\]\(([^)]+)\)$/;
 const MARKDOWN_FILE_SUFFIX_PATTERN = /\.(md|mdx|markdown)$/i;
@@ -83,6 +77,58 @@ type ImageFormState = {
 type ImageControlsState = {
   left: number;
   top: number;
+};
+
+const getDevPreviewUpdateState = (): UpdateState | null => {
+  if (!import.meta.env.DEV || typeof window === "undefined") {
+    return null;
+  }
+
+  const previewStatus = window.localStorage.getItem("glyph.dev.update-preview");
+
+  if (previewStatus === "available") {
+    return {
+      status: "available",
+      currentVersion: "0.1.0",
+      availableVersion: "0.2.0",
+      downloadedVersion: null,
+      releaseName: "Glyph 0.2.0",
+      releaseNotes: null,
+      progressPercent: null,
+      checkedAt: null,
+      errorMessage: null,
+    };
+  }
+
+  if (previewStatus === "downloading") {
+    return {
+      status: "downloading",
+      currentVersion: "0.1.0",
+      availableVersion: "0.2.0",
+      downloadedVersion: null,
+      releaseName: "Glyph 0.2.0",
+      releaseNotes: null,
+      progressPercent: 68,
+      checkedAt: null,
+      errorMessage: null,
+    };
+  }
+
+  if (previewStatus === "downloaded") {
+    return {
+      status: "downloaded",
+      currentVersion: "0.1.0",
+      availableVersion: "0.2.0",
+      downloadedVersion: "0.2.0",
+      releaseName: "Glyph 0.2.0",
+      releaseNotes: null,
+      progressPercent: 100,
+      checkedAt: null,
+      errorMessage: null,
+    };
+  }
+
+  return null;
 };
 
 type HoveredLinkState = {
@@ -115,10 +161,7 @@ const normalizeLinkTarget = (value: string) => {
     return "";
   }
 
-  if (
-    /^[a-z]+:/i.test(trimmed) &&
-    !/^(https?:\/\/|file:\/\/|glyph-local:\/\/)/i.test(trimmed)
-  ) {
+  if (/^[a-z]+:/i.test(trimmed) && !/^(https?:\/\/|file:\/\/|glyph-local:\/\/)/i.test(trimmed)) {
     return "";
   }
 
@@ -133,8 +176,7 @@ const normalizeLinkTarget = (value: string) => {
   return trimmed;
 };
 
-const clamp = (value: number, min: number, max: number) =>
-  Math.min(Math.max(value, min), max);
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 const runMarkdownShortcutConversion = (
   nextEditor: Editor,
@@ -214,9 +256,13 @@ export const MarkdownEditor = ({
   commandPaletteShortcut,
   onNavigateBack,
   onNavigateForward,
+  navigateBackShortcut,
+  navigateForwardShortcut,
   canGoBack,
   canGoForward,
   autoOpenPDFSetting,
+  updateState,
+  onUpdateAction,
 }: MarkdownEditorProps) => {
   const lastSyncedMarkdown = useRef(content);
   const isAutoConvertingRef = useRef(false);
@@ -227,17 +273,11 @@ export const MarkdownEditor = ({
     canDeleteColumn: false,
     canDeleteTable: false,
   });
-  const toastTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(
-    null,
-  );
-  const hoveredLinkHideTimeoutRef = useRef<ReturnType<
-    typeof window.setTimeout
-  > | null>(null);
+  const toastTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const hoveredLinkHideTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [toast, setToast] = useState<MarkdownEditorToast | null>(null);
-  const [activeDialog, setActiveDialog] = useState<EditorActionType | null>(
-    null,
-  );
+  const [activeDialog, setActiveDialog] = useState<EditorActionType | null>(null);
   const [tableForm, setTableForm] = useState<TableFormState>({
     rows: "3",
     cols: "3",
@@ -250,9 +290,7 @@ export const MarkdownEditor = ({
     alt: "",
     src: "",
   });
-  const [imageControls, setImageControls] = useState<ImageControlsState | null>(
-    null,
-  );
+  const [imageControls, setImageControls] = useState<ImageControlsState | null>(null);
   const [hoveredLink, setHoveredLink] = useState<HoveredLinkState | null>(null);
   const [tableControls, setTableControls] = useState<TableControlsState>({
     active: false,
@@ -260,6 +298,23 @@ export const MarkdownEditor = ({
     canDeleteColumn: false,
     canDeleteTable: false,
   });
+  const [devPreviewUpdateState] = useState<UpdateState | null>(() => getDevPreviewUpdateState());
+
+  const effectiveUpdateState = devPreviewUpdateState ?? updateState;
+
+  const shouldShowUpdateButton =
+    effectiveUpdateState?.status === "available" ||
+    effectiveUpdateState?.status === "downloading" ||
+    effectiveUpdateState?.status === "downloaded";
+
+  const updateButtonLabel =
+    effectiveUpdateState?.status === "downloaded"
+      ? "Install update"
+      : effectiveUpdateState?.status === "downloading"
+        ? `Downloading ${Math.round(effectiveUpdateState.progressPercent ?? 0)}%`
+        : "Update available";
+
+  const isUpdateButtonDisabled = effectiveUpdateState?.status === "downloading";
 
   const showToast = (title: string, description: string) => {
     if (toastTimeoutRef.current) {
@@ -293,10 +348,7 @@ export const MarkdownEditor = ({
   const openLinkExternally = (href: string) => {
     if (window.glyph) {
       void window.glyph.openExternal(href).catch((error: unknown) => {
-        showToast(
-          "Could not open link",
-          error instanceof Error ? error.message : "Unknown error",
-        );
+        showToast("Could not open link", error instanceof Error ? error.message : "Unknown error");
       });
       return true;
     }
@@ -328,10 +380,7 @@ export const MarkdownEditor = ({
 
       return openLinkExternally(resolved.target);
     } catch (error) {
-      showToast(
-        "Could not open link",
-        error instanceof Error ? error.message : "Unknown error",
-      );
+      showToast("Could not open link", error instanceof Error ? error.message : "Unknown error");
       return false;
     }
   };
@@ -362,11 +411,7 @@ export const MarkdownEditor = ({
         top: rect.top + 10,
       };
 
-      if (
-        current &&
-        current.left === nextState.left &&
-        current.top === nextState.top
-      ) {
+      if (current && current.left === nextState.left && current.top === nextState.top) {
         return current;
       }
 
@@ -435,8 +480,7 @@ export const MarkdownEditor = ({
       TableCell,
       SlashCommand,
       Placeholder.configure({
-        placeholder:
-          "Start with a title, then let markdown shortcuts shape the page.",
+        placeholder: "Start with a title, then let markdown shortcuts shape the page.",
       }),
       Markdown.configure({
         linkify: true,
@@ -507,8 +551,7 @@ export const MarkdownEditor = ({
       handleDOMEvents: {
         mouseover: (_view, event) => {
           const target = event.target;
-          const link =
-            target instanceof HTMLElement ? target.closest("a") : null;
+          const link = target instanceof HTMLElement ? target.closest("a") : null;
 
           if (!link) {
             return false;
@@ -525,20 +568,14 @@ export const MarkdownEditor = ({
             href,
             iconLeft: rect.right + 4,
             iconTop: rect.top + rect.height / 2,
-            tooltipLeft: clamp(
-              rect.left + rect.width / 2,
-              96,
-              window.innerWidth - 96,
-            ),
+            tooltipLeft: clamp(rect.left + rect.width / 2, 96, window.innerWidth - 96),
             tooltipTop: rect.bottom + 10,
           });
           return false;
         },
         mouseout: (_view, event) => {
           const nextTarget =
-            event.relatedTarget instanceof HTMLElement
-              ? event.relatedTarget
-              : null;
+            event.relatedTarget instanceof HTMLElement ? event.relatedTarget : null;
 
           if (nextTarget?.closest("[data-link-hover-affordance='true']")) {
             return false;
@@ -564,9 +601,7 @@ export const MarkdownEditor = ({
       refreshImageControls(nextEditor);
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any
-      const nextMarkdown = (
-        nextEditor.storage as any
-      ).markdown.getMarkdown() as string;
+      const nextMarkdown = (nextEditor.storage as any).markdown.getMarkdown() as string;
       lastSyncedMarkdown.current = nextMarkdown;
       onChange(nextMarkdown);
     },
@@ -648,15 +683,9 @@ export const MarkdownEditor = ({
       }
     };
 
-    window.addEventListener(
-      "glyph:editor-action",
-      handleEditorAction as EventListener,
-    );
+    window.addEventListener("glyph:editor-action", handleEditorAction as EventListener);
     return () => {
-      window.removeEventListener(
-        "glyph:editor-action",
-        handleEditorAction as EventListener,
-      );
+      window.removeEventListener("glyph:editor-action", handleEditorAction as EventListener);
     };
   }, [editor]);
 
@@ -683,20 +712,10 @@ export const MarkdownEditor = ({
       return;
     }
 
-    const rows = Math.min(
-      12,
-      Math.max(2, Number.parseInt(tableForm.rows, 10) || 3),
-    );
-    const cols = Math.min(
-      8,
-      Math.max(1, Number.parseInt(tableForm.cols, 10) || 3),
-    );
+    const rows = Math.min(12, Math.max(2, Number.parseInt(tableForm.rows, 10) || 3));
+    const cols = Math.min(8, Math.max(1, Number.parseInt(tableForm.cols, 10) || 3));
 
-    editor
-      .chain()
-      .focus()
-      .insertTable({ rows, cols, withHeaderRow: true })
-      .run();
+    editor.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();
     setActiveDialog(null);
     showToast("Table inserted", `${rows} rows and ${cols} columns ready.`);
   };
@@ -814,15 +833,11 @@ export const MarkdownEditor = ({
     try {
       // Get markdown content from editor using the Markdown extension
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const markdown =
-        (editor as any).storage.markdown.getMarkdown?.() || editor.getHTML();
+      const markdown = (editor as any).storage.markdown.getMarkdown?.() || editor.getHTML();
       const filename = fileName.replace(MARKDOWN_FILE_SUFFIX_PATTERN, ".pdf");
 
       if (window.glyph) {
-        const absolutePath = await window.glyph.exportMarkdownToPDF(
-          markdown,
-          filename,
-        );
+        const absolutePath = await window.glyph.exportMarkdownToPDF(markdown, filename);
         showToast("PDF exported successfully", `Saved as ${filename}`);
 
         // Auto-open PDF if setting is enabled
@@ -834,19 +849,13 @@ export const MarkdownEditor = ({
       }
     } catch (err) {
       console.error("Failed to export PDF:", err);
-      showToast(
-        "Failed to export PDF",
-        err instanceof Error ? err.message : "Unknown error",
-      );
+      showToast("Failed to export PDF", err instanceof Error ? err.message : "Unknown error");
     }
   };
 
   const isMacLike = navigator.platform.includes("Mac");
-  const linkOpenShortcutHint = isMacLike
-    ? "Open link (Cmd+Click)"
-    : "Open link (Ctrl+Click)";
-  const headerPaddingClass =
-    isSidebarCollapsed && isMacLike ? "pl-20 pr-4" : "px-4";
+  const linkOpenShortcutHint = isMacLike ? "Open link (Cmd+Click)" : "Open link (Ctrl+Click)";
+  const headerPaddingClass = isSidebarCollapsed && isMacLike ? "pl-20 pr-4" : "px-4";
 
   return (
     <section className="relative h-full min-h-0 flex flex-col bg-background">
@@ -865,11 +874,7 @@ export const MarkdownEditor = ({
                   onClick={onToggleSidebar}
                   type="button"
                 >
-                  {isSidebarCollapsed ? (
-                    <PanelRightIcon size={16} />
-                  ) : (
-                    <PanelLeftIcon size={16} />
-                  )}
+                  {isSidebarCollapsed ? <PanelRightIcon size={16} /> : <PanelLeftIcon size={16} />}
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
@@ -892,7 +897,9 @@ export const MarkdownEditor = ({
                 <ArrowLeftIcon size={14} />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom">Back</TooltipContent>
+            <TooltipContent side="bottom">
+              {`Back (${navigateBackShortcut ?? "⌘["})`}
+            </TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -907,7 +914,9 @@ export const MarkdownEditor = ({
                 <ArrowRightIcon size={14} />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom">Forward</TooltipContent>
+            <TooltipContent side="bottom">
+              {`Forward (${navigateForwardShortcut ?? "⌘]"})`}
+            </TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -921,15 +930,11 @@ export const MarkdownEditor = ({
                 <PlusIcon size={16} />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {`New Note (${newNoteShortcut ?? "⌘N"})`}
-            </TooltipContent>
+            <TooltipContent side="bottom">{`New Note (${newNoteShortcut ?? "⌘N"})`}</TooltipContent>
           </Tooltip>
           {fileName && (
             <>
-              <span className="text-border/60 text-xs flex-shrink-0 mx-0.5">
-                ·
-              </span>
+              <span className="text-border/60 text-xs flex-shrink-0 mx-0.5">·</span>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="text-sm font-medium text-foreground truncate max-w-[180px]">
@@ -967,6 +972,27 @@ export const MarkdownEditor = ({
 
         {/* Right: actions */}
         <div className="flex items-center gap-1 relative flex-shrink-0">
+          {shouldShowUpdateButton && onUpdateAction ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="h-8 shrink-0 rounded-full px-3 text-xs font-semibold shadow-sm"
+                  onClick={onUpdateAction}
+                  disabled={isUpdateButtonDisabled}
+                  type="button"
+                >
+                  {updateButtonLabel}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {effectiveUpdateState?.status === "downloaded"
+                  ? "Restart to install the latest Glyph release"
+                  : "Download the latest Glyph release"}
+              </TooltipContent>
+            </Tooltip>
+          ) : null}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -1000,10 +1026,7 @@ export const MarkdownEditor = ({
 
           {isMenuOpen && (
             <>
-              <div
-                className="fixed inset-0 z-40"
-                onClick={() => setIsMenuOpen(false)}
-              />
+              <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)} />
               <div className="absolute right-0 top-full mt-1 w-48 bg-card border border-border rounded-md shadow-lg z-50 py-1 overflow-hidden">
                 <Button
                   variant="ghost"
@@ -1044,10 +1067,7 @@ export const MarkdownEditor = ({
                   disabled={!filePath}
                   type="button"
                 >
-                  <RevealInFolderIcon
-                    size={14}
-                    className="opacity-70 shrink-0"
-                  />
+                  <RevealInFolderIcon size={14} className="opacity-70 shrink-0" />
                   Open in Finder
                 </Button>
                 <Button
@@ -1205,9 +1225,7 @@ export const MarkdownEditor = ({
           <span>{readingTime} min read</span>
         </div>
         <div className="w-[1px] h-3 bg-border" />
-        <p className="text-xs font-medium text-foreground m-0">
-          {saveStateLabel}
-        </p>
+        <p className="text-xs font-medium text-foreground m-0">{saveStateLabel}</p>
       </div>
       <Dialog
         open={activeDialog === "insert-table"}
@@ -1217,8 +1235,8 @@ export const MarkdownEditor = ({
           <DialogHeader>
             <DialogTitle>Insert Table</DialogTitle>
             <DialogDescription>
-              Start with the right shape, then use the table controls to add or
-              remove rows and columns anytime.
+              Start with the right shape, then use the table controls to add or remove rows and
+              columns anytime.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -1254,11 +1272,7 @@ export const MarkdownEditor = ({
             </label>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              type="button"
-              onClick={() => setActiveDialog(null)}
-            >
+            <Button variant="outline" type="button" onClick={() => setActiveDialog(null)}>
               Cancel
             </Button>
             <Button type="button" onClick={handleInsertTable}>
@@ -1275,8 +1289,8 @@ export const MarkdownEditor = ({
           <DialogHeader>
             <DialogTitle>Insert Link</DialogTitle>
             <DialogDescription>
-              Paste a URL and Glyph will normalize bare domains like
-              `example.com` to `https://` automatically.
+              Paste a URL and Glyph will normalize bare domains like `example.com` to `https://`
+              automatically.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
@@ -1308,11 +1322,7 @@ export const MarkdownEditor = ({
             </label>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              type="button"
-              onClick={() => setActiveDialog(null)}
-            >
+            <Button variant="outline" type="button" onClick={() => setActiveDialog(null)}>
               Cancel
             </Button>
             <Button type="button" onClick={handleInsertLink}>
@@ -1329,8 +1339,8 @@ export const MarkdownEditor = ({
           <DialogHeader>
             <DialogTitle>Insert Image</DialogTitle>
             <DialogDescription>
-              Paste an image URL or choose a local file. Local images are served
-              through Glyph so they render reliably while editing.
+              Paste an image URL or choose a local file. Local images are served through Glyph so
+              they render reliably while editing.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
@@ -1362,8 +1372,7 @@ export const MarkdownEditor = ({
             </label>
             <div className="rounded-xl border border-border/70 bg-muted/30 p-3">
               <p className="m-0 text-xs text-muted-foreground">
-                Local images open a native file picker and avoid broken
-                `file://` previews.
+                Local images open a native file picker and avoid broken `file://` previews.
               </p>
               <Button
                 className="mt-3"
@@ -1386,11 +1395,7 @@ export const MarkdownEditor = ({
             ) : null}
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              type="button"
-              onClick={() => setActiveDialog(null)}
-            >
+            <Button variant="outline" type="button" onClick={() => setActiveDialog(null)}>
               Cancel
             </Button>
             <Button type="button" onClick={handleInsertImage}>
@@ -1409,9 +1414,7 @@ export const MarkdownEditor = ({
             <CheckCircleIcon size={16} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="m-0 text-sm font-medium text-foreground leading-snug">
-              {toast.title}
-            </p>
+            <p className="m-0 text-sm font-medium text-foreground leading-snug">{toast.title}</p>
             {toast.description ? (
               <p className="m-0 mt-0.5 text-xs text-muted-foreground leading-snug break-words">
                 {toast.description}

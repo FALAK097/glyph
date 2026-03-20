@@ -1,5 +1,9 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import type { SlashCommandItem, SlashCommandListHandle, SlashCommandListProps } from "../types/slash-command";
+import type {
+  SlashCommandItem,
+  SlashCommandListHandle,
+  SlashCommandListProps,
+} from "../types/slash-command";
 
 /** Split a shortcut string like "⌘ ⇧ B" into individual token spans. */
 function ShortcutBadge({ shortcut }: { shortcut: string }) {
@@ -34,7 +38,7 @@ export const SlashCommandList = forwardRef<SlashCommandListHandle, SlashCommandL
         const item = items[index];
         if (item) onSelect(item);
       },
-      [items, onSelect]
+      [items, onSelect],
     );
 
     useImperativeHandle(
@@ -58,7 +62,7 @@ export const SlashCommandList = forwardRef<SlashCommandListHandle, SlashCommandL
           return false;
         },
       }),
-      [items.length, selectedIndex, selectItem]
+      [items.length, selectedIndex, selectItem],
     );
 
     if (items.length === 0) {
@@ -70,12 +74,7 @@ export const SlashCommandList = forwardRef<SlashCommandListHandle, SlashCommandL
     }
 
     return (
-      <div
-        ref={containerRef}
-        className="slash-panel"
-        role="listbox"
-        aria-label="Markdown commands"
-      >
+      <div ref={containerRef} className="slash-panel" role="listbox" aria-label="Markdown commands">
         {items.map((item: SlashCommandItem, index: number) => {
           const isSelected = index === selectedIndex;
           return (
@@ -96,7 +95,7 @@ export const SlashCommandList = forwardRef<SlashCommandListHandle, SlashCommandL
         })}
       </div>
     );
-  }
+  },
 );
 
 SlashCommandList.displayName = "SlashCommandList";

@@ -129,7 +129,8 @@
       {
         "provider": "github",
         "owner": "FALAK097",
-        "repo": "glyph"
+        "repo": "glyph",
+        "releaseType": "release"
       }
     ],
     "fileAssociations": [

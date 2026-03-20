@@ -5,6 +5,11 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to publish, for example v0.2.0"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -20,13 +25,14 @@ jobs:
 
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      RELEASE_VERSION: ${{ github.ref_name }}
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -44,7 +50,7 @@ jobs:
 
       - name: Resolve macOS artifact name
         run: |
-          artifact_name=$(node -e 'const fs = require("node:fs"); const pkg = JSON.parse(fs.readFileSync("apps/desktop/package.json", "utf8")); const version = process.env.RELEASE_VERSION.slice(1); const template = pkg.build?.dmg?.artifactName ?? "Glyph-${version}-mac.${ext}"; process.stdout.write(template.replace("${version}", version).replace("${ext}", "dmg"));')
+          artifact_name=$(node -e 'const fs = require("node:fs"); const pkg = JSON.parse(fs.readFileSync("apps/desktop/package.json", "utf8")); const version = process.env.RELEASE_TAG.replace(/^v/, ""); const template = pkg.build?.dmg?.artifactName ?? "Glyph-${version}-mac.${ext}"; process.stdout.write(template.replace("${version}", version).replace("${ext}", "dmg"));')
           echo "MAC_DMG_NAME=${artifact_name}" >> "$GITHUB_ENV"
 
       - name: Build and publish macOS release
@@ -52,7 +58,7 @@ jobs:
         run: pnpm --filter @glyph/desktop release -- --mac
 
       - name: Generate Homebrew cask
-        run: pnpm cask:generate --version "${RELEASE_VERSION#v}" --artifact-path "apps/desktop/release/${MAC_DMG_NAME}"
+        run: pnpm cask:generate --version "${RELEASE_TAG#v}" --artifact-path "apps/desktop/release/${MAC_DMG_NAME}"
 
       - name: Commit updated Homebrew cask
         run: |
@@ -66,7 +72,7 @@ jobs:
             echo "No Homebrew cask changes to commit."
             exit 0
           fi
-          git commit -m "chore(cask): update glyph cask for ${RELEASE_VERSION}"
+          git commit -m "chore(cask): update glyph cask for ${RELEASE_TAG}"
           git push origin main
 
   release-windows:
@@ -75,12 +81,14 @@ jobs:
 
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4

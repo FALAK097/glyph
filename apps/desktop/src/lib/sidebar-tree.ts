@@ -1,16 +1,24 @@
 import type { DragPosition } from "../types/sidebar";
-import type { DirectoryNode, FileDocument, SidebarItemSetting, WorkspaceSnapshot } from "../shared/workspace";
+import type {
+  DirectoryNode,
+  FileDocument,
+  SidebarItemSetting,
+  WorkspaceSnapshot,
+} from "../shared/workspace";
 
 import { getBaseName, isFileInsideWorkspace, isSamePath, normalizePath } from "./paths";
 
 export function toSidebarItemSetting(node: DirectoryNode): SidebarItemSetting {
   return {
     kind: node.type,
-    path: node.path
+    path: node.path,
   };
 }
 
-export function orderSidebarNodes(nodes: DirectoryNode[], orderedItems: SidebarItemSetting[]): DirectoryNode[] {
+export function orderSidebarNodes(
+  nodes: DirectoryNode[],
+  orderedItems: SidebarItemSetting[],
+): DirectoryNode[] {
   const remaining = new Map(nodes.map((node) => [normalizePath(node.path).toLowerCase(), node]));
   const ordered: DirectoryNode[] = [];
 
@@ -32,7 +40,7 @@ export function reorderSidebarNodes(
   nodes: DirectoryNode[],
   sourcePath: string,
   targetPath: string,
-  position: DragPosition
+  position: DragPosition,
 ): DirectoryNode[] {
   const sourceIndex = nodes.findIndex((node) => isSamePath(node.path, sourcePath));
   const targetIndex = nodes.findIndex((node) => isSamePath(node.path, targetPath));
@@ -49,16 +57,23 @@ export function reorderSidebarNodes(
   return nextNodes;
 }
 
-export function upsertSidebarFolder(nodes: DirectoryNode[], workspace: WorkspaceSnapshot): DirectoryNode[] {
+export function upsertSidebarFolder(
+  nodes: DirectoryNode[],
+  workspace: WorkspaceSnapshot,
+): DirectoryNode[] {
   const nextFolder: DirectoryNode = {
     type: "directory",
     name: getBaseName(workspace.rootPath),
     path: workspace.rootPath,
-    children: workspace.tree
+    children: workspace.tree,
   };
 
-  const nextNodes = nodes.filter((node) => !(node.type === "file" && isFileInsideWorkspace(node.path, workspace.rootPath)));
-  const existingIndex = nextNodes.findIndex((node) => node.type === "directory" && isSamePath(node.path, workspace.rootPath));
+  const nextNodes = nodes.filter(
+    (node) => !(node.type === "file" && isFileInsideWorkspace(node.path, workspace.rootPath)),
+  );
+  const existingIndex = nextNodes.findIndex(
+    (node) => node.type === "directory" && isSamePath(node.path, workspace.rootPath),
+  );
 
   if (existingIndex === -1) {
     return [...nextNodes, nextFolder];
@@ -67,8 +82,13 @@ export function upsertSidebarFolder(nodes: DirectoryNode[], workspace: Workspace
   return nextNodes.map((node, index) => (index === existingIndex ? nextFolder : node));
 }
 
-export function upsertSidebarFile(nodes: DirectoryNode[], file: Pick<FileDocument, "path" | "name">): DirectoryNode[] {
-  const isCoveredByFolder = nodes.some((node) => node.type === "directory" && isFileInsideWorkspace(file.path, node.path));
+export function upsertSidebarFile(
+  nodes: DirectoryNode[],
+  file: Pick<FileDocument, "path" | "name">,
+): DirectoryNode[] {
+  const isCoveredByFolder = nodes.some(
+    (node) => node.type === "directory" && isFileInsideWorkspace(file.path, node.path),
+  );
 
   if (isCoveredByFolder) {
     return nodes.filter((node) => !(node.type === "file" && isSamePath(node.path, file.path)));
@@ -77,10 +97,12 @@ export function upsertSidebarFile(nodes: DirectoryNode[], file: Pick<FileDocumen
   const nextFile: DirectoryNode = {
     type: "file",
     name: file.name,
-    path: file.path
+    path: file.path,
   };
 
-  const existingIndex = nodes.findIndex((node) => node.type === "file" && isSamePath(node.path, file.path));
+  const existingIndex = nodes.findIndex(
+    (node) => node.type === "file" && isSamePath(node.path, file.path),
+  );
   if (existingIndex === -1) {
     return [...nodes, nextFile];
   }
@@ -105,7 +127,7 @@ export function removeSidebarPath(nodes: DirectoryNode[], targetPath: string): D
 export function renameSidebarFile(
   nodes: DirectoryNode[],
   oldPath: string,
-  renamedFile: Pick<FileDocument, "path" | "name">
+  renamedFile: Pick<FileDocument, "path" | "name">,
 ): DirectoryNode[] {
   return nodes.map((node) => {
     if (node.type === "directory") {
@@ -119,7 +141,7 @@ export function renameSidebarFile(
     return {
       type: "file",
       path: renamedFile.path,
-      name: renamedFile.name
+      name: renamedFile.name,
     };
   });
 }

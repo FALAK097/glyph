@@ -1,11 +1,12 @@
-const { contextBridge, ipcRenderer } =
-  require("electron") as typeof import("electron");
+const { contextBridge, ipcRenderer } = require("electron") as typeof import("electron");
 
 import type {
   AppCommand,
+  AppInfo,
   AssetSelection,
   AppSettings,
   DialogKind,
+  UpdateState,
   FileDocument,
   FileOpenResult,
   ResolvedLinkTarget,
@@ -48,10 +49,7 @@ const api = {
     );
   },
   openFolder(dirPath?: string) {
-    return invokeWithRetry<WorkspaceSnapshot | null>(
-      "workspace:openFolder",
-      dirPath,
-    );
+    return invokeWithRetry<WorkspaceSnapshot | null>("workspace:openFolder", dirPath);
   },
   openDefaultWorkspace() {
     return invokeWithRetry<WorkspaceSnapshot | null>("workspace:openDefault");
@@ -63,25 +61,13 @@ const api = {
     return invokeWithRetry<FileDocument>("workspace:openFile", filePath);
   },
   saveFile(filePath: string, content: string) {
-    return invokeWithRetry<FileDocument>(
-      "workspace:saveFile",
-      filePath,
-      content,
-    );
+    return invokeWithRetry<FileDocument>("workspace:saveFile", filePath, content);
   },
   createFile(parentDir: string, fileName: string) {
-    return invokeWithRetry<FileDocument>(
-      "workspace:createFile",
-      parentDir,
-      fileName,
-    );
+    return invokeWithRetry<FileDocument>("workspace:createFile", parentDir, fileName);
   },
   renameFile(oldPath: string, newName: string) {
-    return invokeWithRetry<FileDocument>(
-      "workspace:renameFile",
-      oldPath,
-      newName,
-    );
+    return invokeWithRetry<FileDocument>("workspace:renameFile", oldPath, newName);
   },
   deleteFile(targetPath: string) {
     return invokeWithRetry<string>("workspace:deleteFile", targetPath);
@@ -109,11 +95,23 @@ const api = {
   updateSettings(patch: Partial<AppSettings>) {
     return invokeWithRetry<AppSettings>("settings:update", patch);
   },
+  getAppInfo() {
+    return invokeWithRetry<AppInfo>("app:getInfo");
+  },
+  getUpdateState() {
+    return invokeWithRetry<UpdateState>("app:getUpdateState");
+  },
+  checkForUpdates() {
+    return ipcRenderer.invoke("app:checkForUpdates") as Promise<UpdateState>;
+  },
+  downloadUpdate() {
+    return ipcRenderer.invoke("app:downloadUpdate") as Promise<UpdateState>;
+  },
+  installUpdate() {
+    return ipcRenderer.invoke("app:installUpdate") as Promise<void>;
+  },
   onWorkspaceChanged(listener: (event: WorkspaceChangeEvent) => void) {
-    const wrapped = (
-      _event: Electron.IpcRendererEvent,
-      payload: WorkspaceChangeEvent,
-    ) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, payload: WorkspaceChangeEvent) => {
       listener(payload);
     };
 
@@ -124,10 +122,7 @@ const api = {
     };
   },
   onCommand(listener: (command: AppCommand) => void) {
-    const wrapped = (
-      _event: Electron.IpcRendererEvent,
-      command: AppCommand,
-    ) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, command: AppCommand) => {
       listener(command);
     };
 
@@ -138,18 +133,13 @@ const api = {
     };
   },
   getPendingExternalPath() {
-    return invokeWithRetry<ExternalFileTarget | null>(
-      "app:getPendingExternalPath",
-    );
+    return invokeWithRetry<ExternalFileTarget | null>("app:getPendingExternalPath");
   },
   revealInFinder(targetPath: string) {
     return invokeWithRetry<boolean>("app:revealInFinder", targetPath);
   },
   onExternalFile(listener: (target: ExternalFileTarget) => void) {
-    const wrapped = (
-      _event: Electron.IpcRendererEvent,
-      target: ExternalFileTarget,
-    ) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, target: ExternalFileTarget) => {
       listener(target);
     };
 
@@ -157,6 +147,17 @@ const api = {
 
     return () => {
       ipcRenderer.removeListener("app:open-external", wrapped);
+    };
+  },
+  onUpdateStateChange(listener: (state: UpdateState) => void) {
+    const wrapped = (_event: Electron.IpcRendererEvent, state: UpdateState) => {
+      listener(state);
+    };
+
+    ipcRenderer.on("app:updateState", wrapped);
+
+    return () => {
+      ipcRenderer.removeListener("app:updateState", wrapped);
     };
   },
   openExternal(path: string) {

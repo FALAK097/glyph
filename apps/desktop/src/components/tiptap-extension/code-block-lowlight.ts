@@ -62,12 +62,12 @@ export const CustomCodeBlockLowlight = CodeBlockLowlight.configure({
       "Mod-Enter": ({ editor }) => {
         const { $cursor } = editor.state.selection as any;
         if (!$cursor) return false;
-        
+
         const node = $cursor.parent;
         if (node.type.name === "codeBlock") {
           const endPos = $cursor.after();
           const nextNode = editor.state.doc.nodeAt(endPos);
-          
+
           if (!nextNode) {
             editor.commands.insertContent({
               type: "paragraph",

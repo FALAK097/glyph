@@ -83,7 +83,44 @@ export type AppSettings = {
   autoOpenPDF: boolean;
 };
 
-export type AppCommand = "open-file" | "open-folder" | "save" | "new-file" | "new-folder" | "search" | "quick-open" | "toggle-sidebar";
+export type AppInfo = {
+  name: string;
+  version: string;
+  isPackaged: boolean;
+  platform: string;
+  updatesEnabled: boolean;
+};
+
+export type UpdateStatus =
+  | "idle"
+  | "checking"
+  | "available"
+  | "downloading"
+  | "downloaded"
+  | "not-available"
+  | "error";
+
+export type UpdateState = {
+  status: UpdateStatus;
+  currentVersion: string;
+  availableVersion: string | null;
+  downloadedVersion: string | null;
+  releaseName: string | null;
+  releaseNotes: string | null;
+  progressPercent: number | null;
+  checkedAt: string | null;
+  errorMessage: string | null;
+};
+
+export type AppCommand =
+  | "open-file"
+  | "open-folder"
+  | "save"
+  | "new-file"
+  | "new-folder"
+  | "search"
+  | "quick-open"
+  | "toggle-sidebar";
 
 export type ExternalFileTarget = {
   path: string;

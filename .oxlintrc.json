@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": [
+    "node_modules/**",
+    "dist/**",
+    "dist-electron/**",
+    "apps/*/dist/**",
+    "apps/*/dist-electron/**",
+    "apps/*/release/**"
+  ],
+  "overrides": [
+    {
+      "files": [
+        "apps/desktop/src/**/*.ts",
+        "apps/desktop/src/**/*.tsx",
+        "apps/web/src/**/*.ts",
+        "apps/web/src/**/*.tsx"
+      ],
+      "env": {
+        "browser": true
+      }
+    },
+    {
+      "files": ["apps/desktop/electron/**/*.ts", ".github/**/*.js"],
+      "env": {
+        "node": true
+      }
+    }
+  ]
+}

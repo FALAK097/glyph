@@ -1,16 +1,29 @@
 {
   "name": "glyph",
-  "private": true,
   "version": "0.1.0",
-  "packageManager": "pnpm@10.26.0",
+  "private": true,
   "scripts": {
     "dev:desktop": "pnpm --filter @glyph/desktop dev",
     "dev:web": "pnpm --filter @glyph/web dev",
     "build": "pnpm -r build",
     "build:desktop": "pnpm --filter @glyph/desktop build",
     "build:web": "pnpm --filter @glyph/web build",
+    "dist:desktop": "pnpm --filter @glyph/desktop dist",
+    "release:desktop": "pnpm --filter @glyph/desktop release",
+    "cask:generate": "node scripts/generate-homebrew-cask.mjs",
+    "lint": "oxlint . --ignore-pattern 'apps/**/dist/**' --ignore-pattern 'apps/**/dist-electron/**' --ignore-pattern 'apps/**/release/**'",
+    "lint:fix": "oxlint . --fix --ignore-pattern 'apps/**/dist/**' --ignore-pattern 'apps/**/dist-electron/**' --ignore-pattern 'apps/**/release/**'",
+    "lint:desktop": "oxlint apps/desktop --ignore-pattern 'dist/**' --ignore-pattern 'dist-electron/**' --ignore-pattern 'release/**'",
+    "lint:web": "oxlint apps/web --ignore-pattern 'dist/**'",
+    "fmt": "oxfmt apps scripts package.json .release-please-config.json .release-please-manifest.json .oxlintrc.json .oxfmtrc.json '!apps/**/dist/**' '!apps/**/dist-electron/**' '!apps/**/release/**'",
+    "fmt:check": "oxfmt apps scripts package.json .release-please-config.json .release-please-manifest.json .oxlintrc.json .oxfmtrc.json '!apps/**/dist/**' '!apps/**/dist-electron/**' '!apps/**/release/**' --check",
     "typecheck": "pnpm -r typecheck",
     "typecheck:desktop": "pnpm --filter @glyph/desktop typecheck",
     "typecheck:web": "pnpm --filter @glyph/web typecheck"
-  }
+  },
+  "devDependencies": {
+    "oxfmt": "0.41.0",
+    "oxlint": "1.56.0"
+  },
+  "packageManager": "pnpm@10.26.0"
 }

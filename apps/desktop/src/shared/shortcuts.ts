@@ -7,8 +7,6 @@ export type ShortcutId =
   | "open-folder"
   | "save"
   | "settings"
-  | "previous-note"
-  | "next-note"
   | "toggle-sidebar"
   | "navigate-back"
   | "navigate-forward";
@@ -42,8 +40,6 @@ export const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
   { id: "open-folder", label: "Open Folder", keys: "⇧ ⌘ O" },
   { id: "save", label: "Save", keys: "⌘ S" },
   { id: "settings", label: "Settings", keys: "⌘ ," },
-  { id: "previous-note", label: "Previous Note", keys: "⌥ ↑" },
-  { id: "next-note", label: "Next Note", keys: "⌥ ↓" },
   { id: "toggle-sidebar", label: "Toggle Sidebar", keys: "⌘ \\" },
   { id: "navigate-back", label: "Navigate Back", keys: "⌘ [" },
   { id: "navigate-forward", label: "Navigate Forward", keys: "⌘ ]" },
@@ -78,7 +74,7 @@ const NORMALIZED_KEY_ALIASES: Record<string, string> = {
   return: "enter",
   tab: "tab",
   backspace: "backspace",
-  delete: "delete"
+  delete: "delete",
 };
 
 const DISPLAY_KEY_ALIASES: Record<string, string> = {
@@ -91,7 +87,7 @@ const DISPLAY_KEY_ALIASES: Record<string, string> = {
   enter: "Enter",
   tab: "Tab",
   backspace: "Backspace",
-  delete: "Delete"
+  delete: "Delete",
 };
 
 const ELECTRON_KEY_ALIASES: Record<string, string> = {
@@ -108,7 +104,7 @@ const ELECTRON_KEY_ALIASES: Record<string, string> = {
   delete: "Delete",
   "/": "Slash",
   "\\": "Backslash",
-  ".": "Period"
+  ".": "Period",
 };
 
 const SHIFTED_SYMBOL_ALIASES: Record<string, string> = {
@@ -143,7 +139,7 @@ function normalizeShortcutKeyToken(token: string): string | null {
   }
 
   let lower = trimmed.toLowerCase();
-  
+
   if (trimmed.length === 1 && SHIFTED_SYMBOL_ALIASES[trimmed]) {
     lower = SHIFTED_SYMBOL_ALIASES[trimmed];
   }
@@ -185,7 +181,7 @@ export function parseShortcut(keys: string): ParsedShortcut | null {
     primary: parts.includes(MODIFIER_TOKENS.cmdOrCtrl),
     alt: parts.includes(MODIFIER_TOKENS.alt),
     shift: parts.includes(MODIFIER_TOKENS.shift),
-    key
+    key,
   };
 }
 
@@ -213,21 +209,33 @@ export function canonicalizeShortcut(keys: string): string | null {
 export function mergeShortcutSettings(shortcuts?: ShortcutSetting[] | null): ShortcutDefinition[] {
   const saved = new Map(
     (shortcuts ?? [])
-      .filter((shortcut): shortcut is ShortcutSetting => typeof shortcut?.id === "string" && typeof shortcut?.keys === "string")
-      .map((shortcut) => [shortcut.id, canonicalizeShortcut(shortcut.keys) ?? shortcut.keys.trim()])
+      .filter(
+        (shortcut): shortcut is ShortcutSetting =>
+          typeof shortcut?.id === "string" && typeof shortcut?.keys === "string",
+      )
+      .map((shortcut) => [
+        shortcut.id,
+        canonicalizeShortcut(shortcut.keys) ?? shortcut.keys.trim(),
+      ]),
   );
 
   return DEFAULT_SHORTCUTS.map((shortcut) => ({
     ...shortcut,
-    keys: saved.get(shortcut.id) ?? shortcut.keys
+    keys: saved.get(shortcut.id) ?? shortcut.keys,
   }));
 }
 
-export function getShortcutKeys(shortcuts: ShortcutSetting[] | undefined | null, id: ShortcutId): string | undefined {
+export function getShortcutKeys(
+  shortcuts: ShortcutSetting[] | undefined | null,
+  id: ShortcutId,
+): string | undefined {
   return mergeShortcutSettings(shortcuts).find((shortcut) => shortcut.id === id)?.keys;
 }
 
-export function getShortcutDisplay(shortcuts: ShortcutSetting[] | undefined | null, id: ShortcutId): string | undefined {
+export function getShortcutDisplay(
+  shortcuts: ShortcutSetting[] | undefined | null,
+  id: ShortcutId,
+): string | undefined {
   const keys = getShortcutKeys(shortcuts, id);
   return keys?.replace(/\s+/g, "");
 }
@@ -270,7 +278,9 @@ export function toElectronAccelerator(shortcut: string): string | undefined {
     parts.push("Shift");
   }
 
-  const key = ELECTRON_KEY_ALIASES[parsed.key] ?? (parsed.key.length === 1 ? parsed.key.toUpperCase() : parsed.key);
+  const key =
+    ELECTRON_KEY_ALIASES[parsed.key] ??
+    (parsed.key.length === 1 ? parsed.key.toUpperCase() : parsed.key);
   parts.push(key);
 
   return parts.join("+");

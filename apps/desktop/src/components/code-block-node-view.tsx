@@ -1,32 +1,32 @@
-import { useEffect, useRef, useState } from 'react';
-import { NodeViewContent, NodeViewWrapper, type ReactNodeViewProps } from '@tiptap/react';
+import { useEffect, useRef, useState } from "react";
+import { NodeViewContent, NodeViewWrapper, type ReactNodeViewProps } from "@tiptap/react";
 
-import { CopyIcon, TickIcon } from '@/components/icons';
+import { CopyIcon, TickIcon } from "@/components/icons";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { cn } from '@/lib/utils';
-import { SUPPORTED_LANGUAGES } from '@/types/code-block-node-view';
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+import { SUPPORTED_LANGUAGES } from "@/types/code-block-node-view";
 
 const LANGUAGE_LABELS: Record<(typeof SUPPORTED_LANGUAGES)[number], string> = {
-  javascript: 'JavaScript',
-  typescript: 'TypeScript',
-  python: 'Python',
-  html: 'HTML',
-  css: 'CSS',
-  plaintext: 'Plain Text',
-  bash: 'Bash',
-  dockerfile: 'Dockerfile',
-  json: 'JSON',
-  yaml: 'YAML',
-  sql: 'SQL',
-  go: 'Go',
-  rust: 'Rust',
-  markdown: 'Markdown',
+  javascript: "JavaScript",
+  typescript: "TypeScript",
+  python: "Python",
+  html: "HTML",
+  css: "CSS",
+  plaintext: "Plain Text",
+  bash: "Bash",
+  dockerfile: "Dockerfile",
+  json: "JSON",
+  yaml: "YAML",
+  sql: "SQL",
+  go: "Go",
+  rust: "Rust",
+  markdown: "Markdown",
 };
 
 export const CodeBlockNodeView = (props: ReactNodeViewProps) => {
@@ -69,13 +69,13 @@ export const CodeBlockNodeView = (props: ReactNodeViewProps) => {
         copyResetTimeoutRef.current = null;
       }, 1600);
     } catch (error) {
-      console.error('Failed to copy code block:', error);
+      console.error("Failed to copy code block:", error);
       setCopied(false);
     }
   };
 
-  const currentLanguage = (node.attrs.language as string | null) || 'plaintext';
-  const isEditing = editor.isActive('codeBlock');
+  const currentLanguage = (node.attrs.language as string | null) || "plaintext";
+  const isEditing = editor.isActive("codeBlock");
 
   return (
     <NodeViewWrapper
@@ -89,11 +89,11 @@ export const CodeBlockNodeView = (props: ReactNodeViewProps) => {
           onClick={handleCopy}
           onMouseDown={(e) => e.stopPropagation()}
           className={cn(
-            'code-block-copy-button inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-border/70 bg-background/92 px-2 text-muted-foreground shadow-sm transition-[background-color,border-color,color,transform] duration-100 ease-out outline-none hover:border-border hover:bg-background hover:text-foreground focus-visible:border-primary focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-primary/20 active:translate-y-px',
-            copied && 'border-primary/50 bg-primary/10 text-primary'
+            "code-block-copy-button inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-border/70 bg-background/92 px-2 text-muted-foreground shadow-sm transition-[background-color,border-color,color,transform] duration-100 ease-out outline-none hover:border-border hover:bg-background hover:text-foreground focus-visible:border-primary focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-primary/20 active:translate-y-px",
+            copied && "border-primary/50 bg-primary/10 text-primary",
           )}
-          aria-label={copied ? 'Code copied' : 'Copy code'}
-          title={copied ? 'Copied' : 'Copy code'}
+          aria-label={copied ? "Code copied" : "Copy code"}
+          title={copied ? "Copied" : "Copy code"}
         >
           {copied ? (
             <span className="relative flex h-4 w-5 items-center justify-center" aria-hidden="true">
@@ -120,7 +120,10 @@ export const CodeBlockNodeView = (props: ReactNodeViewProps) => {
                 className="inline-flex h-8 max-w-full items-center gap-2 rounded-md border border-border/70 bg-background/92 px-3 text-[11px] font-semibold tracking-[0.16em] text-foreground uppercase shadow-sm outline-none transition-[background-color,border-color,color,transform] duration-100 ease-out hover:cursor-pointer hover:border-border hover:bg-background focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 active:translate-y-px"
                 aria-label="Select code language"
               >
-                <span className="truncate">{LANGUAGE_LABELS[currentLanguage as keyof typeof LANGUAGE_LABELS] ?? currentLanguage}</span>
+                <span className="truncate">
+                  {LANGUAGE_LABELS[currentLanguage as keyof typeof LANGUAGE_LABELS] ??
+                    currentLanguage}
+                </span>
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="end"

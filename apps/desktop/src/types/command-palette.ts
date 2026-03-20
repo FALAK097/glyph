@@ -21,4 +21,3 @@ export type CommandPaletteProps = {
   onMove: (direction: 1 | -1) => void;
   onSelect: () => void;
 };
-

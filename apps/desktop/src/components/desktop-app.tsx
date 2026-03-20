@@ -17,8 +17,11 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   return (
     <TooltipProvider>
       <div
-        className={`h-screen overflow-hidden grid transition-[grid-template-columns] duration-200 ${controller.isSidebarCollapsed ? "grid-cols-[0_minmax(0,1fr)]" : "grid-cols-[280px_minmax(0,1fr)]"
-          }`}
+        className={`h-screen overflow-hidden grid transition-[grid-template-columns] duration-200 ${
+          controller.isSidebarCollapsed
+            ? "grid-cols-[0_minmax(0,1fr)]"
+            : "grid-cols-[280px_minmax(0,1fr)]"
+        }`}
       >
         {controller.isSidebarCollapsed ? (
           <div aria-hidden="true" className="w-0 min-w-0 overflow-hidden" />
@@ -58,12 +61,18 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
             onOpenSettings={() => controller.setIsSettingsOpen(true)}
             onOpenCommandPalette={() => controller.setIsPaletteOpen(true)}
             onOpenLinkedFile={(path) => void controller.openFile(path)}
-            commandPaletteShortcut={getShortcutDisplay(controller.shortcuts, "command-palette") ?? "⌘P"}
+            commandPaletteShortcut={
+              getShortcutDisplay(controller.shortcuts, "command-palette") ?? "⌘P"
+            }
             onNavigateBack={() => void controller.navigateBack()}
             onNavigateForward={() => void controller.navigateForward()}
+            navigateBackShortcut={getShortcutDisplay(controller.shortcuts, "navigate-back")}
+            navigateForwardShortcut={getShortcutDisplay(controller.shortcuts, "navigate-forward")}
             canGoBack={controller.canGoBack()}
             canGoForward={controller.canGoForward()}
             autoOpenPDFSetting={controller.settings?.autoOpenPDF ?? true}
+            updateState={controller.updateState}
+            onUpdateAction={() => void controller.triggerUpdateAction()}
           />
         </main>
         <CommandPalette
@@ -81,17 +90,23 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
               return;
             }
 
-            controller.setSelectedIndex((value) => (value + direction + controller.paletteItems.length) % controller.paletteItems.length);
+            controller.setSelectedIndex(
+              (value) =>
+                (value + direction + controller.paletteItems.length) %
+                controller.paletteItems.length,
+            );
           }}
           onSelect={() => controller.paletteItems[controller.selectedIndex]?.onSelect()}
         />
         <SettingsPanel
           isOpen={controller.isSettingsOpen}
           settings={controller.settings}
+          appInfo={controller.appInfo}
           onClose={() => controller.setIsSettingsOpen(false)}
           onChooseFolder={() => void controller.chooseFolderAndUpdateWorkspace()}
           onChangeMode={(mode: ThemeMode) => void controller.changeThemeMode(mode)}
           onChangeShortcuts={(shortcuts) => void controller.changeShortcuts(shortcuts)}
+          onChangeAutoOpenPDF={(enabled) => void controller.saveSettings({ autoOpenPDF: enabled })}
         />
       </div>
     </TooltipProvider>

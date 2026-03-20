@@ -1,3 +1,5 @@
+import type { UpdateState } from "../shared/workspace";
+
 export type MarkdownEditorProps = {
   content: string;
   fileName: string | null;
@@ -17,9 +19,13 @@ export type MarkdownEditorProps = {
   commandPaletteShortcut?: string;
   onNavigateBack?: () => void;
   onNavigateForward?: () => void;
+  navigateBackShortcut?: string;
+  navigateForwardShortcut?: string;
   canGoBack?: boolean;
   canGoForward?: boolean;
   autoOpenPDFSetting?: boolean;
+  updateState?: UpdateState | null;
+  onUpdateAction?: () => void;
 };
 
 export type MarkdownEditorToast = {

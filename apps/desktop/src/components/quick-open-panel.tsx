@@ -1,7 +1,13 @@
 import { useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
 import type { QuickOpenPanelProps } from "../types/quick-open-panel";
@@ -13,7 +19,7 @@ export const QuickOpenPanel = ({
   isOpen,
   onChangeQuery,
   onClose,
-  onOpenItem
+  onOpenItem,
 }: QuickOpenPanelProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -47,9 +53,15 @@ export const QuickOpenPanel = ({
     >
       <DialogContent className="max-w-[calc(100%-2rem)] gap-0 overflow-hidden p-0 sm:max-w-[720px]">
         <DialogHeader className="border-b border-border/60 px-5 pt-5 pb-4">
-          <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Quick Open</p>
-          <DialogTitle className="text-lg font-semibold text-foreground">Jump to a file</DialogTitle>
-          <DialogDescription className="sr-only">Type a file name to filter notes in the current workspace.</DialogDescription>
+          <p className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+            Quick Open
+          </p>
+          <DialogTitle className="text-lg font-semibold text-foreground">
+            Jump to a file
+          </DialogTitle>
+          <DialogDescription className="sr-only">
+            Type a file name to filter notes in the current workspace.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="p-4">
@@ -76,7 +88,9 @@ export const QuickOpenPanel = ({
             </p>
           ) : null}
           {query.trim() && items.length === 0 ? (
-            <p className="px-3 py-6 text-sm text-muted-foreground text-center">No files match “{query}”.</p>
+            <p className="px-3 py-6 text-sm text-muted-foreground text-center">
+              No files match “{query}”.
+            </p>
           ) : null}
           {items.map((item) => (
             <Button
@@ -88,7 +102,9 @@ export const QuickOpenPanel = ({
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-4">
-                  <strong className="truncate text-sm font-medium text-foreground">{item.name}</strong>
+                  <strong className="truncate text-sm font-medium text-foreground">
+                    {item.name}
+                  </strong>
                 </div>
                 <p className="truncate text-xs text-muted-foreground">{item.relativePath}</p>
               </div>

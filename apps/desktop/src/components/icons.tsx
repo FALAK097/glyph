@@ -3,7 +3,6 @@ import {
   Add01Icon as Add01Svg,
   ArrowLeft01Icon as ArrowLeft01Svg,
   ArrowRight01Icon as ArrowRight01Svg,
-  ArrowRight02Icon as ArrowRight02Svg,
   ArrowUp01Icon as ArrowUp01Svg,
   ArrowDown01Icon as ArrowDown01Svg,
   Cancel01Icon as Cancel01Svg,
@@ -25,7 +24,7 @@ import {
   Search01Icon as Search01Svg,
   Settings01Icon as Settings01Svg,
   UnfoldMoreIcon as UnfoldMoreSvg,
-  Tick02Icon as Tick02Svg
+  Tick02Icon as Tick02Svg,
 } from "@hugeicons/core-free-icons";
 
 import type { HugeIconProps, IconProps } from "../types/icons";
@@ -42,18 +41,26 @@ const HugeIcon = ({ icon, size, className, color, strokeWidth }: HugeIconProps) 
   );
 };
 
-export const ChevronRightIcon = (props: IconProps) => <HugeIcon icon={ArrowRight01Svg} {...props} />;
+export const ChevronRightIcon = (props: IconProps) => (
+  <HugeIcon icon={ArrowRight01Svg} {...props} />
+);
 export const FolderIcon = (props: IconProps) => <HugeIcon icon={Folder01Svg} {...props} />;
 export const FileIcon = (props: IconProps) => <HugeIcon icon={File01Svg} {...props} />;
-export const MoreVerticalIcon = (props: IconProps) => <HugeIcon icon={MoreVerticalSvg} {...props} />;
+export const MoreVerticalIcon = (props: IconProps) => (
+  <HugeIcon icon={MoreVerticalSvg} {...props} />
+);
 export const PencilIcon = (props: IconProps) => <HugeIcon icon={PencilEdit02Svg} {...props} />;
 export const TrashIcon = (props: IconProps) => <HugeIcon icon={Delete02Svg} {...props} />;
 
 export const PanelLeftIcon = (props: IconProps) => <HugeIcon icon={HugePanelLeftIcon} {...props} />;
-export const PanelRightIcon = (props: IconProps) => <HugeIcon icon={HugePanelRightIcon} {...props} />;
+export const PanelRightIcon = (props: IconProps) => (
+  <HugeIcon icon={HugePanelRightIcon} {...props} />
+);
 export const ArrowLeftIcon = (props: IconProps) => <HugeIcon icon={ArrowLeft01Svg} {...props} />;
-export const ArrowRightIcon = (props: IconProps) => <HugeIcon icon={ArrowRight02Svg} {...props} />;
-export const ExternalLinkIcon = (props: IconProps) => <HugeIcon icon={LinkSquare01Svg} {...props} />;
+export const ArrowRightIcon = (props: IconProps) => <HugeIcon icon={ArrowRight01Svg} {...props} />;
+export const ExternalLinkIcon = (props: IconProps) => (
+  <HugeIcon icon={LinkSquare01Svg} {...props} />
+);
 export const ArrowUpIcon = (props: IconProps) => <HugeIcon icon={ArrowUp01Svg} {...props} />;
 export const ArrowDownIcon = (props: IconProps) => <HugeIcon icon={ArrowDown01Svg} {...props} />;
 export const UnfoldMoreIcon = (props: IconProps) => <HugeIcon icon={UnfoldMoreSvg} {...props} />;
@@ -63,12 +70,18 @@ export const GearIcon = (props: IconProps) => <HugeIcon icon={Settings01Svg} {..
 export const ShortcutIcon = (props: IconProps) => <HugeIcon icon={KeyboardSvg} {...props} />;
 export const PlusIcon = (props: IconProps) => <HugeIcon icon={Add01Svg} {...props} />;
 
-export const DotsHorizontalIcon = (props: IconProps) => <HugeIcon icon={MoreHorizontalSvg} {...props} />;
+export const DotsHorizontalIcon = (props: IconProps) => (
+  <HugeIcon icon={MoreHorizontalSvg} {...props} />
+);
 export const CopyIcon = (props: IconProps) => <HugeIcon icon={CopySvg} {...props} />;
 export const LinkIcon = (props: IconProps) => <HugeIcon icon={Link01Svg} {...props} />;
-export const RevealInFolderIcon = (props: IconProps) => <HugeIcon icon={FolderOpenSvg} {...props} />;
+export const RevealInFolderIcon = (props: IconProps) => (
+  <HugeIcon icon={FolderOpenSvg} {...props} />
+);
 export const FileDownIcon = (props: IconProps) => <HugeIcon icon={FileDownSvg} {...props} />;
-export const CheckCircleIcon = (props: IconProps) => <HugeIcon icon={CheckmarkCircle01Svg} {...props} />;
+export const CheckCircleIcon = (props: IconProps) => (
+  <HugeIcon icon={CheckmarkCircle01Svg} {...props} />
+);
 export const XIcon = (props: IconProps) => <HugeIcon icon={Cancel01Svg} {...props} />;
 
 export const GlyphLogoMark = ({ size = 128, className }: IconProps) => {

@@ -242,17 +242,12 @@ const getSuggestionItems = ({ query }: { query: string }) => {
     return COMMANDS;
   }
   return COMMANDS.filter((item) => {
-    const haystack = [item.title, item.description, ...item.keywords]
-      .join(" ")
-      .toLowerCase();
+    const haystack = [item.title, item.description, ...item.keywords].join(" ").toLowerCase();
     return haystack.includes(normalizedQuery);
   });
 };
 
-const slashSuggestion: Omit<
-  SuggestionOptions<SlashCommandWithKey>,
-  "editor"
-> = {
+const slashSuggestion: Omit<SuggestionOptions<SlashCommandWithKey>, "editor"> = {
   char: "/",
   allowSpaces: true,
   startOfLine: true,
@@ -267,8 +262,7 @@ const slashSuggestion: Omit<
         component = new ReactRenderer(SlashCommandList, {
           props: {
             items: props.items,
-            onSelect: (item: SlashCommandItem) =>
-              props.command(item as SlashCommandWithKey),
+            onSelect: (item: SlashCommandItem) => props.command(item as SlashCommandWithKey),
           },
           editor: props.editor,
         });
@@ -291,8 +285,7 @@ const slashSuggestion: Omit<
       onUpdate: (props: SuggestionProps<SlashCommandWithKey>) => {
         component?.updateProps({
           items: props.items,
-          onSelect: (item: SlashCommandItem) =>
-            props.command(item as SlashCommandWithKey),
+          onSelect: (item: SlashCommandItem) => props.command(item as SlashCommandWithKey),
         });
 
         if (!props.clientRect) {

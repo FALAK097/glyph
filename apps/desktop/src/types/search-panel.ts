@@ -9,4 +9,3 @@ export type SearchPanelProps = {
   onClose: () => void;
   onOpenResult: (result: SearchResult) => void;
 };
-

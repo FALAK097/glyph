@@ -68,6 +68,14 @@ let updateCheckInterval: NodeJS.Timeout | null = null;
 const MARKDOWN_EXTENSIONS = [".md", ".mdx", ".markdown"] as const;
 const UPDATE_CHECK_INTERVAL_MS = 1000 * 60 * 60 * 6;
 
+function buildRendererFailurePage() {
+  const message = isDev
+    ? "Check the dev server logs and restart <code>pnpm dev:desktop</code>."
+    : "The packaged renderer bundle could not be loaded. Please reinstall Glyph or download the latest release.";
+
+  return `<!doctype html><meta charset='utf-8'><style>body{font-family:system-ui;padding:24px;line-height:1.5}</style><h1>Glyph could not start the renderer.</h1><p>${message}</p>`;
+}
+
 function createDefaultUpdateState(): UpdateState {
   return {
     status: "idle",
@@ -1075,7 +1083,7 @@ async function pickAsset(kind: "image" | "any-file"): Promise<AssetSelection | n
 
 async function loadRenderer(window: BrowserWindow) {
   if (!isDev) {
-    await window.loadFile(path.join(__dirname, "../dist/index.html"));
+    await window.loadFile(path.join(app.getAppPath(), "dist", "index.html"));
     return;
   }
 
@@ -1127,11 +1135,7 @@ async function createWindow() {
     await loadRenderer(mainWindow);
   } catch (error) {
     console.error("Renderer bootstrap failed:", error);
-    await mainWindow.loadURL(
-      `data:text/html,${encodeURIComponent(
-        "<!doctype html><meta charset='utf-8'><style>body{font-family:system-ui;padding:24px;line-height:1.5}</style><h1>Glyph could not start the renderer.</h1><p>Check the dev server logs and restart <code>pnpm dev:desktop</code>.</p>",
-      )}`,
-    );
+    await mainWindow.loadURL(`data:text/html,${encodeURIComponent(buildRendererFailurePage())}`);
   }
 
   const settings = await loadSettings();

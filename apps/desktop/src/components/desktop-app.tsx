@@ -29,7 +29,9 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
             isCollapsed={controller.isSidebarCollapsed}
             onOpenFile={(filePath) => void controller.openFile(filePath)}
             onDeleteFile={controller.handleDeleteFile}
+            onRemoveFolder={controller.handleRemoveFolder}
             onRenameFile={controller.handleRenameFile}
+            onRevealInFinder={(targetPath) => void controller.revealInFinder(targetPath)}
             onToggleFolder={controller.handleToggleFolder}
             onReorderNodes={controller.handleReorderNodes}
           />

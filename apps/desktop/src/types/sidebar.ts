@@ -13,7 +13,9 @@ export type SidebarProps = {
   isCollapsed: boolean;
   onOpenFile: (filePath: string) => void;
   onDeleteFile: (filePath: string) => void;
+  onRemoveFolder: (folderPath: string) => void;
   onRenameFile: (filePath: string, newName: string) => void;
+  onRevealInFinder: (targetPath: string) => void;
   onToggleFolder: (folderPath: string) => void;
   onReorderNodes: (sourcePath: string, targetPath: string, position: DragPosition) => void;
 };
@@ -28,12 +30,19 @@ export type SidebarDeleteTarget = {
   name: string;
 };
 
+export type SidebarRemoveTarget = {
+  path: string;
+  name: string;
+};
+
 export type SidebarTreeNodeProps = {
   node: DirectoryNode;
   activePath: string | null;
   depth: number;
   isExpanded?: boolean;
   onOpenFile: (filePath: string) => void;
+  onRequestRemoveFolder: (folder: SidebarRemoveTarget) => void;
+  onRevealInFinder: (targetPath: string) => void;
   onRequestDelete: (node: SidebarDeleteTarget) => void;
   onRenameFile: (filePath: string, newName: string) => void;
   onToggleFolder: (folderPath: string) => void;

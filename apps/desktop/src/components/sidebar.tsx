@@ -12,7 +12,7 @@ import {
 
 import { SidebarTreeNode } from "./sidebar-tree-node";
 
-import type { SidebarDeleteTarget, SidebarProps } from "../types/sidebar";
+import type { SidebarDeleteTarget, SidebarProps, SidebarRemoveTarget } from "../types/sidebar";
 import { LogoComponent } from "./logo-component";
 
 export const Sidebar = ({
@@ -21,11 +21,16 @@ export const Sidebar = ({
   isCollapsed,
   onOpenFile,
   onDeleteFile,
+  onRemoveFolder,
   onRenameFile,
+  onRevealInFinder,
   onToggleFolder,
   onReorderNodes,
 }: SidebarProps) => {
   const [nodeToDelete, setNodeToDelete] = useState<SidebarDeleteTarget | null>(
+    null,
+  );
+  const [folderToRemove, setFolderToRemove] = useState<SidebarRemoveTarget | null>(
     null,
   );
   const [draggedPath, setDraggedPath] = useState<string | null>(null);
@@ -35,6 +40,13 @@ export const Sidebar = ({
       onDeleteFile(nodeToDelete.path);
     }
     setNodeToDelete(null);
+  };
+
+  const handleConfirmRemove = () => {
+    if (folderToRemove) {
+      onRemoveFolder(folderToRemove.path);
+    }
+    setFolderToRemove(null);
   };
 
   if (isCollapsed) {
@@ -75,6 +87,8 @@ export const Sidebar = ({
                 depth={0}
                 isExpanded={entry.isExpanded}
                 onOpenFile={onOpenFile}
+                onRequestRemoveFolder={(folder) => setFolderToRemove(folder)}
+                onRevealInFinder={onRevealInFinder}
                 onRequestDelete={(node) => setNodeToDelete(node)}
                 onRenameFile={onRenameFile}
                 onToggleFolder={onToggleFolder}
@@ -129,6 +143,44 @@ export const Sidebar = ({
                 onClick={handleConfirmDelete}
               >
                 Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+      {folderToRemove ? (
+        <Dialog
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) {
+              setFolderToRemove(null);
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-[420px]">
+            <DialogHeader>
+              <DialogTitle>Remove Folder From Glyph</DialogTitle>
+              <DialogDescription>
+                Remove{" "}
+                <span className="font-semibold text-foreground">
+                  "{folderToRemove.name}"
+                </span>{" "}
+                from Glyph? This only removes it from the sidebar and does not delete anything from your device.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                type="button"
+                onClick={() => setFolderToRemove(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={handleConfirmRemove}
+              >
+                Remove
               </Button>
             </DialogFooter>
           </DialogContent>

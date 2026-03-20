@@ -87,8 +87,10 @@ type ImageControlsState = {
 
 type HoveredLinkState = {
   href: string;
-  left: number;
-  top: number;
+  iconLeft: number;
+  iconTop: number;
+  tooltipLeft: number;
+  tooltipTop: number;
 };
 
 type TableControlsState = {
@@ -130,6 +132,9 @@ const normalizeLinkTarget = (value: string) => {
 
   return trimmed;
 };
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
 
 const runMarkdownShortcutConversion = (
   nextEditor: Editor,
@@ -518,8 +523,14 @@ export const MarkdownEditor = ({
           const rect = link.getBoundingClientRect();
           setHoveredLink({
             href,
-            left: rect.right + 8,
-            top: rect.top + rect.height / 2,
+            iconLeft: rect.right + 4,
+            iconTop: rect.top + rect.height / 2,
+            tooltipLeft: clamp(
+              rect.left + rect.width / 2,
+              96,
+              window.innerWidth - 96,
+            ),
+            tooltipTop: rect.bottom + 10,
           });
           return false;
         },
@@ -831,6 +842,9 @@ export const MarkdownEditor = ({
   };
 
   const isMacLike = navigator.platform.includes("Mac");
+  const linkOpenShortcutHint = isMacLike
+    ? "Open link (Cmd+Click)"
+    : "Open link (Ctrl+Click)";
   const headerPaddingClass =
     isSidebarCollapsed && isMacLike ? "pl-20 pr-4" : "px-4";
 
@@ -1125,29 +1139,43 @@ export const MarkdownEditor = ({
           </div>
         ) : null}
         {hoveredLink ? (
-          <div
-            className="fixed z-30"
-            data-link-hover-affordance="true"
-            onMouseEnter={clearHoveredLinkHideTimeout}
-            onMouseLeave={scheduleHoveredLinkHide}
-            style={{
-              left: hoveredLink.left,
-              top: hoveredLink.top,
-              transform: "translateY(-50%)",
-            }}
-          >
-            <Button
+          <>
+            <div
+              className="fixed z-30"
               data-link-hover-affordance="true"
-              variant="ghost"
-              size="icon-xs"
-              type="button"
-              className="pointer-events-auto text-[var(--editor-link)] hover:bg-transparent hover:opacity-80"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => void handleLinkActivation(hoveredLink.href)}
+              onMouseEnter={clearHoveredLinkHideTimeout}
+              onMouseLeave={scheduleHoveredLinkHide}
+              style={{
+                left: hoveredLink.iconLeft,
+                top: hoveredLink.iconTop,
+                transform: "translateY(-50%)",
+              }}
             >
-              <ExternalLinkIcon size={12} />
-            </Button>
-          </div>
+              <Button
+                data-link-hover-affordance="true"
+                variant="ghost"
+                size="icon-xs"
+                type="button"
+                className="pointer-events-auto text-[var(--editor-link)] hover:bg-transparent hover:opacity-80"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => void handleLinkActivation(hoveredLink.href)}
+              >
+                <ExternalLinkIcon size={12} />
+              </Button>
+            </div>
+            <div
+              className="pointer-events-none fixed z-30"
+              style={{
+                left: hoveredLink.tooltipLeft,
+                top: hoveredLink.tooltipTop,
+                transform: "translateX(-50%)",
+              }}
+            >
+              <div className="inline-flex max-w-[220px] items-center rounded-md bg-foreground px-3 py-1.5 text-xs text-background shadow-sm">
+                {linkOpenShortcutHint}
+              </div>
+            </div>
+          </>
         ) : null}
         {imageControls ? (
           <div

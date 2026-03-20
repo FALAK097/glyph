@@ -8,7 +8,7 @@ import { useWorkspaceStore } from "@/store/workspace";
 import { applyTheme } from "@/theme/themes";
 
 import { getErrorMessage } from "@/lib/errors";
-import { isFileInsideWorkspace, isSamePath, normalizePath } from "@/lib/paths";
+import { isFileInsideWorkspace, isPathInside, isSamePath, normalizePath } from "@/lib/paths";
 import {
   orderSidebarNodes,
   removeSidebarPath,
@@ -367,6 +367,14 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     }
   }, [activeFile?.path, setActiveFile, setError, glyph]);
 
+  const revealInFinder = useCallback(async (targetPath: string) => {
+    try {
+      await glyph.revealInFinder(targetPath);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to open in Finder");
+    }
+  }, [setError, glyph]);
+
   const handleRenameFile = useCallback(async (filePath: string, newName: string) => {
     if (!newName.trim()) {
       return;
@@ -382,6 +390,16 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
       setError(err instanceof Error ? err.message : "Failed to rename file");
     }
   }, [activeFile?.path, setActiveFile, setError, glyph]);
+
+  const handleRemoveFolder = useCallback((folderPath: string) => {
+    setSidebarNodes((prev) => removeSidebarPath(prev, folderPath));
+    setExpandedFolderPaths((prev) => prev.filter((path) => !isPathInside(path, folderPath)));
+
+    if (rootPath && isSamePath(rootPath, folderPath)) {
+      setWorkspace({ rootPath: "", tree: [], activeFile: null });
+      setIsWorkspaceMode(false);
+    }
+  }, [rootPath, setWorkspace]);
 
   const handleToggleFolder = useCallback((folderPath: string) => {
     setExpandedFolderPaths((prev) => (
@@ -788,6 +806,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     error,
     files,
     handleDeleteFile,
+    handleRemoveFolder,
     handleRenameFile,
     handleReorderNodes,
     handleToggleFolder,
@@ -802,6 +821,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     paletteItems,
     paletteQuery,
     readingTime,
+    revealInFinder,
     saveSettings,
     saveStateLabel,
     selectedIndex,

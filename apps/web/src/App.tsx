@@ -354,7 +354,7 @@ export function App() {
                         : "max-w-md"
                   }
                 >
-                  <div className={feature.themes ? "max-w-md" : undefined}>
+                  <div className={feature.themes ? "max-w-[44rem]" : undefined}>
                     <span
                       className={`feature-card__eyebrow ${darkCard ? "feature-card__eyebrow--dark" : ""}`}
                     >
@@ -363,7 +363,11 @@ export function App() {
                     <h2
                       className={`feature-card__title ${darkCard ? "feature-card__title--dark" : ""} ${
                         feature.emphasis === "media" ? "feature-card__title--media" : ""
-                      } ${feature.title === "Find Notes" ? "whitespace-nowrap" : ""}`}
+                      } ${
+                        feature.title === "Find Notes" || feature.themes
+                          ? "lg:whitespace-nowrap"
+                          : ""
+                      }`}
                     >
                       {feature.title}
                     </h2>
@@ -392,7 +396,7 @@ export function App() {
                   </div>
 
                   {feature.themes ? (
-                    <div className="hidden w-full max-w-[20rem] lg:block">
+                    <div className="hidden w-full max-w-[20rem] lg:mt-6 lg:block">
                       <div className="rounded-[1.35rem] border border-black/8 bg-white/70 p-5 shadow-[0_10px_30px_-28px_oklch(0.18_0.01_110_/_0.28)]">
                         <span className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-[var(--ink-muted)]">
                           Theme Mode

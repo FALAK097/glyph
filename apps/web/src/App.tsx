@@ -32,14 +32,24 @@ const WindowsIcon = () => (
 );
 
 const DOWNLOAD_URLS = {
-  mac: "https://github.com/FALAK097/glyph/releases/latest/download/Glyph-mac.dmg",
-  windows: "https://github.com/FALAK097/glyph/releases/latest/download/Glyph-windows.exe",
+  latestReleaseApi: "https://api.github.com/repos/FALAK097/glyph/releases/latest",
   releases: "https://github.com/FALAK097/glyph/releases",
   changelog: "https://github.com/FALAK097/glyph/blob/main/CHANGELOG.md",
   github: "https://github.com/FALAK097/glyph",
 } as const;
 
 const BREW_INSTALL_COMMAND = "brew install --cask FALAK097/glyph/glyph";
+
+type DownloadPlatform = "mac" | "windows";
+
+type GitHubReleaseAsset = {
+  name: string;
+  browser_download_url: string;
+};
+
+type GitHubReleaseResponse = {
+  assets?: GitHubReleaseAsset[];
+};
 
 type Feature = {
   eyebrow: string;
@@ -162,6 +172,7 @@ function ProductShot({ src, alt, frame = "compact" }: ProductShotProps) {
 
 export function App() {
   const [hasCopiedBrew, setHasCopiedBrew] = useState(false);
+  const [resolvingPlatform, setResolvingPlatform] = useState<DownloadPlatform | null>(null);
 
   useEffect(() => {
     if (!hasCopiedBrew) {
@@ -183,6 +194,49 @@ export function App() {
       setHasCopiedBrew(true);
     } catch {
       setHasCopiedBrew(false);
+    }
+  };
+
+  const resolveDownloadAsset = (
+    assets: GitHubReleaseAsset[],
+    platform: DownloadPlatform,
+  ): GitHubReleaseAsset | null => {
+    if (platform === "mac") {
+      return (
+        assets.find((asset) => asset.name === "Glyph-mac.dmg") ??
+        assets.find((asset) => asset.name.endsWith(".dmg")) ??
+        null
+      );
+    }
+
+    return (
+      assets.find((asset) => asset.name === "Glyph-windows.exe") ??
+      assets.find((asset) => asset.name.endsWith(".exe")) ??
+      null
+    );
+  };
+
+  const handleDownload = async (platform: DownloadPlatform) => {
+    setResolvingPlatform(platform);
+
+    try {
+      const response = await fetch(DOWNLOAD_URLS.latestReleaseApi);
+      if (!response.ok) {
+        throw new Error("Unable to resolve latest release");
+      }
+
+      const release = (await response.json()) as GitHubReleaseResponse;
+      const asset = resolveDownloadAsset(release.assets ?? [], platform);
+
+      if (!asset) {
+        throw new Error("No matching asset found");
+      }
+
+      window.location.href = asset.browser_download_url;
+    } catch {
+      window.location.href = DOWNLOAD_URLS.releases;
+    } finally {
+      setResolvingPlatform(null);
     }
   };
 
@@ -212,14 +266,24 @@ export function App() {
           </a>
 
           <div className="flex w-full items-center justify-center gap-2 sm:w-auto sm:justify-end">
-            <a href={DOWNLOAD_URLS.mac} className="download-button">
+            <button
+              type="button"
+              className="download-button cursor-pointer border-0"
+              onClick={() => void handleDownload("mac")}
+              disabled={resolvingPlatform !== null}
+            >
               <AppleIcon />
-              Download for macOS
-            </a>
-            <a href={DOWNLOAD_URLS.windows} className="download-button download-button--secondary">
+              {resolvingPlatform === "mac" ? "Preparing download..." : "Download for macOS"}
+            </button>
+            <button
+              type="button"
+              className="download-button download-button--secondary cursor-pointer border-0"
+              onClick={() => void handleDownload("windows")}
+              disabled={resolvingPlatform !== null}
+            >
               <WindowsIcon />
-              Download for Windows
-            </a>
+              {resolvingPlatform === "windows" ? "Preparing download..." : "Download for Windows"}
+            </button>
           </div>
         </div>
       </nav>
@@ -243,19 +307,13 @@ export function App() {
             id="install-with-homebrew"
             className="mt-10 w-full max-w-3xl overflow-hidden rounded-2xl border border-black/8 bg-[color:color-mix(in_oklab,white_86%,var(--surface-paper))] text-left shadow-[0_16px_48px_-44px_oklch(0.17_0.01_110_/_0.3)]"
           >
-            <div className="border-b border-black/8 px-4 pt-3 text-[0.82rem] text-[var(--ink-muted)]">
-              <span className="relative inline-block border-b-2 border-[var(--ink-strong)] px-1 pb-3 font-medium text-[var(--ink-strong)]">
-                brew
-              </span>
-            </div>
-
             <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
               <code className="overflow-x-auto whitespace-nowrap text-[0.98rem] text-[var(--ink-soft)]">
                 {BREW_INSTALL_COMMAND}
               </code>
               <button
                 type="button"
-                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[0.55rem] border border-black/8 bg-[color:color-mix(in_oklab,white_92%,var(--surface-page))] px-3 py-2 text-[0.82rem] font-semibold text-[var(--ink-soft)] transition-transform duration-150 ease-out hover:-translate-y-px hover:text-[var(--ink-strong)] sm:self-auto"
+                className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-[0.55rem] border border-black/8 bg-[color:color-mix(in_oklab,white_92%,var(--surface-page))] px-3 py-2 text-[0.82rem] font-semibold text-[var(--ink-soft)] transition-transform duration-150 ease-out hover:-translate-y-px hover:text-[var(--ink-strong)] sm:self-auto"
                 onClick={() => void handleCopyBrewCommand()}
               >
                 {hasCopiedBrew ? (

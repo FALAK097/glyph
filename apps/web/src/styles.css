@@ -112,97 +112,6 @@ body {
   line-height: 1.8;
 }
 
-.hero-meta__pill {
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid var(--border-soft);
-  border-radius: 999px;
-  background: color-mix(in oklab, white 74%, var(--surface-page));
-  padding: 0.58rem 0.9rem;
-  color: var(--ink-soft);
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-.install-strip {
-  overflow: hidden;
-  border: 1px solid color-mix(in oklab, var(--border-soft) 82%, white);
-  border-radius: 0.95rem;
-  background: color-mix(in oklab, white 86%, var(--surface-paper));
-  box-shadow: 0 16px 48px -44px oklch(0.17 0.01 110 / 0.3);
-}
-
-.install-strip__tabs {
-  display: flex;
-  gap: 0.25rem;
-  border-bottom: 1px solid color-mix(in oklab, var(--border-soft) 88%, white);
-  padding: 0.45rem 0.7rem 0;
-  overflow-x: auto;
-}
-
-.install-strip__tab {
-  position: relative;
-  padding: 0.65rem 0.72rem 0.78rem;
-  color: var(--ink-muted);
-  font-size: 0.82rem;
-  white-space: nowrap;
-}
-
-.install-strip__tab--active {
-  color: var(--ink-strong);
-}
-
-.install-strip__tab--active::after {
-  content: "";
-  position: absolute;
-  right: 0.35rem;
-  bottom: 0;
-  left: 0.35rem;
-  height: 2px;
-  border-radius: 999px;
-  background: var(--ink-strong);
-}
-
-.install-strip__command {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.9rem;
-  padding: 1rem 1rem 1.05rem;
-}
-
-.install-strip__command code {
-  overflow-x: auto;
-  color: var(--ink-soft);
-  font-size: 1rem;
-  white-space: nowrap;
-}
-
-.install-strip__command strong {
-  color: var(--ink-strong);
-  font-weight: 600;
-}
-
-.install-strip__copy {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 0.4rem;
-  border: 1px solid color-mix(in oklab, var(--border-soft) 82%, white);
-  border-radius: 0.55rem;
-  background: color-mix(in oklab, white 92%, var(--surface-page));
-  padding: 0.5rem 0.72rem;
-  color: var(--ink-soft);
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    transform 120ms var(--ease-out-strong),
-    background-color 160ms ease,
-    color 160ms ease;
-}
-
 .feature-card {
   padding: clamp(2rem, 1.55rem + 1.1vw, 3.2rem);
   border-radius: 2rem;
@@ -324,12 +233,6 @@ body {
     border-color: oklch(0.72 0.009 95 / 0.5);
   }
 
-  .install-strip__copy:hover {
-    transform: translateY(-1px);
-    background: color-mix(in oklab, white 82%, var(--surface-page));
-    color: var(--ink-strong);
-  }
-
   .footer-link:hover::after {
     opacity: 0.92;
     transform: scaleX(1);
@@ -350,15 +253,6 @@ body {
     font-size: 0.88rem;
   }
 
-  .install-strip__command {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .install-strip__copy {
-    justify-content: center;
-  }
-
   .hero-display {
     font-size: clamp(3.6rem, 17vw, 5.2rem);
     line-height: 0.9;
@@ -375,7 +269,6 @@ body {
   }
 
   .download-button,
-  .install-strip__copy,
   .footer-link,
   .footer-link::after {
     transition-duration: 0ms;

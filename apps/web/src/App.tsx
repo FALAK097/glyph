@@ -40,7 +40,6 @@ const DOWNLOAD_URLS = {
 } as const;
 
 const BREW_INSTALL_COMMAND = "brew install --cask FALAK097/glyph/glyph";
-const INSTALL_METHOD_LABELS = ["curl", "npm", "bun", "brew", "paru"] as const;
 
 type Feature = {
   eyebrow: string;
@@ -240,31 +239,23 @@ export function App() {
             digital noise, leaving only your words, your folders, and a reading experience built for
             clarity.
           </p>
-          <div className="hero-meta mt-8 flex flex-wrap items-center justify-center gap-3">
-            <span className="hero-meta__pill">Free to use</span>
-            <span className="hero-meta__pill">Local-first</span>
-            <span className="hero-meta__pill">Markdown folders, not lock-in</span>
-          </div>
           <div
             id="install-with-homebrew"
-            className="install-strip mt-10 w-full max-w-3xl text-left"
+            className="mt-10 w-full max-w-3xl overflow-hidden rounded-2xl border border-black/8 bg-[color:color-mix(in_oklab,white_86%,var(--surface-paper))] text-left shadow-[0_16px_48px_-44px_oklch(0.17_0.01_110_/_0.3)]"
           >
-            <div className="install-strip__tabs" aria-hidden="true">
-              {INSTALL_METHOD_LABELS.map((label) => (
-                <span
-                  key={label}
-                  className={`install-strip__tab ${label === "brew" ? "install-strip__tab--active" : ""}`}
-                >
-                  {label}
-                </span>
-              ))}
+            <div className="border-b border-black/8 px-4 pt-3 text-[0.82rem] text-[var(--ink-muted)]">
+              <span className="relative inline-block border-b-2 border-[var(--ink-strong)] px-1 pb-3 font-medium text-[var(--ink-strong)]">
+                brew
+              </span>
             </div>
 
-            <div className="install-strip__command">
-              <code>{BREW_INSTALL_COMMAND}</code>
+            <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <code className="overflow-x-auto whitespace-nowrap text-[0.98rem] text-[var(--ink-soft)]">
+                {BREW_INSTALL_COMMAND}
+              </code>
               <button
                 type="button"
-                className="install-strip__copy"
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-[0.55rem] border border-black/8 bg-[color:color-mix(in_oklab,white_92%,var(--surface-page))] px-3 py-2 text-[0.82rem] font-semibold text-[var(--ink-soft)] transition-transform duration-150 ease-out hover:-translate-y-px hover:text-[var(--ink-strong)] sm:self-auto"
                 onClick={() => void handleCopyBrewCommand()}
               >
                 {hasCopiedBrew ? (

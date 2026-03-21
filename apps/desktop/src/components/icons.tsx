@@ -84,10 +84,12 @@ export const CheckCircleIcon = (props: IconProps) => (
 );
 export const XIcon = (props: IconProps) => <HugeIcon icon={Cancel01Svg} {...props} />;
 
+const glyphLogoMarkSrc = `${import.meta.env.BASE_URL}icon.png`;
+
 export const GlyphLogoMark = ({ size = 128, className }: IconProps) => {
   return (
     <img
-      src="/icon.png"
+      src={glyphLogoMarkSrc}
       alt="Glyph Logo"
       width={size}
       height={size}

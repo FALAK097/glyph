@@ -33,3 +33,29 @@ Project board:
 - Do not leave finished work in `In Progress`.
 - Do not open a PR without linking the issue or issues it addresses.
 - Treat the GitHub Project board as the source of truth for roadmap execution state.
+
+## Release Please Compatibility
+
+Glyph uses Release Please from [release-please.yml](/Users/falakgala/projects/glyph/.github/workflows/release-please.yml), so commits that land on `main` must follow Conventional Commits.
+
+Use this format for every commit you create:
+
+- `<type>(<scope>): <summary>`
+
+Preferred types and scopes:
+
+- `feat(desktop): ...` for user-visible desktop features
+- `fix(desktop): ...` for desktop bug fixes
+- `feat(web): ...` or `fix(web): ...` for the web app
+- `docs(skills): ...` or `docs(repo): ...` for documentation and skill updates
+- `refactor(desktop): ...` for internal cleanup without behavior changes
+- `build(repo): ...` or `ci(repo): ...` for tooling and workflow changes
+- `chore(repo): ...` only for non-user-facing maintenance
+
+Important rules:
+
+1. Do not use vague commit headers like `update`, `misc`, or `fix stuff`.
+2. Use `feat` for product-facing additions and `fix` for bug fixes so Release Please can version correctly.
+3. For breaking changes, use `!` in the header and include a `BREAKING CHANGE:` footer in the commit body.
+4. If the PR will be squash-merged, the PR title must also use the same Conventional Commit format because that squash commit is what lands on `main`.
+5. Before pushing, make sure the final branch history and the PR title are both release-please friendly.

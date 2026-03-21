@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.3](https://github.com/FALAK097/glyph/compare/v0.2.2...v0.2.3) (2026-03-21)
+
+
+### Bug Fixes
+
+* **desktop:** load sidebar branding from packaged assets ([0f62472](https://github.com/FALAK097/glyph/commit/0f62472a1c1ea9a8ae4676025930dd582b1a0dc0))
+
 ## [0.2.2](https://github.com/FALAK097/glyph/compare/v0.2.1...v0.2.2) (2026-03-20)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "@glyph/desktop",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": false,
   "description": "Glyph - A minimal markdown viewer and editor for macOS and Windows. Browse local notes, edit markdown fast, and read rendered documents in a focused desktop workspace.",
   "keywords": [

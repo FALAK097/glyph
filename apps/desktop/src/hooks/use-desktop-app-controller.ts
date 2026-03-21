@@ -35,6 +35,8 @@ import { flattenFiles } from "@/lib/workspace-tree";
 
 import type { CommandPaletteItem } from "@/types/command-palette";
 
+const toPathKey = (path: string) => normalizePath(path).toLowerCase();
+
 export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => {
   const {
     rootPath,
@@ -238,6 +240,43 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     [glyph],
   );
 
+  const saveSettings = useCallback(
+    async (patch: Partial<AppSettings>) => {
+      const next = await glyph.updateSettings(patch);
+      setSettings(next);
+      return next;
+    },
+    [glyph],
+  );
+
+  const syncTrackedPaths = useCallback(
+    async (oldPath: string, nextPath?: string) => {
+      if (!settings) {
+        return;
+      }
+
+      const remap = (entries: string[]) =>
+        Array.from(
+          new Set(
+            entries.flatMap((entry) => {
+              if (!isSamePath(entry, oldPath)) {
+                return [entry];
+              }
+
+              return nextPath ? [nextPath] : [];
+            }),
+          ),
+        );
+
+      await saveSettings({
+        recentFiles: remap(settings.recentFiles),
+        pinnedFiles: remap(settings.pinnedFiles),
+        favoriteFiles: remap(settings.favoriteFiles),
+      });
+    },
+    [saveSettings, settings],
+  );
+
   useEffect(() => {
     return glyph.onExternalFile(async (target) => {
       if (target.isDirectory) {
@@ -286,6 +325,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
         const isUntitled = activeFile.name.startsWith("Untitled-");
 
         if (isUntitled && draftContent.trim().length > 0) {
+          const previousPath = currentPath;
           const firstLine =
             draftContent
               .split(/\r?\n/)[0]
@@ -303,6 +343,8 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
             );
             currentPath = finalFile.path;
             updateActiveFile(finalFile);
+            replaceHistoryPath(previousPath, finalFile.path);
+            await syncTrackedPaths(previousPath, finalFile.path);
           }
         }
 
@@ -315,7 +357,18 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     }, 800);
 
     return () => window.clearTimeout(timer);
-  }, [activeFile?.path, draftContent, isDirty, isSaving, markSaved, setError, setSaving, glyph]);
+  }, [
+    activeFile?.path,
+    draftContent,
+    glyph,
+    isDirty,
+    isSaving,
+    markSaved,
+    replaceHistoryPath,
+    setError,
+    setSaving,
+    syncTrackedPaths,
+  ]);
 
   useEffect(() => {
     if (!isPaletteOpen) {
@@ -346,42 +399,6 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     applyTheme(settings.themeMode);
   }, [settings]);
 
-  const saveSettings = useCallback(
-    async (patch: Partial<AppSettings>) => {
-      const next = await glyph.updateSettings(patch);
-      setSettings(next);
-      return next;
-    },
-    [glyph],
-  );
-
-  const syncTrackedPaths = useCallback(
-    async (oldPath: string, nextPath?: string) => {
-      if (!settings) {
-        return;
-      }
-
-      const remap = (entries: string[]) =>
-        Array.from(
-          new Set(
-            entries.flatMap((entry) => {
-              if (!isSamePath(entry, oldPath)) {
-                return [entry];
-              }
-
-              return nextPath ? [nextPath] : [];
-            }),
-          ),
-        );
-
-      await saveSettings({
-        recentFiles: remap(settings.recentFiles),
-        pinnedFiles: remap(settings.pinnedFiles),
-        favoriteFiles: remap(settings.favoriteFiles),
-      });
-    },
-    [saveSettings, settings],
-  );
   const togglePinnedFile = useCallback(
     async (filePath: string) => {
       const current = settings?.pinnedFiles ?? [];
@@ -833,8 +850,9 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     const traverseSidebar = (nodes: DirectoryNode[], parentPath: string = "") => {
       for (const node of nodes) {
         if (node.type === "file") {
-          if (!seenPaths.has(node.path)) {
-            seenPaths.add(node.path);
+          const pathKey = toPathKey(node.path);
+          if (!seenPaths.has(pathKey)) {
+            seenPaths.add(pathKey);
             result.push({
               path: node.path,
               name: node.name,
@@ -849,8 +867,9 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     traverseSidebar(sidebarNodes);
 
     for (const f of files) {
-      if (!seenPaths.has(f.path)) {
-        seenPaths.add(f.path);
+      const pathKey = toPathKey(f.path);
+      if (!seenPaths.has(pathKey)) {
+        seenPaths.add(pathKey);
         result.push(f);
       }
     }
@@ -862,15 +881,15 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     const lookup = new Map<string, NoteShortcutItem>();
 
     for (const file of allSearchableFiles) {
-      lookup.set(file.path, {
+      lookup.set(toPathKey(file.path), {
         path: file.path,
         title: file.name.replace(/\.(md|mdx|markdown)$/i, ""),
         subtitle: file.relativePath,
       });
     }
 
-    if (activeFile && !lookup.has(activeFile.path)) {
-      lookup.set(activeFile.path, {
+    if (activeFile && !lookup.has(toPathKey(activeFile.path))) {
+      lookup.set(toPathKey(activeFile.path), {
         path: activeFile.path,
         title: activeFile.name.replace(/\.(md|mdx|markdown)$/i, ""),
         subtitle: activeFile.path,
@@ -883,7 +902,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
   const toShortcutItems = useCallback(
     (paths: string[], badge?: string) =>
       paths.flatMap((targetPath) => {
-        const match = noteShortcutLookup.get(targetPath);
+        const match = noteShortcutLookup.get(toPathKey(targetPath));
         return match ? [{ ...match, badge }] : [];
       }),
     [noteShortcutLookup],
@@ -908,10 +927,10 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
       ? (navigationHistory[navigationIndex + 1] ?? null)
       : null;
   const previousHistoryItem = previousHistoryPath
-    ? (noteShortcutLookup.get(previousHistoryPath) ?? null)
+    ? (noteShortcutLookup.get(toPathKey(previousHistoryPath)) ?? null)
     : null;
   const nextHistoryItem = nextHistoryPath
-    ? (noteShortcutLookup.get(nextHistoryPath) ?? null)
+    ? (noteShortcutLookup.get(toPathKey(nextHistoryPath)) ?? null)
     : null;
   const paletteItems = useMemo<CommandPaletteItem[]>(() => {
     const query = deferredPaletteQuery.trim().toLowerCase();

@@ -492,12 +492,12 @@ export const MarkdownEditor = ({
     return true;
   }, []);
 
-  const handleScrollToTop = () => {
+  const handleScrollToTop = useCallback(() => {
     scrollContainerRef.current?.scrollTo({
       top: 0,
       behavior: "smooth",
     });
-  };
+  }, []);
 
   const clearHoveredLinkHideTimeout = () => {
     if (!hoveredLinkHideTimeoutRef.current) {
@@ -667,6 +667,7 @@ export const MarkdownEditor = ({
     editorProps: {
       attributes: {
         class: editorSurfaceClassName,
+        "data-glyph-editor": "true",
         spellcheck: "true",
       },
       handleClick: (_view, _pos, event) => {

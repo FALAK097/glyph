@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, MouseEvent, ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ import type {
   SidebarTreeNodeProps,
 } from "../types/sidebar";
 
-export const SidebarTreeNode = ({
+export const SidebarTreeNode = memo(function SidebarTreeNode({
   node,
   activePath,
   depth,
@@ -45,7 +45,7 @@ export const SidebarTreeNode = ({
   draggable,
   onDragStartTopLevel,
   onDropNode,
-}: SidebarTreeNodeProps) => {
+}: SidebarTreeNodeProps) {
   const [localIsExpanded, setLocalIsExpanded] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -64,6 +64,18 @@ export const SidebarTreeNode = ({
   const isActive = isSamePath(activePath, node.path);
   const pinLabel = isPinned ? "Unpin note" : "Pin note";
   const favoriteLabel = isFavorite ? "Remove from favorites" : "Add to favorites";
+  const focusMenuButton = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      menuButtonRef.current?.focus();
+    });
+  }, []);
+  const focusEditorSurface = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        document.querySelector<HTMLElement>("[data-glyph-editor='true']")?.focus();
+      });
+    });
+  }, []);
 
   const containerClassName = useMemo(() => {
     if (dropPosition === "before") {
@@ -119,6 +131,7 @@ export const SidebarTreeNode = ({
 
     onTogglePinnedFile(node.path);
     setShowMenu(false);
+    focusMenuButton();
   };
 
   const handleToggleFavoriteFile = () => {
@@ -128,6 +141,7 @@ export const SidebarTreeNode = ({
 
     onToggleFavoriteFile(node.path);
     setShowMenu(false);
+    focusMenuButton();
   };
 
   const dragHandlers = draggable
@@ -174,6 +188,7 @@ export const SidebarTreeNode = ({
           onClick={(event) => {
             event.stopPropagation();
             setShowMenu(false);
+            focusMenuButton();
           }}
           type="button"
           tabIndex={-1}
@@ -307,6 +322,7 @@ export const SidebarTreeNode = ({
                 event.stopPropagation();
                 onRevealInFinder(node.path);
                 setShowMenu(false);
+                focusMenuButton();
               }}
               type="button"
             >
@@ -439,6 +455,7 @@ export const SidebarTreeNode = ({
               event.stopPropagation();
               onOpenFile(node.path);
               setShowMenu(false);
+              focusEditorSurface();
             }}
             type="button"
           >
@@ -453,6 +470,7 @@ export const SidebarTreeNode = ({
               event.stopPropagation();
               onRevealInFinder(node.path);
               setShowMenu(false);
+              focusMenuButton();
             }}
             type="button"
           >
@@ -523,4 +541,4 @@ export const SidebarTreeNode = ({
       )}
     </div>
   );
-};
+});

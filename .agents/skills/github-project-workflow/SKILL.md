@@ -36,7 +36,7 @@ Project board:
 
 ## Release Please Compatibility
 
-Glyph uses Release Please from [release-please.yml](/Users/falakgala/projects/glyph/.github/workflows/release-please.yml), so commits that land on `main` must follow Conventional Commits.
+Glyph uses Release Please from [release-please.yml](/.github/workflows/release-please.yml), so commits that land on `main` must follow Conventional Commits.
 
 Use this format for every commit you create:
 

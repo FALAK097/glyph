@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent, ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { normalizePath } from "@/lib/paths";
 
 import type { NoteShortcutItem } from "@/types/navigation";
-import type { SidebarDeleteTarget, SidebarProps, SidebarRemoveTarget } from "../types/sidebar";
+import type {
+  DragPosition,
+  SidebarDeleteTarget,
+  SidebarProps,
+  SidebarRemoveTarget,
+} from "../types/sidebar";
 
 import { LogoComponent } from "./logo-component";
 import {
@@ -84,9 +89,29 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
 }: SidebarShortcutRowProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [menuCoords, setMenuCoords] = useState<{ top: number; left: number } | null>(null);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const isActive = normalizePathKey(activePath ?? "") === normalizePathKey(item.path);
   const pinLabel = isPinned ? "Unpin note" : "Pin note";
   const favoriteLabel = isFavorite ? "Remove from favorites" : "Add to favorites";
+
+  const focusMenuButton = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      if (menuButtonRef.current?.isConnected) {
+        menuButtonRef.current.focus();
+        return;
+      }
+
+      document.querySelector<HTMLElement>("[data-glyph-editor='true']")?.focus();
+    });
+  }, []);
+
+  const focusEditorSurface = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        document.querySelector<HTMLElement>("[data-glyph-editor='true']")?.focus();
+      });
+    });
+  }, []);
 
   const openMenu = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
@@ -157,6 +182,7 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
+            ref={menuButtonRef}
             type="button"
             variant="ghost"
             size="icon-xs"
@@ -177,6 +203,7 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
             onClick={(event) => {
               event.stopPropagation();
               setShowMenu(false);
+              focusMenuButton();
             }}
             type="button"
             tabIndex={-1}
@@ -193,6 +220,7 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
                 event.stopPropagation();
                 onOpenFile(item.path);
                 setShowMenu(false);
+                focusEditorSurface();
               }}
               type="button"
             >
@@ -208,6 +236,7 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
                   event.stopPropagation();
                   onTogglePinnedFile(item.path);
                   setShowMenu(false);
+                  focusMenuButton();
                 }}
                 type="button"
               >
@@ -228,6 +257,7 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
                   event.stopPropagation();
                   onToggleFavoriteFile(item.path);
                   setShowMenu(false);
+                  focusMenuButton();
                 }}
                 type="button"
               >
@@ -243,6 +273,7 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
                 event.stopPropagation();
                 onRevealInFinder(item.path);
                 setShowMenu(false);
+                focusMenuButton();
               }}
               type="button"
             >
@@ -256,18 +287,7 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
   );
 });
 
-const SidebarShortcutList = ({
-  activePath,
-  items,
-  emptyLabel,
-  folderRevealLabel,
-  onOpenFile,
-  onRevealInFinder,
-  onTogglePinnedFile,
-  onToggleFavoriteFile,
-  pinnedPaths,
-  favoritePaths,
-}: {
+type SidebarShortcutListProps = {
   activePath: string | null;
   items: NoteShortcutItem[];
   emptyLabel: string;
@@ -278,13 +298,26 @@ const SidebarShortcutList = ({
   onToggleFavoriteFile?: (filePath: string) => void;
   pinnedPaths: string[];
   favoritePaths: string[];
-}) => {
+};
+
+const SidebarShortcutList = memo(function SidebarShortcutList({
+  activePath,
+  items,
+  emptyLabel,
+  folderRevealLabel,
+  onOpenFile,
+  onRevealInFinder,
+  onTogglePinnedFile,
+  onToggleFavoriteFile,
+  pinnedPaths,
+  favoritePaths,
+}: SidebarShortcutListProps) {
+  const pinnedSet = useMemo(() => new Set(pinnedPaths.map(normalizePathKey)), [pinnedPaths]);
+  const favoriteSet = useMemo(() => new Set(favoritePaths.map(normalizePathKey)), [favoritePaths]);
+
   if (items.length === 0) {
     return <p className="px-2 text-xs leading-5 text-muted-foreground">{emptyLabel}</p>;
   }
-
-  const pinnedSet = new Set(pinnedPaths.map(normalizePathKey));
-  const favoriteSet = new Set(favoritePaths.map(normalizePathKey));
 
   return (
     <div className="space-y-1">
@@ -308,7 +341,7 @@ const SidebarShortcutList = ({
       })}
     </div>
   );
-};
+});
 
 export const Sidebar = ({
   tree,
@@ -341,6 +374,23 @@ export const Sidebar = ({
   const pinnedPaths = useMemo(() => pinnedList.map((note) => note.path), [pinnedList]);
   const favoritePaths = useMemo(() => favoriteList.map((note) => note.path), [favoriteList]);
   const workspaceCount = tree.length;
+  const handleRequestRemoveFolder = useCallback((folder: SidebarRemoveTarget) => {
+    setFolderToRemove(folder);
+  }, []);
+  const handleRequestDelete = useCallback((node: SidebarDeleteTarget) => {
+    setNodeToDelete(node);
+  }, []);
+  const handleDropNode = useCallback(
+    (targetPath: string, position: DragPosition) => {
+      if (!draggedPath || draggedPath === targetPath) {
+        return;
+      }
+
+      onReorderNodes(draggedPath, targetPath, position);
+      setDraggedPath(null);
+    },
+    [draggedPath, onReorderNodes],
+  );
 
   const handleConfirmDelete = () => {
     if (nodeToDelete) {
@@ -461,23 +511,16 @@ export const Sidebar = ({
                     isExpanded={entry.isExpanded}
                     pinnedPaths={pinnedPaths}
                     onOpenFile={onOpenFile}
-                    onRequestRemoveFolder={(folder) => setFolderToRemove(folder)}
+                    onRequestRemoveFolder={handleRequestRemoveFolder}
                     onRevealInFinder={onRevealInFinder}
-                    onRequestDelete={(node) => setNodeToDelete(node)}
+                    onRequestDelete={handleRequestDelete}
                     onRenameFile={onRenameFile}
                     onToggleFavoriteFile={onToggleFavoriteFile}
                     onToggleFolder={onToggleFolder}
                     onTogglePinnedFile={onTogglePinnedFile}
                     draggable
                     onDragStartTopLevel={setDraggedPath}
-                    onDropNode={(targetPath, position) => {
-                      if (!draggedPath || draggedPath === targetPath) {
-                        return;
-                      }
-
-                      onReorderNodes(draggedPath, targetPath, position);
-                      setDraggedPath(null);
-                    }}
+                    onDropNode={handleDropNode}
                   />
                 ))}
               </div>

@@ -73,13 +73,21 @@ export type SidebarState = {
   expandedFolders: string[];
 };
 
+export type EditorPreferences = {
+  focusMode: boolean;
+  readingMode: boolean;
+};
+
 export type AppSettings = {
   defaultWorkspacePath: string;
   themeId: string;
   themeMode: ThemeMode;
   recentFiles: string[];
+  pinnedFiles: string[];
+  favoriteFiles: string[];
   shortcuts: ShortcutSetting[];
   sidebar: SidebarState;
+  editorPreferences: EditorPreferences;
   autoOpenPDF: boolean;
 };
 

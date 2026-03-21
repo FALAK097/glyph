@@ -4,10 +4,11 @@ import type { DragEvent, MouseEvent, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { getDisplayFileName } from "@/lib/paths";
+import { getDisplayFileName, isSamePath } from "@/lib/paths";
 
 import {
   ChevronRightIcon,
+  CheckCircleIcon,
   FileIcon,
   FolderIcon,
   MoreVerticalIcon,
@@ -28,9 +29,14 @@ export const SidebarTreeNode = ({
   activePath,
   depth,
   isExpanded,
+  folderRevealLabel,
+  pinnedPaths,
+  favoritePaths,
   onOpenFile,
   onRequestRemoveFolder,
   onRevealInFinder,
+  onTogglePinnedFile,
+  onToggleFavoriteFile,
   onRequestDelete,
   onRenameFile,
   onToggleFolder,
@@ -48,14 +54,21 @@ export const SidebarTreeNode = ({
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const displayFileName = useMemo(() => getDisplayFileName(node.name), [node.name]);
   const isFolderExpanded = isExpanded ?? localIsExpanded;
+  const revealLabel = folderRevealLabel;
+  const pinnedPathList = pinnedPaths ?? [];
+  const favoritePathList = favoritePaths ?? [];
+  const isPinned = pinnedPathList.some((path) => isSamePath(path, node.path));
+  const isFavorite = favoritePathList.some((path) => isSamePath(path, node.path));
+  const pinLabel = isPinned ? "Unpin note" : "Pin note";
+  const favoriteLabel = isFavorite ? "Remove from favorites" : "Add to favorites";
 
   const containerClassName = useMemo(() => {
     if (dropPosition === "before") {
-      return "border-t-2 border-primary";
+      return "border-t-2 border-primary/70 bg-primary/5 ring-1 ring-primary/20";
     }
 
     if (dropPosition === "after") {
-      return "border-b-2 border-primary";
+      return "border-b-2 border-primary/70 bg-primary/5 ring-1 ring-primary/20";
     }
 
     return "border-transparent";
@@ -94,6 +107,24 @@ export const SidebarTreeNode = ({
       setMenuCoords({ top: rect.bottom + 4, left: rect.right + 4 });
     }
     setShowMenu((prev) => !prev);
+  };
+
+  const handleTogglePinnedFile = () => {
+    if (!onTogglePinnedFile) {
+      return;
+    }
+
+    onTogglePinnedFile(node.path);
+    setShowMenu(false);
+  };
+
+  const handleToggleFavoriteFile = () => {
+    if (!onToggleFavoriteFile) {
+      return;
+    }
+
+    onToggleFavoriteFile(node.path);
+    setShowMenu(false);
   };
 
   const dragHandlers = draggable
@@ -156,9 +187,12 @@ export const SidebarTreeNode = ({
 
   if (node.type === "directory") {
     return (
-      <div className={`relative mb-1 border-transparent ${containerClassName}`} {...dragHandlers}>
+      <div
+        className={`relative mb-1 rounded-xl border border-transparent transition-all duration-150 ease-out ${containerClassName}`}
+        {...dragHandlers}
+      >
         <div
-          className="group/folder-row mx-1 flex min-w-0 items-center rounded-md text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+          className="group/folder-row mx-1 flex min-w-0 items-center rounded-lg border border-transparent text-sidebar-foreground transition-all duration-150 ease-out hover:border-sidebar-accent/20 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground focus-within:border-sidebar-accent/30 focus-within:bg-sidebar-accent/50"
           style={{
             paddingLeft: `${depth * 14 + 6}px`,
             paddingRight: "4px",
@@ -230,7 +264,7 @@ export const SidebarTreeNode = ({
                     <MoreVerticalIcon size={14} />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="right">Options</TooltipContent>
+                <TooltipContent side="right">Folder actions</TooltipContent>
               </Tooltip>
             </div>
           ) : null}
@@ -247,6 +281,11 @@ export const SidebarTreeNode = ({
                 onOpenFile={onOpenFile}
                 onRequestRemoveFolder={onRequestRemoveFolder}
                 onRevealInFinder={onRevealInFinder}
+                folderRevealLabel={folderRevealLabel}
+                pinnedPaths={pinnedPaths}
+                favoritePaths={favoritePaths}
+                onTogglePinnedFile={onTogglePinnedFile}
+                onToggleFavoriteFile={onToggleFavoriteFile}
                 onRequestDelete={onRequestDelete}
                 onRenameFile={onRenameFile}
                 onToggleFolder={onToggleFolder}
@@ -269,7 +308,7 @@ export const SidebarTreeNode = ({
               type="button"
             >
               <RevealInFolderIcon size={14} className="shrink-0 opacity-70" />
-              Open in Finder
+              {revealLabel}
             </Button>
             <Button
               variant="ghost"
@@ -298,14 +337,14 @@ export const SidebarTreeNode = ({
 
   return (
     <div
-      className={`group/file-row relative mb-0.5 flex min-w-0 items-center overflow-hidden border-transparent ${containerClassName}`}
+      className={`group/file-row relative mb-0.5 flex min-w-0 items-center overflow-hidden rounded-xl border border-transparent transition-all duration-150 ease-out ${containerClassName}`}
       {...dragHandlers}
     >
       <div
         className={`mx-1 flex min-w-0 flex-1 cursor-pointer items-center rounded-md transition-colors ${
           activePath === node.path
-            ? "bg-sidebar-accent text-sidebar-accent-foreground"
-            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-accent/30"
+            : "text-sidebar-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-within:bg-sidebar-accent/70 focus-within:text-sidebar-accent-foreground"
         }`}
         style={{
           paddingLeft: `${depth * 14 + 8}px`,
@@ -314,6 +353,9 @@ export const SidebarTreeNode = ({
           paddingBottom: "6px",
         }}
       >
+        {activePath === node.path ? (
+          <span className="mr-2 h-5 w-1 rounded-full bg-sidebar-accent-foreground/80" aria-hidden="true" />
+        ) : null}
         <FileIcon
           size={12}
           className={`mr-2 shrink-0 transition-colors ${
@@ -350,6 +392,16 @@ export const SidebarTreeNode = ({
             {displayFileName}
           </Button>
         )}
+        {isPinned ? (
+          <span className="ml-2 rounded-full border border-sidebar-accent/30 bg-sidebar-accent/60 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.16em] text-sidebar-accent-foreground">
+            Pinned
+          </span>
+        ) : null}
+        {isFavorite ? (
+          <span className="ml-1 rounded-full border border-border/60 bg-background/70 px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+            Favorite
+          </span>
+        ) : null}
         {!isRenaming ? (
           <div className="relative ml-1 shrink-0">
             <Tooltip>
@@ -364,8 +416,8 @@ export const SidebarTreeNode = ({
                 >
                   <MoreVerticalIcon size={14} />
                 </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right">Options</TooltipContent>
+                </TooltipTrigger>
+              <TooltipContent side="right">Note actions</TooltipContent>
             </Tooltip>
           </div>
         ) : null}
@@ -373,6 +425,60 @@ export const SidebarTreeNode = ({
 
       {renderMenu(
         <>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
+            onClick={(event) => {
+              event.stopPropagation();
+              onOpenFile(node.path);
+              setShowMenu(false);
+            }}
+            type="button"
+          >
+            <FileIcon size={14} className="opacity-70" />
+            Open
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
+            onClick={(event) => {
+              event.stopPropagation();
+              onRevealInFinder(node.path);
+              setShowMenu(false);
+            }}
+            type="button"
+          >
+            <RevealInFolderIcon size={14} className="opacity-70" />
+            {revealLabel}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
+            onClick={(event) => {
+              event.stopPropagation();
+              handleTogglePinnedFile();
+            }}
+            type="button"
+          >
+            <PencilIcon size={14} className="opacity-70" />
+            {pinLabel}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
+            onClick={(event) => {
+              event.stopPropagation();
+              handleToggleFavoriteFile();
+            }}
+            type="button"
+          >
+            <CheckCircleIcon size={14} className="opacity-70" />
+            {favoriteLabel}
+          </Button>
           <Button
             variant="ghost"
             size="sm"

@@ -89,8 +89,8 @@ export const CommandPalette = ({
           <Input
             ref={inputRef}
             className="border-0 bg-transparent shadow-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/50 h-10"
-            aria-label="Search files, commands, and sessions"
-            placeholder="Search files, commands, and sessions…"
+            aria-label="Search notes, headings, commands, and history"
+            placeholder="Search notes, headings, commands, and history…"
             value={query}
             onChange={(event) => onChangeQuery(event.target.value)}
             onKeyDown={(event) => {
@@ -131,7 +131,7 @@ export const CommandPalette = ({
         >
           {items.length === 0 ? (
             <div className="py-12 text-center text-sm text-muted-foreground">
-              <p>No results found.</p>
+              <p>No matching notes or commands.</p>
             </div>
           ) : (
             <div className="px-2 pt-1 pb-2">
@@ -180,16 +180,9 @@ export const CommandPalette = ({
                           ) : null}
                         </div>
                         {item.shortcut ? (
-                          <div className="flex gap-1 pl-3 flex-shrink-0">
-                            {item.shortcut.split("").map((char, i) => (
-                              <kbd
-                                key={`${item.id}:${i}`}
-                                className="px-1.5 py-0.5 text-[10px] font-medium bg-muted/40 border border-border/40 rounded text-muted-foreground"
-                              >
-                                {char}
-                              </kbd>
-                            ))}
-                          </div>
+                          <kbd className="ml-3 shrink-0 rounded border border-border/40 bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                            {item.shortcut}
+                          </kbd>
                         ) : null}
                       </Button>
                     ))}

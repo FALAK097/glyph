@@ -28,6 +28,8 @@ type WorkspaceState = {
   setError: (message: string | null) => void;
   // Navigation history methods
   pushHistory: (filePath: string) => void;
+  replaceHistoryPath: (oldPath: string, newPath: string) => void;
+  removeHistoryPath: (targetPath: string) => void;
   canGoBack: () => boolean;
   canGoForward: () => boolean;
   goBack: () => string | null;
@@ -106,6 +108,28 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return {
         navigationHistory: newHistory,
         navigationIndex: newHistory.length - 1,
+      };
+    });
+  },
+  replaceHistoryPath: (oldPath, newPath) => {
+    set((state) => ({
+      navigationHistory: state.navigationHistory.map((entry) => (entry === oldPath ? newPath : entry)),
+    }));
+  },
+  removeHistoryPath: (targetPath) => {
+    set((state) => {
+      const nextHistory = state.navigationHistory.filter((entry) => entry !== targetPath);
+
+      if (nextHistory.length === state.navigationHistory.length) {
+        return state;
+      }
+
+      return {
+        navigationHistory: nextHistory,
+        navigationIndex:
+          nextHistory.length === 0
+            ? -1
+            : Math.min(state.navigationIndex, nextHistory.length - 1),
       };
     });
   },

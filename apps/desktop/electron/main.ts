@@ -457,10 +457,16 @@ function getDefaultSettings(): AppSettings {
     themeId: "aura",
     themeMode: "light",
     recentFiles: [],
+    pinnedFiles: [],
+    favoriteFiles: [],
     shortcuts: DEFAULT_SHORTCUTS,
     sidebar: {
       items: [],
       expandedFolders: [],
+    },
+    editorPreferences: {
+      focusMode: false,
+      readingMode: false,
     },
     autoOpenPDF: true,
   };
@@ -494,6 +500,21 @@ function isThemeMode(value: unknown): value is AppSettings["themeMode"] {
 
 function normalizeShortcutSettings(shortcuts: AppSettings["shortcuts"] | undefined) {
   return mergeShortcutSettings(shortcuts).map(({ id, keys }) => ({ id, keys }));
+}
+
+function normalizePersistedFileList(input: unknown) {
+  return Array.isArray(input)
+    ? input.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    : [];
+}
+
+function normalizeEditorPreferences(
+  input: Partial<AppSettings["editorPreferences"]> | undefined,
+): AppSettings["editorPreferences"] {
+  return {
+    focusMode: typeof input?.focusMode === "boolean" ? input.focusMode : false,
+    readingMode: typeof input?.readingMode === "boolean" ? input.readingMode : false,
+  };
 }
 
 function validateShortcutSettings(shortcuts: AppSettings["shortcuts"]) {
@@ -622,15 +643,21 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
   const candidate = input as Partial<AppSettings>;
 
   let validRecentFiles: string[] = [];
-  if (Array.isArray(candidate.recentFiles)) {
-    for (const filePath of candidate.recentFiles) {
-      if (typeof filePath === "string") {
-        try {
-          await fs.access(filePath);
-          validRecentFiles.push(filePath);
-        } catch {
-          // Skip files that don't exist or can't be accessed
-        }
+  const validPinnedFiles: string[] = [];
+  const validFavoriteFiles: string[] = [];
+  const persistedFileGroups = [
+    [normalizePersistedFileList(candidate.recentFiles), validRecentFiles],
+    [normalizePersistedFileList(candidate.pinnedFiles), validPinnedFiles],
+    [normalizePersistedFileList(candidate.favoriteFiles), validFavoriteFiles],
+  ] as const;
+
+  for (const [inputPaths, target] of persistedFileGroups) {
+    for (const filePath of inputPaths) {
+      try {
+        await fs.access(filePath);
+        target.push(filePath);
+      } catch {
+        // Skip files that don't exist or can't be accessed.
       }
     }
   }
@@ -676,6 +703,8 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
         : defaults.themeId,
     themeMode: isThemeMode(candidate.themeMode) ? candidate.themeMode : defaults.themeMode,
     recentFiles: validRecentFiles,
+    pinnedFiles: Array.from(new Set(validPinnedFiles)),
+    favoriteFiles: Array.from(new Set(validFavoriteFiles)),
     shortcuts: Array.isArray(candidate.shortcuts)
       ? normalizeShortcutSettings(
           candidate.shortcuts.filter(
@@ -688,6 +717,7 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
       items: validSidebarItems,
       expandedFolders: Array.from(new Set(validExpandedFolders)),
     },
+    editorPreferences: normalizeEditorPreferences(candidate.editorPreferences),
     autoOpenPDF:
       typeof candidate.autoOpenPDF === "boolean" ? candidate.autoOpenPDF : defaults.autoOpenPDF,
   };
@@ -722,7 +752,7 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
 
   if ("themeMode" in candidate) {
     if (!isThemeMode(candidate.themeMode)) {
-      throw new Error("themeMode must be 'light' or 'dark'.");
+      throw new Error("themeMode must be 'light', 'dark', or 'system'.");
     }
 
     nextPatch.themeMode = candidate.themeMode;
@@ -737,6 +767,28 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
     }
 
     nextPatch.recentFiles = candidate.recentFiles;
+  }
+
+  if ("pinnedFiles" in candidate) {
+    if (
+      !Array.isArray(candidate.pinnedFiles) ||
+      candidate.pinnedFiles.some((entry) => typeof entry !== "string")
+    ) {
+      throw new Error("pinnedFiles must be an array of strings.");
+    }
+
+    nextPatch.pinnedFiles = candidate.pinnedFiles;
+  }
+
+  if ("favoriteFiles" in candidate) {
+    if (
+      !Array.isArray(candidate.favoriteFiles) ||
+      candidate.favoriteFiles.some((entry) => typeof entry !== "string")
+    ) {
+      throw new Error("favoriteFiles must be an array of strings.");
+    }
+
+    nextPatch.favoriteFiles = candidate.favoriteFiles;
   }
 
   if ("shortcuts" in candidate) {
@@ -762,6 +814,20 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
     nextPatch.sidebar = normalizeSidebarState(candidate.sidebar as Partial<AppSettings["sidebar"]>);
   }
 
+  if ("editorPreferences" in candidate) {
+    if (
+      !candidate.editorPreferences ||
+      typeof candidate.editorPreferences !== "object" ||
+      Array.isArray(candidate.editorPreferences)
+    ) {
+      throw new Error("editorPreferences must be an object.");
+    }
+
+    nextPatch.editorPreferences = normalizeEditorPreferences(
+      candidate.editorPreferences as Partial<AppSettings["editorPreferences"]>,
+    );
+  }
+
   if ("autoOpenPDF" in candidate) {
     if (typeof candidate.autoOpenPDF !== "boolean") {
       throw new Error("autoOpenPDF must be a boolean.");
@@ -777,8 +843,11 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
         "themeId",
         "themeMode",
         "recentFiles",
+        "pinnedFiles",
+        "favoriteFiles",
         "shortcuts",
         "sidebar",
+        "editorPreferences",
         "autoOpenPDF",
       ].includes(key),
   );

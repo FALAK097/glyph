@@ -1,5 +1,6 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
+import type { BreadcrumbItem, NoteShortcutItem, OutlineItem } from "@/types/navigation";
 import type { DragPosition, SidebarTopLevelNode } from "@/types/sidebar";
 
 import { getShortcutDisplay, matchShortcut, mergeShortcutSettings } from "@/shared/shortcuts";
@@ -18,7 +19,9 @@ import { useWorkspaceStore } from "@/store/workspace";
 import { applyTheme } from "@/theme/themes";
 
 import { getErrorMessage } from "@/lib/errors";
+import { buildBreadcrumbs, extractMarkdownOutline } from "@/lib/note-navigation";
 import { isFileInsideWorkspace, isPathInside, isSamePath, normalizePath } from "@/lib/paths";
+import { getFolderRevealLabel } from "@/lib/platform";
 import {
   orderSidebarNodes,
   removeSidebarPath,
@@ -42,6 +45,8 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     isSaving,
     lastSavedAt,
     error,
+    navigationHistory,
+    navigationIndex,
     setWorkspace,
     setTree,
     setActiveFile,
@@ -52,6 +57,8 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     setSaving,
     setError,
     pushHistory,
+    replaceHistoryPath,
+    removeHistoryPath,
     canGoBack,
     canGoForward,
     goBack,
@@ -71,6 +78,10 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
   const [sidebarNodes, setSidebarNodes] = useState<DirectoryNode[]>([]);
   const [expandedFolderPaths, setExpandedFolderPaths] = useState<string[]>([]);
   const [hasHydratedSidebar, setHasHydratedSidebar] = useState(false);
+  const [outlineJumpRequest, setOutlineJumpRequest] = useState<{
+    id: string;
+    nonce: number;
+  } | null>(null);
   const draftFileCreationRef = useRef<Promise<FileDocument | null> | null>(null);
   const deferredPaletteQuery = useDeferredValue(paletteQuery);
 
@@ -80,6 +91,21 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     return text ? text.split(/\s+/).length : 0;
   }, [draftContent]);
   const readingTime = Math.max(1, Math.round(wordCount / 200));
+  const outlineItems = useMemo<OutlineItem[]>(() => extractMarkdownOutline(draftContent), [draftContent]);
+  const breadcrumbs = useMemo<BreadcrumbItem[]>(
+    () => buildBreadcrumbs(activeFile?.path ?? null, rootPath),
+    [activeFile?.path, rootPath],
+  );
+  const editorPreferences = settings?.editorPreferences;
+  const isFocusMode = editorPreferences?.focusMode ?? false;
+  const isReadingMode = editorPreferences?.readingMode ?? false;
+  const folderRevealLabel = getFolderRevealLabel(appInfo?.platform);
+  const isActiveFilePinned = activeFile
+    ? (settings?.pinnedFiles ?? []).some((filePath) => isSamePath(filePath, activeFile.path))
+    : false;
+  const isActiveFileFavorite = activeFile
+    ? (settings?.favoriteFiles ?? []).some((filePath) => isSamePath(filePath, activeFile.path))
+    : false;
 
   const visibleSidebarNodes = useMemo<SidebarTopLevelNode[]>(() => {
     const expanded = new Set(expandedFolderPaths.map((p) => normalizePath(p).toLowerCase()));
@@ -120,15 +146,18 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
   );
 
   const syncOpenedFile = useCallback(
-    async (file: FileDocument) => {
+    async (file: FileDocument, options?: { recordHistory?: boolean }) => {
       setActiveFile(file);
       setIsWorkspaceMode(isFileInsideWorkspace(file.path, rootPath));
       setSidebarNodes((prev) => upsertSidebarFile(prev, file));
       const nextSettings = await glyph.getSettings();
       setSettings(nextSettings);
       setIsPaletteOpen(false);
+      if (options?.recordHistory) {
+        pushHistory(file.path);
+      }
     },
-    [rootPath, setActiveFile, glyph],
+    [rootPath, setActiveFile, glyph, pushHistory],
   );
 
   useEffect(() => {
@@ -171,6 +200,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
           }
           const file = await glyph.readFile(target.path);
           setActiveFile(file);
+          pushHistory(file.path);
           setIsWorkspaceMode(
             Boolean(workspace && isFileInsideWorkspace(file.path, workspace.rootPath)),
           );
@@ -195,7 +225,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     };
 
     void boot();
-  }, [restoreSidebarNodes, setActiveFile, setWorkspace, glyph]);
+  }, [pushHistory, restoreSidebarNodes, setActiveFile, setWorkspace, glyph]);
 
   useEffect(
     () =>
@@ -215,7 +245,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
         }
       } else {
         const file = await glyph.readFile(target.path);
-        await syncOpenedFile(file);
+        await syncOpenedFile(file, { recordHistory: true });
       }
     });
   }, [syncOpenedFile, syncWorkspace, glyph]);
@@ -322,6 +352,86 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     [glyph],
   );
 
+  const syncTrackedPaths = useCallback(
+    async (oldPath: string, nextPath?: string) => {
+      if (!settings) {
+        return;
+      }
+
+      const remap = (entries: string[]) =>
+        Array.from(
+          new Set(
+            entries.flatMap((entry) => {
+              if (!isSamePath(entry, oldPath)) {
+                return [entry];
+              }
+
+              return nextPath ? [nextPath] : [];
+            }),
+          ),
+        );
+
+      await saveSettings({
+        recentFiles: remap(settings.recentFiles),
+        pinnedFiles: remap(settings.pinnedFiles),
+        favoriteFiles: remap(settings.favoriteFiles),
+      });
+    },
+    [saveSettings, settings],
+  );
+  const togglePinnedFile = useCallback(
+    async (filePath: string) => {
+      const current = settings?.pinnedFiles ?? [];
+      const nextPinnedFiles = current.some((entry) => isSamePath(entry, filePath))
+        ? current.filter((entry) => !isSamePath(entry, filePath))
+        : [filePath, ...current.filter((entry) => !isSamePath(entry, filePath))].slice(0, 12);
+
+      await saveSettings({ pinnedFiles: nextPinnedFiles });
+    },
+    [saveSettings, settings?.pinnedFiles],
+  );
+
+  const toggleFavoriteFile = useCallback(
+    async (filePath: string) => {
+      const current = settings?.favoriteFiles ?? [];
+      const nextFavoriteFiles = current.some((entry) => isSamePath(entry, filePath))
+        ? current.filter((entry) => !isSamePath(entry, filePath))
+        : [filePath, ...current.filter((entry) => !isSamePath(entry, filePath))].slice(0, 24);
+
+      await saveSettings({ favoriteFiles: nextFavoriteFiles });
+    },
+    [saveSettings, settings?.favoriteFiles],
+  );
+
+  const toggleFocusMode = useCallback(async () => {
+    await saveSettings({
+      editorPreferences: {
+        focusMode: !isFocusMode,
+        readingMode: isReadingMode,
+      },
+    });
+  }, [isFocusMode, isReadingMode, saveSettings]);
+
+  const toggleReadingMode = useCallback(async () => {
+    await saveSettings({
+      editorPreferences: {
+        focusMode: isFocusMode,
+        readingMode: !isReadingMode,
+      },
+    });
+  }, [isFocusMode, isReadingMode, saveSettings]);
+
+  const requestOutlineJump = useCallback((id: string) => {
+    setOutlineJumpRequest({
+      id,
+      nonce: Date.now(),
+    });
+  }, []);
+
+  const clearOutlineJumpRequest = useCallback(() => {
+    setOutlineJumpRequest(null);
+  }, []);
+
   useEffect(() => {
     if (!settings || !hasHydratedSidebar) {
       return;
@@ -339,10 +449,9 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
   const openFile = useCallback(
     async (filePath: string) => {
       const file = await glyph.readFile(filePath);
-      await syncOpenedFile(file);
-      pushHistory(filePath);
+      await syncOpenedFile(file, { recordHistory: true });
     },
-    [syncOpenedFile, glyph, pushHistory],
+    [syncOpenedFile, glyph],
   );
 
   const createNote = useCallback(async () => {
@@ -358,8 +467,16 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     setSidebarNodes((prev) => upsertSidebarFile(prev, file));
     const nextSettings = await glyph.getSettings();
     setSettings(nextSettings);
+    pushHistory(file.path);
     setIsPaletteOpen(false);
-  }, [isWorkspaceMode, rootPath, setActiveFile, settings?.defaultWorkspacePath, glyph]);
+  }, [
+    glyph,
+    isWorkspaceMode,
+    pushHistory,
+    rootPath,
+    setActiveFile,
+    settings?.defaultWorkspacePath,
+  ]);
 
   const ensureActiveDraftFile = useCallback(async () => {
     if (activeFile) {
@@ -382,6 +499,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
       setSidebarNodes((prev) => upsertSidebarFile(prev, file));
       const nextSettings = await glyph.getSettings();
       setSettings(nextSettings);
+      pushHistory(file.path);
       return file;
     })();
 
@@ -397,6 +515,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     attachActiveFile,
     glyph,
     isWorkspaceMode,
+    pushHistory,
     rootPath,
     settings?.defaultWorkspacePath,
   ]);
@@ -435,6 +554,8 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
       try {
         await glyph.deleteFile(filePath);
         setSidebarNodes((prev) => removeSidebarPath(prev, filePath));
+        removeHistoryPath(filePath);
+        await syncTrackedPaths(filePath);
 
         if (activeFile?.path === filePath) {
           setActiveFile(null);
@@ -443,7 +564,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
         setError(err instanceof Error ? err.message : "Failed to delete file");
       }
     },
-    [activeFile?.path, setActiveFile, setError, glyph],
+    [activeFile?.path, glyph, removeHistoryPath, setActiveFile, setError, syncTrackedPaths],
   );
 
   const revealInFinder = useCallback(
@@ -451,10 +572,10 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
       try {
         await glyph.revealInFinder(targetPath);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to open in Finder");
+        setError(err instanceof Error ? err.message : `Failed to ${folderRevealLabel.toLowerCase()}`);
       }
     },
-    [setError, glyph],
+    [folderRevealLabel, glyph, setError],
   );
 
   const handleRenameFile = useCallback(
@@ -468,6 +589,8 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
         setSidebarNodes((prev) =>
           upsertSidebarFile(renameSidebarFile(prev, filePath, renamedFile), renamedFile),
         );
+        replaceHistoryPath(filePath, renamedFile.path);
+        await syncTrackedPaths(filePath, renamedFile.path);
         if (activeFile?.path === filePath) {
           setActiveFile(renamedFile);
         }
@@ -475,7 +598,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
         setError(err instanceof Error ? err.message : "Failed to rename file");
       }
     },
-    [activeFile?.path, setActiveFile, setError, glyph],
+    [activeFile?.path, glyph, replaceHistoryPath, setActiveFile, setError, syncTrackedPaths],
   );
 
   const handleRemoveFolder = useCallback(
@@ -532,7 +655,9 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
         kind: "command",
         onSelect: async () => {
           const file = await glyph.openDocument();
-          if (file) await syncOpenedFile(file);
+          if (file) {
+            await syncOpenedFile(file, { recordHistory: true });
+          }
           setIsPaletteOpen(false);
         },
       },
@@ -589,6 +714,58 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
         },
       },
       {
+        id: "toggle-focus-mode",
+        title: isFocusMode ? "Exit Focus Mode" : "Enter Focus Mode",
+        subtitle: "Hide navigation and keep the note centered",
+        section: "View",
+        kind: "command",
+        onSelect: () => {
+          void toggleFocusMode();
+          setIsPaletteOpen(false);
+        },
+      },
+      {
+        id: "toggle-reading-mode",
+        title: isReadingMode ? "Exit Reading Mode" : "Enter Reading Mode",
+        subtitle: "Switch between editing and distraction-free reading",
+        section: "View",
+        kind: "command",
+        onSelect: () => {
+          void toggleReadingMode();
+          setIsPaletteOpen(false);
+        },
+      },
+      ...(activeFile
+        ? [
+            {
+              id: "pin-note",
+              title: isActiveFilePinned ? "Unpin Current Note" : "Pin Current Note",
+              subtitle: isActiveFilePinned
+                ? "Remove it from quick access"
+                : "Keep it near the top of the sidebar",
+              section: "Note",
+              kind: "command" as const,
+              onSelect: () => {
+                void togglePinnedFile(activeFile.path);
+                setIsPaletteOpen(false);
+              },
+            },
+            {
+              id: "favorite-note",
+              title: isActiveFileFavorite ? "Unfavorite Current Note" : "Favorite Current Note",
+              subtitle: isActiveFileFavorite
+                ? "Remove it from favorites"
+                : "Keep it in your favorites section",
+              section: "Note",
+              kind: "command" as const,
+              onSelect: () => {
+                void toggleFavoriteFile(activeFile.path);
+                setIsPaletteOpen(false);
+              },
+            },
+          ]
+        : []),
+      {
         id: "theme-light",
         title: "Theme: Light",
         subtitle: "Switch to light mode",
@@ -623,13 +800,22 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
       },
     ],
     [
+      activeFile,
       createNote,
+      isActiveFileFavorite,
+      isActiveFilePinned,
+      isFocusMode,
+      isReadingMode,
       navigateBack,
       navigateForward,
       saveSettings,
       shortcuts,
       syncOpenedFile,
       syncWorkspace,
+      toggleFavoriteFile,
+      toggleFocusMode,
+      togglePinnedFile,
+      toggleReadingMode,
       glyph,
     ],
   );
@@ -667,12 +853,139 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     return result;
   }, [files, sidebarNodes]);
 
+  const noteShortcutLookup = useMemo(() => {
+    const lookup = new Map<string, NoteShortcutItem>();
+
+    for (const file of allSearchableFiles) {
+      lookup.set(file.path, {
+        path: file.path,
+        title: file.name.replace(/\.(md|mdx|markdown)$/i, ""),
+        subtitle: file.relativePath,
+      });
+    }
+
+    if (activeFile && !lookup.has(activeFile.path)) {
+      lookup.set(activeFile.path, {
+        path: activeFile.path,
+        title: activeFile.name.replace(/\.(md|mdx|markdown)$/i, ""),
+        subtitle: activeFile.path,
+      });
+    }
+
+    return lookup;
+  }, [activeFile, allSearchableFiles]);
+
+  const toShortcutItems = useCallback(
+    (paths: string[], badge?: string) =>
+      paths.flatMap((targetPath) => {
+        const match = noteShortcutLookup.get(targetPath);
+        return match ? [{ ...match, badge }] : [];
+      }),
+    [noteShortcutLookup],
+  );
+
+  const recentNotes = useMemo(
+    () => toShortcutItems(settings?.recentFiles ?? [], "Recent"),
+    [settings?.recentFiles, toShortcutItems],
+  );
+  const pinnedNotes = useMemo(
+    () => toShortcutItems(settings?.pinnedFiles ?? [], "Pinned"),
+    [settings?.pinnedFiles, toShortcutItems],
+  );
+  const favoriteNotes = useMemo(
+    () => toShortcutItems(settings?.favoriteFiles ?? [], "Favorite"),
+    [settings?.favoriteFiles, toShortcutItems],
+  );
+  const previousHistoryPath =
+    navigationIndex > 0 ? navigationHistory[navigationIndex - 1] ?? null : null;
+  const nextHistoryPath =
+    navigationIndex < navigationHistory.length - 1
+      ? navigationHistory[navigationIndex + 1] ?? null
+      : null;
+  const previousHistoryItem = previousHistoryPath
+    ? noteShortcutLookup.get(previousHistoryPath) ?? null
+    : null;
+  const nextHistoryItem = nextHistoryPath ? noteShortcutLookup.get(nextHistoryPath) ?? null : null;
   const paletteItems = useMemo<CommandPaletteItem[]>(() => {
     const query = deferredPaletteQuery.trim().toLowerCase();
+    const pinnedPaletteItems = pinnedNotes.slice(0, 8).map((note) => ({
+      id: `pinned-${note.path}`,
+      title: note.title,
+      subtitle: note.subtitle,
+      hint: "Pinned",
+      section: "Pinned Notes",
+      kind: "file" as const,
+      onSelect: () => void openFile(note.path),
+    }));
+    const favoritePaletteItems = favoriteNotes.slice(0, 8).map((note) => ({
+      id: `favorite-${note.path}`,
+      title: note.title,
+      subtitle: note.subtitle,
+      hint: "Favorite",
+      section: "Favorite Notes",
+      kind: "file" as const,
+      onSelect: () => void openFile(note.path),
+    }));
+    const recentPaletteItems = recentNotes.slice(0, 6).map((note) => ({
+      id: `recent-${note.path}`,
+      title: note.title,
+      subtitle: note.subtitle,
+      hint: "Recent",
+      section: "Recent Notes",
+      kind: "file" as const,
+      onSelect: () => void openFile(note.path),
+    }));
+    const historyPaletteItems: CommandPaletteItem[] = [];
 
-    // No query: show all commands only
+    if (previousHistoryItem) {
+      historyPaletteItems.push({
+        id: `history-back-${previousHistoryItem.path}`,
+        title: previousHistoryItem.title,
+        subtitle: `Back · ${previousHistoryItem.subtitle}`,
+        hint: "Back",
+        section: "History",
+        kind: "file",
+        onSelect: () => void navigateBack(),
+      });
+    }
+
+    if (nextHistoryItem) {
+      historyPaletteItems.push({
+        id: `history-forward-${nextHistoryItem.path}`,
+        title: nextHistoryItem.title,
+        subtitle: `Forward · ${nextHistoryItem.subtitle}`,
+        hint: "Forward",
+        section: "History",
+        kind: "file",
+        onSelect: () => void navigateForward(),
+      });
+    }
+
+    const headingPaletteItems = outlineItems
+      .filter((heading) => !query || heading.title.toLowerCase().includes(query))
+      .slice(0, query ? 10 : 6)
+      .map((heading) => ({
+        id: `heading-${heading.id}`,
+        title: heading.title,
+        subtitle: `Heading · line ${heading.line}`,
+        hint: `H${heading.depth}`,
+        section: "Headings",
+        kind: "command" as const,
+        onSelect: () => {
+          requestOutlineJump(heading.id);
+          setIsPaletteOpen(false);
+        },
+      }));
+
     if (!query) {
-      return baseCommands;
+      return [
+        ...pinnedPaletteItems,
+        ...favoritePaletteItems,
+        ...historyPaletteItems,
+        ...recentPaletteItems,
+        ...headingPaletteItems,
+        ...baseCommands,
+      ];
     }
 
     const items: CommandPaletteItem[] = [];
@@ -680,6 +993,26 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     // Match commands by title only — never subtitle (prevents false positives)
     const matchedCommands = baseCommands.filter((cmd) => cmd.title.toLowerCase().includes(query));
     items.push(...matchedCommands);
+    items.push(
+      ...pinnedPaletteItems.filter(
+        (note) =>
+          note.title.toLowerCase().includes(query) || note.subtitle?.toLowerCase().includes(query),
+      ),
+    );
+    items.push(
+      ...favoritePaletteItems.filter(
+        (note) =>
+          note.title.toLowerCase().includes(query) || note.subtitle?.toLowerCase().includes(query),
+      ),
+    );
+    items.push(...historyPaletteItems);
+    items.push(
+      ...recentPaletteItems.filter(
+        (note) =>
+          note.title.toLowerCase().includes(query) || note.subtitle?.toLowerCase().includes(query),
+      ),
+    );
+    items.push(...headingPaletteItems);
 
     // Match files by name or path
     const matchingFiles = allSearchableFiles.filter(
@@ -713,7 +1046,22 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     });
 
     return items;
-  }, [allSearchableFiles, baseCommands, deferredPaletteQuery, openFile, searchResults]);
+  }, [
+    allSearchableFiles,
+    baseCommands,
+    deferredPaletteQuery,
+    favoriteNotes,
+    nextHistoryItem,
+    navigateBack,
+    navigateForward,
+    openFile,
+    outlineItems,
+    pinnedNotes,
+    previousHistoryItem,
+    recentNotes,
+    requestOutlineJump,
+    searchResults,
+  ]);
 
   // Reset query when palette closes
   useEffect(() => {
@@ -790,7 +1138,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
             case "open-file": {
               const file = await glyph.openDocument();
               if (file) {
-                await syncOpenedFile(file);
+                await syncOpenedFile(file, { recordHistory: true });
               }
               break;
             }
@@ -859,7 +1207,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
       if (command === "open-file") {
         const file = await glyph.openDocument();
         if (file) {
-          await syncOpenedFile(file);
+          await syncOpenedFile(file, { recordHistory: true });
         }
         return;
       }
@@ -961,32 +1309,47 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
   return {
     activeFile,
     appInfo,
+    breadcrumbs,
     canGoBack,
     canGoForward,
     changeShortcuts,
     changeThemeMode,
     chooseFolderAndUpdateWorkspace,
+    clearOutlineJumpRequest,
     createNote,
     draftContent,
     error,
+    favoriteNotes,
     files,
+    folderRevealLabel,
     handleDeleteFile,
     handleRemoveFolder,
     handleRenameFile,
     handleReorderNodes,
     handleToggleFolder,
+    isActiveFileFavorite,
+    isActiveFilePinned,
+    isFocusMode,
     isPaletteOpen,
+    isReadingMode,
     isSaving,
     isSettingsOpen,
     isSidebarCollapsed,
     markSaved,
     navigateBack,
     navigateForward,
+    nextHistoryItem,
     openFile,
+    outlineItems,
+    outlineJumpRequest,
     paletteItems,
     paletteQuery,
+    pinnedNotes,
+    previousHistoryItem,
     readingTime,
+    recentNotes,
     revealInFinder,
+    requestOutlineJump,
     saveSettings,
     saveStateLabel,
     selectedIndex,
@@ -997,6 +1360,10 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     setSelectedIndex,
     settings,
     shortcuts,
+    toggleFavoriteFile,
+    toggleFocusMode,
+    togglePinnedFile,
+    toggleReadingMode,
     triggerUpdateAction,
     updateState,
     updateDraftContent: handleDraftChange,

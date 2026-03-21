@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
@@ -13,6 +13,9 @@ import StarterKit from "@tiptap/starter-kit";
 import type { Editor } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { Markdown } from "tiptap-markdown";
+
+import { buildBreadcrumbs, createHeadingId } from "@/lib/note-navigation";
+import { getFolderRevealLabel } from "@/lib/platform";
 
 import { CustomCodeBlockLowlight } from "./tiptap-extension/code-block-lowlight";
 import { MarkdownShortcuts } from "./tiptap-extension/markdown-shortcuts";
@@ -31,6 +34,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 
 import { SlashCommand } from "./slash-command";
 import {
+  ArrowUpIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
   CheckCircleIcon,
@@ -49,6 +53,7 @@ import {
 } from "./icons";
 
 import type { MarkdownEditorProps, MarkdownEditorToast } from "../types/markdown-editor";
+import type { BreadcrumbItem, OutlineItem } from "@/types/navigation";
 import type { UpdateState } from "../shared/workspace";
 
 const LINK_IMAGE_PATTERN = /(!?)\[([^\]]+)\]\(([^)]+)\)$/;
@@ -146,6 +151,16 @@ type TableControlsState = {
   canDeleteTable: boolean;
 };
 
+type EditorOutlineItem = OutlineItem & {
+  pos: number;
+};
+
+type NoteViewState = {
+  scrollTop: number;
+  selectionFrom: number;
+  selectionTo: number;
+};
+
 const extractLinkAttributes = (input: string) => {
   const match = input.match(/(.+?)\s+"([^"]+)"$/);
   if (match) {
@@ -177,6 +192,44 @@ const normalizeLinkTarget = (value: string) => {
 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+function collectEditorOutline(editor: Editor): EditorOutlineItem[] {
+  const items: EditorOutlineItem[] = [];
+  const counts = new Map<string, number>();
+
+  editor.state.doc.descendants((node, pos) => {
+    if (node.type.name !== "heading") {
+      return;
+    }
+
+    const level = Number(node.attrs.level ?? 0);
+    if (level < 1 || level > 4) {
+      return;
+    }
+
+    const title = node.textContent.trim();
+    if (!title) {
+      return;
+    }
+
+    const baseId = createHeadingId(title);
+    const instanceCount = counts.get(baseId) ?? 0;
+    counts.set(baseId, instanceCount + 1);
+
+    const textBeforeHeading = editor.state.doc.textBetween(0, pos, "\n");
+    const line = textBeforeHeading ? textBeforeHeading.split("\n").length + 1 : 1;
+
+    items.push({
+      id: instanceCount === 0 ? baseId : `${baseId}-${instanceCount + 1}`,
+      depth: level,
+      title,
+      line,
+      pos: pos + 1,
+    });
+  });
+
+  return items;
+}
 
 const runMarkdownShortcutConversion = (
   nextEditor: Editor,
@@ -241,6 +294,8 @@ export const MarkdownEditor = ({
   content,
   fileName,
   filePath,
+  workspaceRootPath,
+  breadcrumbs,
   saveStateLabel,
   wordCount,
   readingTime,
@@ -261,12 +316,28 @@ export const MarkdownEditor = ({
   canGoBack,
   canGoForward,
   autoOpenPDFSetting,
+  isActiveFileFavorite,
+  isActiveFilePinned,
+  nextHistoryItem,
+  onOutlineJumpHandled,
+  onToggleFavoriteFile,
   updateState,
   onUpdateAction,
+  isFocusMode,
+  isReadingMode,
+  onToggleFocusMode,
+  onTogglePinnedFile,
+  onToggleReadingMode,
+  folderRevealLabel,
+  outlineJumpRequest,
+  previousHistoryItem,
 }: MarkdownEditorProps) => {
   const lastSyncedMarkdown = useRef(content);
   const isAutoConvertingRef = useRef(false);
+  const liveEditorRef = useRef<Editor | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const noteViewStateRef = useRef(new Map<string, NoteViewState>());
+  const previousFilePathRef = useRef<string | null>(filePath);
   const tableControlsRef = useRef<TableControlsState>({
     active: false,
     canDeleteRow: false,
@@ -315,6 +386,49 @@ export const MarkdownEditor = ({
         : "Update available";
 
   const isUpdateButtonDisabled = effectiveUpdateState?.status === "downloading";
+  const resolvedBreadcrumbs = useMemo<BreadcrumbItem[]>(
+    () => breadcrumbs ?? buildBreadcrumbs(filePath, workspaceRootPath ?? null),
+    [breadcrumbs, filePath, workspaceRootPath],
+  );
+  const breadcrumbTrail = useMemo(
+    () => resolvedBreadcrumbs.slice(0, Math.max(0, resolvedBreadcrumbs.length - 1)),
+    [resolvedBreadcrumbs],
+  );
+  const isFocusLayout = Boolean(isFocusMode);
+  const isReadingLayout = Boolean(isReadingMode);
+  const revealInFolderLabel = folderRevealLabel ?? getFolderRevealLabel(navigator.platform);
+  const editorSurfaceClassName = [
+    "tiptap-editor mx-auto max-w-[800px] px-10 py-5 pb-32 text-[15px] leading-[1.7] text-foreground outline-none",
+    "[&>p]:mb-4",
+    "[&>ul]:mb-4 [&>ol]:mb-4 [&>blockquote]:mb-4 [&>hr]:my-8",
+    "[&>pre]:mb-4 [&>pre]:rounded-lg [&>pre]:overflow-auto",
+    "[&>h1]:mt-10 [&>h1]:mb-3 [&>h1]:text-3xl [&>h1]:font-semibold [&>h1]:leading-tight",
+    "[&>h2]:mt-8 [&>h2]:mb-3 [&>h2]:text-2xl [&>h2]:font-semibold [&>h2]:leading-tight",
+    "[&>h3]:mt-7 [&>h3]:mb-2 [&>h3]:text-xl [&>h3]:font-semibold [&>h3]:leading-tight",
+    "[&>h4]:mt-6 [&>h4]:mb-2 [&>h4]:text-lg [&>h4]:font-semibold [&>h4]:leading-tight",
+    "[&>ul]:list-disc [&>ol]:list-decimal [&>ul]:pl-6 [&>ol]:pl-6",
+    "[&>ul[data-type='taskList']]:list-none [&>ul[data-type='taskList']]:pl-0",
+    "[&>ul[data-type='taskList']_li]:flex [&>ul[data-type='taskList']_li]:gap-2.5 [&>ul[data-type='taskList']_li]:items-start",
+    "[&>ul[data-type='taskList']_li>label]:inline-flex [&>ul[data-type='taskList']_li>label]:items-center [&>ul[data-type='taskList']_li>label]:mt-0.5 [&>ul[data-type='taskList']_li>label]:shrink-0 [&>ul[data-type='taskList']_li>label]:cursor-pointer",
+    "[&>ul[data-type='taskList']_li>label>input]:mt-0.5 [&>ul[data-type='taskList']_li>label>input]:cursor-pointer",
+    "[&>ul[data-type='taskList']_li>div]:flex-1",
+    "[&>blockquote]:pl-4 [&>blockquote]:border-l-2 [&>blockquote]:border-border [&>blockquote]:text-muted-foreground",
+    "[&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded-md [&_code]:bg-muted [&_code]:font-mono [&_code]:text-[0.875em]",
+    "[&>pre]:mb-4 [&>pre]:rounded-lg [&>pre]:overflow-auto",
+    "[&>pre_code]:p-0 [&>pre_code]:bg-transparent [&>pre_code]:color-inherit",
+    "[&_a]:font-medium [&_a]:underline [&_a]:underline-offset-2 [&_a]:cursor-pointer",
+    "[&_.tableWrapper]:my-5 [&_.tableWrapper]:overflow-x-auto",
+    "[&_.tableWrapper_table]:w-full [&_.tableWrapper_table]:border-collapse [&_.tableWrapper_table]:border-spacing-0 [&_.tableWrapper_table]:min-w-[440px]",
+    "[&_.tableWrapper_th]:bg-muted [&_.tableWrapper_th]:font-semibold",
+    "[&_.tableWrapper_th]:border [&_.tableWrapper_th]:border-border [&_.tableWrapper_th]:px-3 [&_.tableWrapper_th]:py-2 [&_.tableWrapper_th]:align-top",
+    "[&_.tableWrapper_td]:border [&_.tableWrapper_td]:border-border [&_.tableWrapper_td]:px-3 [&_.tableWrapper_td]:py-2 [&_.tableWrapper_td]:align-top",
+    "[&>img]:max-w-full [&>img]:h-auto [&>img]:rounded-xl",
+    isReadingLayout ? "text-[16px] leading-[1.85]" : "",
+    isReadingLayout ? "[&>p]:mb-5" : "",
+    isFocusLayout ? "max-w-[720px] px-8" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   const showToast = (title: string, description: string) => {
     if (toastTimeoutRef.current) {
@@ -326,6 +440,60 @@ export const MarkdownEditor = ({
       setToast(null);
       toastTimeoutRef.current = null;
     }, 2000);
+  };
+
+  const handleJumpToHeading = (item: EditorOutlineItem) => {
+    if (!editor) {
+      return;
+    }
+
+    editor.chain().focus().setTextSelection(item.pos).scrollIntoView().run();
+  };
+
+  const storeNoteViewState = useCallback((targetFilePath: string | null | undefined) => {
+    const nextEditor = liveEditorRef.current;
+    if (!nextEditor || !targetFilePath || !scrollContainerRef.current) {
+      return;
+    }
+
+    noteViewStateRef.current.set(targetFilePath, {
+      scrollTop: scrollContainerRef.current.scrollTop,
+      selectionFrom: nextEditor.state.selection.from,
+      selectionTo: nextEditor.state.selection.to,
+    });
+  }, []);
+
+  const restoreNoteViewState = useCallback((targetFilePath: string | null | undefined) => {
+    const nextEditor = liveEditorRef.current;
+    if (!nextEditor || !targetFilePath || !scrollContainerRef.current) {
+      return false;
+    }
+
+    const savedState = noteViewStateRef.current.get(targetFilePath);
+    if (!savedState) {
+      return false;
+    }
+
+    const maxPosition = Math.max(1, nextEditor.state.doc.content.size);
+    const selectionFrom = clamp(savedState.selectionFrom, 1, maxPosition);
+    const selectionTo = clamp(savedState.selectionTo, selectionFrom, maxPosition);
+
+    nextEditor.commands.setTextSelection({ from: selectionFrom, to: selectionTo });
+
+    window.requestAnimationFrame(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = savedState.scrollTop;
+      }
+    });
+
+    return true;
+  }, []);
+
+  const handleScrollToTop = () => {
+    scrollContainerRef.current?.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   };
 
   const clearHoveredLinkHideTimeout = () => {
@@ -492,36 +660,10 @@ export const MarkdownEditor = ({
     enableInputRules: true,
     enablePasteRules: true,
     content: content,
+    editable: !isReadingLayout,
     editorProps: {
       attributes: {
-        class: [
-          "tiptap-editor",
-          "mx-auto max-w-[800px] px-10 py-5 pb-32 text-[15px] leading-[1.7] text-foreground outline-none",
-          "[&>p]:mb-4",
-          "[&>ul]:mb-4 [&>ol]:mb-4 [&>blockquote]:mb-4 [&>hr]:my-8",
-          "[&>pre]:mb-4 [&>pre]:rounded-lg [&>pre]:overflow-auto",
-          "[&>h1]:mt-10 [&>h1]:mb-3 [&>h1]:text-3xl [&>h1]:font-semibold [&>h1]:leading-tight",
-          "[&>h2]:mt-8 [&>h2]:mb-3 [&>h2]:text-2xl [&>h2]:font-semibold [&>h2]:leading-tight",
-          "[&>h3]:mt-7 [&>h3]:mb-2 [&>h3]:text-xl [&>h3]:font-semibold [&>h3]:leading-tight",
-          "[&>h4]:mt-6 [&>h4]:mb-2 [&>h4]:text-lg [&>h4]:font-semibold [&>h4]:leading-tight",
-          "[&>ul]:list-disc [&>ol]:list-decimal [&>ul]:pl-6 [&>ol]:pl-6",
-          "[&>ul[data-type='taskList']]:list-none [&>ul[data-type='taskList']]:pl-0",
-          "[&>ul[data-type='taskList']_li]:flex [&>ul[data-type='taskList']_li]:gap-2.5 [&>ul[data-type='taskList']_li]:items-start",
-          "[&>ul[data-type='taskList']_li>label]:inline-flex [&>ul[data-type='taskList']_li>label]:items-center [&>ul[data-type='taskList']_li>label]:mt-0.5 [&>ul[data-type='taskList']_li>label]:shrink-0 [&>ul[data-type='taskList']_li>label]:cursor-pointer",
-          "[&>ul[data-type='taskList']_li>label>input]:mt-0.5 [&>ul[data-type='taskList']_li>label>input]:cursor-pointer",
-          "[&>ul[data-type='taskList']_li>div]:flex-1",
-          "[&>blockquote]:pl-4 [&>blockquote]:border-l-2 [&>blockquote]:border-border [&>blockquote]:text-muted-foreground",
-          "[&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded-md [&_code]:bg-muted [&_code]:font-mono [&_code]:text-[0.875em]",
-          "[&>pre]:mb-4 [&>pre]:rounded-lg [&>pre]:overflow-auto",
-          "[&>pre_code]:p-0 [&>pre_code]:bg-transparent [&>pre_code]:color-inherit",
-          "[&_a]:font-medium [&_a]:underline [&_a]:underline-offset-2 [&_a]:cursor-pointer",
-          "[&_.tableWrapper]:my-5 [&_.tableWrapper]:overflow-x-auto",
-          "[&_.tableWrapper_table]:w-full [&_.tableWrapper_table]:border-collapse [&_.tableWrapper_table]:border-spacing-0 [&_.tableWrapper_table]:min-w-[440px]",
-          "[&_.tableWrapper_th]:bg-muted [&_.tableWrapper_th]:font-semibold",
-          "[&_.tableWrapper_th]:border [&_.tableWrapper_th]:border-border [&_.tableWrapper_th]:px-3 [&_.tableWrapper_th]:py-2 [&_.tableWrapper_th]:align-top",
-          "[&_.tableWrapper_td]:border [&_.tableWrapper_td]:border-border [&_.tableWrapper_td]:px-3 [&_.tableWrapper_td]:py-2 [&_.tableWrapper_td]:align-top",
-          "[&>img]:max-w-full [&>img]:h-auto [&>img]:rounded-xl",
-        ].join(" "),
+        class: editorSurfaceClassName,
         spellcheck: "true",
       },
       handleClick: (_view, _pos, event) => {
@@ -593,6 +735,7 @@ export const MarkdownEditor = ({
       },
     },
     onUpdate: ({ editor: nextEditor }) => {
+      liveEditorRef.current = nextEditor;
       if (runMarkdownShortcutConversion(nextEditor, isAutoConvertingRef)) {
         return;
       }
@@ -603,19 +746,31 @@ export const MarkdownEditor = ({
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any
       const nextMarkdown = (nextEditor.storage as any).markdown.getMarkdown() as string;
       lastSyncedMarkdown.current = nextMarkdown;
+      storeNoteViewState(filePath);
       onChange(nextMarkdown);
     },
     onSelectionUpdate: ({ editor: nextEditor }) => {
+      liveEditorRef.current = nextEditor;
       refreshTableControls(nextEditor);
       refreshImageControls(nextEditor);
+      storeNoteViewState(filePath);
     },
   });
+
+  const outlineItems = useMemo<EditorOutlineItem[]>(() => {
+    if (!editor) {
+      return [];
+    }
+
+    return collectEditorOutline(editor);
+  }, [content, editor]);
 
   useEffect(() => {
     if (!editor || content === lastSyncedMarkdown.current) {
       return;
     }
 
+    liveEditorRef.current = editor;
     editor.commands.setContent(content, {
       emitUpdate: false,
     });
@@ -625,25 +780,56 @@ export const MarkdownEditor = ({
   }, [content, editor]);
 
   useEffect(() => {
+    if (!editor) {
+      return;
+    }
+
+    liveEditorRef.current = editor;
+    editor.setEditable(!isReadingLayout);
+  }, [editor, isReadingLayout]);
+
+  useEffect(() => {
     if (!filePath) {
       return;
     }
 
+    const previousFilePath = previousFilePathRef.current;
+
+    if (previousFilePath && previousFilePath !== filePath) {
+      storeNoteViewState(previousFilePath);
+    }
+
     window.requestAnimationFrame(() => {
-      if (scrollContainerRef.current) {
+      const restored = restoreNoteViewState(filePath);
+      if (!restored && scrollContainerRef.current) {
         scrollContainerRef.current.scrollTop = 0;
       }
+      previousFilePathRef.current = filePath;
     });
-  }, [filePath]);
+  }, [editor, filePath, restoreNoteViewState, storeNoteViewState]);
+
+  useEffect(() => {
+    if (!outlineJumpRequest || !editor) {
+      return;
+    }
+
+    const target = collectEditorOutline(editor).find((item) => item.id === outlineJumpRequest.id);
+    if (target) {
+      handleJumpToHeading(target);
+    }
+
+    onOutlineJumpHandled?.();
+  }, [editor, onOutlineJumpHandled, outlineJumpRequest]);
 
   useEffect(() => {
     return () => {
+      storeNoteViewState(filePath);
       clearHoveredLinkHideTimeout();
       if (toastTimeoutRef.current) {
         window.clearTimeout(toastTimeoutRef.current);
       }
     };
-  }, []);
+  }, [filePath, storeNoteViewState]);
 
   useEffect(() => {
     if (!editor) {
@@ -790,10 +976,10 @@ export const MarkdownEditor = ({
     if (filePath) {
       try {
         await navigator.clipboard.writeText(filePath);
-        showToast("Path copied to clipboard", "");
+        showToast("Note path copied", "");
       } catch (err) {
         console.error("Failed to copy path:", err);
-        showToast("Failed to copy path", "");
+        showToast("Could not copy note path", "");
       }
     }
   };
@@ -815,11 +1001,11 @@ export const MarkdownEditor = ({
       try {
         const didReveal = await window.glyph.revealInFinder(filePath);
         if (!didReveal) {
-          showToast("Could not open in Finder", "");
+          showToast("Could not reveal note", "");
         }
       } catch (err) {
-        console.error("Failed to open in Finder:", err);
-        showToast("Could not open in Finder", "");
+        console.error("Failed to reveal note:", err);
+        showToast("Could not reveal note", "");
       }
     }
   };
@@ -856,6 +1042,16 @@ export const MarkdownEditor = ({
   const isMacLike = navigator.platform.includes("Mac");
   const linkOpenShortcutHint = isMacLike ? "Open link (Cmd+Click)" : "Open link (Ctrl+Click)";
   const headerPaddingClass = isSidebarCollapsed && isMacLike ? "pl-20 pr-4" : "px-4";
+  const shouldShowOutlineRail = !isFocusLayout;
+  const shouldShowCommandPalette = Boolean(onOpenCommandPalette && !isFocusLayout);
+  const modeButtonsVisible = Boolean(onToggleFocusMode || onToggleReadingMode);
+  const breadcrumbContext = breadcrumbTrail.map((item) => item.label).join(" / ");
+  const backTooltipLabel = previousHistoryItem
+    ? `Back to ${previousHistoryItem.title} (${navigateBackShortcut ?? "⌘["})`
+    : `Back (${navigateBackShortcut ?? "⌘["})`;
+  const forwardTooltipLabel = nextHistoryItem
+    ? `Forward to ${nextHistoryItem.title} (${navigateForwardShortcut ?? "⌘]"})`
+    : `Forward (${navigateForwardShortcut ?? "⌘]"})`;
 
   return (
     <section className="relative h-full min-h-0 flex flex-col bg-background">
@@ -897,9 +1093,7 @@ export const MarkdownEditor = ({
                 <ArrowLeftIcon size={14} />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {`Back (${navigateBackShortcut ?? "⌘["})`}
-            </TooltipContent>
+            <TooltipContent side="bottom">{backTooltipLabel}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -914,9 +1108,7 @@ export const MarkdownEditor = ({
                 <ArrowRightIcon size={14} />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {`Forward (${navigateForwardShortcut ?? "⌘]"})`}
-            </TooltipContent>
+            <TooltipContent side="bottom">{forwardTooltipLabel}</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -932,25 +1124,35 @@ export const MarkdownEditor = ({
             </TooltipTrigger>
             <TooltipContent side="bottom">{`New Note (${newNoteShortcut ?? "⌘N"})`}</TooltipContent>
           </Tooltip>
-          {fileName && (
-            <>
-              <span className="text-border/60 text-xs flex-shrink-0 mx-0.5">·</span>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="text-sm font-medium text-foreground truncate max-w-[180px]">
-                    {fileName.replace(MARKDOWN_FILE_SUFFIX_PATTERN, "")}
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  {fileName.replace(MARKDOWN_FILE_SUFFIX_PATTERN, "")}
-                </TooltipContent>
-              </Tooltip>
-            </>
-          )}
+          {fileName ? (
+            <div className="flex min-w-0 flex-col justify-center gap-0.5 pl-1">
+              {breadcrumbTrail.length > 0 ? (
+                <div
+                  className="flex min-w-0 items-center gap-1 overflow-hidden text-[11px] font-medium tracking-[0.12em] text-muted-foreground"
+                  title={breadcrumbContext || filePath || fileName}
+                >
+                  {breadcrumbTrail.map((crumb, index) => (
+                    <span key={crumb.id} className="flex min-w-0 items-center gap-1">
+                      <span className="truncate">{crumb.label}</span>
+                      {index < breadcrumbTrail.length - 1 ? (
+                        <span className="text-border/70">/</span>
+                      ) : null}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              <span
+                className="max-w-[220px] truncate text-sm font-medium text-foreground"
+                title={filePath ?? fileName}
+              >
+                {fileName.replace(MARKDOWN_FILE_SUFFIX_PATTERN, "")}
+              </span>
+            </div>
+          ) : null}
         </div>
 
         {/* Center: search bar */}
-        {onOpenCommandPalette && (
+        {shouldShowCommandPalette && onOpenCommandPalette ? (
           <div className="flex-1 flex justify-center px-2 min-w-0">
             <Button
               variant="outline"
@@ -961,17 +1163,45 @@ export const MarkdownEditor = ({
             >
               <div className="flex items-center gap-2">
                 <SearchIcon size={13} className="opacity-60 flex-shrink-0" />
-                <span>Search glyph</span>
+                <span>Search notes</span>
               </div>
               <span className="font-mono text-xs opacity-50 ml-4 flex-shrink-0">
                 {commandPaletteShortcut ?? "⌘P"}
               </span>
             </Button>
           </div>
-        )}
+        ) : null}
 
         {/* Right: actions */}
         <div className="flex items-center gap-1 relative flex-shrink-0">
+          {modeButtonsVisible ? (
+            <div className="flex items-center gap-1 rounded-full border border-border/60 bg-muted/35 p-1 shadow-sm">
+              {onToggleFocusMode ? (
+                <Button
+                  variant={isFocusLayout ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-8 rounded-full px-3 text-xs font-semibold"
+                  onClick={onToggleFocusMode}
+                  aria-pressed={isFocusLayout}
+                  type="button"
+                >
+                  Focus
+                </Button>
+              ) : null}
+              {onToggleReadingMode ? (
+                <Button
+                  variant={isReadingLayout ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-8 rounded-full px-3 text-xs font-semibold"
+                  onClick={onToggleReadingMode}
+                  aria-pressed={isReadingLayout}
+                  type="button"
+                >
+                  Reading
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
           {shouldShowUpdateButton && onUpdateAction ? (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -1026,8 +1256,45 @@ export const MarkdownEditor = ({
 
           {isMenuOpen && (
             <>
-              <div className="fixed inset-0 z-40" onClick={() => setIsMenuOpen(false)} />
+              <button
+                aria-label="Close menu"
+                className="fixed inset-0 z-40 cursor-default bg-transparent outline-none"
+                onClick={() => setIsMenuOpen(false)}
+                type="button"
+              />
               <div className="absolute right-0 top-full mt-1 w-48 bg-card border border-border rounded-md shadow-lg z-50 py-1 overflow-hidden">
+                {onTogglePinnedFile ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto w-full justify-start gap-2 rounded-none px-3 py-1.5 text-sm"
+                    onClick={() => {
+                      onTogglePinnedFile();
+                      setIsMenuOpen(false);
+                    }}
+                    disabled={!filePath}
+                    type="button"
+                  >
+                    <CheckCircleIcon size={14} className="opacity-70" />
+                    {isActiveFilePinned ? "Unpin note" : "Pin note"}
+                  </Button>
+                ) : null}
+                {onToggleFavoriteFile ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto w-full justify-start gap-2 rounded-none px-3 py-1.5 text-sm"
+                    onClick={() => {
+                      onToggleFavoriteFile();
+                      setIsMenuOpen(false);
+                    }}
+                    disabled={!filePath}
+                    type="button"
+                  >
+                    <CheckCircleIcon size={14} className="opacity-70" />
+                    {isActiveFileFavorite ? "Remove favorite" : "Add favorite"}
+                  </Button>
+                ) : null}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1040,7 +1307,7 @@ export const MarkdownEditor = ({
                   type="button"
                 >
                   <CopyIcon size={14} className="opacity-70" />
-                  Copy as MD
+                  Copy as Markdown
                 </Button>
                 <Button
                   variant="ghost"
@@ -1054,7 +1321,7 @@ export const MarkdownEditor = ({
                   type="button"
                 >
                   <LinkIcon size={14} className="opacity-70" />
-                  Copy file path
+                  Copy note path
                 </Button>
                 <Button
                   variant="ghost"
@@ -1068,7 +1335,21 @@ export const MarkdownEditor = ({
                   type="button"
                 >
                   <RevealInFolderIcon size={14} className="opacity-70 shrink-0" />
-                  Open in Finder
+                  {revealInFolderLabel}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto w-full justify-start gap-2 rounded-none px-3 py-1.5 text-sm"
+                  onClick={() => {
+                    handleScrollToTop();
+                    setIsMenuOpen(false);
+                  }}
+                  disabled={!content}
+                  type="button"
+                >
+                  <ArrowUpIcon size={14} className="opacity-70" />
+                  Scroll to top
                 </Button>
                 <Button
                   variant="ghost"
@@ -1091,14 +1372,17 @@ export const MarkdownEditor = ({
       </div>
       <div
         ref={scrollContainerRef}
-        className="flex-1 min-h-0 overflow-y-auto relative [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        className={`flex-1 min-h-0 overflow-y-auto relative [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${
+          shouldShowOutlineRail ? "xl:pr-[316px]" : ""
+        }`}
         onScroll={() => {
           setImageControls(null);
           clearHoveredLinkHideTimeout();
           setHoveredLink(null);
+          storeNoteViewState(filePath);
         }}
       >
-        {tableControls.active ? (
+        {tableControls.active && !isReadingLayout ? (
           <div className="pointer-events-none absolute top-4 right-6 z-20">
             <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-2xl border border-border/70 bg-card/95 px-3 py-2 shadow-lg supports-backdrop-filter:backdrop-blur-sm">
               <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
@@ -1219,7 +1503,60 @@ export const MarkdownEditor = ({
         ) : null}
         <EditorContent editor={editor} />
       </div>
-      <div className="absolute bottom-6 right-10 flex items-center gap-3 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur-sm border border-border shadow-sm z-30 pointer-events-none">
+      {shouldShowOutlineRail ? (
+        <aside className="pointer-events-none absolute right-4 top-[72px] z-20 hidden xl:block w-[290px]">
+          <div className="pointer-events-auto flex min-h-0 flex-col rounded-2xl border border-border/60 bg-card/95 p-4 shadow-lg backdrop-blur-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Outline
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {outlineItems.length} headings
+                </p>
+              </div>
+              <Button variant="ghost" size="xs" type="button" onClick={handleScrollToTop}>
+                Top
+              </Button>
+            </div>
+            <div className="mt-4 max-h-[calc(100vh-12rem)] overflow-y-auto pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+              {outlineItems.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Add H1 to H4 headings to build a quick table of contents.
+                </p>
+              ) : (
+                <div className="space-y-1">
+                  {outlineItems.map((item) => (
+                    <Button
+                      key={item.id}
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      className="h-auto w-full justify-start rounded-xl px-3 py-2 text-left text-sm text-foreground hover:bg-muted/70"
+                      style={{
+                        paddingLeft: `${12 + (item.depth - 1) * 12}px`,
+                      }}
+                      onClick={() => handleJumpToHeading(item)}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium">{item.title}</div>
+                        <div className="mt-0.5 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                          H{item.depth} · line {item.line}
+                        </div>
+                      </div>
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </aside>
+      ) : null}
+      <div
+        className={`absolute bottom-6 flex items-center gap-3 rounded-full border border-border bg-card/80 px-3 py-1.5 shadow-sm z-30 pointer-events-none ${
+          shouldShowOutlineRail ? "xl:right-[326px]" : "right-10"
+        }`}
+      >
         <div className="flex items-center gap-2 text-muted-foreground text-xs">
           <span>{wordCount} words</span>
           <span>{readingTime} min read</span>
@@ -1240,9 +1577,10 @@ export const MarkdownEditor = ({
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="grid gap-2 text-sm">
+            <label className="grid gap-2 text-sm" htmlFor="table-rows-input">
               <span className="font-medium text-foreground">Rows</span>
               <Input
+                id="table-rows-input"
                 min={2}
                 max={12}
                 type="number"
@@ -1255,9 +1593,10 @@ export const MarkdownEditor = ({
                 }
               />
             </label>
-            <label className="grid gap-2 text-sm">
+            <label className="grid gap-2 text-sm" htmlFor="table-cols-input">
               <span className="font-medium text-foreground">Columns</span>
               <Input
+                id="table-cols-input"
                 min={1}
                 max={8}
                 type="number"
@@ -1294,9 +1633,10 @@ export const MarkdownEditor = ({
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
-            <label className="grid gap-2 text-sm">
+            <label className="grid gap-2 text-sm" htmlFor="link-label-input">
               <span className="font-medium text-foreground">Label</span>
               <Input
+                id="link-label-input"
                 value={linkForm.text}
                 onChange={(event) =>
                   setLinkForm((current) => ({
@@ -1307,9 +1647,10 @@ export const MarkdownEditor = ({
                 placeholder="Open site"
               />
             </label>
-            <label className="grid gap-2 text-sm">
+            <label className="grid gap-2 text-sm" htmlFor="link-url-input">
               <span className="font-medium text-foreground">URL</span>
               <Input
+                id="link-url-input"
                 value={linkForm.href}
                 onChange={(event) =>
                   setLinkForm((current) => ({
@@ -1344,9 +1685,10 @@ export const MarkdownEditor = ({
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4">
-            <label className="grid gap-2 text-sm">
+            <label className="grid gap-2 text-sm" htmlFor="image-alt-input">
               <span className="font-medium text-foreground">Alt text</span>
               <Input
+                id="image-alt-input"
                 value={imageForm.alt}
                 onChange={(event) =>
                   setImageForm((current) => ({
@@ -1357,9 +1699,10 @@ export const MarkdownEditor = ({
                 placeholder="Team logo"
               />
             </label>
-            <label className="grid gap-2 text-sm">
+            <label className="grid gap-2 text-sm" htmlFor="image-src-input">
               <span className="font-medium text-foreground">Image source</span>
               <Input
+                id="image-src-input"
                 value={imageForm.src}
                 onChange={(event) =>
                   setImageForm((current) => ({

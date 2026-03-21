@@ -18,20 +18,28 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     <TooltipProvider>
       <div
         className={`h-screen overflow-hidden grid transition-[grid-template-columns] duration-200 ${
-          controller.isSidebarCollapsed
+          controller.isSidebarCollapsed || controller.isFocusMode
             ? "grid-cols-[0_minmax(0,1fr)]"
             : "grid-cols-[280px_minmax(0,1fr)]"
         }`}
       >
-        {controller.isSidebarCollapsed ? (
+        {controller.isSidebarCollapsed || controller.isFocusMode ? (
           <div aria-hidden="true" className="w-0 min-w-0 overflow-hidden" />
         ) : (
           <Sidebar
             tree={controller.visibleSidebarNodes}
             activePath={controller.activeFile?.path ?? null}
             isCollapsed={controller.isSidebarCollapsed}
+            openInFolderLabel={controller.folderRevealLabel}
+            favoriteNotes={controller.favoriteNotes}
+            pinnedNotes={controller.pinnedNotes}
+            recentNotes={controller.recentNotes}
             onOpenFile={(filePath) => void controller.openFile(filePath)}
+            onOpenCommandPalette={() => controller.setIsPaletteOpen(true)}
+            onCreateNote={() => void controller.createNote()}
             onDeleteFile={controller.handleDeleteFile}
+            onToggleFavoriteFile={(filePath) => void controller.toggleFavoriteFile(filePath)}
+            onTogglePinnedFile={(filePath) => void controller.togglePinnedFile(filePath)}
             onRemoveFolder={controller.handleRemoveFolder}
             onRenameFile={controller.handleRenameFile}
             onRevealInFinder={(targetPath) => void controller.revealInFinder(targetPath)}
@@ -71,6 +79,29 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
             canGoBack={controller.canGoBack()}
             canGoForward={controller.canGoForward()}
             autoOpenPDFSetting={controller.settings?.autoOpenPDF ?? true}
+            breadcrumbs={controller.breadcrumbs}
+            folderRevealLabel={controller.folderRevealLabel}
+            isActiveFileFavorite={controller.isActiveFileFavorite}
+            isActiveFilePinned={controller.isActiveFilePinned}
+            isFocusMode={controller.isFocusMode}
+            isReadingMode={controller.isReadingMode}
+            nextHistoryItem={controller.nextHistoryItem}
+            onOutlineJumpHandled={controller.clearOutlineJumpRequest}
+            onToggleFavoriteFile={
+              controller.activeFile
+                ? () => void controller.toggleFavoriteFile(controller.activeFile!.path)
+                : undefined
+            }
+            onToggleFocusMode={() => void controller.toggleFocusMode()}
+            onTogglePinnedFile={
+              controller.activeFile
+                ? () => void controller.togglePinnedFile(controller.activeFile!.path)
+                : undefined
+            }
+            onToggleReadingMode={() => void controller.toggleReadingMode()}
+            outlineItems={controller.outlineItems}
+            outlineJumpRequest={controller.outlineJumpRequest}
+            previousHistoryItem={controller.previousHistoryItem}
             updateState={controller.updateState}
             onUpdateAction={() => void controller.triggerUpdateAction()}
           />

@@ -1,3 +1,6 @@
+import { Check, Copy, ExternalLink, Terminal } from "lucide-react";
+import { useEffect, useState } from "react";
+
 const AppleIcon = () => (
   <svg
     viewBox="0 0 384 512"
@@ -27,6 +30,16 @@ const WindowsIcon = () => (
     />
   </svg>
 );
+
+const DOWNLOAD_URLS = {
+  mac: "https://github.com/FALAK097/glyph/releases/latest/download/Glyph-mac.dmg",
+  windows: "https://github.com/FALAK097/glyph/releases/latest/download/Glyph-windows.exe",
+  releases: "https://github.com/FALAK097/glyph/releases",
+  changelog: "https://github.com/FALAK097/glyph/blob/main/CHANGELOG.md",
+  github: "https://github.com/FALAK097/glyph",
+} as const;
+
+const BREW_INSTALL_COMMAND = "brew install --cask FALAK097/glyph/glyph";
 
 type Feature = {
   eyebrow: string;
@@ -148,6 +161,31 @@ function ProductShot({ src, alt, frame = "compact" }: ProductShotProps) {
 }
 
 export function App() {
+  const [hasCopiedBrew, setHasCopiedBrew] = useState(false);
+
+  useEffect(() => {
+    if (!hasCopiedBrew) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setHasCopiedBrew(false);
+    }, 2200);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [hasCopiedBrew]);
+
+  const handleCopyBrewCommand = async () => {
+    try {
+      await navigator.clipboard.writeText(BREW_INSTALL_COMMAND);
+      setHasCopiedBrew(true);
+    } catch {
+      setHasCopiedBrew(false);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-[var(--surface-page)] text-[var(--ink-strong)] [font-family:var(--font-sans)]">
       <a
@@ -164,22 +202,40 @@ export function App() {
             aria-label="Glyph Home"
             className="brand-lockup rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 focus-visible:ring-offset-4 focus-visible:ring-offset-[var(--surface-page)]"
           >
-            <img src="/icon.png" alt="" width="238" height="218" className="brand-lockup__mark" />
-            <span className="brand-lockup__type">Glyph</span>
+            <img
+              src="/logo-wordmark-dark.png"
+              alt="Glyph"
+              width="512"
+              height="128"
+              className="brand-lockup__wordmark"
+            />
           </a>
 
-          <div className="flex w-full items-center justify-center gap-2 sm:w-auto sm:justify-end">
-            <a href="https://github.com/FALAK097/glyph/releases/latest" className="download-button">
-              <AppleIcon />
-              Download for macOS
-            </a>
-            <a
-              href="https://github.com/FALAK097/glyph/releases/latest"
-              className="download-button download-button--secondary"
-            >
-              <WindowsIcon />
-              Download for Windows
-            </a>
+          <div className="flex w-full flex-col items-center gap-2 sm:w-auto sm:items-end">
+            <div className="flex w-full items-center justify-center gap-2 sm:w-auto sm:justify-end">
+              <a href={DOWNLOAD_URLS.mac} className="download-button">
+                <AppleIcon />
+                Download for macOS
+              </a>
+              <a
+                href={DOWNLOAD_URLS.windows}
+                className="download-button download-button--secondary"
+              >
+                <WindowsIcon />
+                Download for Windows
+              </a>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[0.78rem] text-[var(--ink-soft)] sm:justify-end">
+              <a href="#install-with-homebrew" className="micro-link">
+                Install with Homebrew
+              </a>
+              <a href={DOWNLOAD_URLS.changelog} className="micro-link">
+                Changelog
+              </a>
+              <a href={DOWNLOAD_URLS.releases} className="micro-link">
+                All releases
+              </a>
+            </div>
           </div>
         </div>
       </nav>
@@ -195,9 +251,62 @@ export function App() {
             writer.
           </h1>
           <p className="hero-body mt-7 max-w-2xl text-balance">
-            Glyph strips away digital noise, leaving only your words, your folders, and a reading
-            experience built for clarity.
+            Glyph is free to use, local-first, and built around plain markdown files. It strips away
+            digital noise, leaving only your words, your folders, and a reading experience built for
+            clarity.
           </p>
+          <div className="hero-meta mt-8 flex flex-wrap items-center justify-center gap-3">
+            <span className="hero-meta__pill">Free to use</span>
+            <span className="hero-meta__pill">Local-first</span>
+            <span className="hero-meta__pill">Markdown folders, not lock-in</span>
+          </div>
+          <div
+            id="install-with-homebrew"
+            className="install-panel mt-10 w-full max-w-3xl text-left"
+          >
+            <div className="install-panel__header">
+              <div>
+                <span className="install-panel__eyebrow">Install with Homebrew</span>
+                <h2 className="install-panel__title">One command. Native-feeling setup.</h2>
+              </div>
+              <a href={DOWNLOAD_URLS.releases} className="install-panel__release-link">
+                Browse all releases
+                <ExternalLink size={14} aria-hidden="true" />
+              </a>
+            </div>
+
+            <div className="install-command-shell">
+              <div className="install-command-shell__prompt">
+                <Terminal size={16} aria-hidden="true" />
+                <span>Terminal</span>
+              </div>
+              <div className="install-command-shell__body">
+                <code>{BREW_INSTALL_COMMAND}</code>
+                <button
+                  type="button"
+                  className="install-command-shell__copy"
+                  onClick={() => void handleCopyBrewCommand()}
+                >
+                  {hasCopiedBrew ? (
+                    <>
+                      <Check size={15} aria-hidden="true" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={15} aria-hidden="true" />
+                      Copy
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <p className="install-panel__note">
+              Prefer a manual install? Use the platform download buttons above for the latest macOS
+              DMG and Windows installer, or browse the full release history and changelog.
+            </p>
+          </div>
         </div>
       </header>
 
@@ -234,7 +343,7 @@ export function App() {
                     {feature.title === "Open Source" ? (
                       <>
                         <a
-                          href="https://github.com/FALAK097/glyph"
+                          href={DOWNLOAD_URLS.github}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="footer-link"
@@ -284,6 +393,8 @@ export function App() {
         <div className="mx-auto max-w-screen-2xl px-6 py-10 text-center sm:px-8 lg:px-12">
           <div className="mx-auto mb-8 h-px max-w-4xl bg-black/10" />
           <p className="text-[0.8rem] font-medium tracking-[0.03em] text-[var(--ink-soft)]">
+            Free to use
+            <span className="px-2 text-black/25">·</span>
             Made by{" "}
             <a
               href="https://falakgala.dev"
@@ -301,6 +412,22 @@ export function App() {
               className="footer-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 focus-visible:ring-offset-4 focus-visible:ring-offset-[var(--surface-page)]"
             >
               GitHub
+            </a>
+            <span className="px-2 text-black/25">·</span>
+            <a
+              href={DOWNLOAD_URLS.changelog}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="footer-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 focus-visible:ring-offset-4 focus-visible:ring-offset-[var(--surface-page)]"
+            >
+              Changelog
+            </a>
+            <span className="px-2 text-black/25">·</span>
+            <a
+              href="#install-with-homebrew"
+              className="footer-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20 focus-visible:ring-offset-4 focus-visible:ring-offset-[var(--surface-page)]"
+            >
+              Homebrew
             </a>
           </p>
         </div>

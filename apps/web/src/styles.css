@@ -41,23 +41,14 @@ body {
 .brand-lockup {
   display: inline-flex;
   align-items: center;
-  gap: 0.8rem;
   color: var(--ink-strong);
   text-decoration: none;
 }
 
-.brand-lockup__mark {
-  width: 1.9rem;
+.brand-lockup__wordmark {
+  width: clamp(7.25rem, 6.8rem + 0.9vw, 8.4rem);
   height: auto;
-  filter: drop-shadow(0 12px 22px oklch(0.5 0.08 290 / 0.12));
-}
-
-.brand-lockup__type {
-  font-family: var(--font-display);
-  font-size: clamp(1.55rem, 1.3rem + 0.8vw, 2rem);
-  font-weight: 600;
-  letter-spacing: -0.04em;
-  line-height: 0.95;
+  display: block;
 }
 
 .download-button {
@@ -86,6 +77,29 @@ body {
   background: color-mix(in oklab, white 92%, var(--surface-page));
   color: var(--ink-strong);
   box-shadow: none;
+}
+
+.micro-link {
+  position: relative;
+  color: var(--ink-soft);
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.micro-link::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -0.12rem;
+  left: 0;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.3;
+  transform: scaleX(0.3);
+  transform-origin: left center;
+  transition:
+    transform 180ms var(--ease-out-strong),
+    opacity 180ms ease;
 }
 
 .hero-kicker {
@@ -118,6 +132,131 @@ body {
 .hero-body {
   color: var(--ink-soft);
   font-size: clamp(1.15rem, 1rem + 0.45vw, 1.6rem);
+  line-height: 1.8;
+}
+
+.hero-meta__pill {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: color-mix(in oklab, white 74%, var(--surface-page));
+  padding: 0.58rem 0.9rem;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.install-panel {
+  border: 1px solid color-mix(in oklab, var(--border-soft) 70%, white);
+  border-radius: 2rem;
+  background:
+    linear-gradient(180deg, oklch(1 0 0 / 0.65), transparent 100%),
+    color-mix(in oklab, white 64%, var(--surface-paper));
+  padding: clamp(1.45rem, 1.2rem + 0.7vw, 2.2rem);
+  box-shadow: 0 22px 60px -44px oklch(0.18 0.01 110 / 0.38);
+}
+
+.install-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.install-panel__eyebrow {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.install-panel__title {
+  margin-top: 0.7rem;
+  margin-bottom: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 1.8rem + 0.5vw, 2.6rem);
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.install-panel__release-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color 160ms ease;
+}
+
+.install-command-shell {
+  margin-top: 1.4rem;
+  overflow: hidden;
+  border: 1px solid oklch(0.83 0.01 95 / 0.75);
+  border-radius: 1.35rem;
+  background: oklch(0.25 0.012 110);
+  color: var(--ink-inverse);
+}
+
+.install-command-shell__prompt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.8rem 1rem 0;
+  color: oklch(0.86 0.005 95 / 0.72);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.install-command-shell__body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.9rem;
+  padding: 0.85rem 1rem 1rem;
+}
+
+.install-command-shell__body code {
+  overflow-x: auto;
+  color: oklch(0.96 0.003 95);
+  font-size: 0.95rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.install-command-shell__copy {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid oklch(0.45 0.012 95 / 0.45);
+  border-radius: 999px;
+  background: oklch(0.31 0.013 110);
+  padding: 0.55rem 0.85rem;
+  color: oklch(0.96 0.003 95);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 120ms var(--ease-out-strong),
+    background-color 160ms ease,
+    border-color 160ms ease;
+}
+
+.install-panel__note {
+  margin-top: 1rem;
+  margin-bottom: 0;
+  color: var(--ink-soft);
+  font-size: 0.94rem;
   line-height: 1.8;
 }
 
@@ -242,6 +381,25 @@ body {
     border-color: oklch(0.72 0.009 95 / 0.5);
   }
 
+  .micro-link:hover {
+    color: var(--ink-strong);
+  }
+
+  .micro-link:hover::after {
+    opacity: 0.85;
+    transform: scaleX(1);
+  }
+
+  .install-panel__release-link:hover {
+    color: var(--ink-strong);
+  }
+
+  .install-command-shell__copy:hover {
+    transform: translateY(-1px);
+    background: oklch(0.35 0.015 110);
+    border-color: oklch(0.58 0.014 95 / 0.55);
+  }
+
   .footer-link:hover::after {
     opacity: 0.92;
     transform: scaleX(1);
@@ -253,13 +411,23 @@ body {
 }
 
 @media (max-width: 640px) {
-  .brand-lockup__type {
-    font-size: 1.72rem;
+  .brand-lockup__wordmark {
+    width: 7rem;
   }
 
   .download-button {
     padding-inline: 0.95rem;
     font-size: 0.88rem;
+  }
+
+  .install-panel__header,
+  .install-command-shell__body {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .install-panel__release-link {
+    white-space: normal;
   }
 
   .hero-display {
@@ -278,6 +446,9 @@ body {
   }
 
   .download-button,
+  .micro-link,
+  .micro-link::after,
+  .install-command-shell__copy,
   .footer-link,
   .footer-link::after {
     transition-duration: 0ms;

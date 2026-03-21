@@ -20,6 +20,8 @@ import {
   MoreVerticalIcon as MoreVerticalSvg,
   PanelLeftIcon as HugePanelLeftIcon,
   PanelRightIcon as HugePanelRightIcon,
+  PinIcon as HugePinIcon,
+  PinOffIcon as HugePinOffIcon,
   PencilEdit02Icon as PencilEdit02Svg,
   Search01Icon as Search01Svg,
   Settings01Icon as Settings01Svg,
@@ -89,49 +91,8 @@ export const CheckCircleIcon = (props: IconProps) => (
   <HugeIcon icon={CheckmarkCircle01Svg} {...props} />
 );
 export const XIcon = (props: IconProps) => <HugeIcon icon={Cancel01Svg} {...props} />;
-
-export const PinIcon = (props: IconProps) => {
-  const svg = getSvgProps(props);
-  return (
-    <svg
-      width={svg.size}
-      height={svg.size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={svg.color}
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={svg.className}
-      aria-hidden="true"
-    >
-      <path d="M8.5 4.5h7l-1.4 5 2.9 2.9H7l2.9-2.9-1.4-5Z" />
-      <path d="M12 12.4V20" />
-    </svg>
-  );
-};
-
-export const PinOffIcon = (props: IconProps) => {
-  const svg = getSvgProps(props);
-  return (
-    <svg
-      width={svg.size}
-      height={svg.size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke={svg.color}
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={svg.className}
-      aria-hidden="true"
-    >
-      <path d="M8.5 4.5h7l-1.4 5 2.9 2.9H7l2.9-2.9-1.4-5Z" />
-      <path d="M12 12.4V20" />
-      <path d="M4.5 4.5 19.5 19.5" />
-    </svg>
-  );
-};
+export const PinIcon = (props: IconProps) => <HugeIcon icon={HugePinIcon} {...props} />;
+export const PinOffIcon = (props: IconProps) => <HugeIcon icon={HugePinOffIcon} {...props} />;
 
 export const StarIcon = (props: IconProps) => {
   const svg = getSvgProps(props);

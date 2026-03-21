@@ -91,7 +91,10 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     return text ? text.split(/\s+/).length : 0;
   }, [draftContent]);
   const readingTime = Math.max(1, Math.round(wordCount / 200));
-  const outlineItems = useMemo<OutlineItem[]>(() => extractMarkdownOutline(draftContent), [draftContent]);
+  const outlineItems = useMemo<OutlineItem[]>(
+    () => extractMarkdownOutline(draftContent),
+    [draftContent],
+  );
   const breadcrumbs = useMemo<BreadcrumbItem[]>(
     () => buildBreadcrumbs(activeFile?.path ?? null, rootPath),
     [activeFile?.path, rootPath],
@@ -572,7 +575,9 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
       try {
         await glyph.revealInFinder(targetPath);
       } catch (err) {
-        setError(err instanceof Error ? err.message : `Failed to ${folderRevealLabel.toLowerCase()}`);
+        setError(
+          err instanceof Error ? err.message : `Failed to ${folderRevealLabel.toLowerCase()}`,
+        );
       }
     },
     [folderRevealLabel, glyph, setError],
@@ -897,15 +902,17 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     [settings?.favoriteFiles, toShortcutItems],
   );
   const previousHistoryPath =
-    navigationIndex > 0 ? navigationHistory[navigationIndex - 1] ?? null : null;
+    navigationIndex > 0 ? (navigationHistory[navigationIndex - 1] ?? null) : null;
   const nextHistoryPath =
     navigationIndex < navigationHistory.length - 1
-      ? navigationHistory[navigationIndex + 1] ?? null
+      ? (navigationHistory[navigationIndex + 1] ?? null)
       : null;
   const previousHistoryItem = previousHistoryPath
-    ? noteShortcutLookup.get(previousHistoryPath) ?? null
+    ? (noteShortcutLookup.get(previousHistoryPath) ?? null)
     : null;
-  const nextHistoryItem = nextHistoryPath ? noteShortcutLookup.get(nextHistoryPath) ?? null : null;
+  const nextHistoryItem = nextHistoryPath
+    ? (noteShortcutLookup.get(nextHistoryPath) ?? null)
+    : null;
   const paletteItems = useMemo<CommandPaletteItem[]>(() => {
     const query = deferredPaletteQuery.trim().toLowerCase();
     const pinnedPaletteItems = pinnedNotes.slice(0, 8).map((note) => ({

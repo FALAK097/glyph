@@ -354,7 +354,10 @@ export const SidebarTreeNode = ({
         }}
       >
         {activePath === node.path ? (
-          <span className="mr-2 h-5 w-1 rounded-full bg-sidebar-accent-foreground/80" aria-hidden="true" />
+          <span
+            className="mr-2 h-5 w-1 rounded-full bg-sidebar-accent-foreground/80"
+            aria-hidden="true"
+          />
         ) : null}
         <FileIcon
           size={12}
@@ -416,7 +419,7 @@ export const SidebarTreeNode = ({
                 >
                   <MoreVerticalIcon size={14} />
                 </Button>
-                </TooltipTrigger>
+              </TooltipTrigger>
               <TooltipContent side="right">Note actions</TooltipContent>
             </Tooltip>
           </div>

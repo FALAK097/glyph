@@ -1511,9 +1511,7 @@ export const MarkdownEditor = ({
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                   Outline
                 </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {outlineItems.length} headings
-                </p>
+                <p className="mt-1 text-sm text-muted-foreground">{outlineItems.length} headings</p>
               </div>
               <Button variant="ghost" size="xs" type="button" onClick={handleScrollToTop}>
                 Top

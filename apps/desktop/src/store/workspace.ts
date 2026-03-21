@@ -113,7 +113,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   replaceHistoryPath: (oldPath, newPath) => {
     set((state) => ({
-      navigationHistory: state.navigationHistory.map((entry) => (entry === oldPath ? newPath : entry)),
+      navigationHistory: state.navigationHistory.map((entry) =>
+        entry === oldPath ? newPath : entry,
+      ),
     }));
   },
   removeHistoryPath: (targetPath) => {
@@ -127,9 +129,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return {
         navigationHistory: nextHistory,
         navigationIndex:
-          nextHistory.length === 0
-            ? -1
-            : Math.min(state.navigationIndex, nextHistory.length - 1),
+          nextHistory.length === 0 ? -1 : Math.min(state.navigationIndex, nextHistory.length - 1),
       };
     });
   },

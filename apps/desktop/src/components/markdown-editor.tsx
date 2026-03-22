@@ -383,6 +383,9 @@ export const MarkdownEditor = ({
   const isFocusLayout = Boolean(isFocusMode);
   const revealInFolderLabel = folderRevealLabel ?? getFolderRevealLabel(navigator.platform);
   const breadcrumbTrail = (breadcrumbs ?? []).slice(0, -1);
+  const visibleBreadcrumbTrail = breadcrumbTrail.filter(
+    (item, index) => !(index === 0 && item.label.trim().toLowerCase() === "glyph"),
+  );
   const editorSurfaceClassName = [
     "tiptap-editor mx-auto max-w-[800px] px-10 py-5 pb-32 text-[15px] leading-[1.7] text-foreground outline-none",
     "[&>p]:mb-4",
@@ -1094,12 +1097,12 @@ export const MarkdownEditor = ({
           </Tooltip>
           {fileName ? (
             <div className="flex min-w-0 flex-col justify-center gap-0.5 pl-1">
-              {breadcrumbTrail.length > 0 ? (
+              {visibleBreadcrumbTrail.length > 0 ? (
                 <span
                   className="max-w-[300px] truncate text-[11px] text-muted-foreground"
-                  title={breadcrumbTrail.map((item) => item.label).join(" / ")}
+                  title={visibleBreadcrumbTrail.map((item) => item.label).join(" / ")}
                 >
-                  {breadcrumbTrail.map((item) => item.label).join(" / ")}
+                  {visibleBreadcrumbTrail.map((item) => item.label).join(" / ")}
                 </span>
               ) : null}
               <span

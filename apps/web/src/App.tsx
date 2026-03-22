@@ -234,7 +234,7 @@ export function App() {
       </a>
 
       <nav className="sticky top-0 z-40 border-b border-black/5 bg-[color:color-mix(in_oklab,var(--surface-page)_88%,white)]/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-screen-2xl flex-wrap items-center justify-between gap-4 px-6 sm:px-8 lg:px-12">
+        <div className="mx-auto flex max-w-screen-2xl flex-col items-start gap-3 px-6 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-8 sm:py-0 lg:px-12">
           <a
             href="/"
             aria-label="Glyph Home"
@@ -249,14 +249,14 @@ export function App() {
             />
           </a>
 
-          <div className="flex w-full items-center justify-center gap-2 sm:w-auto sm:justify-end">
-            <a href={DOWNLOAD_URLS.mac} className="download-button cursor-pointer border-0">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+            <a href={DOWNLOAD_URLS.mac} className="download-button w-full cursor-pointer border-0 sm:w-auto">
               <AppleIcon />
               Download for macOS
             </a>
             <a
               href={DOWNLOAD_URLS.windows}
-              className="download-button download-button--secondary cursor-pointer border-0"
+              className="download-button download-button--secondary w-full cursor-pointer border-0 sm:w-auto"
             >
               <WindowsIcon />
               Download for Windows
@@ -284,8 +284,8 @@ export function App() {
             id="install-with-homebrew"
             className="mt-10 w-full max-w-3xl overflow-hidden rounded-2xl border border-black/8 bg-[color:color-mix(in_oklab,white_86%,var(--surface-paper))] text-left shadow-[0_16px_48px_-44px_oklch(0.17_0.01_110_/_0.3)]"
           >
-            <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-              <code className="overflow-x-auto whitespace-nowrap text-[0.98rem] text-[var(--ink-soft)]">
+            <div className="flex items-start gap-3 px-4 py-4">
+              <code className="min-w-0 flex-1 whitespace-normal break-all text-[0.98rem] leading-relaxed text-[var(--ink-soft)]">
                 {BREW_INSTALL_COMMAND}
               </code>
               <button

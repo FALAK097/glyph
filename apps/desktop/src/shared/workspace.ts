@@ -75,6 +75,7 @@ export type SidebarState = {
 
 export type EditorPreferences = {
   focusMode: boolean;
+  showOutline: boolean;
 };
 
 export type AppSettings = {

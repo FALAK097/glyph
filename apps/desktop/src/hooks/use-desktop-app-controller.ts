@@ -103,6 +103,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
   );
   const editorPreferences = settings?.editorPreferences;
   const isFocusMode = editorPreferences?.focusMode ?? false;
+  const showOutline = editorPreferences?.showOutline ?? true;
     const folderRevealLabel = getFolderRevealLabel(appInfo?.platform);
   const isActiveFilePinned = activeFile
     ? (settings?.pinnedFiles ?? []).some((filePath) => isSamePath(filePath, activeFile.path))
@@ -410,9 +411,19 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     await saveSettings({
       editorPreferences: {
         focusMode: !isFocusMode,
-              },
+        showOutline,
+      },
     });
-  }, [isFocusMode, saveSettings]);
+  }, [isFocusMode, showOutline, saveSettings]);
+
+  const toggleOutline = useCallback(async () => {
+    await saveSettings({
+      editorPreferences: {
+        focusMode: isFocusMode,
+        showOutline: !showOutline,
+      },
+    });
+  }, [isFocusMode, showOutline, saveSettings]);
 
   const requestOutlineJump = useCallback((id: string) => {
     setOutlineJumpRequest({
@@ -706,6 +717,17 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
           setIsPaletteOpen(false);
         },
       },
+      {
+        id: "toggle-outline",
+        title: showOutline ? "Hide Outline" : "Show Outline",
+        subtitle: "Toggle the table of contents panel",
+        section: "View",
+        kind: "command",
+        onSelect: () => {
+          void toggleOutline();
+          setIsPaletteOpen(false);
+        },
+      },
       ...(activeFile
         ? [
             {
@@ -779,9 +801,11 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
       navigateForward,
       saveSettings,
       shortcuts,
+      showOutline,
       syncOpenedFile,
       syncWorkspace,
       toggleFocusMode,
+      toggleOutline,
       togglePinnedFile,
     ],
   );
@@ -1242,6 +1266,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     setSelectedIndex,
     settings,
     shortcuts,
+    showOutline,
     toggleFocusMode,
     togglePinnedFile,
         triggerUpdateAction,

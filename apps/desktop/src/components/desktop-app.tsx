@@ -56,6 +56,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
             filePath={controller.activeFile?.path ?? null}
             saveStateLabel={controller.saveStateLabel}
             wordCount={controller.wordCount}
+            readingTime={controller.readingTime}
             onChange={controller.updateDraftContent}
             onToggleSidebar={() => controller.setIsSidebarCollapsed(!controller.isSidebarCollapsed)}
             isSidebarCollapsed={controller.isSidebarCollapsed}
@@ -93,6 +94,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
             outlineItems={controller.outlineItems}
             outlineJumpRequest={controller.outlineJumpRequest}
             previousHistoryItem={controller.previousHistoryItem}
+            showOutline={controller.showOutline}
             updateState={controller.updateState}
             onUpdateAction={() => void controller.triggerUpdateAction()}
           />

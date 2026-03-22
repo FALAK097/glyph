@@ -17,7 +17,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   return (
     <TooltipProvider>
       <div
-        className={`h-screen overflow-hidden grid transition-[grid-template-columns] duration-200 ${
+        className={`grid h-screen min-h-0 overflow-hidden transition-[grid-template-columns] duration-200 ${
           controller.isSidebarCollapsed
             ? "grid-cols-[0_minmax(0,1fr)]"
             : "grid-cols-[280px_minmax(0,1fr)]"

@@ -50,7 +50,7 @@ export const Sidebar = ({
   }
 
   return (
-    <aside className="flex flex-col h-full w-[280px] bg-sidebar border-r border-border">
+    <aside className="flex h-full min-h-0 w-[280px] flex-col border-r border-border bg-sidebar">
       <div
         className="flex items-center justify-center flex-shrink-0 bg-sidebar"
         style={{ WebkitAppRegion: "drag" } as any}
@@ -61,7 +61,7 @@ export const Sidebar = ({
       </div>
 
       {/* Scrollable content area */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden py-3 min-h-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+      <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-3">
         <div className="px-1">
           {/* Section label */}
           <p className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">

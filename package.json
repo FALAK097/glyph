@@ -1,6 +1,6 @@
 {
   "name": "glyph",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "private": true,
   "scripts": {
     "dev:desktop": "pnpm --filter @glyph/desktop dev",

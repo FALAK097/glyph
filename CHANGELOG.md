@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.5](https://github.com/FALAK097/glyph/compare/v0.2.4...v0.2.5) (2026-03-22)
+
+
+### Bug Fixes
+
+* **desktop:** keep downloaded updates staged until install ([#122](https://github.com/FALAK097/glyph/issues/122)) ([84a9b7f](https://github.com/FALAK097/glyph/commit/84a9b7f831fad2b3274a82e7ea09014ea438ec71))
+
 ## [0.2.4](https://github.com/FALAK097/glyph/compare/v0.2.3...v0.2.4) (2026-03-22)
 
 

@@ -36,7 +36,6 @@ import {
   CheckCircleIcon,
   CopyIcon,
   DotsHorizontalIcon,
-  ExternalLinkIcon,
   FileDownIcon,
   GearIcon,
   LinkIcon,
@@ -132,9 +131,6 @@ const getDevPreviewUpdateState = (): UpdateState | null => {
 };
 
 type HoveredLinkState = {
-  href: string;
-  iconLeft: number;
-  iconTop: number;
   tooltipLeft: number;
   tooltipTop: number;
 };
@@ -144,6 +140,8 @@ type TableControlsState = {
   canDeleteRow: boolean;
   canDeleteColumn: boolean;
   canDeleteTable: boolean;
+  left: number;
+  top: number;
 };
 
 const extractLinkAttributes = (input: string) => {
@@ -177,6 +175,15 @@ const normalizeLinkTarget = (value: string) => {
 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const INACTIVE_TABLE_CONTROLS: TableControlsState = {
+  active: false,
+  canDeleteRow: false,
+  canDeleteColumn: false,
+  canDeleteTable: false,
+  left: 0,
+  top: 0,
+};
 
 const runMarkdownShortcutConversion = (
   nextEditor: Editor,
@@ -267,12 +274,7 @@ export const MarkdownEditor = ({
   const lastSyncedMarkdown = useRef(content);
   const isAutoConvertingRef = useRef(false);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const tableControlsRef = useRef<TableControlsState>({
-    active: false,
-    canDeleteRow: false,
-    canDeleteColumn: false,
-    canDeleteTable: false,
-  });
+  const tableControlsRef = useRef<TableControlsState>(INACTIVE_TABLE_CONTROLS);
   const toastTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const hoveredLinkHideTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -292,12 +294,7 @@ export const MarkdownEditor = ({
   });
   const [imageControls, setImageControls] = useState<ImageControlsState | null>(null);
   const [hoveredLink, setHoveredLink] = useState<HoveredLinkState | null>(null);
-  const [tableControls, setTableControls] = useState<TableControlsState>({
-    active: false,
-    canDeleteRow: false,
-    canDeleteColumn: false,
-    canDeleteTable: false,
-  });
+  const [tableControls, setTableControls] = useState<TableControlsState>(INACTIVE_TABLE_CONTROLS);
   const [devPreviewUpdateState] = useState<UpdateState | null>(() => getDevPreviewUpdateState());
 
   const effectiveUpdateState = devPreviewUpdateState ?? updateState;
@@ -420,11 +417,48 @@ export const MarkdownEditor = ({
   };
 
   const refreshTableControls = (nextEditor: Editor) => {
+    const scrollContainer = scrollContainerRef.current;
+    const nodeDom = nextEditor.view.nodeDOM(nextEditor.state.selection.from);
+    const selectionElement =
+      nodeDom instanceof HTMLElement
+        ? nodeDom
+        : nodeDom instanceof Text
+          ? nodeDom.parentElement
+          : null;
+    const activeCell = selectionElement?.closest("td, th");
+    const tableWrapper =
+      activeCell instanceof HTMLElement ? activeCell.closest(".tableWrapper") : null;
+
+    if (
+      !nextEditor.isFocused ||
+      !(activeCell instanceof HTMLElement) ||
+      !(tableWrapper instanceof HTMLElement) ||
+      !scrollContainer
+    ) {
+      const currentState = tableControlsRef.current;
+      if (!currentState.active) {
+        return;
+      }
+
+      tableControlsRef.current = INACTIVE_TABLE_CONTROLS;
+      setTableControls(INACTIVE_TABLE_CONTROLS);
+      return;
+    }
+
+    const containerRect = scrollContainer.getBoundingClientRect();
+    const cellRect = activeCell.getBoundingClientRect();
+    const tableRect = tableWrapper.getBoundingClientRect();
+    const nextTop = Math.round(Math.max(containerRect.top + 12, cellRect.top - 56));
+    const nextLeft = Math.round(
+      clamp(tableRect.left + tableRect.width / 2, 196, window.innerWidth - 196),
+    );
     const nextState = {
-      active: nextEditor.isActive("table"),
+      active: nextEditor.isActive("tableCell") || nextEditor.isActive("tableHeader"),
       canDeleteRow: nextEditor.can().deleteRow(),
       canDeleteColumn: nextEditor.can().deleteColumn(),
       canDeleteTable: nextEditor.can().deleteTable(),
+      left: nextLeft,
+      top: nextTop,
     };
 
     const currentState = tableControlsRef.current;
@@ -432,7 +466,9 @@ export const MarkdownEditor = ({
       currentState.active === nextState.active &&
       currentState.canDeleteRow === nextState.canDeleteRow &&
       currentState.canDeleteColumn === nextState.canDeleteColumn &&
-      currentState.canDeleteTable === nextState.canDeleteTable
+      currentState.canDeleteTable === nextState.canDeleteTable &&
+      currentState.left === nextState.left &&
+      currentState.top === nextState.top
     ) {
       return;
     }
@@ -565,23 +601,18 @@ export const MarkdownEditor = ({
           clearHoveredLinkHideTimeout();
           const rect = link.getBoundingClientRect();
           setHoveredLink({
-            href,
-            iconLeft: rect.right + 4,
-            iconTop: rect.top + rect.height / 2,
             tooltipLeft: clamp(rect.left + rect.width / 2, 96, window.innerWidth - 96),
             tooltipTop: rect.bottom + 10,
           });
           return false;
         },
-        mouseout: (_view, event) => {
-          const nextTarget =
-            event.relatedTarget instanceof HTMLElement ? event.relatedTarget : null;
-
-          if (nextTarget?.closest("[data-link-hover-affordance='true']")) {
-            return false;
-          }
-
+        mouseout: (_view, _event) => {
           scheduleHoveredLinkHide();
+          return false;
+        },
+        blur: () => {
+          tableControlsRef.current = INACTIVE_TABLE_CONTROLS;
+          setTableControls(INACTIVE_TABLE_CONTROLS);
           return false;
         },
         scroll: () => {
@@ -1096,11 +1127,21 @@ export const MarkdownEditor = ({
           setImageControls(null);
           clearHoveredLinkHideTimeout();
           setHoveredLink(null);
+          if (editor) {
+            refreshTableControls(editor);
+          }
         }}
       >
         {tableControls.active ? (
-          <div className="pointer-events-none absolute top-4 right-6 z-20">
-            <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-2xl border border-border/70 bg-card/95 px-3 py-2 shadow-lg supports-backdrop-filter:backdrop-blur-sm">
+          <div
+            className="pointer-events-none fixed z-30"
+            style={{
+              left: tableControls.left,
+              top: tableControls.top,
+              transform: "translateX(-50%)",
+            }}
+          >
+            <div className="pointer-events-auto flex max-w-[min(720px,calc(100vw-2rem))] flex-wrap items-center justify-center gap-2 rounded-2xl border border-border/70 bg-card/95 px-3 py-2 shadow-lg supports-backdrop-filter:backdrop-blur-sm">
               <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                 Table
               </span>
@@ -1108,6 +1149,7 @@ export const MarkdownEditor = ({
                 variant="outline"
                 size="xs"
                 type="button"
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => editor?.chain().focus().addRowAfter().run()}
               >
                 Add Row
@@ -1116,6 +1158,7 @@ export const MarkdownEditor = ({
                 variant="outline"
                 size="xs"
                 type="button"
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => editor?.chain().focus().addColumnAfter().run()}
               >
                 Add Column
@@ -1125,6 +1168,7 @@ export const MarkdownEditor = ({
                 size="xs"
                 type="button"
                 disabled={!tableControls.canDeleteRow}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => editor?.chain().focus().deleteRow().run()}
               >
                 Remove Row
@@ -1134,6 +1178,7 @@ export const MarkdownEditor = ({
                 size="xs"
                 type="button"
                 disabled={!tableControls.canDeleteColumn}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => editor?.chain().focus().deleteColumn().run()}
               >
                 Remove Column
@@ -1142,6 +1187,7 @@ export const MarkdownEditor = ({
                 variant="outline"
                 size="xs"
                 type="button"
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => editor?.chain().focus().toggleHeaderRow().run()}
               >
                 Toggle Header
@@ -1151,6 +1197,7 @@ export const MarkdownEditor = ({
                 size="xs"
                 type="button"
                 disabled={!tableControls.canDeleteTable}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => editor?.chain().focus().deleteTable().run()}
               >
                 Delete Table
@@ -1159,43 +1206,18 @@ export const MarkdownEditor = ({
           </div>
         ) : null}
         {hoveredLink ? (
-          <>
-            <div
-              className="fixed z-30"
-              data-link-hover-affordance="true"
-              onMouseEnter={clearHoveredLinkHideTimeout}
-              onMouseLeave={scheduleHoveredLinkHide}
-              style={{
-                left: hoveredLink.iconLeft,
-                top: hoveredLink.iconTop,
-                transform: "translateY(-50%)",
-              }}
-            >
-              <Button
-                data-link-hover-affordance="true"
-                variant="ghost"
-                size="icon-xs"
-                type="button"
-                className="pointer-events-auto text-[var(--editor-link)] hover:bg-transparent hover:opacity-80"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => void handleLinkActivation(hoveredLink.href)}
-              >
-                <ExternalLinkIcon size={12} />
-              </Button>
+          <div
+            className="pointer-events-none fixed z-30"
+            style={{
+              left: hoveredLink.tooltipLeft,
+              top: hoveredLink.tooltipTop,
+              transform: "translateX(-50%)",
+            }}
+          >
+            <div className="inline-flex max-w-[220px] items-center rounded-md bg-foreground px-3 py-1.5 text-xs text-background shadow-sm">
+              {linkOpenShortcutHint}
             </div>
-            <div
-              className="pointer-events-none fixed z-30"
-              style={{
-                left: hoveredLink.tooltipLeft,
-                top: hoveredLink.tooltipTop,
-                transform: "translateX(-50%)",
-              }}
-            >
-              <div className="inline-flex max-w-[220px] items-center rounded-md bg-foreground px-3 py-1.5 text-xs text-background shadow-sm">
-                {linkOpenShortcutHint}
-              </div>
-            </div>
-          </>
+          </div>
         ) : null}
         {imageControls ? (
           <div

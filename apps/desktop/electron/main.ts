@@ -34,7 +34,6 @@ import {
   mergeShortcutSettings,
   toElectronAccelerator,
 } from "../src/shared/shortcuts.js";
-import { isSamePath } from "../src/lib/paths.js";
 
 const { autoUpdater } = electronUpdater;
 
@@ -459,7 +458,6 @@ async function resolveLinkTarget(
 function getDefaultSettings(): AppSettings {
   return {
     defaultWorkspacePath: getDefaultWorkspacePath(),
-    lastActiveFilePath: null,
     themeId: "aura",
     themeMode: "light",
     pinnedFiles: [],
@@ -658,7 +656,6 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
 
   const candidate = input as Partial<AppSettings>;
   const validPinnedFiles: string[] = [];
-  let validLastActiveFilePath: string | null = null;
   const persistedFileGroups = [
     [normalizePersistedFileList(candidate.pinnedFiles), validPinnedFiles],
   ] as const;
@@ -671,18 +668,6 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
       } catch {
         // Skip files that don't exist or can't be accessed.
       }
-    }
-  }
-
-  if (
-    typeof candidate.lastActiveFilePath === "string" &&
-    candidate.lastActiveFilePath.trim().length > 0
-  ) {
-    try {
-      await fs.access(candidate.lastActiveFilePath);
-      validLastActiveFilePath = candidate.lastActiveFilePath;
-    } catch {
-      // Skip last active files that no longer exist.
     }
   }
 
@@ -721,7 +706,6 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
       candidate.defaultWorkspacePath.trim().length > 0
         ? candidate.defaultWorkspacePath
         : defaults.defaultWorkspacePath,
-    lastActiveFilePath: validLastActiveFilePath,
     themeId:
       typeof candidate.themeId === "string" && candidate.themeId.trim().length > 0
         ? candidate.themeId
@@ -763,18 +747,6 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
     }
 
     nextPatch.defaultWorkspacePath = candidate.defaultWorkspacePath;
-  }
-
-  if ("lastActiveFilePath" in candidate) {
-    if (
-      candidate.lastActiveFilePath !== null &&
-      (typeof candidate.lastActiveFilePath !== "string" ||
-        candidate.lastActiveFilePath.trim().length === 0)
-    ) {
-      throw new Error("lastActiveFilePath must be a non-empty string or null.");
-    }
-
-    nextPatch.lastActiveFilePath = candidate.lastActiveFilePath;
   }
 
   if ("themeId" in candidate) {
@@ -853,7 +825,6 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
     (key) =>
       ![
         "defaultWorkspacePath",
-        "lastActiveFilePath",
         "themeId",
         "themeMode",
         "pinnedFiles",
@@ -1022,14 +993,7 @@ async function collectMarkdownFiles(nodes: DirectoryNode[]): Promise<string[]> {
   return paths;
 }
 
-function getPreferredWorkspaceFilePath(filePaths: string[], preferredFilePath: string | null) {
-  if (preferredFilePath) {
-    const matchedPath = filePaths.find((filePath) => isSamePath(filePath, preferredFilePath));
-    if (matchedPath) {
-      return matchedPath;
-    }
-  }
-
+function getPreferredWorkspaceFilePath(filePaths: string[]) {
   return filePaths[0] ?? null;
 }
 
@@ -1039,11 +1003,7 @@ async function openWorkspace(dirPath: string): Promise<WorkspaceSnapshot> {
 
   const tree = await buildDirectoryTree(dirPath);
   searchableFilesCache = await collectMarkdownFiles(tree);
-  const settings = await loadSettings();
-  const activeFilePath = getPreferredWorkspaceFilePath(
-    searchableFilesCache,
-    settings.lastActiveFilePath,
-  );
+  const activeFilePath = getPreferredWorkspaceFilePath(searchableFilesCache);
   const activeFile = activeFilePath ? await readMarkdownFile(activeFilePath) : null;
 
   if (activeWatcher) {

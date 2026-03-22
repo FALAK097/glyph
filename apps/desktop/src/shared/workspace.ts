@@ -80,7 +80,6 @@ export type EditorPreferences = {
 
 export type AppSettings = {
   defaultWorkspacePath: string;
-  lastActiveFilePath: string | null;
   themeId: string;
   themeMode: ThemeMode;
   pinnedFiles: string[];

@@ -155,15 +155,6 @@ type EditorOutlineItem = OutlineItem & {
   pos: number;
 };
 
-type NoteViewState = {
-  scrollTop: number;
-  selectionFrom: number;
-  selectionTo: number;
-};
-
-const NOTE_VIEW_STATE_STORAGE_KEY = "glyph.note-view-state.v1";
-const MAX_NOTE_VIEW_STATES = 200;
-
 const extractLinkAttributes = (input: string) => {
   const match = input.match(/(.+?)\s+"([^"]+)"$/);
   if (match) {
@@ -195,69 +186,6 @@ const normalizeLinkTarget = (value: string) => {
 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
-
-const isNoteViewState = (value: unknown): value is NoteViewState => {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const candidate = value as Partial<NoteViewState>;
-
-  return (
-    typeof candidate.scrollTop === "number" &&
-    Number.isFinite(candidate.scrollTop) &&
-    typeof candidate.selectionFrom === "number" &&
-    Number.isFinite(candidate.selectionFrom) &&
-    typeof candidate.selectionTo === "number" &&
-    Number.isFinite(candidate.selectionTo)
-  );
-};
-
-const loadStoredNoteViewStates = () => {
-  if (typeof window === "undefined") {
-    return new Map<string, NoteViewState>();
-  }
-
-  try {
-    const raw = window.localStorage.getItem(NOTE_VIEW_STATE_STORAGE_KEY);
-    if (!raw) {
-      return new Map<string, NoteViewState>();
-    }
-
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) {
-      return new Map<string, NoteViewState>();
-    }
-
-    const entries = parsed.flatMap((entry) => {
-      if (!Array.isArray(entry) || entry.length !== 2) {
-        return [];
-      }
-
-      const [filePath, state] = entry;
-      if (typeof filePath !== "string" || !isNoteViewState(state)) {
-        return [];
-      }
-
-      return [[filePath, state] as const];
-    });
-
-    return new Map<string, NoteViewState>(entries);
-  } catch {
-    return new Map<string, NoteViewState>();
-  }
-};
-
-const persistNoteViewStates = (states: Map<string, NoteViewState>) => {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.setItem(
-    NOTE_VIEW_STATE_STORAGE_KEY,
-    JSON.stringify(Array.from(states.entries())),
-  );
-};
 
 function collectEditorOutline(editor: Editor): EditorOutlineItem[] {
   const items: EditorOutlineItem[] = [];
@@ -403,9 +331,6 @@ export const MarkdownEditor = ({
   const isAutoConvertingRef = useRef(false);
   const liveEditorRef = useRef<Editor | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const noteViewStateRef = useRef(loadStoredNoteViewStates());
-  const noteViewStateOwnerRef = useRef<string | null>(filePath);
-  const isRestoringNoteViewStateRef = useRef(false);
   const tableControlsRef = useRef<TableControlsState>(INACTIVE_TABLE_CONTROLS);
   const toastTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const hoveredLinkHideTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
@@ -517,84 +442,6 @@ export const MarkdownEditor = ({
     }
 
     nextEditor.chain().focus().setTextSelection(item.pos).run();
-  }, []);
-
-  const storeNoteViewState = useCallback(
-    (
-      targetFilePath: string | null | undefined,
-      options?: {
-        force?: boolean;
-      },
-    ) => {
-      if (isRestoringNoteViewStateRef.current && !options?.force) {
-        return;
-      }
-
-      const nextEditor = liveEditorRef.current;
-      if (!nextEditor || !targetFilePath || !scrollContainerRef.current) {
-        return;
-      }
-
-      const nextState = {
-        scrollTop: scrollContainerRef.current.scrollTop,
-        selectionFrom: nextEditor.state.selection.from,
-        selectionTo: nextEditor.state.selection.to,
-      };
-      const previousState = noteViewStateRef.current.get(targetFilePath);
-
-      if (
-        previousState &&
-        previousState.scrollTop === nextState.scrollTop &&
-        previousState.selectionFrom === nextState.selectionFrom &&
-        previousState.selectionTo === nextState.selectionTo
-      ) {
-        return;
-      }
-
-      if (previousState) {
-        noteViewStateRef.current.delete(targetFilePath);
-      }
-
-      noteViewStateRef.current.set(targetFilePath, nextState);
-
-      while (noteViewStateRef.current.size > MAX_NOTE_VIEW_STATES) {
-        const oldestFilePath = noteViewStateRef.current.keys().next().value;
-        if (!oldestFilePath) {
-          break;
-        }
-
-        noteViewStateRef.current.delete(oldestFilePath);
-      }
-
-      persistNoteViewStates(noteViewStateRef.current);
-    },
-    [],
-  );
-
-  const restoreNoteViewState = useCallback((targetFilePath: string | null | undefined) => {
-    const nextEditor = liveEditorRef.current;
-    if (!nextEditor || !targetFilePath || !scrollContainerRef.current) {
-      return false;
-    }
-
-    const savedState = noteViewStateRef.current.get(targetFilePath);
-    if (!savedState) {
-      return false;
-    }
-
-    const maxPosition = Math.max(1, nextEditor.state.doc.content.size);
-    const selectionFrom = clamp(savedState.selectionFrom, 1, maxPosition);
-    const selectionTo = clamp(savedState.selectionTo, selectionFrom, maxPosition);
-
-    nextEditor.commands.setTextSelection({ from: selectionFrom, to: selectionTo });
-
-    window.requestAnimationFrame(() => {
-      if (scrollContainerRef.current) {
-        scrollContainerRef.current.scrollTop = savedState.scrollTop;
-      }
-    });
-
-    return true;
   }, []);
   const clearHoveredLinkHideTimeout = () => {
     if (!hoveredLinkHideTimeoutRef.current) {
@@ -745,89 +592,65 @@ export const MarkdownEditor = ({
     setTableControls(nextState);
   };
 
-  const editor = useEditor({
-    immediatelyRender: false,
-    extensions: [
-      StarterKit.configure({
-        heading: {
-          levels: [1, 2, 3, 4],
+  const editor = useEditor(
+    {
+      immediatelyRender: false,
+      extensions: [
+        StarterKit.configure({
+          heading: {
+            levels: [1, 2, 3, 4],
+          },
+          codeBlock: false,
+          link: false,
+        }),
+        MarkdownShortcuts,
+        CustomCodeBlockLowlight,
+        Link.configure({
+          autolink: true,
+          defaultProtocol: "https",
+          linkOnPaste: true,
+          openOnClick: false,
+          HTMLAttributes: {
+            rel: "noopener noreferrer nofollow",
+            target: "_blank",
+          },
+        }),
+        Image.configure({
+          resize: {
+            enabled: true,
+          },
+        }),
+        TaskList,
+        TaskItem.configure({
+          nested: true,
+        }),
+        Table.configure({
+          resizable: true,
+        }),
+        TableRow,
+        TableHeader,
+        TableCell,
+        SlashCommand,
+        Placeholder.configure({
+          placeholder: "Start with a title, then let markdown shortcuts shape the page.",
+        }),
+        Markdown.configure({
+          linkify: true,
+          transformPastedText: true,
+          transformCopiedText: true,
+          breaks: true,
+        }),
+      ],
+      enableInputRules: true,
+      enablePasteRules: true,
+      content: content,
+      editorProps: {
+        attributes: {
+          class: editorSurfaceClassName,
+          "data-glyph-editor": "true",
+          spellcheck: "true",
         },
-        codeBlock: false,
-        link: false,
-      }),
-      MarkdownShortcuts,
-      CustomCodeBlockLowlight,
-      Link.configure({
-        autolink: true,
-        defaultProtocol: "https",
-        linkOnPaste: true,
-        openOnClick: false,
-        HTMLAttributes: {
-          rel: "noopener noreferrer nofollow",
-          target: "_blank",
-        },
-      }),
-      Image.configure({
-        resize: {
-          enabled: true,
-        },
-      }),
-      TaskList,
-      TaskItem.configure({
-        nested: true,
-      }),
-      Table.configure({
-        resizable: true,
-      }),
-      TableRow,
-      TableHeader,
-      TableCell,
-      SlashCommand,
-      Placeholder.configure({
-        placeholder: "Start with a title, then let markdown shortcuts shape the page.",
-      }),
-      Markdown.configure({
-        linkify: true,
-        transformPastedText: true,
-        transformCopiedText: true,
-        breaks: true,
-      }),
-    ],
-    enableInputRules: true,
-    enablePasteRules: true,
-    content: content,
-    editorProps: {
-      attributes: {
-        class: editorSurfaceClassName,
-        "data-glyph-editor": "true",
-        spellcheck: "true",
-      },
-      handleClick: (_view, _pos, event) => {
-        const target = event.target;
-        const link = target instanceof HTMLElement ? target.closest("a") : null;
-
-        if (!link) {
-          return false;
-        }
-
-        const href = link.getAttribute("href");
-        if (!href) {
-          return false;
-        }
-
-        if (!event.metaKey && !event.ctrlKey) {
-          return false;
-        }
-
-        event.preventDefault();
-        event.stopPropagation();
-
-        void handleLinkActivation(href);
-
-        return true;
-      },
-      handleDOMEvents: {
-        mouseover: (_view, event) => {
+        handleClick: (_view, _pos, event) => {
           const target = event.target;
           const link = target instanceof HTMLElement ? target.closest("a") : null;
 
@@ -840,54 +663,79 @@ export const MarkdownEditor = ({
             return false;
           }
 
-          clearHoveredLinkHideTimeout();
-          const rect = link.getBoundingClientRect();
-          setHoveredLink({
-            tooltipLeft: clamp(rect.left + rect.width / 2, 96, window.innerWidth - 96),
-            tooltipTop: rect.bottom + 10,
-          });
-          return false;
+          if (!event.metaKey && !event.ctrlKey) {
+            return false;
+          }
+
+          event.preventDefault();
+          event.stopPropagation();
+
+          void handleLinkActivation(href);
+
+          return true;
         },
-        mouseout: (_view, _event) => {
-          scheduleHoveredLinkHide();
-          return false;
-        },
-        blur: () => {
-          tableControlsRef.current = INACTIVE_TABLE_CONTROLS;
-          setTableControls(INACTIVE_TABLE_CONTROLS);
-          return false;
-        },
-        scroll: () => {
-          setImageControls(null);
-          clearHoveredLinkHideTimeout();
-          setHoveredLink(null);
-          return false;
+        handleDOMEvents: {
+          mouseover: (_view, event) => {
+            const target = event.target;
+            const link = target instanceof HTMLElement ? target.closest("a") : null;
+
+            if (!link) {
+              return false;
+            }
+
+            const href = link.getAttribute("href");
+            if (!href) {
+              return false;
+            }
+
+            clearHoveredLinkHideTimeout();
+            const rect = link.getBoundingClientRect();
+            setHoveredLink({
+              tooltipLeft: clamp(rect.left + rect.width / 2, 96, window.innerWidth - 96),
+              tooltipTop: rect.bottom + 10,
+            });
+            return false;
+          },
+          mouseout: (_view, _event) => {
+            scheduleHoveredLinkHide();
+            return false;
+          },
+          blur: () => {
+            tableControlsRef.current = INACTIVE_TABLE_CONTROLS;
+            setTableControls(INACTIVE_TABLE_CONTROLS);
+            return false;
+          },
+          scroll: () => {
+            setImageControls(null);
+            clearHoveredLinkHideTimeout();
+            setHoveredLink(null);
+            return false;
+          },
         },
       },
-    },
-    onUpdate: ({ editor: nextEditor }) => {
-      liveEditorRef.current = nextEditor;
-      if (runMarkdownShortcutConversion(nextEditor, isAutoConvertingRef)) {
-        return;
-      }
+      onUpdate: ({ editor: nextEditor }) => {
+        liveEditorRef.current = nextEditor;
+        if (runMarkdownShortcutConversion(nextEditor, isAutoConvertingRef)) {
+          return;
+        }
 
-      refreshTableControls(nextEditor);
-      refreshImageControls(nextEditor);
-      refreshOutline(nextEditor);
+        refreshTableControls(nextEditor);
+        refreshImageControls(nextEditor);
+        refreshOutline(nextEditor);
 
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any
-      const nextMarkdown = (nextEditor.storage as any).markdown.getMarkdown() as string;
-      lastSyncedMarkdown.current = nextMarkdown;
-      storeNoteViewState(noteViewStateOwnerRef.current);
-      onChange(nextMarkdown);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any
+        const nextMarkdown = (nextEditor.storage as any).markdown.getMarkdown() as string;
+        lastSyncedMarkdown.current = nextMarkdown;
+        onChange(nextMarkdown);
+      },
+      onSelectionUpdate: ({ editor: nextEditor }) => {
+        liveEditorRef.current = nextEditor;
+        refreshTableControls(nextEditor);
+        refreshImageControls(nextEditor);
+      },
     },
-    onSelectionUpdate: ({ editor: nextEditor }) => {
-      liveEditorRef.current = nextEditor;
-      refreshTableControls(nextEditor);
-      refreshImageControls(nextEditor);
-      storeNoteViewState(noteViewStateOwnerRef.current);
-    },
-  });
+    [filePath],
+  );
 
   useEffect(() => {
     if (!editor || content === lastSyncedMarkdown.current) {
@@ -914,34 +762,17 @@ export const MarkdownEditor = ({
   }, [editor]);
 
   useEffect(() => {
-    const previousFilePath = noteViewStateOwnerRef.current;
-    if (previousFilePath && previousFilePath !== filePath) {
-      storeNoteViewState(previousFilePath, { force: true });
-    }
-
-    if (!filePath) {
-      noteViewStateOwnerRef.current = null;
+    if (!editor || !filePath) {
       return;
     }
 
-    noteViewStateOwnerRef.current = filePath;
-    isRestoringNoteViewStateRef.current = true;
-
     window.requestAnimationFrame(() => {
-      const restored = restoreNoteViewState(filePath);
-      if (!restored) {
-        liveEditorRef.current?.commands.setTextSelection(1);
-        if (scrollContainerRef.current) {
-          scrollContainerRef.current.scrollTop = 0;
-        }
+      liveEditorRef.current?.commands.setTextSelection(1);
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = 0;
       }
-
-      window.requestAnimationFrame(() => {
-        isRestoringNoteViewStateRef.current = false;
-        storeNoteViewState(filePath);
-      });
     });
-  }, [editor, filePath, restoreNoteViewState, storeNoteViewState]);
+  }, [editor, filePath]);
 
   useEffect(() => {
     if (!outlineJumpRequest || !editor) {
@@ -958,13 +789,12 @@ export const MarkdownEditor = ({
 
   useEffect(() => {
     return () => {
-      storeNoteViewState(noteViewStateOwnerRef.current, { force: true });
       clearHoveredLinkHideTimeout();
       if (toastTimeoutRef.current) {
         window.clearTimeout(toastTimeoutRef.current);
       }
     };
-  }, [filePath, storeNoteViewState]);
+  }, []);
 
   useEffect(() => {
     if (!editor) {
@@ -1467,7 +1297,6 @@ export const MarkdownEditor = ({
           setImageControls(null);
           clearHoveredLinkHideTimeout();
           setHoveredLink(null);
-          storeNoteViewState(noteViewStateOwnerRef.current);
 
           if (!editor) return;
           const container = scrollContainerRef.current;
@@ -1613,7 +1442,7 @@ export const MarkdownEditor = ({
             </Button>
           </div>
         ) : null}
-        <EditorContent editor={editor} />
+        <EditorContent key={filePath ?? "no-file"} editor={editor} />
       </div>
       {shouldShowOutlineRail ? (
         <aside className="pointer-events-none absolute right-8 top-[88px] z-20 hidden xl:block w-[240px] animate-in fade-in slide-in-from-right-2 duration-200 ease-out">

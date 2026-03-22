@@ -152,7 +152,11 @@ function wireAutoUpdater() {
   }
 
   autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = true;
+  // Keep the downloaded update staged until the user explicitly installs it.
+  // On macOS, enabling install-on-quit starts an extra native updater handoff
+  // immediately after download, which can emit an error and clear the install CTA
+  // before the user gets a chance to apply the update.
+  autoUpdater.autoInstallOnAppQuit = false;
 
   autoUpdater.on("checking-for-update", () => {
     if (shouldPreserveUpdateState(updateState.status)) {

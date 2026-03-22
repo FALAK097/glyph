@@ -296,7 +296,6 @@ export const MarkdownEditor = ({
   content,
   fileName,
   filePath,
-  breadcrumbs,
   saveStateLabel,
   wordCount,
   readingTime,
@@ -382,7 +381,6 @@ export const MarkdownEditor = ({
   const isUpdateButtonDisabled = effectiveUpdateState?.status === "downloading";
   const isFocusLayout = Boolean(isFocusMode);
   const revealInFolderLabel = folderRevealLabel ?? getFolderRevealLabel(navigator.platform);
-  const breadcrumbTrail = (breadcrumbs ?? []).slice(0, -1);
   const editorSurfaceClassName = [
     "tiptap-editor mx-auto max-w-[800px] px-10 py-5 pb-32 text-[15px] leading-[1.7] text-foreground outline-none",
     "[&>p]:mb-4",
@@ -1093,22 +1091,12 @@ export const MarkdownEditor = ({
             <TooltipContent side="bottom">{`New Note (${newNoteShortcut ?? "⌘N"})`}</TooltipContent>
           </Tooltip>
           {fileName ? (
-            <div className="flex min-w-0 flex-col justify-center gap-0.5 pl-1">
-              {breadcrumbTrail.length > 0 ? (
-                <span
-                  className="max-w-[300px] truncate text-[11px] text-muted-foreground"
-                  title={breadcrumbTrail.map((item) => item.label).join(" / ")}
-                >
-                  {breadcrumbTrail.map((item) => item.label).join(" / ")}
-                </span>
-              ) : null}
-              <span
-                className="max-w-[220px] truncate text-sm font-medium text-foreground"
-                title={filePath ?? fileName}
-              >
-                {fileName.replace(MARKDOWN_FILE_SUFFIX_PATTERN, "")}
-              </span>
-            </div>
+            <span
+              className="max-w-[220px] truncate pl-1 text-sm font-medium text-foreground"
+              title={filePath ?? fileName}
+            >
+              {fileName.replace(MARKDOWN_FILE_SUFFIX_PATTERN, "")}
+            </span>
           ) : null}
         </div>
 

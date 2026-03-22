@@ -249,8 +249,10 @@ body {
   }
 
   .download-button {
-    padding-inline: 0.95rem;
-    font-size: 0.88rem;
+    min-height: 2.35rem;
+    gap: 0.4rem;
+    padding: 0.52rem 0.72rem;
+    font-size: 0.82rem;
   }
 
   .hero-display {

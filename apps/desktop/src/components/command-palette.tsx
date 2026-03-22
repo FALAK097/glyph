@@ -89,8 +89,8 @@ export const CommandPalette = ({
           <Input
             ref={inputRef}
             className="border-0 bg-transparent shadow-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/50 h-10"
-            aria-label="Search files, commands, and sessions"
-            placeholder="Search files, commands, and sessions…"
+            aria-label="Search notes and commands…"
+            placeholder="Search notes and commands…"
             value={query}
             onChange={(event) => onChangeQuery(event.target.value)}
             onKeyDown={(event) => {

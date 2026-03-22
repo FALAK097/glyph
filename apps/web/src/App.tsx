@@ -234,7 +234,7 @@ export function App() {
       </a>
 
       <nav className="sticky top-0 z-40 border-b border-black/5 bg-[color:color-mix(in_oklab,var(--surface-page)_88%,white)]/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-screen-2xl flex-wrap items-center justify-between gap-4 px-6 sm:px-8 lg:px-12">
+        <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-2 px-4 py-3 sm:gap-4 sm:px-8 sm:py-0 lg:px-12">
           <a
             href="/"
             aria-label="Glyph Home"
@@ -249,17 +249,19 @@ export function App() {
             />
           </a>
 
-          <div className="flex w-full items-center justify-center gap-2 sm:w-auto sm:justify-end">
+          <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
             <a href={DOWNLOAD_URLS.mac} className="download-button cursor-pointer border-0">
               <AppleIcon />
-              Download for macOS
+              <span className="sm:hidden">macOS</span>
+              <span className="hidden sm:inline">Download for macOS</span>
             </a>
             <a
               href={DOWNLOAD_URLS.windows}
               className="download-button download-button--secondary cursor-pointer border-0"
             >
               <WindowsIcon />
-              Download for Windows
+              <span className="sm:hidden">Windows</span>
+              <span className="hidden sm:inline">Download for Windows</span>
             </a>
           </div>
         </div>
@@ -284,24 +286,25 @@ export function App() {
             id="install-with-homebrew"
             className="mt-10 w-full max-w-3xl overflow-hidden rounded-2xl border border-black/8 bg-[color:color-mix(in_oklab,white_86%,var(--surface-paper))] text-left shadow-[0_16px_48px_-44px_oklch(0.17_0.01_110_/_0.3)]"
           >
-            <div className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-              <code className="overflow-x-auto whitespace-nowrap text-[0.98rem] text-[var(--ink-soft)]">
+            <div className="relative px-4 py-4">
+              <code className="block min-w-0 pr-13 whitespace-normal break-all text-[0.98rem] leading-relaxed text-[var(--ink-soft)] sm:pr-36">
                 {BREW_INSTALL_COMMAND}
               </code>
               <button
                 type="button"
-                className="inline-flex shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-[0.55rem] border border-black/8 bg-[color:color-mix(in_oklab,white_92%,var(--surface-page))] px-3 py-2 text-[0.82rem] font-semibold text-[var(--ink-soft)] transition-transform duration-150 ease-out hover:-translate-y-px hover:text-[var(--ink-strong)] sm:self-auto"
+                aria-label={hasCopiedBrew ? "Copied command" : "Copy command"}
+                className="absolute top-3 right-3 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[0.55rem] border border-black/8 bg-[color:color-mix(in_oklab,white_92%,var(--surface-page))] text-[var(--ink-soft)] transition-transform duration-150 ease-out hover:-translate-y-px hover:text-[var(--ink-strong)] sm:h-auto sm:w-auto sm:gap-1.5 sm:px-3 sm:py-2 sm:text-[0.82rem] sm:font-semibold"
                 onClick={() => void handleCopyBrewCommand()}
               >
                 {hasCopiedBrew ? (
                   <>
                     <Check size={15} aria-hidden="true" />
-                    Copied
+                    <span className="hidden sm:inline">Copied</span>
                   </>
                 ) : (
                   <>
                     <Copy size={15} aria-hidden="true" />
-                    Copy
+                    <span className="hidden sm:inline">Copy</span>
                   </>
                 )}
               </button>

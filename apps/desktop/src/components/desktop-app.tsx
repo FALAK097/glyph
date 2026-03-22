@@ -87,7 +87,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
             canGoBack={controller.canGoBack()}
             canGoForward={controller.canGoForward()}
             autoOpenPDFSetting={controller.settings?.autoOpenPDF ?? true}
-            breadcrumbs={controller.breadcrumbs}
             folderRevealLabel={controller.folderRevealLabel}
             isActiveFilePinned={controller.isActiveFilePinned}
             isFocusMode={controller.isFocusMode}

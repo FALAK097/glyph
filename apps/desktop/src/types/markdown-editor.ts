@@ -1,12 +1,11 @@
 import type { UpdateState } from "../shared/workspace";
-import type { BreadcrumbItem, OutlineItem } from "@/types/navigation";
+import type { OutlineItem } from "@/types/navigation";
 
 export type MarkdownEditorProps = {
   content: string;
   fileName: string | null;
   filePath: string | null;
   workspaceRootPath?: string | null;
-  breadcrumbs?: BreadcrumbItem[];
   saveStateLabel: string;
   wordCount: number;
   readingTime: number;

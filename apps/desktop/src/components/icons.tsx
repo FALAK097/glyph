@@ -5,6 +5,7 @@ import {
   ArrowRight01Icon as ArrowRight01Svg,
   ArrowUp01Icon as ArrowUp01Svg,
   ArrowDown01Icon as ArrowDown01Svg,
+  BookOpen01Icon as BookOpen01Svg,
   Cancel01Icon as Cancel01Svg,
   CheckmarkCircle01Icon as CheckmarkCircle01Svg,
   CopyIcon as CopySvg,
@@ -16,13 +17,18 @@ import {
   KeyboardIcon as KeyboardSvg,
   Link01Icon as Link01Svg,
   LinkSquare01Icon as LinkSquare01Svg,
+  ListViewIcon as ListViewSvg,
+  Maximize01Icon as Maximize01Svg,
   MoreHorizontalIcon as MoreHorizontalSvg,
   MoreVerticalIcon as MoreVerticalSvg,
   PanelLeftIcon as HugePanelLeftIcon,
   PanelRightIcon as HugePanelRightIcon,
+  PinIcon as HugePinIcon,
+  PinOffIcon as HugePinOffIcon,
   PencilEdit02Icon as PencilEdit02Svg,
   Search01Icon as Search01Svg,
   Settings01Icon as Settings01Svg,
+  StarIcon as StarSvg,
   UnfoldMoreIcon as UnfoldMoreSvg,
   Tick02Icon as Tick02Svg,
 } from "@hugeicons/core-free-icons";
@@ -83,6 +89,13 @@ export const CheckCircleIcon = (props: IconProps) => (
   <HugeIcon icon={CheckmarkCircle01Svg} {...props} />
 );
 export const XIcon = (props: IconProps) => <HugeIcon icon={Cancel01Svg} {...props} />;
+export const PinIcon = (props: IconProps) => <HugeIcon icon={HugePinIcon} {...props} />;
+export const PinOffIcon = (props: IconProps) => <HugeIcon icon={HugePinOffIcon} {...props} />;
+
+export const StarIcon = (props: IconProps) => <HugeIcon icon={StarSvg} {...props} />;
+export const FocusIcon = (props: IconProps) => <HugeIcon icon={Maximize01Svg} {...props} />;
+export const ReadingModeIcon = (props: IconProps) => <HugeIcon icon={BookOpen01Svg} {...props} />;
+export const OutlineIcon = (props: IconProps) => <HugeIcon icon={ListViewSvg} {...props} />;
 
 const glyphLogoMarkSrc = `${import.meta.env.BASE_URL}icon.png`;
 

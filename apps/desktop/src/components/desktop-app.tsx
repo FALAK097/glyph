@@ -18,20 +18,25 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     <TooltipProvider>
       <div
         className={`grid h-screen min-h-0 overflow-hidden transition-[grid-template-columns] duration-200 ${
-          controller.isSidebarCollapsed
+          controller.isSidebarCollapsed || controller.isFocusMode
             ? "grid-cols-[0_minmax(0,1fr)]"
             : "grid-cols-[280px_minmax(0,1fr)]"
         }`}
       >
-        {controller.isSidebarCollapsed ? (
+        {controller.isSidebarCollapsed || controller.isFocusMode ? (
           <div aria-hidden="true" className="w-0 min-w-0 overflow-hidden" />
         ) : (
           <Sidebar
             tree={controller.visibleSidebarNodes}
             activePath={controller.activeFile?.path ?? null}
             isCollapsed={controller.isSidebarCollapsed}
+            openInFolderLabel={controller.folderRevealLabel}
+            pinnedNotes={controller.pinnedNotes}
             onOpenFile={(filePath) => void controller.openFile(filePath)}
+            onOpenCommandPalette={() => controller.setIsPaletteOpen(true)}
+            onCreateNote={() => void controller.createNote()}
             onDeleteFile={controller.handleDeleteFile}
+            onTogglePinnedFile={(filePath) => void controller.togglePinnedFile(filePath)}
             onRemoveFolder={controller.handleRemoveFolder}
             onRenameFile={controller.handleRenameFile}
             onRevealInFinder={(targetPath) => void controller.revealInFinder(targetPath)}
@@ -68,9 +73,34 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
             onNavigateForward={() => void controller.navigateForward()}
             navigateBackShortcut={getShortcutDisplay(controller.shortcuts, "navigate-back")}
             navigateForwardShortcut={getShortcutDisplay(controller.shortcuts, "navigate-forward")}
+            focusModeShortcut={getShortcutDisplay(controller.shortcuts, "focus-mode")}
+            onDeleteNote={
+              controller.activeFile
+                ? () => void controller.handleDeleteFile(controller.activeFile!.path)
+                : undefined
+            }
+            onOpenNewWindow={
+              controller.activeFile
+                ? () => void window.glyph?.openExternal(controller.activeFile!.path)
+                : undefined
+            }
             canGoBack={controller.canGoBack()}
             canGoForward={controller.canGoForward()}
             autoOpenPDFSetting={controller.settings?.autoOpenPDF ?? true}
+            breadcrumbs={controller.breadcrumbs}
+            folderRevealLabel={controller.folderRevealLabel}
+            isActiveFilePinned={controller.isActiveFilePinned}
+            isFocusMode={controller.isFocusMode}
+            onOutlineJumpHandled={controller.clearOutlineJumpRequest}
+            onToggleFocusMode={() => void controller.toggleFocusMode()}
+            onTogglePinnedFile={
+              controller.activeFile
+                ? () => void controller.togglePinnedFile(controller.activeFile!.path)
+                : undefined
+            }
+            outlineItems={controller.outlineItems}
+            outlineJumpRequest={controller.outlineJumpRequest}
+            showOutline={controller.showOutline}
             updateState={controller.updateState}
             onUpdateAction={() => void controller.triggerUpdateAction()}
           />

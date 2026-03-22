@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, MouseEvent, ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { getDisplayFileName } from "@/lib/paths";
+import { getDisplayFileName, isSamePath } from "@/lib/paths";
 
 import {
   ChevronRightIcon,
   FileIcon,
   FolderIcon,
   MoreVerticalIcon,
+  PinIcon,
   PencilIcon,
   RevealInFolderIcon,
   TrashIcon,
@@ -23,21 +25,24 @@ import type {
   SidebarTreeNodeProps,
 } from "../types/sidebar";
 
-export const SidebarTreeNode = ({
+export const SidebarTreeNode = memo(function SidebarTreeNode({
   node,
   activePath,
   depth,
   isExpanded,
+  folderRevealLabel,
+  pinnedPaths,
   onOpenFile,
   onRequestRemoveFolder,
   onRevealInFinder,
+  onTogglePinnedFile,
   onRequestDelete,
   onRenameFile,
   onToggleFolder,
   draggable,
   onDragStartTopLevel,
   onDropNode,
-}: SidebarTreeNodeProps) => {
+}: SidebarTreeNodeProps) {
   const [localIsExpanded, setLocalIsExpanded] = useState(true);
   const [showMenu, setShowMenu] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
@@ -48,14 +53,23 @@ export const SidebarTreeNode = ({
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const displayFileName = useMemo(() => getDisplayFileName(node.name), [node.name]);
   const isFolderExpanded = isExpanded ?? localIsExpanded;
+  const revealLabel = folderRevealLabel;
+  const pinnedPathList = pinnedPaths ?? [];
+  const isPinned = pinnedPathList.some((path) => isSamePath(path, node.path));
+  const isActive = isSamePath(activePath, node.path);
+  const focusMenuButton = useCallback(() => {
+    window.requestAnimationFrame(() => {
+      menuButtonRef.current?.focus();
+    });
+  }, []);
 
   const containerClassName = useMemo(() => {
     if (dropPosition === "before") {
-      return "border-t-2 border-primary";
+      return "border-t-2 border-primary/70 bg-primary/5 ring-1 ring-primary/20";
     }
 
     if (dropPosition === "after") {
-      return "border-b-2 border-primary";
+      return "border-b-2 border-primary/70 bg-primary/5 ring-1 ring-primary/20";
     }
 
     return "border-transparent";
@@ -132,7 +146,7 @@ export const SidebarTreeNode = ({
       return null;
     }
 
-    return (
+    return createPortal(
       <>
         <button
           aria-label={ariaLabel}
@@ -140,6 +154,7 @@ export const SidebarTreeNode = ({
           onClick={(event) => {
             event.stopPropagation();
             setShowMenu(false);
+            focusMenuButton();
           }}
           type="button"
           tabIndex={-1}
@@ -150,15 +165,19 @@ export const SidebarTreeNode = ({
         >
           {content}
         </div>
-      </>
+      </>,
+      document.body,
     );
   };
 
   if (node.type === "directory") {
     return (
-      <div className={`relative mb-1 border-transparent ${containerClassName}`} {...dragHandlers}>
+      <div
+        className={`relative mb-1 rounded-xl border border-transparent transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out ${containerClassName}`}
+        {...dragHandlers}
+      >
         <div
-          className="group/folder-row mx-1 flex min-w-0 items-center rounded-md text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+          className="group/folder-row mx-1 flex min-w-0 items-center rounded-lg border border-transparent text-sidebar-foreground transition-[background-color,border-color,color] duration-150 ease-out hover:border-sidebar-accent/20 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground focus-within:border-sidebar-accent/30 focus-within:bg-sidebar-accent/50"
           style={{
             paddingLeft: `${depth * 14 + 6}px`,
             paddingRight: "4px",
@@ -185,11 +204,11 @@ export const SidebarTreeNode = ({
             <span className="relative flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground">
               <FolderIcon
                 size={14}
-                className="transition-all duration-150 ease-out group-hover/folder-row:scale-90 group-hover/folder-row:opacity-0 group-hover/folder-row:text-sidebar-accent-foreground/75"
+                className="transition-[transform,opacity,color] duration-200 ease-out group-hover/folder-row:scale-90 group-hover/folder-row:opacity-0 group-hover/folder-row:text-sidebar-accent-foreground/75"
               />
               <ChevronRightIcon
                 size={12}
-                className={`absolute opacity-0 transition-all duration-150 ease-out group-hover/folder-row:opacity-100 ${
+                className={`absolute opacity-0 transition-[transform,opacity,color] duration-200 ease-out group-hover/folder-row:opacity-100 ${
                   isFolderExpanded ? "rotate-90" : ""
                 }`}
               />
@@ -230,7 +249,7 @@ export const SidebarTreeNode = ({
                     <MoreVerticalIcon size={14} />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="right">Options</TooltipContent>
+                <TooltipContent side="right">Folder actions</TooltipContent>
               </Tooltip>
             </div>
           ) : null}
@@ -247,6 +266,9 @@ export const SidebarTreeNode = ({
                 onOpenFile={onOpenFile}
                 onRequestRemoveFolder={onRequestRemoveFolder}
                 onRevealInFinder={onRevealInFinder}
+                folderRevealLabel={folderRevealLabel}
+                pinnedPaths={pinnedPaths}
+                onTogglePinnedFile={onTogglePinnedFile}
                 onRequestDelete={onRequestDelete}
                 onRenameFile={onRenameFile}
                 onToggleFolder={onToggleFolder}
@@ -265,11 +287,12 @@ export const SidebarTreeNode = ({
                 event.stopPropagation();
                 onRevealInFinder(node.path);
                 setShowMenu(false);
+                focusMenuButton();
               }}
               type="button"
             >
               <RevealInFolderIcon size={14} className="shrink-0 opacity-70" />
-              Open in Finder
+              {revealLabel}
             </Button>
             <Button
               variant="ghost"
@@ -298,14 +321,14 @@ export const SidebarTreeNode = ({
 
   return (
     <div
-      className={`group/file-row relative mb-0.5 flex min-w-0 items-center overflow-hidden border-transparent ${containerClassName}`}
+      className={`group/file-row relative mb-0.5 flex min-w-0 items-center overflow-hidden rounded-xl border border-transparent transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out active:scale-[0.98] ${containerClassName}`}
       {...dragHandlers}
     >
       <div
         className={`mx-1 flex min-w-0 flex-1 cursor-pointer items-center rounded-md transition-colors ${
-          activePath === node.path
-            ? "bg-sidebar-accent text-sidebar-accent-foreground"
-            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          isActive
+            ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-accent/30"
+            : "text-sidebar-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-within:bg-sidebar-accent/70 focus-within:text-sidebar-accent-foreground"
         }`}
         style={{
           paddingLeft: `${depth * 14 + 8}px`,
@@ -314,14 +337,35 @@ export const SidebarTreeNode = ({
           paddingBottom: "6px",
         }}
       >
-        <FileIcon
-          size={12}
-          className={`mr-2 shrink-0 transition-colors ${
-            activePath === node.path
-              ? "text-sidebar-accent-foreground/70"
-              : "text-muted-foreground group-hover/file-row:text-sidebar-accent-foreground/70"
-          }`}
-        />
+        <span className="relative flex h-4 w-4 shrink-0 items-center justify-center mr-2">
+          <FileIcon
+            size={12}
+            className={`transition-[opacity,color] duration-200 ${
+              isPinned
+                ? "opacity-0"
+                : isActive
+                  ? "text-sidebar-accent-foreground/70 group-hover/file-row:opacity-0"
+                  : "text-muted-foreground group-hover/file-row:text-sidebar-accent-foreground/70 group-hover/file-row:opacity-0"
+            }`}
+          />
+          <button
+            type="button"
+            className={`absolute flex items-center justify-center transition-[opacity,color] duration-200 cursor-pointer hover:text-foreground ${
+              isPinned
+                ? isActive
+                  ? "opacity-100 text-sidebar-accent-foreground/70"
+                  : "opacity-100 text-muted-foreground"
+                : "opacity-0 group-hover/file-row:opacity-100 group-hover/file-row:text-sidebar-accent-foreground/70"
+            }`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onTogglePinnedFile?.(node.path);
+            }}
+            aria-label={isPinned ? "Unpin note" : "Pin note"}
+          >
+            <PinIcon size={12} />
+          </button>
+        </span>
         {isRenaming ? (
           <Input
             ref={renameInputRef}
@@ -365,7 +409,7 @@ export const SidebarTreeNode = ({
                   <MoreVerticalIcon size={14} />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="right">Options</TooltipContent>
+              <TooltipContent side="right">Note actions</TooltipContent>
             </Tooltip>
           </div>
         ) : null}
@@ -407,4 +451,4 @@ export const SidebarTreeNode = ({
       )}
     </div>
   );
-};
+});

@@ -19,6 +19,7 @@ This repo ships local skills for various domains. **Load them before working on 
 | ----------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | `electron`                    | `.agents/skills/electron/SKILL.md`                    | IPC, BrowserWindow, menus, tray, packaging, security, cross-platform Electron APIs          |
 | `frontend-design`             | `.agents/skills/frontend-design/SKILL.md`             | When building frontend components/interfaces to ensure distinctive, production-grade design |
+| `github-project-workflow`     | `.agents/skills/github-project-workflow/SKILL.md`     | When working on GitHub issues, PRs, roadmap execution, or project board status updates      |
 | `remotion-best-practices`     | `.agents/skills/remotion-best-practices/SKILL.md`     | Best practices for Remotion - Video creation in React                                       |
 | `vercel-react-best-practices` | `.agents/skills/vercel-react-best-practices/SKILL.md` | Performance and optimization guidelines for React/Next.js                                   |
 | `web-design-guidelines`       | `.agents/skills/web-design-guidelines/SKILL.md`       | When reviewing UI, checking accessibility, UX audits, or verifying best practices           |

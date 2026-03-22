@@ -73,13 +73,19 @@ export type SidebarState = {
   expandedFolders: string[];
 };
 
+export type EditorPreferences = {
+  focusMode: boolean;
+  showOutline: boolean;
+};
+
 export type AppSettings = {
   defaultWorkspacePath: string;
   themeId: string;
   themeMode: ThemeMode;
-  recentFiles: string[];
+  pinnedFiles: string[];
   shortcuts: ShortcutSetting[];
   sidebar: SidebarState;
+  editorPreferences: EditorPreferences;
   autoOpenPDF: boolean;
 };
 
@@ -120,7 +126,8 @@ export type AppCommand =
   | "new-folder"
   | "search"
   | "quick-open"
-  | "toggle-sidebar";
+  | "toggle-sidebar"
+  | "focus-mode";
 
 export type ExternalFileTarget = {
   path: string;

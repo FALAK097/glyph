@@ -1,9 +1,12 @@
 import type { UpdateState } from "../shared/workspace";
+import type { BreadcrumbItem, OutlineItem } from "@/types/navigation";
 
 export type MarkdownEditorProps = {
   content: string;
   fileName: string | null;
   filePath: string | null;
+  workspaceRootPath?: string | null;
+  breadcrumbs?: BreadcrumbItem[];
   saveStateLabel: string;
   wordCount: number;
   readingTime: number;
@@ -24,8 +27,22 @@ export type MarkdownEditorProps = {
   canGoBack?: boolean;
   canGoForward?: boolean;
   autoOpenPDFSetting?: boolean;
+  isActiveFileFavorite?: boolean;
+  isActiveFilePinned?: boolean;
+  onOutlineJumpHandled?: () => void;
+  onToggleFavoriteFile?: () => void;
   updateState?: UpdateState | null;
   onUpdateAction?: () => void;
+  isFocusMode?: boolean;
+  showOutline?: boolean;
+  onToggleFocusMode?: () => void;
+  focusModeShortcut?: string;
+  onOpenNewWindow?: () => void;
+  onDeleteNote?: () => void;
+  onTogglePinnedFile?: () => void;
+  folderRevealLabel?: string;
+  outlineItems?: OutlineItem[];
+  outlineJumpRequest?: { id: string; nonce: number } | null;
 };
 
 export type MarkdownEditorToast = {

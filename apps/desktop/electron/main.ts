@@ -460,11 +460,15 @@ function getDefaultSettings(): AppSettings {
     defaultWorkspacePath: getDefaultWorkspacePath(),
     themeId: "aura",
     themeMode: "light",
-    recentFiles: [],
+    pinnedFiles: [],
     shortcuts: DEFAULT_SHORTCUTS,
     sidebar: {
       items: [],
       expandedFolders: [],
+    },
+    editorPreferences: {
+      focusMode: false,
+      showOutline: true,
     },
     autoOpenPDF: true,
   };
@@ -500,6 +504,21 @@ function normalizeShortcutSettings(shortcuts: AppSettings["shortcuts"] | undefin
   return mergeShortcutSettings(shortcuts).map(({ id, keys }) => ({ id, keys }));
 }
 
+function normalizePersistedFileList(input: unknown) {
+  return Array.isArray(input)
+    ? input.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    : [];
+}
+
+function normalizeEditorPreferences(
+  input: Partial<AppSettings["editorPreferences"]> | undefined,
+): AppSettings["editorPreferences"] {
+  return {
+    focusMode: typeof input?.focusMode === "boolean" ? input.focusMode : false,
+    showOutline: typeof input?.showOutline === "boolean" ? input.showOutline : true,
+  };
+}
+
 function validateShortcutSettings(shortcuts: AppSettings["shortcuts"]) {
   const normalized = normalizeShortcutSettings(shortcuts);
   const seen = new Map<string, string>();
@@ -527,9 +546,21 @@ function buildApplicationMenu(shortcuts: AppSettings["shortcuts"]) {
     const keys = resolvedShortcuts.find((shortcut) => shortcut.id === id)?.keys;
     return keys ? toElectronAccelerator(keys) : undefined;
   };
+  const focusModeItem: Electron.MenuItemConstructorOptions = {
+    label: "Toggle Focus Mode",
+    accelerator: getAccelerator("focus-mode"),
+    click: () => mainWindow?.webContents.send("app:command", "focus-mode" satisfies AppCommand),
+  };
+
   const viewSubmenu: Electron.MenuItemConstructorOptions[] = isDev
-    ? [{ role: "reload" }, { role: "forceReload" }, { role: "toggleDevTools" }]
-    : [{ role: "togglefullscreen" }];
+    ? [
+        { role: "reload" },
+        { role: "forceReload" },
+        { role: "toggleDevTools" },
+        { type: "separator" },
+        focusModeItem,
+      ]
+    : [{ role: "togglefullscreen" }, { type: "separator" }, focusModeItem];
 
   const menuTemplate: Electron.MenuItemConstructorOptions[] = [
     {
@@ -624,17 +655,18 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
   }
 
   const candidate = input as Partial<AppSettings>;
+  const validPinnedFiles: string[] = [];
+  const persistedFileGroups = [
+    [normalizePersistedFileList(candidate.pinnedFiles), validPinnedFiles],
+  ] as const;
 
-  let validRecentFiles: string[] = [];
-  if (Array.isArray(candidate.recentFiles)) {
-    for (const filePath of candidate.recentFiles) {
-      if (typeof filePath === "string") {
-        try {
-          await fs.access(filePath);
-          validRecentFiles.push(filePath);
-        } catch {
-          // Skip files that don't exist or can't be accessed
-        }
+  for (const [inputPaths, target] of persistedFileGroups) {
+    for (const filePath of inputPaths) {
+      try {
+        await fs.access(filePath);
+        target.push(filePath);
+      } catch {
+        // Skip files that don't exist or can't be accessed.
       }
     }
   }
@@ -679,7 +711,7 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
         ? candidate.themeId
         : defaults.themeId,
     themeMode: isThemeMode(candidate.themeMode) ? candidate.themeMode : defaults.themeMode,
-    recentFiles: validRecentFiles,
+    pinnedFiles: Array.from(new Set(validPinnedFiles)),
     shortcuts: Array.isArray(candidate.shortcuts)
       ? normalizeShortcutSettings(
           candidate.shortcuts.filter(
@@ -692,6 +724,7 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
       items: validSidebarItems,
       expandedFolders: Array.from(new Set(validExpandedFolders)),
     },
+    editorPreferences: normalizeEditorPreferences(candidate.editorPreferences),
     autoOpenPDF:
       typeof candidate.autoOpenPDF === "boolean" ? candidate.autoOpenPDF : defaults.autoOpenPDF,
   };
@@ -726,21 +759,21 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
 
   if ("themeMode" in candidate) {
     if (!isThemeMode(candidate.themeMode)) {
-      throw new Error("themeMode must be 'light' or 'dark'.");
+      throw new Error("themeMode must be 'light', 'dark', or 'system'.");
     }
 
     nextPatch.themeMode = candidate.themeMode;
   }
 
-  if ("recentFiles" in candidate) {
+  if ("pinnedFiles" in candidate) {
     if (
-      !Array.isArray(candidate.recentFiles) ||
-      candidate.recentFiles.some((entry) => typeof entry !== "string")
+      !Array.isArray(candidate.pinnedFiles) ||
+      candidate.pinnedFiles.some((entry) => typeof entry !== "string")
     ) {
-      throw new Error("recentFiles must be an array of strings.");
+      throw new Error("pinnedFiles must be an array of strings.");
     }
 
-    nextPatch.recentFiles = candidate.recentFiles;
+    nextPatch.pinnedFiles = candidate.pinnedFiles;
   }
 
   if ("shortcuts" in candidate) {
@@ -766,6 +799,20 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
     nextPatch.sidebar = normalizeSidebarState(candidate.sidebar as Partial<AppSettings["sidebar"]>);
   }
 
+  if ("editorPreferences" in candidate) {
+    if (
+      !candidate.editorPreferences ||
+      typeof candidate.editorPreferences !== "object" ||
+      Array.isArray(candidate.editorPreferences)
+    ) {
+      throw new Error("editorPreferences must be an object.");
+    }
+
+    nextPatch.editorPreferences = normalizeEditorPreferences(
+      candidate.editorPreferences as Partial<AppSettings["editorPreferences"]>,
+    );
+  }
+
   if ("autoOpenPDF" in candidate) {
     if (typeof candidate.autoOpenPDF !== "boolean") {
       throw new Error("autoOpenPDF must be a boolean.");
@@ -780,9 +827,10 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
         "defaultWorkspacePath",
         "themeId",
         "themeMode",
-        "recentFiles",
+        "pinnedFiles",
         "shortcuts",
         "sidebar",
+        "editorPreferences",
         "autoOpenPDF",
       ].includes(key),
   );
@@ -824,24 +872,11 @@ async function updateSettings(patch: Partial<AppSettings>) {
 
   return settingsUpdatePromise;
 }
-
-async function recordRecentFile(filePath: string) {
-  const settings = await loadSettings();
-  const recentFiles = [
-    filePath,
-    ...settings.recentFiles.filter((entry) => entry !== filePath),
-  ].slice(0, 8);
-  await saveSettings({
-    ...settings,
-    recentFiles,
-  });
-}
-
 async function ensureWorkspace(dirPath: string) {
   await fs.mkdir(dirPath, { recursive: true });
 }
 
-async function readMarkdownFile(filePath: string, recordRecent = false) {
+async function readMarkdownFile(filePath: string) {
   try {
     // Check if file exists first
     await fs.access(filePath);
@@ -856,11 +891,7 @@ async function readMarkdownFile(filePath: string, recordRecent = false) {
     throw err;
   }
 
-  const content = await fs.readFile(filePath, "utf8");
-
-  if (recordRecent) {
-    await recordRecentFile(filePath);
-  }
+  const content = (await fs.readFile(filePath, "utf8")).replace(/\r\n?/g, "\n");
 
   return {
     path: filePath,
@@ -962,32 +993,7 @@ async function collectMarkdownFiles(nodes: DirectoryNode[]): Promise<string[]> {
   return paths;
 }
 
-function getPreferredWorkspaceFilePath(
-  workspaceRoot: string,
-  filePaths: string[],
-  recentFiles: string[],
-) {
-  const available = new Map(
-    filePaths.map((filePath) => [normalizePathForComparison(filePath), filePath]),
-  );
-
-  for (const recentFile of recentFiles) {
-    if (!recentFile) {
-      continue;
-    }
-
-    const normalizedRecentFile = normalizePathForComparison(recentFile);
-    const relativePath = path.relative(workspaceRoot, recentFile);
-    if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
-      continue;
-    }
-
-    const matchingFile = available.get(normalizedRecentFile);
-    if (matchingFile) {
-      return matchingFile;
-    }
-  }
-
+function getPreferredWorkspaceFilePath(filePaths: string[]) {
   return filePaths[0] ?? null;
 }
 
@@ -997,13 +1003,8 @@ async function openWorkspace(dirPath: string): Promise<WorkspaceSnapshot> {
 
   const tree = await buildDirectoryTree(dirPath);
   searchableFilesCache = await collectMarkdownFiles(tree);
-  const settings = await loadSettings();
-  const activeFilePath = getPreferredWorkspaceFilePath(
-    dirPath,
-    searchableFilesCache,
-    settings.recentFiles,
-  );
-  const activeFile = activeFilePath ? await readMarkdownFile(activeFilePath, true) : null;
+  const activeFilePath = getPreferredWorkspaceFilePath(searchableFilesCache);
+  const activeFile = activeFilePath ? await readMarkdownFile(activeFilePath) : null;
 
   if (activeWatcher) {
     await activeWatcher.close();
@@ -1226,12 +1227,23 @@ function assertWithinWorkspace(targetPath: string) {
 }
 
 ipcMain.handle("workspace:openFile", async (_event, filePath: string) =>
-  readMarkdownFile(filePath, true),
+  readMarkdownFile(filePath),
 );
 
 ipcMain.handle("workspace:saveFile", async (_event, filePath: string, content: string) => {
-  await fs.writeFile(filePath, content, "utf8");
-  return readMarkdownFile(filePath, false);
+  let nextContent = content;
+
+  try {
+    const existingContent = await fs.readFile(filePath, "utf8");
+    if (existingContent.includes("\r\n")) {
+      nextContent = content.replace(/\r?\n/g, "\r\n");
+    }
+  } catch {
+    // If we can't read the existing file, fall back to the normalized editor content.
+  }
+
+  await fs.writeFile(filePath, nextContent, "utf8");
+  return readMarkdownFile(filePath);
 });
 
 ipcMain.handle("workspace:createFile", async (_event, parentDir: string, fileName: string) => {
@@ -1240,7 +1252,7 @@ ipcMain.handle("workspace:createFile", async (_event, parentDir: string, fileNam
   const normalizedFileName = getMarkdownExtension(fileName) !== null ? fileName : `${fileName}.md`;
   const targetPath = path.join(parentDir, normalizedFileName);
   await fs.writeFile(targetPath, "", { flag: "wx" });
-  return readMarkdownFile(targetPath, true);
+  return readMarkdownFile(targetPath);
 });
 
 ipcMain.handle("workspace:renameFile", async (_event, oldPath: string, newName: string) => {
@@ -1251,7 +1263,7 @@ ipcMain.handle("workspace:renameFile", async (_event, oldPath: string, newName: 
     getMarkdownExtension(newName) !== null ? newName : `${newName}${currentExtension}`;
   const newPath = path.join(path.dirname(oldPath), normalizedFileName);
   await fs.rename(oldPath, newPath);
-  return readMarkdownFile(newPath, true);
+  return readMarkdownFile(newPath);
 });
 
 ipcMain.handle("workspace:deleteFile", async (_event, targetPath: string) => {
@@ -1285,7 +1297,7 @@ ipcMain.handle("workspace:openDocument", async () => {
     return null;
   }
 
-  return readMarkdownFile(selection.path, true);
+  return readMarkdownFile(selection.path);
 });
 
 ipcMain.handle("settings:get", async () => loadSettings());
@@ -1316,7 +1328,12 @@ ipcMain.handle("app:installUpdate", async () => {
 });
 
 ipcMain.handle("app:revealInFinder", async (_event, targetPath: string) => {
-  shell.showItemInFolder(targetPath);
+  try {
+    shell.showItemInFolder(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
 });
 
 ipcMain.handle("app:saveBlob", async (_event, filePath: string, base64Data: string) => {

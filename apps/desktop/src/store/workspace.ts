@@ -1,5 +1,27 @@
 import { create } from "zustand";
+
+import { isSamePath } from "@/lib/paths";
+
 import type { DirectoryNode, FileDocument } from "../shared/workspace";
+
+const getClosestHistoryIndex = (history: string[], currentIndex: number, filePath: string) => {
+  let closestIndex = -1;
+  let closestDistance = Number.POSITIVE_INFINITY;
+
+  history.forEach((entry, index) => {
+    if (!isSamePath(entry, filePath)) {
+      return;
+    }
+
+    const distance = Math.abs(index - currentIndex);
+    if (distance < closestDistance || (distance === closestDistance && index < closestIndex)) {
+      closestIndex = index;
+      closestDistance = distance;
+    }
+  });
+
+  return closestIndex;
+};
 
 type WorkspaceState = {
   rootPath: string | null;
@@ -28,6 +50,8 @@ type WorkspaceState = {
   setError: (message: string | null) => void;
   // Navigation history methods
   pushHistory: (filePath: string) => void;
+  replaceHistoryPath: (oldPath: string, newPath: string) => void;
+  removeHistoryPath: (targetPath: string) => void;
   canGoBack: () => boolean;
   canGoForward: () => boolean;
   goBack: () => string | null;
@@ -88,11 +112,32 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   setError: (error) => set({ error }),
   pushHistory: (filePath) => {
     set((state) => {
+      const currentPath =
+        state.navigationIndex >= 0
+          ? (state.navigationHistory[state.navigationIndex] ?? null)
+          : null;
+
+      if (currentPath && isSamePath(currentPath, filePath)) {
+        return state;
+      }
+
+      const existingIndex = getClosestHistoryIndex(
+        state.navigationHistory,
+        state.navigationIndex,
+        filePath,
+      );
+      if (existingIndex >= 0) {
+        return {
+          navigationHistory: state.navigationHistory,
+          navigationIndex: existingIndex,
+        };
+      }
+
       // If we're not at the end of history, remove forward entries
       const newHistory = state.navigationHistory.slice(0, state.navigationIndex + 1);
 
       // Don't add duplicate consecutive entries
-      if (newHistory[newHistory.length - 1] === filePath) {
+      if (isSamePath(newHistory[newHistory.length - 1], filePath)) {
         return state;
       }
 
@@ -106,6 +151,50 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return {
         navigationHistory: newHistory,
         navigationIndex: newHistory.length - 1,
+      };
+    });
+  },
+  replaceHistoryPath: (oldPath, newPath) => {
+    set((state) => ({
+      navigationHistory: state.navigationHistory.map((entry) =>
+        isSamePath(entry, oldPath) ? newPath : entry,
+      ),
+    }));
+  },
+  removeHistoryPath: (targetPath) => {
+    set((state) => {
+      const removedIndices: number[] = [];
+      const nextHistory = state.navigationHistory.filter((entry, index) => {
+        if (isSamePath(entry, targetPath)) {
+          removedIndices.push(index);
+          return false;
+        }
+
+        return true;
+      });
+
+      if (nextHistory.length === state.navigationHistory.length) {
+        return state;
+      }
+
+      if (nextHistory.length === 0) {
+        return {
+          navigationHistory: [],
+          navigationIndex: -1,
+        };
+      }
+
+      const removedBeforeCurrent = removedIndices.filter(
+        (index) => index < state.navigationIndex,
+      ).length;
+      const removedCurrentEntry = removedIndices.includes(state.navigationIndex);
+      const nextNavigationIndex = removedCurrentEntry
+        ? state.navigationIndex - removedBeforeCurrent - 1
+        : state.navigationIndex - removedBeforeCurrent;
+
+      return {
+        navigationHistory: nextHistory,
+        navigationIndex: Math.max(0, Math.min(nextNavigationIndex, nextHistory.length - 1)),
       };
     });
   },

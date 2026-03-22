@@ -9,7 +9,8 @@ export type ShortcutId =
   | "settings"
   | "toggle-sidebar"
   | "navigate-back"
-  | "navigate-forward";
+  | "navigate-forward"
+  | "focus-mode";
 
 export type ShortcutDefinition = ShortcutSetting & {
   id: ShortcutId;
@@ -43,6 +44,7 @@ export const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
   { id: "toggle-sidebar", label: "Toggle Sidebar", keys: "⌘ \\" },
   { id: "navigate-back", label: "Navigate Back", keys: "⌘ [" },
   { id: "navigate-forward", label: "Navigate Forward", keys: "⌘ ]" },
+  { id: "focus-mode", label: "Toggle Focus Mode", keys: "⇧ ⌘ F" },
 ];
 
 export const MODIFIER_TOKENS = {

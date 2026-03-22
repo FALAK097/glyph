@@ -250,7 +250,10 @@ export function App() {
           </a>
 
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
-            <a href={DOWNLOAD_URLS.mac} className="download-button w-full cursor-pointer border-0 sm:w-auto">
+            <a
+              href={DOWNLOAD_URLS.mac}
+              className="download-button w-full cursor-pointer border-0 sm:w-auto"
+            >
               <AppleIcon />
               Download for macOS
             </a>

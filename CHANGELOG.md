@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.1](https://github.com/FALAK097/glyph/compare/v0.3.0...v0.3.1) (2026-03-22)
+
+
+### Bug Fixes
+
+* **desktop:** align palette label and remove header breadcrumbs ([a912f13](https://github.com/FALAK097/glyph/commit/a912f13491c168ab112b3fce63352e404e67aa66))
+* **desktop:** update command palette placeholder and header breadcrumb ([9eaa3c5](https://github.com/FALAK097/glyph/commit/9eaa3c55ceac269d7a4c11b3f2aa6b5178c508af))
+* **desktop:** update command palette placeholder and header breadcrumb ([21549f0](https://github.com/FALAK097/glyph/commit/21549f0ff00d605acfc15d219d777843b5ae595f))
+* **web:** improve mobile header and brew command layout ([35248cf](https://github.com/FALAK097/glyph/commit/35248cff506e3269f3b84698b566c7876209144b))
+* **web:** keep brew copy action top-right on desktop ([84ae6fe](https://github.com/FALAK097/glyph/commit/84ae6fe833ed7a107db7ce5558e9c9e91edd3ca9))
+* **web:** refine mobile nav and brew command actions ([6c815c6](https://github.com/FALAK097/glyph/commit/6c815c6afe01fc94b0745385e7891c59980b5783))
+* **web:** update canonical domain to glyph.falakgala.dev ([e0ea065](https://github.com/FALAK097/glyph/commit/e0ea0651bcb3bb1acc4243702782af21a4eb1f7e))
+
 ## [0.3.0](https://github.com/FALAK097/glyph/compare/v0.2.5...v0.3.0) (2026-03-22)
 
 

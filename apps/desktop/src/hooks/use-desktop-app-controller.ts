@@ -880,7 +880,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     ? (noteShortcutLookup.get(toPathKey(nextHistoryPath)) ?? null)
     : null;
   const paletteItems = useMemo<CommandPaletteItem[]>(() => {
-    const query = deferredPaletteQuery.trim().toLowerCase();
+    const query = paletteQuery.trim().toLowerCase();
     const pinnedPaletteItems = pinnedNotes.slice(0, 8).map((note) => ({
       id: `pinned-${note.path}`,
       title: note.title,
@@ -1000,7 +1000,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
   }, [
     allSearchableFiles,
     baseCommands,
-    deferredPaletteQuery,
+    paletteQuery,
     nextHistoryItem,
     navigateBack,
     navigateForward,

@@ -140,8 +140,6 @@ type TableControlsState = {
   canDeleteRow: boolean;
   canDeleteColumn: boolean;
   canDeleteTable: boolean;
-  left: number;
-  top: number;
 };
 
 const extractLinkAttributes = (input: string) => {
@@ -181,8 +179,6 @@ const INACTIVE_TABLE_CONTROLS: TableControlsState = {
   canDeleteRow: false,
   canDeleteColumn: false,
   canDeleteTable: false,
-  left: 0,
-  top: 0,
 };
 
 const runMarkdownShortcutConversion = (
@@ -417,23 +413,30 @@ export const MarkdownEditor = ({
   };
 
   const refreshTableControls = (nextEditor: Editor) => {
-    const scrollContainer = scrollContainerRef.current;
-    const nodeDom = nextEditor.view.nodeDOM(nextEditor.state.selection.from);
-    const selectionElement =
-      nodeDom instanceof HTMLElement
-        ? nodeDom
-        : nodeDom instanceof Text
-          ? nodeDom.parentElement
-          : null;
-    const activeCell = selectionElement?.closest("td, th");
-    const tableWrapper =
-      activeCell instanceof HTMLElement ? activeCell.closest(".tableWrapper") : null;
+    const selectionIncludesTable = [nextEditor.state.selection.$anchor, nextEditor.state.selection.$head].some(
+      ($position) => {
+        for (let depth = $position.depth; depth >= 0; depth -= 1) {
+          const nodeName = $position.node(depth).type.name;
+          if (
+            nodeName === "table" ||
+            nodeName === "tableRow" ||
+            nodeName === "tableCell" ||
+            nodeName === "tableHeader"
+          ) {
+            return true;
+          }
+        }
+
+        return false;
+      },
+    );
 
     if (
       !nextEditor.isFocused ||
-      !(activeCell instanceof HTMLElement) ||
-      !(tableWrapper instanceof HTMLElement) ||
-      !scrollContainer
+      !selectionIncludesTable ||
+      (!nextEditor.isActive("table") &&
+        !nextEditor.isActive("tableCell") &&
+        !nextEditor.isActive("tableHeader"))
     ) {
       const currentState = tableControlsRef.current;
       if (!currentState.active) {
@@ -445,20 +448,11 @@ export const MarkdownEditor = ({
       return;
     }
 
-    const containerRect = scrollContainer.getBoundingClientRect();
-    const cellRect = activeCell.getBoundingClientRect();
-    const tableRect = tableWrapper.getBoundingClientRect();
-    const nextTop = Math.round(Math.max(containerRect.top + 12, cellRect.top - 56));
-    const nextLeft = Math.round(
-      clamp(tableRect.left + tableRect.width / 2, 196, window.innerWidth - 196),
-    );
     const nextState = {
-      active: nextEditor.isActive("tableCell") || nextEditor.isActive("tableHeader"),
+      active: true,
       canDeleteRow: nextEditor.can().deleteRow(),
       canDeleteColumn: nextEditor.can().deleteColumn(),
       canDeleteTable: nextEditor.can().deleteTable(),
-      left: nextLeft,
-      top: nextTop,
     };
 
     const currentState = tableControlsRef.current;
@@ -466,9 +460,7 @@ export const MarkdownEditor = ({
       currentState.active === nextState.active &&
       currentState.canDeleteRow === nextState.canDeleteRow &&
       currentState.canDeleteColumn === nextState.canDeleteColumn &&
-      currentState.canDeleteTable === nextState.canDeleteTable &&
-      currentState.left === nextState.left &&
-      currentState.top === nextState.top
+      currentState.canDeleteTable === nextState.canDeleteTable
     ) {
       return;
     }
@@ -1127,20 +1119,10 @@ export const MarkdownEditor = ({
           setImageControls(null);
           clearHoveredLinkHideTimeout();
           setHoveredLink(null);
-          if (editor) {
-            refreshTableControls(editor);
-          }
         }}
       >
         {tableControls.active ? (
-          <div
-            className="pointer-events-none fixed z-30"
-            style={{
-              left: tableControls.left,
-              top: tableControls.top,
-              transform: "translateX(-50%)",
-            }}
-          >
+          <div className="pointer-events-none sticky top-4 z-20 ml-auto mr-6 h-0 w-fit">
             <div className="pointer-events-auto flex max-w-[min(720px,calc(100vw-2rem))] flex-wrap items-center justify-center gap-2 rounded-2xl border border-border/70 bg-card/95 px-3 py-2 shadow-lg supports-backdrop-filter:backdrop-blur-sm">
               <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
                 Table

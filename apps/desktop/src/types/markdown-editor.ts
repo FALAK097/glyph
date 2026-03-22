@@ -34,7 +34,11 @@ export type MarkdownEditorProps = {
   updateState?: UpdateState | null;
   onUpdateAction?: () => void;
   isFocusMode?: boolean;
+  showOutline?: boolean;
   onToggleFocusMode?: () => void;
+  focusModeShortcut?: string;
+  onOpenNewWindow?: () => void;
+  onDeleteNote?: () => void;
   onTogglePinnedFile?: () => void;
   folderRevealLabel?: string;
   outlineItems?: OutlineItem[];

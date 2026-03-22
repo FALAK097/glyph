@@ -31,14 +31,11 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
             activePath={controller.activeFile?.path ?? null}
             isCollapsed={controller.isSidebarCollapsed}
             openInFolderLabel={controller.folderRevealLabel}
-            favoriteNotes={controller.favoriteNotes}
             pinnedNotes={controller.pinnedNotes}
-            recentNotes={controller.recentNotes}
             onOpenFile={(filePath) => void controller.openFile(filePath)}
             onOpenCommandPalette={() => controller.setIsPaletteOpen(true)}
             onCreateNote={() => void controller.createNote()}
             onDeleteFile={controller.handleDeleteFile}
-            onToggleFavoriteFile={(filePath) => void controller.toggleFavoriteFile(filePath)}
             onTogglePinnedFile={(filePath) => void controller.togglePinnedFile(filePath)}
             onRemoveFolder={controller.handleRemoveFolder}
             onRenameFile={controller.handleRenameFile}
@@ -75,21 +72,18 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
             onNavigateForward={() => void controller.navigateForward()}
             navigateBackShortcut={getShortcutDisplay(controller.shortcuts, "navigate-back")}
             navigateForwardShortcut={getShortcutDisplay(controller.shortcuts, "navigate-forward")}
+            focusModeShortcut={getShortcutDisplay(controller.shortcuts, "focus-mode")}
+            onDeleteNote={controller.activeFile ? () => void controller.handleDeleteFile(controller.activeFile!.path) : undefined}
+            onOpenNewWindow={controller.activeFile ? () => void window.glyph?.openExternal(controller.activeFile!.path) : undefined}
             canGoBack={controller.canGoBack()}
             canGoForward={controller.canGoForward()}
             autoOpenPDFSetting={controller.settings?.autoOpenPDF ?? true}
             breadcrumbs={controller.breadcrumbs}
             folderRevealLabel={controller.folderRevealLabel}
-            isActiveFileFavorite={controller.isActiveFileFavorite}
             isActiveFilePinned={controller.isActiveFilePinned}
             isFocusMode={controller.isFocusMode}
             nextHistoryItem={controller.nextHistoryItem}
             onOutlineJumpHandled={controller.clearOutlineJumpRequest}
-            onToggleFavoriteFile={
-              controller.activeFile
-                ? () => void controller.toggleFavoriteFile(controller.activeFile!.path)
-                : undefined
-            }
             onToggleFocusMode={() => void controller.toggleFocusMode()}
             onTogglePinnedFile={
               controller.activeFile

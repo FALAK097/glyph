@@ -40,32 +40,26 @@ type SidebarShortcutRowProps = {
   activePath: string | null;
   item: NoteShortcutItem;
   isPinned: boolean;
-  isFavorite: boolean;
   folderRevealLabel: string;
   onOpenFile: (filePath: string) => void;
   onRevealInFinder: (targetPath: string) => void;
   onTogglePinnedFile?: (filePath: string) => void;
-  onToggleFavoriteFile?: (filePath: string) => void;
 };
 
 const SidebarShortcutRow = memo(function SidebarShortcutRow({
   activePath,
   item,
   isPinned,
-  isFavorite,
   folderRevealLabel,
   onOpenFile,
   onRevealInFinder,
   onTogglePinnedFile,
-  onToggleFavoriteFile,
 }: SidebarShortcutRowProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [menuCoords, setMenuCoords] = useState<{ top: number; left: number } | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const isActive = normalizePathKey(activePath ?? "") === normalizePathKey(item.path);
   const pinLabel = isPinned ? "Unpin note" : "Pin note";
-  const favoriteLabel = isFavorite ? "Remove from favorites" : "Add to favorites";
-
   const focusMenuButton = useCallback(() => {
     window.requestAnimationFrame(() => {
       if (menuButtonRef.current?.isConnected) {
@@ -120,9 +114,6 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
                 : "group-hover/shortcut:text-sidebar-accent-foreground/70"
             }`}
           />
-          {isActive ? (
-            <span className="absolute -left-3 h-5 w-1 rounded-full bg-sidebar-accent-foreground/80" />
-          ) : null}
         </span>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium">{item.title}</span>
@@ -212,23 +203,6 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
                 {pinLabel}
               </Button>
             ) : null}
-            {onToggleFavoriteFile ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onToggleFavoriteFile(item.path);
-                  setShowMenu(false);
-                  focusMenuButton();
-                }}
-                type="button"
-              >
-                <CheckCircleIcon size={14} className="opacity-70" />
-                {favoriteLabel}
-              </Button>
-            ) : null}
             <Button
               variant="ghost"
               size="sm"
@@ -259,9 +233,7 @@ type SidebarShortcutListProps = {
   onOpenFile: (filePath: string) => void;
   onRevealInFinder: (targetPath: string) => void;
   onTogglePinnedFile?: (filePath: string) => void;
-  onToggleFavoriteFile?: (filePath: string) => void;
   pinnedPaths: string[];
-  favoritePaths: string[];
 };
 
 const SidebarShortcutList = memo(function SidebarShortcutList({
@@ -272,13 +244,9 @@ const SidebarShortcutList = memo(function SidebarShortcutList({
   onOpenFile,
   onRevealInFinder,
   onTogglePinnedFile,
-  onToggleFavoriteFile,
   pinnedPaths,
-  favoritePaths,
 }: SidebarShortcutListProps) {
   const pinnedSet = useMemo(() => new Set(pinnedPaths.map(normalizePathKey)), [pinnedPaths]);
-  const favoriteSet = useMemo(() => new Set(favoritePaths.map(normalizePathKey)), [favoritePaths]);
-
   if (items.length === 0) {
     return <p className="px-2 text-xs leading-5 text-muted-foreground">{emptyLabel}</p>;
   }
@@ -293,12 +261,10 @@ const SidebarShortcutList = memo(function SidebarShortcutList({
             key={item.path}
             activePath={activePath}
             item={item}
-            isFavorite={favoriteSet.has(itemPathKey)}
             isPinned={pinnedSet.has(itemPathKey)}
             folderRevealLabel={folderRevealLabel}
             onOpenFile={onOpenFile}
             onRevealInFinder={onRevealInFinder}
-            onToggleFavoriteFile={onToggleFavoriteFile}
             onTogglePinnedFile={onTogglePinnedFile}
           />
         );
@@ -311,16 +277,13 @@ export const Sidebar = ({
   tree,
   activePath,
   isCollapsed,
-  favoriteNotes,
   folderRevealLabel,
   openInFolderLabel,
   pinnedNotes,
-  recentNotes,
   onCreateNote,
   onOpenCommandPalette,
   onOpenFile,
   onDeleteFile,
-  onToggleFavoriteFile,
   onTogglePinnedFile,
   onRemoveFolder,
   onRenameFile,
@@ -331,13 +294,8 @@ export const Sidebar = ({
   const [nodeToDelete, setNodeToDelete] = useState<SidebarDeleteTarget | null>(null);
   const [folderToRemove, setFolderToRemove] = useState<SidebarRemoveTarget | null>(null);
   const [draggedPath, setDraggedPath] = useState<string | null>(null);
-  const pinnedList = pinnedNotes ?? [];
-  const favoriteList = favoriteNotes ?? [];
-  const recentList = recentNotes ?? [];
-  const revealLabel = folderRevealLabel ?? openInFolderLabel ?? "Open in Finder";
-  const pinnedPaths = useMemo(() => pinnedList.map((note) => note.path), [pinnedList]);
-  const favoritePaths = useMemo(() => favoriteList.map((note) => note.path), [favoriteList]);
-  const workspaceCount = tree.length;
+  const pinnedList = pinnedNotes ?? [];  const revealLabel = folderRevealLabel ?? openInFolderLabel ?? "Open in Finder";
+  const pinnedPaths = useMemo(() => pinnedList.map((note) => note.path), [pinnedList]);  const workspaceCount = tree.length;
   const handleRequestRemoveFolder = useCallback((folder: SidebarRemoveTarget) => {
     setFolderToRemove(folder);
   }, []);
@@ -403,9 +361,7 @@ export const Sidebar = ({
                 folderRevealLabel={revealLabel}
                 onRevealInFinder={onRevealInFinder}
                 onTogglePinnedFile={onTogglePinnedFile}
-                onToggleFavoriteFile={onToggleFavoriteFile}
                 pinnedPaths={pinnedPaths}
-                favoritePaths={favoritePaths}
               />
             </div>
           </div>
@@ -430,7 +386,6 @@ export const Sidebar = ({
                     node={entry.node}
                     activePath={activePath}
                     depth={0}
-                    favoritePaths={favoritePaths}
                     folderRevealLabel={revealLabel}
                     isExpanded={entry.isExpanded}
                     pinnedPaths={pinnedPaths}
@@ -439,7 +394,6 @@ export const Sidebar = ({
                     onRevealInFinder={onRevealInFinder}
                     onRequestDelete={handleRequestDelete}
                     onRenameFile={onRenameFile}
-                    onToggleFavoriteFile={onToggleFavoriteFile}
                     onToggleFolder={onToggleFolder}
                     onTogglePinnedFile={onTogglePinnedFile}
                     draggable

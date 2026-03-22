@@ -33,6 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 import { SlashCommand } from "./slash-command";
+import { TableOfContents } from "./table-of-contents";
 import {
   ArrowUpIcon,
   ArrowLeftIcon,
@@ -327,7 +328,11 @@ export const MarkdownEditor = ({
   updateState,
   onUpdateAction,
   isFocusMode,
+  showOutline = true,
   onToggleFocusMode,
+  focusModeShortcut,
+  onOpenNewWindow,
+  onDeleteNote,
   onTogglePinnedFile,
   folderRevealLabel,
   outlineJumpRequest,
@@ -371,6 +376,15 @@ export const MarkdownEditor = ({
     canDeleteTable: false,
   });
   const [devPreviewUpdateState] = useState<UpdateState | null>(() => getDevPreviewUpdateState());
+  const [outlineItems, setOutlineItems] = useState<EditorOutlineItem[]>([]);
+  const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
+  const outlineItemsRef = useRef<EditorOutlineItem[]>([]);
+
+  const refreshOutline = useCallback((nextEditor: Editor) => {
+    const items = collectEditorOutline(nextEditor);
+    setOutlineItems(items);
+    outlineItemsRef.current = items;
+  }, []);
 
   const effectiveUpdateState = devPreviewUpdateState ?? updateState;
 
@@ -445,7 +459,20 @@ export const MarkdownEditor = ({
       return;
     }
 
-    nextEditor.chain().focus().setTextSelection(item.pos).scrollIntoView().run();
+    const nodeDom = nextEditor.view.nodeDOM(item.pos - 1);
+    const container = scrollContainerRef.current;
+    
+    if (nodeDom instanceof HTMLElement && container) {
+      const containerRect = container.getBoundingClientRect();
+      const nodeRect = nodeDom.getBoundingClientRect();
+      
+      const targetScrollTop = container.scrollTop + (nodeRect.top - containerRect.top) - 40;
+      container.scrollTo({ top: targetScrollTop, behavior: "smooth" });
+    } else {
+      nextEditor.chain().focus().setTextSelection(item.pos).scrollIntoView().run();
+    }
+    
+    nextEditor.chain().focus().setTextSelection(item.pos).run();
   }, []);
 
   const storeNoteViewState = useCallback((targetFilePath: string | null | undefined) => {
@@ -740,6 +767,7 @@ export const MarkdownEditor = ({
 
       refreshTableControls(nextEditor);
       refreshImageControls(nextEditor);
+      refreshOutline(nextEditor);
 
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any
       const nextMarkdown = (nextEditor.storage as any).markdown.getMarkdown() as string;
@@ -755,29 +783,6 @@ export const MarkdownEditor = ({
     },
   });
 
-  const outlineItems = useMemo<EditorOutlineItem[]>(() => {
-    if (!editor) {
-      return [];
-    }
-
-    return collectEditorOutline(editor);
-  }, [content, editor]);
-
-  const outlineIndentStyles = useMemo<Record<number, CSSProperties>>(() => {
-    const styles: Record<number, CSSProperties> = {};
-
-    outlineItems.forEach((item) => {
-      if (styles[item.depth]) {
-        return;
-      }
-
-      styles[item.depth] = {
-        paddingLeft: `${12 + (item.depth - 1) * 12}px`,
-      };
-    });
-
-    return styles;
-  }, [outlineItems]);
 
   useEffect(() => {
     if (!editor || content === lastSyncedMarkdown.current) {
@@ -791,7 +796,8 @@ export const MarkdownEditor = ({
     lastSyncedMarkdown.current = content;
     refreshTableControls(editor);
     refreshImageControls(editor);
-  }, [content, editor]);
+    refreshOutline(editor);
+  }, [content, editor, refreshOutline]);
 
   useEffect(() => {
     if (!editor) {
@@ -1056,8 +1062,8 @@ export const MarkdownEditor = ({
   const isMacLike = navigator.platform.includes("Mac");
   const linkOpenShortcutHint = isMacLike ? "Open link (Cmd+Click)" : "Open link (Ctrl+Click)";
   const headerPaddingClass = (isSidebarCollapsed || isFocusLayout) && isMacLike ? "pl-20 pr-4" : "px-4";
-  const shouldShowOutlineRail = !isFocusLayout;
-  const shouldShowCommandPalette = Boolean(onOpenCommandPalette && !isFocusLayout);
+  const shouldShowOutlineRail = !isFocusLayout && showOutline;
+  const shouldShowCommandPalette = Boolean(onOpenCommandPalette);
   const modeButtonsVisible = Boolean(onToggleFocusMode);
   const breadcrumbContext = breadcrumbTrail.map((item) => item.label).join(" / ");
   const backTooltipLabel = previousHistoryItem
@@ -1140,21 +1146,7 @@ export const MarkdownEditor = ({
           </Tooltip>
           {fileName ? (
             <div className="flex min-w-0 flex-col justify-center gap-0.5 pl-1">
-              {breadcrumbTrail.length > 0 ? (
-                <div
-                  className="flex min-w-0 items-center gap-1 overflow-hidden text-[11px] font-medium tracking-[0.12em] text-muted-foreground"
-                  title={breadcrumbContext || filePath || fileName}
-                >
-                  {breadcrumbTrail.map((crumb, index) => (
-                    <span key={crumb.id} className="flex min-w-0 items-center gap-1">
-                      <span className="truncate">{crumb.label}</span>
-                      {index < breadcrumbTrail.length - 1 ? (
-                        <span className="text-border/70">/</span>
-                      ) : null}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
+
               <span
                 className="max-w-[220px] truncate text-sm font-medium text-foreground"
                 title={filePath ?? fileName}
@@ -1207,7 +1199,7 @@ export const MarkdownEditor = ({
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom">
-                    {isFocusLayout ? "Exit Focus Mode" : "Enter Focus Mode"}
+                    {isFocusLayout ? "Exit Focus Mode" : "Enter Focus Mode"}{focusModeShortcut ? ` (${focusModeShortcut})` : ""}
                   </TooltipContent>
                 </Tooltip>
               ) : null}
@@ -1275,42 +1267,6 @@ export const MarkdownEditor = ({
                 type="button"
               />
               <div className="absolute right-0 top-full mt-1 w-48 bg-card border border-border rounded-md shadow-lg z-50 py-1 overflow-hidden">
-                {onTogglePinnedFile ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto w-full justify-start gap-2 rounded-none px-3 py-1.5 text-sm"
-                    onClick={() => {
-                      onTogglePinnedFile();
-                      setIsMenuOpen(false);
-                    }}
-                    disabled={!filePath}
-                    type="button"
-                  >
-                    {isActiveFilePinned ? (
-                      <PinOffIcon size={14} className="opacity-70" />
-                    ) : (
-                      <PinIcon size={14} className="opacity-70" />
-                    )}
-                    {isActiveFilePinned ? "Unpin note" : "Pin note"}
-                  </Button>
-                ) : null}
-                {onToggleFavoriteFile ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto w-full justify-start gap-2 rounded-none px-3 py-1.5 text-sm"
-                    onClick={() => {
-                      onToggleFavoriteFile();
-                      setIsMenuOpen(false);
-                    }}
-                    disabled={!filePath}
-                    type="button"
-                  >
-                    <CheckCircleIcon size={14} className="opacity-70" />
-                    {isActiveFileFavorite ? "Remove favorite" : "Add favorite"}
-                  </Button>
-                ) : null}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1353,34 +1309,38 @@ export const MarkdownEditor = ({
                   <RevealInFolderIcon size={14} className="opacity-70 shrink-0" />
                   {revealInFolderLabel}
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-auto w-full justify-start gap-2 rounded-none px-3 py-1.5 text-sm"
-                  onClick={() => {
-                    handleScrollToTop();
-                    setIsMenuOpen(false);
-                  }}
-                  disabled={!content}
-                  type="button"
-                >
-                  <ArrowUpIcon size={14} className="opacity-70" />
-                  Scroll to top
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-auto w-full justify-start gap-2 rounded-none px-3 py-1.5 text-sm"
-                  onClick={() => {
-                    void handleExportPDF();
-                    setIsMenuOpen(false);
-                  }}
-                  disabled={!content}
-                  type="button"
-                >
-                  <FileDownIcon size={14} className="opacity-70" />
-                  Export as PDF
-                </Button>
+                {onOpenNewWindow ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto w-full justify-start gap-2 rounded-none px-3 py-1.5 text-sm"
+                    onClick={() => {
+                      onOpenNewWindow();
+                      setIsMenuOpen(false);
+                    }}
+                    disabled={!filePath}
+                    type="button"
+                  >
+                    <ExternalLinkIcon size={14} className="opacity-70" />
+                    Open in new window
+                  </Button>
+                ) : null}
+                {onDeleteNote ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto w-full justify-start gap-2 rounded-none px-3 py-1.5 text-sm text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => {
+                      onDeleteNote();
+                      setIsMenuOpen(false);
+                    }}
+                    disabled={!filePath}
+                    type="button"
+                  >
+                    <TrashIcon size={14} className="opacity-70" />
+                    Delete note
+                  </Button>
+                ) : null}
               </div>
             </>
           )}
@@ -1396,6 +1356,38 @@ export const MarkdownEditor = ({
           clearHoveredLinkHideTimeout();
           setHoveredLink(null);
           storeNoteViewState(filePath);
+
+          if (!editor) return;
+          const container = scrollContainerRef.current;
+          if (!container) return;
+
+          const headings = outlineItemsRef.current;
+          if (headings.length === 0) {
+            setActiveHeadingId(null);
+            return;
+          }
+
+          let activeId = headings[0].id;
+          for (const heading of headings) {
+            const nodeDom = editor.view.nodeDOM(heading.pos - 1);
+            if (nodeDom instanceof HTMLElement) {
+              const rect = nodeDom.getBoundingClientRect();
+              const containerRect = container.getBoundingClientRect();
+              // Add a bit more tolerance so if we jump to 40px, it comfortably highlights
+              if (rect.top <= containerRect.top + 120) {
+                activeId = heading.id;
+              } else {
+                break;
+              }
+            }
+          }
+          
+          // Check if scrolled to the absolute bottom
+          if (Math.abs(container.scrollHeight - container.scrollTop - container.clientHeight) < 10) {
+            activeId = headings[headings.length - 1].id;
+          }
+          
+          setActiveHeadingId(activeId);
         }}
       >
         {tableControls.active ? (
@@ -1534,19 +1526,7 @@ export const MarkdownEditor = ({
                   Add headings to build a table of contents.
                 </p>
               ) : (
-                <div className="flex flex-col border-l border-border/40 py-1">
-                  {outlineItems.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className="w-full text-left py-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors truncate"
-                      style={outlineIndentStyles[item.depth]}
-                      onClick={() => handleJumpToHeading(item)}
-                    >
-                      {item.title}
-                    </button>
-                  ))}
-                </div>
+                <TableOfContents items={outlineItems} activeId={activeHeadingId} onJump={handleJumpToHeading} />
               )}
             </div>
           </div>

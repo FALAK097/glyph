@@ -456,9 +456,7 @@ function getDefaultSettings(): AppSettings {
     defaultWorkspacePath: getDefaultWorkspacePath(),
     themeId: "aura",
     themeMode: "light",
-    recentFiles: [],
     pinnedFiles: [],
-    favoriteFiles: [],
     shortcuts: DEFAULT_SHORTCUTS,
     sidebar: {
       items: [],
@@ -639,14 +637,9 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
   }
 
   const candidate = input as Partial<AppSettings>;
-
-  let validRecentFiles: string[] = [];
   const validPinnedFiles: string[] = [];
-  const validFavoriteFiles: string[] = [];
   const persistedFileGroups = [
-    [normalizePersistedFileList(candidate.recentFiles), validRecentFiles],
     [normalizePersistedFileList(candidate.pinnedFiles), validPinnedFiles],
-    [normalizePersistedFileList(candidate.favoriteFiles), validFavoriteFiles],
   ] as const;
 
   for (const [inputPaths, target] of persistedFileGroups) {
@@ -700,9 +693,7 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
         ? candidate.themeId
         : defaults.themeId,
     themeMode: isThemeMode(candidate.themeMode) ? candidate.themeMode : defaults.themeMode,
-    recentFiles: validRecentFiles,
     pinnedFiles: Array.from(new Set(validPinnedFiles)),
-    favoriteFiles: Array.from(new Set(validFavoriteFiles)),
     shortcuts: Array.isArray(candidate.shortcuts)
       ? normalizeShortcutSettings(
           candidate.shortcuts.filter(
@@ -756,17 +747,6 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
     nextPatch.themeMode = candidate.themeMode;
   }
 
-  if ("recentFiles" in candidate) {
-    if (
-      !Array.isArray(candidate.recentFiles) ||
-      candidate.recentFiles.some((entry) => typeof entry !== "string")
-    ) {
-      throw new Error("recentFiles must be an array of strings.");
-    }
-
-    nextPatch.recentFiles = candidate.recentFiles;
-  }
-
   if ("pinnedFiles" in candidate) {
     if (
       !Array.isArray(candidate.pinnedFiles) ||
@@ -776,17 +756,6 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
     }
 
     nextPatch.pinnedFiles = candidate.pinnedFiles;
-  }
-
-  if ("favoriteFiles" in candidate) {
-    if (
-      !Array.isArray(candidate.favoriteFiles) ||
-      candidate.favoriteFiles.some((entry) => typeof entry !== "string")
-    ) {
-      throw new Error("favoriteFiles must be an array of strings.");
-    }
-
-    nextPatch.favoriteFiles = candidate.favoriteFiles;
   }
 
   if ("shortcuts" in candidate) {
@@ -840,9 +809,7 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
         "defaultWorkspacePath",
         "themeId",
         "themeMode",
-        "recentFiles",
         "pinnedFiles",
-        "favoriteFiles",
         "shortcuts",
         "sidebar",
         "editorPreferences",
@@ -887,24 +854,11 @@ async function updateSettings(patch: Partial<AppSettings>) {
 
   return settingsUpdatePromise;
 }
-
-async function recordRecentFile(filePath: string) {
-  const settings = await loadSettings();
-  const recentFiles = [
-    filePath,
-    ...settings.recentFiles.filter((entry) => entry !== filePath),
-  ].slice(0, 8);
-  await saveSettings({
-    ...settings,
-    recentFiles,
-  });
-}
-
 async function ensureWorkspace(dirPath: string) {
   await fs.mkdir(dirPath, { recursive: true });
 }
 
-async function readMarkdownFile(filePath: string, recordRecent = false) {
+async function readMarkdownFile(filePath: string) {
   try {
     // Check if file exists first
     await fs.access(filePath);
@@ -920,10 +874,6 @@ async function readMarkdownFile(filePath: string, recordRecent = false) {
   }
 
   const content = await fs.readFile(filePath, "utf8");
-
-  if (recordRecent) {
-    await recordRecentFile(filePath);
-  }
 
   return {
     path: filePath,
@@ -1028,29 +978,7 @@ async function collectMarkdownFiles(nodes: DirectoryNode[]): Promise<string[]> {
 function getPreferredWorkspaceFilePath(
   workspaceRoot: string,
   filePaths: string[],
-  recentFiles: string[],
 ) {
-  const available = new Map(
-    filePaths.map((filePath) => [normalizePathForComparison(filePath), filePath]),
-  );
-
-  for (const recentFile of recentFiles) {
-    if (!recentFile) {
-      continue;
-    }
-
-    const normalizedRecentFile = normalizePathForComparison(recentFile);
-    const relativePath = path.relative(workspaceRoot, recentFile);
-    if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
-      continue;
-    }
-
-    const matchingFile = available.get(normalizedRecentFile);
-    if (matchingFile) {
-      return matchingFile;
-    }
-  }
-
   return filePaths[0] ?? null;
 }
 
@@ -1064,9 +992,8 @@ async function openWorkspace(dirPath: string): Promise<WorkspaceSnapshot> {
   const activeFilePath = getPreferredWorkspaceFilePath(
     dirPath,
     searchableFilesCache,
-    settings.recentFiles,
   );
-  const activeFile = activeFilePath ? await readMarkdownFile(activeFilePath, true) : null;
+  const activeFile = activeFilePath ? await readMarkdownFile(activeFilePath) : null;
 
   if (activeWatcher) {
     await activeWatcher.close();
@@ -1289,12 +1216,12 @@ function assertWithinWorkspace(targetPath: string) {
 }
 
 ipcMain.handle("workspace:openFile", async (_event, filePath: string) =>
-  readMarkdownFile(filePath, true),
+  readMarkdownFile(filePath),
 );
 
 ipcMain.handle("workspace:saveFile", async (_event, filePath: string, content: string) => {
   await fs.writeFile(filePath, content, "utf8");
-  return readMarkdownFile(filePath, false);
+  return readMarkdownFile(filePath);
 });
 
 ipcMain.handle("workspace:createFile", async (_event, parentDir: string, fileName: string) => {
@@ -1303,7 +1230,7 @@ ipcMain.handle("workspace:createFile", async (_event, parentDir: string, fileNam
   const normalizedFileName = getMarkdownExtension(fileName) !== null ? fileName : `${fileName}.md`;
   const targetPath = path.join(parentDir, normalizedFileName);
   await fs.writeFile(targetPath, "", { flag: "wx" });
-  return readMarkdownFile(targetPath, true);
+  return readMarkdownFile(targetPath);
 });
 
 ipcMain.handle("workspace:renameFile", async (_event, oldPath: string, newName: string) => {
@@ -1314,7 +1241,7 @@ ipcMain.handle("workspace:renameFile", async (_event, oldPath: string, newName: 
     getMarkdownExtension(newName) !== null ? newName : `${newName}${currentExtension}`;
   const newPath = path.join(path.dirname(oldPath), normalizedFileName);
   await fs.rename(oldPath, newPath);
-  return readMarkdownFile(newPath, true);
+  return readMarkdownFile(newPath);
 });
 
 ipcMain.handle("workspace:deleteFile", async (_event, targetPath: string) => {
@@ -1348,7 +1275,7 @@ ipcMain.handle("workspace:openDocument", async () => {
     return null;
   }
 
-  return readMarkdownFile(selection.path, true);
+  return readMarkdownFile(selection.path);
 });
 
 ipcMain.handle("settings:get", async () => loadSettings());

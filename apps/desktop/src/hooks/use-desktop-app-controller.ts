@@ -107,9 +107,6 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
   const isActiveFilePinned = activeFile
     ? (settings?.pinnedFiles ?? []).some((filePath) => isSamePath(filePath, activeFile.path))
     : false;
-  const isActiveFileFavorite = activeFile
-    ? (settings?.favoriteFiles ?? []).some((filePath) => isSamePath(filePath, activeFile.path))
-    : false;
 
   const visibleSidebarNodes = useMemo<SidebarTopLevelNode[]>(() => {
     const expanded = new Set(expandedFolderPaths.map((p) => normalizePath(p).toLowerCase()));
@@ -268,9 +265,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
         );
 
       await saveSettings({
-        recentFiles: remap(settings.recentFiles),
         pinnedFiles: remap(settings.pinnedFiles),
-        favoriteFiles: remap(settings.favoriteFiles),
       });
     },
     [saveSettings, settings],
@@ -410,17 +405,6 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     [saveSettings, settings?.pinnedFiles],
   );
 
-  const toggleFavoriteFile = useCallback(
-    async (filePath: string) => {
-      const current = settings?.favoriteFiles ?? [];
-      const nextFavoriteFiles = current.some((entry) => isSamePath(entry, filePath))
-        ? current.filter((entry) => !isSamePath(entry, filePath))
-        : [filePath, ...current.filter((entry) => !isSamePath(entry, filePath))].slice(0, 24);
-
-      await saveSettings({ favoriteFiles: nextFavoriteFiles });
-    },
-    [saveSettings, settings?.favoriteFiles],
-  );
 
   const toggleFocusMode = useCallback(async () => {
     await saveSettings({
@@ -754,17 +738,9 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     [noteShortcutLookup],
   );
 
-  const recentNotes = useMemo(
-    () => toShortcutItems(settings?.recentFiles ?? [], "Recent"),
-    [settings?.recentFiles, toShortcutItems],
-  );
   const pinnedNotes = useMemo(
     () => toShortcutItems(settings?.pinnedFiles ?? [], "Pinned"),
     [settings?.pinnedFiles, toShortcutItems],
-  );
-  const favoriteNotes = useMemo(
-    () => toShortcutItems(settings?.favoriteFiles ?? [], "Favorite"),
-    [settings?.favoriteFiles, toShortcutItems],
   );
   const previousHistoryPath =
     navigationIndex > 0 ? (navigationHistory[navigationIndex - 1] ?? null) : null;
@@ -786,24 +762,6 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
       subtitle: note.subtitle,
       hint: "Pinned",
       section: "Pinned Notes",
-      kind: "file" as const,
-      onSelect: () => void openFile(note.path),
-    }));
-    const favoritePaletteItems = favoriteNotes.slice(0, 8).map((note) => ({
-      id: `favorite-${note.path}`,
-      title: note.title,
-      subtitle: note.subtitle,
-      hint: "Favorite",
-      section: "Favorite Notes",
-      kind: "file" as const,
-      onSelect: () => void openFile(note.path),
-    }));
-    const recentPaletteItems = recentNotes.slice(0, 6).map((note) => ({
-      id: `recent-${note.path}`,
-      title: note.title,
-      subtitle: note.subtitle,
-      hint: "Recent",
-      section: "Recent Notes",
       kind: "file" as const,
       onSelect: () => void openFile(note.path),
     }));
@@ -852,9 +810,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     if (!query) {
       return [
         ...pinnedPaletteItems,
-        ...favoritePaletteItems,
         ...historyPaletteItems,
-        ...recentPaletteItems,
         ...headingPaletteItems,
         ...baseCommands,
       ];
@@ -871,19 +827,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
           note.title.toLowerCase().includes(query) || note.subtitle?.toLowerCase().includes(query),
       ),
     );
-    items.push(
-      ...favoritePaletteItems.filter(
-        (note) =>
-          note.title.toLowerCase().includes(query) || note.subtitle?.toLowerCase().includes(query),
-      ),
-    );
     items.push(...historyPaletteItems);
-    items.push(
-      ...recentPaletteItems.filter(
-        (note) =>
-          note.title.toLowerCase().includes(query) || note.subtitle?.toLowerCase().includes(query),
-      ),
-    );
     items.push(...headingPaletteItems);
 
     // Match files by name or path
@@ -922,7 +866,6 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     allSearchableFiles,
     baseCommands,
     deferredPaletteQuery,
-    favoriteNotes,
     nextHistoryItem,
     navigateBack,
     navigateForward,
@@ -930,7 +873,6 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     outlineItems,
     pinnedNotes,
     previousHistoryItem,
-    recentNotes,
     requestOutlineJump,
     searchResults,
   ]);
@@ -1191,7 +1133,6 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     createNote,
     draftContent,
     error,
-    favoriteNotes,
     files,
     folderRevealLabel,
     handleDeleteFile,
@@ -1199,7 +1140,6 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     handleRenameFile,
     handleReorderNodes,
     handleToggleFolder,
-    isActiveFileFavorite,
     isActiveFilePinned,
     isFocusMode,
     isPaletteOpen,
@@ -1218,7 +1158,6 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     pinnedNotes,
     previousHistoryItem,
     readingTime,
-    recentNotes,
     revealInFinder,
     requestOutlineJump,
     saveSettings,
@@ -1231,7 +1170,6 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     setSelectedIndex,
     settings,
     shortcuts,
-    toggleFavoriteFile,
     toggleFocusMode,
     togglePinnedFile,
         triggerUpdateAction,

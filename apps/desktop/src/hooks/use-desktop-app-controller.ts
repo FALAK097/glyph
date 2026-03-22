@@ -890,55 +890,10 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
       kind: "file" as const,
       onSelect: () => void openFile(note.path),
     }));
-    const historyPaletteItems: CommandPaletteItem[] = [];
 
-    if (previousHistoryItem) {
-      historyPaletteItems.push({
-        id: `history-back-${previousHistoryItem.path}`,
-        title: previousHistoryItem.title,
-        subtitle: `Back · ${previousHistoryItem.subtitle}`,
-        hint: "Back",
-        section: "History",
-        kind: "file",
-        onSelect: () => void navigateBack(),
-      });
-    }
-
-    if (nextHistoryItem) {
-      historyPaletteItems.push({
-        id: `history-forward-${nextHistoryItem.path}`,
-        title: nextHistoryItem.title,
-        subtitle: `Forward · ${nextHistoryItem.subtitle}`,
-        hint: "Forward",
-        section: "History",
-        kind: "file",
-        onSelect: () => void navigateForward(),
-      });
-    }
-
-    const headingPaletteItems = outlineItems
-      .filter((heading) => !query || heading.title.toLowerCase().includes(query))
-      .slice(0, query ? 10 : 6)
-      .map((heading) => ({
-        id: `heading-${heading.id}`,
-        title: heading.title,
-        subtitle: `Heading · line ${heading.line}`,
-        hint: `H${heading.depth}`,
-        section: "Headings",
-        kind: "command" as const,
-        onSelect: () => {
-          requestOutlineJump(heading.id);
-          setIsPaletteOpen(false);
-        },
-      }));
-
+    // No query: show pinned notes + all commands
     if (!query) {
-      return [
-        ...pinnedPaletteItems,
-        ...historyPaletteItems,
-        ...headingPaletteItems,
-        ...baseCommands,
-      ];
+      return [...pinnedPaletteItems, ...baseCommands];
     }
 
     const items: CommandPaletteItem[] = [];
@@ -950,18 +905,6 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
       ...pinnedPaletteItems.filter(
         (note) =>
           note.title.toLowerCase().includes(query) || note.subtitle?.toLowerCase().includes(query),
-      ),
-    );
-    items.push(
-      ...historyPaletteItems.filter(
-        (item) =>
-          item.title.toLowerCase().includes(query) ||
-          item.subtitle?.toLowerCase().includes(query),
-      ),
-    );
-    items.push(
-      ...headingPaletteItems.filter(
-        (item) => item.title.toLowerCase().includes(query),
       ),
     );
 
@@ -1001,14 +944,8 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     allSearchableFiles,
     baseCommands,
     paletteQuery,
-    nextHistoryItem,
-    navigateBack,
-    navigateForward,
     openFile,
-    outlineItems,
     pinnedNotes,
-    previousHistoryItem,
-    requestOutlineJump,
     searchResults,
   ]);
 

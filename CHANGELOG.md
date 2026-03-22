@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.3.0](https://github.com/FALAK097/glyph/compare/v0.2.5...v0.3.0) (2026-03-22)
+
+
+### Features
+
+* **desktop:** add Toggle Outline command to command palette ([c6c7a07](https://github.com/FALAK097/glyph/commit/c6c7a0757ac915e7612c39a74412fd4ba34fd243))
+
+
+### Bug Fixes
+
+* **desktop:** address navigation shell review feedback ([7c1f954](https://github.com/FALAK097/glyph/commit/7c1f9545b8a8dac2962fe99a0a3850d865db10b2))
+* **desktop:** fix TOC indicator alignment, scroll tracking, focus mode shortcut, and sidebar polish ([3c133c4](https://github.com/FALAK097/glyph/commit/3c133c4d1ddb28897abfa8eddfd55b3d827f7610))
+* **desktop:** remove history and heading items from command palette ([caf67f8](https://github.com/FALAK097/glyph/commit/caf67f825e65dec82a8d4265b611e52939665762))
+* **desktop:** remove note restore persistence ([dfda874](https://github.com/FALAK097/glyph/commit/dfda8745e470bf27bc2edd5bea39263d10173ca1))
+* **desktop:** restore command palette commands and revert sidebar logo to main ([de50fde](https://github.com/FALAK097/glyph/commit/de50fdeea1b995041520e0b023208053749b1e79))
+* **desktop:** restore note navigation and view state ([0813624](https://github.com/FALAK097/glyph/commit/0813624711a80a41ad9d3d72ecbe4fe1de89cc37))
+* **desktop:** use immediate paletteQuery for palette items to prevent stale results ([489bb36](https://github.com/FALAK097/glyph/commit/489bb3629b3a7e825ea71136854243b2e2eae1ee))
+
 ## [0.2.5](https://github.com/FALAK097/glyph/compare/v0.2.4...v0.2.5) (2026-03-22)
 
 

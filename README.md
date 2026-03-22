@@ -95,3 +95,13 @@ pnpm lint
 pnpm fmt:check
 pnpm cask:generate --version <version> --artifact-path apps/desktop/release/Glyph-<version>-mac.dmg
 ```
+
+## Pre-commit checks
+
+Enable the repository pre-commit hook after install:
+
+```bash
+pnpm hooks:install
+```
+
+The hook runs `pnpm fmt:check`, `pnpm lint`, and `pnpm typecheck` before a commit is created.

@@ -19,7 +19,8 @@
     "fmt:check": "oxfmt apps scripts package.json .release-please-config.json .release-please-manifest.json .oxlintrc.json .oxfmtrc.json '!apps/**/dist/**' '!apps/**/dist-electron/**' '!apps/**/release/**' --check",
     "typecheck": "pnpm -r typecheck",
     "typecheck:desktop": "pnpm --filter @glyph/desktop typecheck",
-    "typecheck:web": "pnpm --filter @glyph/web typecheck"
+    "typecheck:web": "pnpm --filter @glyph/web typecheck",
+    "hooks:install": "git config core.hooksPath .githooks"
   },
   "devDependencies": {
     "oxfmt": "0.41.0",

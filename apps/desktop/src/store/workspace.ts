@@ -4,6 +4,25 @@ import { isSamePath } from "@/lib/paths";
 
 import type { DirectoryNode, FileDocument } from "../shared/workspace";
 
+const getClosestHistoryIndex = (history: string[], currentIndex: number, filePath: string) => {
+  let closestIndex = -1;
+  let closestDistance = Number.POSITIVE_INFINITY;
+
+  history.forEach((entry, index) => {
+    if (!isSamePath(entry, filePath)) {
+      return;
+    }
+
+    const distance = Math.abs(index - currentIndex);
+    if (distance < closestDistance || (distance === closestDistance && index < closestIndex)) {
+      closestIndex = index;
+      closestDistance = distance;
+    }
+  });
+
+  return closestIndex;
+};
+
 type WorkspaceState = {
   rootPath: string | null;
   tree: DirectoryNode[];
@@ -93,6 +112,27 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   setError: (error) => set({ error }),
   pushHistory: (filePath) => {
     set((state) => {
+      const currentPath =
+        state.navigationIndex >= 0
+          ? (state.navigationHistory[state.navigationIndex] ?? null)
+          : null;
+
+      if (currentPath && isSamePath(currentPath, filePath)) {
+        return state;
+      }
+
+      const existingIndex = getClosestHistoryIndex(
+        state.navigationHistory,
+        state.navigationIndex,
+        filePath,
+      );
+      if (existingIndex >= 0) {
+        return {
+          navigationHistory: state.navigationHistory,
+          navigationIndex: existingIndex,
+        };
+      }
+
       // If we're not at the end of history, remove forward entries
       const newHistory = state.navigationHistory.slice(0, state.navigationIndex + 1);
 

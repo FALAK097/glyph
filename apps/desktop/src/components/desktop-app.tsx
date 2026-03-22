@@ -91,7 +91,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
             folderRevealLabel={controller.folderRevealLabel}
             isActiveFilePinned={controller.isActiveFilePinned}
             isFocusMode={controller.isFocusMode}
-            nextHistoryItem={controller.nextHistoryItem}
             onOutlineJumpHandled={controller.clearOutlineJumpRequest}
             onToggleFocusMode={() => void controller.toggleFocusMode()}
             onTogglePinnedFile={
@@ -101,7 +100,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
             }
             outlineItems={controller.outlineItems}
             outlineJumpRequest={controller.outlineJumpRequest}
-            previousHistoryItem={controller.previousHistoryItem}
             showOutline={controller.showOutline}
             updateState={controller.updateState}
             onUpdateAction={() => void controller.triggerUpdateAction()}

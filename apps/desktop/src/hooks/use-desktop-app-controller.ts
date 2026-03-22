@@ -47,8 +47,6 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     isSaving,
     lastSavedAt,
     error,
-    navigationHistory,
-    navigationIndex,
     setWorkspace,
     setTree,
     setActiveFile,
@@ -152,7 +150,9 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
       setActiveFile(file);
       setIsWorkspaceMode(isFileInsideWorkspace(file.path, rootPath));
       setSidebarNodes((prev) => upsertSidebarFile(prev, file));
-      const nextSettings = await glyph.getSettings();
+      const nextSettings = await glyph.updateSettings({
+        lastActiveFilePath: file.path,
+      });
       setSettings(nextSettings);
       setIsPaletteOpen(false);
       if (options?.recordHistory) {
@@ -203,6 +203,10 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
           const file = await glyph.readFile(target.path);
           setActiveFile(file);
           pushHistory(file.path);
+          const refreshedSettings = await glyph.updateSettings({
+            lastActiveFilePath: file.path,
+          });
+          setSettings(refreshedSettings);
           setIsWorkspaceMode(
             Boolean(workspace && isFileInsideWorkspace(file.path, workspace.rootPath)),
           );
@@ -468,7 +472,9 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     setActiveFile(file);
     setIsWorkspaceMode(true);
     setSidebarNodes((prev) => upsertSidebarFile(prev, file));
-    const nextSettings = await glyph.getSettings();
+    const nextSettings = await glyph.updateSettings({
+      lastActiveFilePath: file.path,
+    });
     setSettings(nextSettings);
     pushHistory(file.path);
     setIsPaletteOpen(false);
@@ -500,7 +506,9 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
       attachActiveFile(file);
       setIsWorkspaceMode(true);
       setSidebarNodes((prev) => upsertSidebarFile(prev, file));
-      const nextSettings = await glyph.getSettings();
+      const nextSettings = await glyph.updateSettings({
+        lastActiveFilePath: file.path,
+      });
       setSettings(nextSettings);
       pushHistory(file.path);
       return file;
@@ -562,6 +570,10 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
 
         if (activeFile?.path === filePath) {
           setActiveFile(null);
+          const nextSettings = await glyph.updateSettings({
+            lastActiveFilePath: null,
+          });
+          setSettings(nextSettings);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to delete file");
@@ -598,6 +610,10 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
         await syncTrackedPaths(filePath, renamedFile.path);
         if (activeFile?.path === filePath) {
           setActiveFile(renamedFile);
+          const nextSettings = await glyph.updateSettings({
+            lastActiveFilePath: renamedFile.path,
+          });
+          setSettings(nextSettings);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to rename file");
@@ -891,18 +907,6 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     () => toShortcutItems(settings?.pinnedFiles ?? []),
     [settings?.pinnedFiles, toShortcutItems],
   );
-  const previousHistoryPath =
-    navigationIndex > 0 ? (navigationHistory[navigationIndex - 1] ?? null) : null;
-  const nextHistoryPath =
-    navigationIndex < navigationHistory.length - 1
-      ? (navigationHistory[navigationIndex + 1] ?? null)
-      : null;
-  const previousHistoryItem = previousHistoryPath
-    ? (noteShortcutLookup.get(toPathKey(previousHistoryPath)) ?? null)
-    : null;
-  const nextHistoryItem = nextHistoryPath
-    ? (noteShortcutLookup.get(toPathKey(nextHistoryPath)) ?? null)
-    : null;
   const paletteItems = useMemo<CommandPaletteItem[]>(() => {
     const query = paletteQuery.trim().toLowerCase();
     const pinnedPaletteItems = pinnedNotes.slice(0, 8).map((note) => ({
@@ -1248,14 +1252,12 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     markSaved,
     navigateBack,
     navigateForward,
-    nextHistoryItem,
     openFile,
     outlineItems,
     outlineJumpRequest,
     paletteItems,
     paletteQuery,
     pinnedNotes,
-    previousHistoryItem,
     readingTime,
     revealInFinder,
     requestOutlineJump,

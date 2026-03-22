@@ -161,6 +161,9 @@ type NoteViewState = {
   selectionTo: number;
 };
 
+const NOTE_VIEW_STATE_STORAGE_KEY = "glyph.note-view-state.v1";
+const MAX_NOTE_VIEW_STATES = 200;
+
 const extractLinkAttributes = (input: string) => {
   const match = input.match(/(.+?)\s+"([^"]+)"$/);
   if (match) {
@@ -192,6 +195,69 @@ const normalizeLinkTarget = (value: string) => {
 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const isNoteViewState = (value: unknown): value is NoteViewState => {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<NoteViewState>;
+
+  return (
+    typeof candidate.scrollTop === "number" &&
+    Number.isFinite(candidate.scrollTop) &&
+    typeof candidate.selectionFrom === "number" &&
+    Number.isFinite(candidate.selectionFrom) &&
+    typeof candidate.selectionTo === "number" &&
+    Number.isFinite(candidate.selectionTo)
+  );
+};
+
+const loadStoredNoteViewStates = () => {
+  if (typeof window === "undefined") {
+    return new Map<string, NoteViewState>();
+  }
+
+  try {
+    const raw = window.localStorage.getItem(NOTE_VIEW_STATE_STORAGE_KEY);
+    if (!raw) {
+      return new Map<string, NoteViewState>();
+    }
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return new Map<string, NoteViewState>();
+    }
+
+    const entries = parsed.flatMap((entry) => {
+      if (!Array.isArray(entry) || entry.length !== 2) {
+        return [];
+      }
+
+      const [filePath, state] = entry;
+      if (typeof filePath !== "string" || !isNoteViewState(state)) {
+        return [];
+      }
+
+      return [[filePath, state] as const];
+    });
+
+    return new Map<string, NoteViewState>(entries);
+  } catch {
+    return new Map<string, NoteViewState>();
+  }
+};
+
+const persistNoteViewStates = (states: Map<string, NoteViewState>) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(
+    NOTE_VIEW_STATE_STORAGE_KEY,
+    JSON.stringify(Array.from(states.entries())),
+  );
+};
 
 function collectEditorOutline(editor: Editor): EditorOutlineItem[] {
   const items: EditorOutlineItem[] = [];
@@ -322,7 +388,6 @@ export const MarkdownEditor = ({
   canGoForward,
   autoOpenPDFSetting,
   isActiveFilePinned,
-  nextHistoryItem,
   onOutlineJumpHandled,
   updateState,
   onUpdateAction,
@@ -333,14 +398,14 @@ export const MarkdownEditor = ({
   onTogglePinnedFile,
   folderRevealLabel,
   outlineJumpRequest,
-  previousHistoryItem,
 }: MarkdownEditorProps) => {
   const lastSyncedMarkdown = useRef(content);
   const isAutoConvertingRef = useRef(false);
   const liveEditorRef = useRef<Editor | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const noteViewStateRef = useRef(new Map<string, NoteViewState>());
-  const previousFilePathRef = useRef<string | null>(filePath);
+  const noteViewStateRef = useRef(loadStoredNoteViewStates());
+  const noteViewStateOwnerRef = useRef<string | null>(filePath);
+  const isRestoringNoteViewStateRef = useRef(false);
   const tableControlsRef = useRef<TableControlsState>(INACTIVE_TABLE_CONTROLS);
   const toastTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const hoveredLinkHideTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
@@ -454,18 +519,57 @@ export const MarkdownEditor = ({
     nextEditor.chain().focus().setTextSelection(item.pos).run();
   }, []);
 
-  const storeNoteViewState = useCallback((targetFilePath: string | null | undefined) => {
-    const nextEditor = liveEditorRef.current;
-    if (!nextEditor || !targetFilePath || !scrollContainerRef.current) {
-      return;
-    }
+  const storeNoteViewState = useCallback(
+    (
+      targetFilePath: string | null | undefined,
+      options?: {
+        force?: boolean;
+      },
+    ) => {
+      if (isRestoringNoteViewStateRef.current && !options?.force) {
+        return;
+      }
 
-    noteViewStateRef.current.set(targetFilePath, {
-      scrollTop: scrollContainerRef.current.scrollTop,
-      selectionFrom: nextEditor.state.selection.from,
-      selectionTo: nextEditor.state.selection.to,
-    });
-  }, []);
+      const nextEditor = liveEditorRef.current;
+      if (!nextEditor || !targetFilePath || !scrollContainerRef.current) {
+        return;
+      }
+
+      const nextState = {
+        scrollTop: scrollContainerRef.current.scrollTop,
+        selectionFrom: nextEditor.state.selection.from,
+        selectionTo: nextEditor.state.selection.to,
+      };
+      const previousState = noteViewStateRef.current.get(targetFilePath);
+
+      if (
+        previousState &&
+        previousState.scrollTop === nextState.scrollTop &&
+        previousState.selectionFrom === nextState.selectionFrom &&
+        previousState.selectionTo === nextState.selectionTo
+      ) {
+        return;
+      }
+
+      if (previousState) {
+        noteViewStateRef.current.delete(targetFilePath);
+      }
+
+      noteViewStateRef.current.set(targetFilePath, nextState);
+
+      while (noteViewStateRef.current.size > MAX_NOTE_VIEW_STATES) {
+        const oldestFilePath = noteViewStateRef.current.keys().next().value;
+        if (!oldestFilePath) {
+          break;
+        }
+
+        noteViewStateRef.current.delete(oldestFilePath);
+      }
+
+      persistNoteViewStates(noteViewStateRef.current);
+    },
+    [],
+  );
 
   const restoreNoteViewState = useCallback((targetFilePath: string | null | undefined) => {
     const nextEditor = liveEditorRef.current;
@@ -774,14 +878,14 @@ export const MarkdownEditor = ({
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any
       const nextMarkdown = (nextEditor.storage as any).markdown.getMarkdown() as string;
       lastSyncedMarkdown.current = nextMarkdown;
-      storeNoteViewState(filePath);
+      storeNoteViewState(noteViewStateOwnerRef.current);
       onChange(nextMarkdown);
     },
     onSelectionUpdate: ({ editor: nextEditor }) => {
       liveEditorRef.current = nextEditor;
       refreshTableControls(nextEditor);
       refreshImageControls(nextEditor);
-      storeNoteViewState(filePath);
+      storeNoteViewState(noteViewStateOwnerRef.current);
     },
   });
 
@@ -810,22 +914,32 @@ export const MarkdownEditor = ({
   }, [editor]);
 
   useEffect(() => {
+    const previousFilePath = noteViewStateOwnerRef.current;
+    if (previousFilePath && previousFilePath !== filePath) {
+      storeNoteViewState(previousFilePath, { force: true });
+    }
+
     if (!filePath) {
+      noteViewStateOwnerRef.current = null;
       return;
     }
 
-    const previousFilePath = previousFilePathRef.current;
-
-    if (previousFilePath && previousFilePath !== filePath) {
-      storeNoteViewState(previousFilePath);
-    }
+    noteViewStateOwnerRef.current = filePath;
+    isRestoringNoteViewStateRef.current = true;
 
     window.requestAnimationFrame(() => {
       const restored = restoreNoteViewState(filePath);
-      if (!restored && scrollContainerRef.current) {
-        scrollContainerRef.current.scrollTop = 0;
+      if (!restored) {
+        liveEditorRef.current?.commands.setTextSelection(1);
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = 0;
+        }
       }
-      previousFilePathRef.current = filePath;
+
+      window.requestAnimationFrame(() => {
+        isRestoringNoteViewStateRef.current = false;
+        storeNoteViewState(filePath);
+      });
     });
   }, [editor, filePath, restoreNoteViewState, storeNoteViewState]);
 
@@ -844,7 +958,7 @@ export const MarkdownEditor = ({
 
   useEffect(() => {
     return () => {
-      storeNoteViewState(filePath);
+      storeNoteViewState(noteViewStateOwnerRef.current, { force: true });
       clearHoveredLinkHideTimeout();
       if (toastTimeoutRef.current) {
         window.clearTimeout(toastTimeoutRef.current);
@@ -1067,12 +1181,8 @@ export const MarkdownEditor = ({
   const shouldShowOutlineRail = !isFocusLayout && showOutline;
   const shouldShowCommandPalette = Boolean(onOpenCommandPalette);
   const modeButtonsVisible = Boolean(onToggleFocusMode);
-  const backTooltipLabel = previousHistoryItem
-    ? `Back to ${previousHistoryItem.title} (${navigateBackShortcut ?? "⌘["})`
-    : `Back (${navigateBackShortcut ?? "⌘["})`;
-  const forwardTooltipLabel = nextHistoryItem
-    ? `Forward to ${nextHistoryItem.title} (${navigateForwardShortcut ?? "⌘]"})`
-    : `Forward (${navigateForwardShortcut ?? "⌘]"})`;
+  const backTooltipLabel = `Back (${navigateBackShortcut ?? "⌘["})`;
+  const forwardTooltipLabel = `Forward (${navigateForwardShortcut ?? "⌘]"})`;
 
   return (
     <section className="relative h-full min-h-0 flex flex-col bg-background">
@@ -1357,7 +1467,7 @@ export const MarkdownEditor = ({
           setImageControls(null);
           clearHoveredLinkHideTimeout();
           setHoveredLink(null);
-          storeNoteViewState(filePath);
+          storeNoteViewState(noteViewStateOwnerRef.current);
 
           if (!editor) return;
           const container = scrollContainerRef.current;

@@ -1,5 +1,5 @@
 import type { UpdateState } from "../shared/workspace";
-import type { BreadcrumbItem, NoteShortcutItem, OutlineItem } from "@/types/navigation";
+import type { BreadcrumbItem, OutlineItem } from "@/types/navigation";
 
 export type MarkdownEditorProps = {
   content: string;
@@ -29,7 +29,6 @@ export type MarkdownEditorProps = {
   autoOpenPDFSetting?: boolean;
   isActiveFileFavorite?: boolean;
   isActiveFilePinned?: boolean;
-  nextHistoryItem?: NoteShortcutItem | null;
   onOutlineJumpHandled?: () => void;
   onToggleFavoriteFile?: () => void;
   updateState?: UpdateState | null;
@@ -44,7 +43,6 @@ export type MarkdownEditorProps = {
   folderRevealLabel?: string;
   outlineItems?: OutlineItem[];
   outlineJumpRequest?: { id: string; nonce: number } | null;
-  previousHistoryItem?: NoteShortcutItem | null;
 };
 
 export type MarkdownEditorToast = {

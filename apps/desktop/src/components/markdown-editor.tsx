@@ -413,23 +413,24 @@ export const MarkdownEditor = ({
   };
 
   const refreshTableControls = (nextEditor: Editor) => {
-    const selectionIncludesTable = [nextEditor.state.selection.$anchor, nextEditor.state.selection.$head].some(
-      ($position) => {
-        for (let depth = $position.depth; depth >= 0; depth -= 1) {
-          const nodeName = $position.node(depth).type.name;
-          if (
-            nodeName === "table" ||
-            nodeName === "tableRow" ||
-            nodeName === "tableCell" ||
-            nodeName === "tableHeader"
-          ) {
-            return true;
-          }
+    const selectionIncludesTable = [
+      nextEditor.state.selection.$anchor,
+      nextEditor.state.selection.$head,
+    ].some(($position) => {
+      for (let depth = $position.depth; depth >= 0; depth -= 1) {
+        const nodeName = $position.node(depth).type.name;
+        if (
+          nodeName === "table" ||
+          nodeName === "tableRow" ||
+          nodeName === "tableCell" ||
+          nodeName === "tableHeader"
+        ) {
+          return true;
         }
+      }
 
-        return false;
-      },
-    );
+      return false;
+    });
 
     if (
       !nextEditor.isFocused ||

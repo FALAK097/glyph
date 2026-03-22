@@ -89,8 +89,8 @@ export const CommandPalette = ({
           <Input
             ref={inputRef}
             className="border-0 bg-transparent shadow-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-0 text-base placeholder:text-muted-foreground/50 h-10"
-            aria-label="Search notes, headings, commands, and history"
-            placeholder="Search notes, headings, commands, and history…"
+            aria-label="Search files, commands, and sessions"
+            placeholder="Search files, commands, and sessions…"
             value={query}
             onChange={(event) => onChangeQuery(event.target.value)}
             onKeyDown={(event) => {
@@ -131,7 +131,7 @@ export const CommandPalette = ({
         >
           {items.length === 0 ? (
             <div className="py-12 text-center text-sm text-muted-foreground">
-              <p>No matching notes or commands.</p>
+              <p>No results found.</p>
             </div>
           ) : (
             <div className="px-2 pt-1 pb-2">
@@ -147,8 +147,7 @@ export const CommandPalette = ({
                         }}
                         className={`
                           h-auto w-full px-3 py-2.5 rounded-sm text-sm
-                          transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.98]
-                          flex items-center justify-between
+                          transition-all duration-100 flex items-center justify-between
                           ${
                             selectedIndex === index
                               ? "bg-accent/10 text-foreground"
@@ -181,9 +180,16 @@ export const CommandPalette = ({
                           ) : null}
                         </div>
                         {item.shortcut ? (
-                          <kbd className="ml-3 shrink-0 rounded border border-border/40 bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                            {item.shortcut}
-                          </kbd>
+                          <div className="flex gap-1 pl-3 flex-shrink-0">
+                            {item.shortcut.split("").map((char, i) => (
+                              <kbd
+                                key={`${item.id}:${i}`}
+                                className="px-1.5 py-0.5 text-[10px] font-medium bg-muted/40 border border-border/40 rounded text-muted-foreground"
+                              >
+                                {char}
+                              </kbd>
+                            ))}
+                          </div>
                         ) : null}
                       </Button>
                     ))}

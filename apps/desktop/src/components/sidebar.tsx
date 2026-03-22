@@ -1,5 +1,6 @@
-import { memo, useCallback, useMemo, useRef, useState } from "react";
-import type { CSSProperties, MouseEvent, ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, MouseEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { normalizePath } from "@/lib/paths";
+import { getDisplayFileName, normalizePath } from "@/lib/paths";
 
 import type { NoteShortcutItem } from "@/types/navigation";
 import type {
@@ -23,14 +24,11 @@ import type {
 
 import { LogoComponent } from "./logo-component";
 import {
-  CheckCircleIcon,
-  FileIcon,
   MoreVerticalIcon,
+  PencilIcon,
   PinIcon,
-  PinOffIcon,
-  PlusIcon,
   RevealInFolderIcon,
-  SearchIcon,
+  TrashIcon,
 } from "./icons";
 import { SidebarTreeNode } from "./sidebar-tree-node";
 
@@ -39,27 +37,35 @@ const normalizePathKey = (path: string) => normalizePath(path).toLowerCase();
 type SidebarShortcutRowProps = {
   activePath: string | null;
   item: NoteShortcutItem;
-  isPinned: boolean;
   folderRevealLabel: string;
   onOpenFile: (filePath: string) => void;
   onRevealInFinder: (targetPath: string) => void;
-  onTogglePinnedFile?: (filePath: string) => void;
+  onDeleteFile: (filePath: string) => void;
+  onRenameFile: (filePath: string, newName: string) => void;
 };
 
 const SidebarShortcutRow = memo(function SidebarShortcutRow({
   activePath,
   item,
-  isPinned,
   folderRevealLabel,
   onOpenFile,
   onRevealInFinder,
-  onTogglePinnedFile,
+  onDeleteFile,
+  onRenameFile,
 }: SidebarShortcutRowProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [menuCoords, setMenuCoords] = useState<{ top: number; left: number } | null>(null);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
   const isActive = normalizePathKey(activePath ?? "") === normalizePathKey(item.path);
-  const pinLabel = isPinned ? "Unpin note" : "Pin note";
+  const displayFileName = useMemo(() => {
+    const segments = item.path.replace(/\\/g, "/").split("/");
+    const fileName = segments.pop() ?? item.title;
+    return getDisplayFileName(fileName);
+  }, [item.path, item.title]);
+
   const focusMenuButton = useCallback(() => {
     window.requestAnimationFrame(() => {
       if (menuButtonRef.current?.isConnected) {
@@ -71,13 +77,28 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
     });
   }, []);
 
-  const focusEditorSurface = useCallback(() => {
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        document.querySelector<HTMLElement>("[data-glyph-editor='true']")?.focus();
-      });
-    });
-  }, []);
+  useEffect(() => {
+    if (!isRenaming) {
+      return;
+    }
+
+    renameInputRef.current?.focus();
+    renameInputRef.current?.select();
+  }, [isRenaming]);
+
+  const handleRenameSubmit = () => {
+    const trimmed = renameValue.trim();
+    if (!trimmed) {
+      setIsRenaming(false);
+      return;
+    }
+
+    if (trimmed !== displayFileName) {
+      onRenameFile(item.path, trimmed);
+    }
+
+    setIsRenaming(false);
+  };
 
   const openMenu = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
@@ -90,137 +111,152 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
     setShowMenu((value) => !value);
   };
 
-  return (
-    <div
-      className={`group/shortcut relative mb-1 flex items-center overflow-hidden rounded-xl border border-transparent transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out active:scale-[0.98] ${
-        isActive
-          ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-accent/30"
-          : "text-sidebar-foreground hover:border-sidebar-accent/20 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
-      }`}
-    >
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="h-auto min-w-0 flex-1 justify-start gap-2 rounded-none bg-transparent px-2.5 py-2 text-left hover:!bg-transparent"
-        onClick={() => onOpenFile(item.path)}
-      >
-        <span className="relative flex h-4 w-4 shrink-0 items-center justify-center text-muted-foreground">
-          <FileIcon
-            size={12}
-            className={`transition-colors ${
-              isActive
-                ? "text-sidebar-accent-foreground/70"
-                : "group-hover/shortcut:text-sidebar-accent-foreground/70"
-            }`}
-          />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium">{item.title}</span>
-          <span
-            className={`block truncate text-[11px] ${
-              isActive ? "text-sidebar-accent-foreground/65" : "text-muted-foreground"
-            }`}
-          >
-            {item.subtitle}
-          </span>
-        </span>
-        {item.badge ? (
-          <span className="ml-2 rounded-full border border-border/60 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-            {item.badge}
-          </span>
-        ) : null}
-        
-        
-      </Button>
+  const renderMenu = () => {
+    if (!showMenu || !menuCoords) {
+      return null;
+    }
 
-      <Tooltip>
-        <TooltipTrigger asChild>
+    return createPortal(
+      <>
+        <button
+          aria-label="Close note actions"
+          className="fixed inset-0 z-40 cursor-default bg-transparent outline-none"
+          onClick={(event) => {
+            event.stopPropagation();
+            setShowMenu(false);
+            focusMenuButton();
+          }}
+          type="button"
+          tabIndex={-1}
+        />
+        <div
+          className="fixed z-50 w-[142px] rounded-md border border-border bg-popover py-1 shadow-lg"
+          style={{ top: menuCoords.top, left: menuCoords.left }}
+        >
           <Button
-            ref={menuButtonRef}
-            type="button"
             variant="ghost"
-            size="icon-xs"
-            className="pointer-events-none mr-1 rounded bg-transparent text-muted-foreground opacity-0 transition-opacity group-hover/shortcut:pointer-events-auto group-hover/shortcut:opacity-100 hover:text-foreground hover:!bg-transparent focus-visible:opacity-100 focus-visible:!bg-transparent"
-            onClick={openMenu}
-          >
-            <MoreVerticalIcon size={14} />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="right">Note actions</TooltipContent>
-      </Tooltip>
-
-      {showMenu && menuCoords ? (
-        <>
-          <button
-            aria-label="Close note actions"
-            className="fixed inset-0 z-40 cursor-default bg-transparent outline-none"
+            size="sm"
+            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
             onClick={(event) => {
               event.stopPropagation();
+              setRenameValue(displayFileName);
+              setIsRenaming(true);
+              setShowMenu(false);
+            }}
+            type="button"
+          >
+            <PencilIcon size={14} className="opacity-70" />
+            Rename
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
+            onClick={(event) => {
+              event.stopPropagation();
+              onRevealInFinder(item.path);
               setShowMenu(false);
               focusMenuButton();
             }}
             type="button"
-            tabIndex={-1}
-          />
-          <div
-            className="fixed z-50 w-[176px] rounded-md border border-border bg-popover py-1 shadow-lg"
-            style={{ top: menuCoords.top, left: menuCoords.left }}
           >
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
-              onClick={(event) => {
-                event.stopPropagation();
-                onOpenFile(item.path);
-                setShowMenu(false);
-                focusEditorSurface();
-              }}
-              type="button"
-            >
-              <FileIcon size={14} className="opacity-70" />
-              Open
-            </Button>
-            {onTogglePinnedFile ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onTogglePinnedFile(item.path);
-                  setShowMenu(false);
-                  focusMenuButton();
-                }}
-                type="button"
-              >
-                {isPinned ? (
-                  <PinOffIcon size={14} className="opacity-70" />
-                ) : (
-                  <PinIcon size={14} className="opacity-70" />
-                )}
-                {pinLabel}
-              </Button>
-            ) : null}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
-              onClick={(event) => {
-                event.stopPropagation();
-                onRevealInFinder(item.path);
-                setShowMenu(false);
-                focusMenuButton();
-              }}
-              type="button"
-            >
-              <RevealInFolderIcon size={14} className="opacity-70" />
-              {folderRevealLabel}
-            </Button>
+            <RevealInFolderIcon size={14} className="shrink-0 opacity-70" />
+            {folderRevealLabel}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-destructive/10 hover:text-destructive"
+            onClick={(event) => {
+              event.stopPropagation();
+              onDeleteFile(item.path);
+              setShowMenu(false);
+            }}
+            type="button"
+          >
+            <TrashIcon size={14} className="opacity-70" />
+            Delete
+          </Button>
+        </div>
+      </>,
+      document.body,
+    );
+  };
+
+  return (
+    <div
+      className={`group/shortcut relative mb-0.5 flex min-w-0 items-center overflow-hidden rounded-xl border border-transparent transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out active:scale-[0.98]`}
+    >
+      <div
+        className={`mx-1 flex min-w-0 flex-1 cursor-pointer items-center rounded-md transition-colors ${
+          isActive
+            ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-accent/30"
+            : "text-sidebar-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-within:bg-sidebar-accent/70 focus-within:text-sidebar-accent-foreground"
+        }`}
+        style={{
+          paddingLeft: "8px",
+          paddingRight: "4px",
+          paddingTop: "6px",
+          paddingBottom: "6px",
+        }}
+      >
+        <PinIcon
+          size={12}
+          className={`mr-2 shrink-0 transition-colors ${
+            isActive
+              ? "text-sidebar-accent-foreground/70"
+              : "text-muted-foreground"
+          }`}
+        />
+        {isRenaming ? (
+          <input
+            ref={renameInputRef}
+            type="text"
+            className="h-7 min-w-0 flex-1 -ml-1 rounded border-transparent bg-transparent px-1 text-sm shadow-none outline-none focus-visible:ring-1 focus-visible:ring-primary/50"
+            value={renameValue}
+            onChange={(event) => setRenameValue(event.target.value)}
+            onBlur={handleRenameSubmit}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.currentTarget.blur();
+              }
+              if (event.key === "Escape") {
+                setIsRenaming(false);
+              }
+            }}
+          />
+        ) : (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-auto min-w-0 flex-1 cursor-pointer justify-start truncate bg-transparent px-0 py-0 text-left text-sm hover:!bg-transparent"
+            onClick={() => onOpenFile(item.path)}
+            type="button"
+          >
+            {item.title}
+          </Button>
+        )}
+        {!isRenaming ? (
+          <div className="relative ml-1 shrink-0">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  ref={menuButtonRef}
+                  variant="ghost"
+                  size="icon-xs"
+                  className="pointer-events-none rounded bg-transparent text-muted-foreground opacity-0 transition-opacity group-hover/shortcut:pointer-events-auto group-hover/shortcut:opacity-100 hover:text-foreground hover:!bg-transparent focus-visible:opacity-100 focus-visible:!bg-transparent"
+                  onClick={openMenu}
+                  type="button"
+                >
+                  <MoreVerticalIcon size={14} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Note actions</TooltipContent>
+            </Tooltip>
           </div>
-        </>
-      ) : null}
+        ) : null}
+      </div>
+      {renderMenu()}
     </div>
   );
 });
@@ -228,47 +264,40 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
 type SidebarShortcutListProps = {
   activePath: string | null;
   items: NoteShortcutItem[];
-  emptyLabel: string;
   folderRevealLabel: string;
   onOpenFile: (filePath: string) => void;
   onRevealInFinder: (targetPath: string) => void;
-  onTogglePinnedFile?: (filePath: string) => void;
-  pinnedPaths: string[];
+  onDeleteFile: (filePath: string) => void;
+  onRenameFile: (filePath: string, newName: string) => void;
 };
 
 const SidebarShortcutList = memo(function SidebarShortcutList({
   activePath,
   items,
-  emptyLabel,
   folderRevealLabel,
   onOpenFile,
   onRevealInFinder,
-  onTogglePinnedFile,
-  pinnedPaths,
+  onDeleteFile,
+  onRenameFile,
 }: SidebarShortcutListProps) {
-  const pinnedSet = useMemo(() => new Set(pinnedPaths.map(normalizePathKey)), [pinnedPaths]);
   if (items.length === 0) {
-    return <p className="px-2 text-xs leading-5 text-muted-foreground">{emptyLabel}</p>;
+    return null;
   }
 
   return (
-    <div className="space-y-1">
-      {items.map((item) => {
-        const itemPathKey = normalizePathKey(item.path);
-
-        return (
-          <SidebarShortcutRow
-            key={item.path}
-            activePath={activePath}
-            item={item}
-            isPinned={pinnedSet.has(itemPathKey)}
-            folderRevealLabel={folderRevealLabel}
-            onOpenFile={onOpenFile}
-            onRevealInFinder={onRevealInFinder}
-            onTogglePinnedFile={onTogglePinnedFile}
-          />
-        );
-      })}
+    <div className="space-y-0.5">
+      {items.map((item) => (
+        <SidebarShortcutRow
+          key={item.path}
+          activePath={activePath}
+          item={item}
+          folderRevealLabel={folderRevealLabel}
+          onOpenFile={onOpenFile}
+          onRevealInFinder={onRevealInFinder}
+          onDeleteFile={onDeleteFile}
+          onRenameFile={onRenameFile}
+        />
+      ))}
     </div>
   );
 });
@@ -333,37 +362,32 @@ export const Sidebar = ({
   }
 
   return (
-    <aside className="flex h-full w-[280px] flex-col border-r border-sidebar-border bg-sidebar">
+    <aside className="flex h-full min-h-0 w-[280px] flex-col border-r border-border bg-sidebar">
       <div
-        className="flex h-[52px] flex-shrink-0 items-center px-4 border-b border-sidebar-border/50"
+        className="flex items-center justify-center flex-shrink-0 bg-sidebar"
         style={{ WebkitAppRegion: "drag" } as CSSProperties}
       >
-        <div style={{ WebkitAppRegion: "no-drag" } as CSSProperties} className="flex items-center gap-2">
-          <LogoComponent size={20} />
-          <span className="font-semibold text-sm">Glyph</span>
+        <div style={{ WebkitAppRegion: "no-drag" } as CSSProperties}>
+          <LogoComponent size={120} />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto overflow-x-hidden py-3 min-h-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+      <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-3">
         {pinnedList.length > 0 && (
-          <div className="mb-4">
-            <div className="px-4 py-1.5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                PINNED
-              </p>
-            </div>
-            <div className="px-2">
-              <SidebarShortcutList
-                activePath={activePath}
-                items={pinnedList}
-                emptyLabel="Pin your key notes to keep them one click away."
-                onOpenFile={onOpenFile}
-                folderRevealLabel={revealLabel}
-                onRevealInFinder={onRevealInFinder}
-                onTogglePinnedFile={onTogglePinnedFile}
-                pinnedPaths={pinnedPaths}
-              />
-            </div>
+          <div className="mb-2 px-2">
+            <SidebarShortcutList
+              activePath={activePath}
+              items={pinnedList}
+              onOpenFile={onOpenFile}
+              folderRevealLabel={revealLabel}
+              onRevealInFinder={onRevealInFinder}
+              onDeleteFile={(filePath) => {
+                const segments = filePath.replace(/\\/g, "/").split("/");
+                const name = segments.pop() ?? filePath;
+                setNodeToDelete({ path: filePath, name });
+              }}
+              onRenameFile={onRenameFile}
+            />
           </div>
         )}
 

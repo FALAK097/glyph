@@ -633,6 +633,68 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
   const baseCommands = useMemo<CommandPaletteItem[]>(
     () => [
       {
+        id: "new-note",
+        title: "New note",
+        subtitle: "Create a fresh markdown note",
+        shortcut: getShortcutDisplay(shortcuts, "new-note"),
+        section: "Actions",
+        kind: "command",
+        onSelect: () => void createNote(),
+      },
+      {
+        id: "open-file",
+        title: "Open File",
+        subtitle: "Open an existing markdown file",
+        shortcut: getShortcutDisplay(shortcuts, "open-file"),
+        section: "Actions",
+        kind: "command",
+        onSelect: async () => {
+          const file = await glyph.openDocument();
+          if (file) await syncOpenedFile(file, { recordHistory: true });
+          setIsPaletteOpen(false);
+        },
+      },
+      {
+        id: "open-folder",
+        title: "Open Folder",
+        subtitle: "Open a folder as a workspace",
+        shortcut: getShortcutDisplay(shortcuts, "open-folder"),
+        section: "Actions",
+        kind: "command",
+        onSelect: async () => {
+          const workspace = await glyph.openFolder();
+          if (workspace) {
+            syncWorkspace(workspace);
+            setIsWorkspaceMode(true);
+          }
+          setIsPaletteOpen(false);
+        },
+      },
+      {
+        id: "navigate-back",
+        title: "Navigate Back",
+        subtitle: "Go to previous file in history",
+        shortcut: getShortcutDisplay(shortcuts, "navigate-back"),
+        section: "Navigation",
+        kind: "command",
+        onSelect: () => {
+          void navigateBack();
+          setIsPaletteOpen(false);
+        },
+      },
+      {
+        id: "navigate-forward",
+        title: "Navigate Forward",
+        subtitle: "Go to next file in history",
+        shortcut: getShortcutDisplay(shortcuts, "navigate-forward"),
+        section: "Navigation",
+        kind: "command",
+        onSelect: () => {
+          void navigateForward();
+          setIsPaletteOpen(false);
+        },
+      },
+      {
         id: "toggle-focus-mode",
         title: isFocusMode ? "Exit Focus Mode" : "Enter Focus Mode",
         shortcut: getShortcutDisplay(shortcuts, "focus-mode"),
@@ -661,15 +723,67 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
             },
           ]
         : []),
+      {
+        id: "settings",
+        title: "Settings",
+        subtitle: "Adjust workspace defaults",
+        shortcut: getShortcutDisplay(shortcuts, "settings"),
+        section: "Actions",
+        kind: "command",
+        onSelect: () => {
+          setIsSettingsOpen(true);
+          setIsPaletteOpen(false);
+        },
+      },
+      {
+        id: "theme-light",
+        title: "Theme: Light",
+        subtitle: "Switch to light mode",
+        section: "Theme",
+        kind: "command",
+        onSelect: () => {
+          void saveSettings({ themeMode: "light" });
+          setIsPaletteOpen(false);
+        },
+      },
+      {
+        id: "theme-dark",
+        title: "Theme: Dark",
+        subtitle: "Switch to dark mode",
+        section: "Theme",
+        kind: "command",
+        onSelect: () => {
+          void saveSettings({ themeMode: "dark" });
+          setIsPaletteOpen(false);
+        },
+      },
+      {
+        id: "theme-system",
+        title: "Theme: System",
+        subtitle: "Sync theme with system",
+        section: "Theme",
+        kind: "command",
+        onSelect: () => {
+          void saveSettings({ themeMode: "system" });
+          setIsPaletteOpen(false);
+        },
+      },
     ],
     [
       activeFile,
+      createNote,
+      glyph,
       isActiveFilePinned,
       isFocusMode,
+      navigateBack,
+      navigateForward,
+      saveSettings,
       shortcuts,
+      syncOpenedFile,
+      syncWorkspace,
       toggleFocusMode,
       togglePinnedFile,
-          ],
+    ],
   );
 
   // Stable deduplicated file list — only rebuilds when sidebarNodes or files change, never on query change
@@ -731,15 +845,26 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
 
   const toShortcutItems = useCallback(
     (paths: string[], badge?: string) =>
-      paths.flatMap((targetPath) => {
+      paths.map((targetPath) => {
         const match = noteShortcutLookup.get(toPathKey(targetPath));
-        return match ? [{ ...match, badge }] : [];
+        if (match) {
+          return { ...match, badge };
+        }
+
+        const segments = targetPath.replace(/\\/g, "/").split("/");
+        const fileName = segments.pop() ?? targetPath;
+        return {
+          path: targetPath,
+          title: fileName.replace(/\.(md|mdx|markdown)$/i, ""),
+          subtitle: targetPath,
+          badge,
+        };
       }),
     [noteShortcutLookup],
   );
 
   const pinnedNotes = useMemo(
-    () => toShortcutItems(settings?.pinnedFiles ?? [], "Pinned"),
+    () => toShortcutItems(settings?.pinnedFiles ?? []),
     [settings?.pinnedFiles, toShortcutItems],
   );
   const previousHistoryPath =
@@ -827,8 +952,18 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
           note.title.toLowerCase().includes(query) || note.subtitle?.toLowerCase().includes(query),
       ),
     );
-    items.push(...historyPaletteItems);
-    items.push(...headingPaletteItems);
+    items.push(
+      ...historyPaletteItems.filter(
+        (item) =>
+          item.title.toLowerCase().includes(query) ||
+          item.subtitle?.toLowerCase().includes(query),
+      ),
+    );
+    items.push(
+      ...headingPaletteItems.filter(
+        (item) => item.title.toLowerCase().includes(query),
+      ),
+    );
 
     // Match files by name or path
     const matchingFiles = allSearchableFiles.filter(

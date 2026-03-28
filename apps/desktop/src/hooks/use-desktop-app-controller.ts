@@ -53,9 +53,16 @@ const getDraftNoteName = (content: string) => {
   return safeName && safeName !== EMPTY_NOTE_NAME ? safeName : null;
 };
 
+const hasCommittedDraftTitle = (content: string) =>
+  /\r?\n/.test(content) && Boolean(getDraftTitleLine(content));
+
 const getCommittedDraftFileName = (content: string) => {
+  if (!hasCommittedDraftTitle(content)) {
+    return null;
+  }
+
   const safeName = getDraftNoteName(content);
-  if (!safeName || !/\r?\n/.test(content)) {
+  if (!safeName) {
     return null;
   }
 
@@ -543,7 +550,12 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
         if (committedFileName) {
           try {
             file = await glyph.renameFile(draftFile.path, committedFileName);
-          } catch {
+          } catch (renameError) {
+            console.error("Failed to rename draft file to committed name.", {
+              draftFilePath: draftFile.path,
+              committedFileName,
+              error: renameError,
+            });
             file = draftFile;
           }
         }
@@ -582,7 +594,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     (nextContent: string) => {
       updateDraftContent(nextContent);
 
-      if (!activeFile && getCommittedDraftFileName(nextContent)) {
+      if (!activeFile && hasCommittedDraftTitle(nextContent)) {
         void ensureActiveDraftFile(nextContent).catch((error: unknown) => {
           setError(getErrorMessage(error));
         });

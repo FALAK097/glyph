@@ -189,6 +189,16 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     [setWorkspace],
   );
 
+  const requestEditorFocus = useCallback((mode: "start" | "preserve") => {
+    window.requestAnimationFrame(() => {
+      editorFocusNonceRef.current += 1;
+      setEditorFocusRequest({
+        mode,
+        nonce: editorFocusNonceRef.current,
+      });
+    });
+  }, []);
+
   const syncOpenedFile = useCallback(
     async (file: FileDocument, options?: { recordHistory?: boolean }) => {
       setActiveFile(file);
@@ -200,19 +210,10 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
       if (options?.recordHistory) {
         pushHistory(file.path);
       }
+      requestEditorFocus("start");
     },
-    [rootPath, setActiveFile, glyph, pushHistory],
+    [glyph, pushHistory, requestEditorFocus, rootPath, setActiveFile],
   );
-
-  const requestEditorFocus = useCallback((mode: "start" | "preserve") => {
-    window.requestAnimationFrame(() => {
-      editorFocusNonceRef.current += 1;
-      setEditorFocusRequest({
-        mode,
-        nonce: editorFocusNonceRef.current,
-      });
-    });
-  }, []);
 
   useEffect(() => {
     const boot = async () => {

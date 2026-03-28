@@ -330,8 +330,6 @@ export const MarkdownEditor = ({
   outlineJumpRequest,
 }: MarkdownEditorProps) => {
   const lastSyncedMarkdown = useRef(content);
-  const lastFilePathRef = useRef(filePath);
-  const lastContentRef = useRef(content);
   const isAutoConvertingRef = useRef(false);
   const liveEditorRef = useRef<Editor | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -778,24 +776,6 @@ export const MarkdownEditor = ({
     liveEditorRef.current = editor;
     editor.setEditable(true);
   }, [editor]);
-
-  useEffect(() => {
-    const previousFilePath = lastFilePathRef.current;
-    const previousContent = lastContentRef.current;
-    lastFilePathRef.current = filePath;
-    lastContentRef.current = content;
-
-    if (!editor || !filePath || previousFilePath === filePath || previousContent === content) {
-      return;
-    }
-
-    window.requestAnimationFrame(() => {
-      liveEditorRef.current?.commands.setTextSelection(1);
-      if (scrollContainerRef.current) {
-        scrollContainerRef.current.scrollTop = 0;
-      }
-    });
-  }, [content, editor, filePath]);
 
   useEffect(() => {
     if (!editorFocusRequest || !editor) {

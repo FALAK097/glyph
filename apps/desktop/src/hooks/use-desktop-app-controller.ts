@@ -736,6 +736,18 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
         },
       },
       {
+        id: "settings",
+        title: "Settings",
+        subtitle: "Adjust workspace defaults",
+        shortcut: getShortcutDisplay(shortcuts, "settings"),
+        section: "Actions",
+        kind: "command",
+        onSelect: () => {
+          setIsSettingsOpen(true);
+          setIsPaletteOpen(false);
+        },
+      },
+      {
         id: "navigate-back",
         title: "Navigate Back",
         subtitle: "Go to previous file in history",
@@ -799,18 +811,6 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
             },
           ]
         : []),
-      {
-        id: "settings",
-        title: "Settings",
-        subtitle: "Adjust workspace defaults",
-        shortcut: getShortcutDisplay(shortcuts, "settings"),
-        section: "Actions",
-        kind: "command",
-        onSelect: () => {
-          setIsSettingsOpen(true);
-          setIsPaletteOpen(false);
-        },
-      },
       {
         id: "theme-light",
         title: "Theme: Light",

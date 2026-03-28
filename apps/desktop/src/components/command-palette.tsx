@@ -136,7 +136,7 @@ export const CommandPalette = ({
           ) : (
             <div className="px-2 pt-1 pb-2">
               {sections.map((section, sectionIdx) => (
-                <div key={section.title}>
+                <div key={`${section.title}-${sectionIdx}`}>
                   {sectionIdx > 0 && <div className="h-px bg-border/20 my-1" />}
                   <div>
                     {section.items.map(({ item, index }) => (

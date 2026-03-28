@@ -15,14 +15,14 @@ Package manager: **pnpm 10.26.0** (always use `pnpm`, never `npm` or `yarn`).
 
 This repo ships local skills for various domains. **Load them before working on related tasks.**
 
-| Skill                         | Path                                                  | When to load                                                                                |
-| ----------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `electron`                    | `.agents/skills/electron/SKILL.md`                    | IPC, BrowserWindow, menus, tray, packaging, security, cross-platform Electron APIs          |
-| `frontend-design`             | `.agents/skills/frontend-design/SKILL.md`             | When building frontend components/interfaces to ensure distinctive, production-grade design |
-| `github-project-workflow`     | `.agents/skills/github-project-workflow/SKILL.md`     | When working on GitHub issues, PRs, roadmap execution, or project board status updates      |
-| `remotion-best-practices`     | `.agents/skills/remotion-best-practices/SKILL.md`     | Best practices for Remotion - Video creation in React                                       |
-| `vercel-react-best-practices` | `.agents/skills/vercel-react-best-practices/SKILL.md` | Performance and optimization guidelines for React/Next.js                                   |
-| `web-design-guidelines`       | `.agents/skills/web-design-guidelines/SKILL.md`       | When reviewing UI, checking accessibility, UX audits, or verifying best practices           |
+| Skill | Path | When to load |
+| --- | --- | --- |
+| `electron` | `.agents/skills/electron/SKILL.md` | IPC, BrowserWindow, menus, tray, packaging, security, cross-platform Electron APIs |
+| `frontend-design` | `.agents/skills/frontend-design/SKILL.md` | When building frontend components/interfaces to ensure distinctive, production-grade design |
+| `github-project-workflow` | `.agents/skills/github-project-workflow/SKILL.md` | When working on GitHub issues, PRs, roadmap execution, or project board status updates |
+| `remotion-best-practices` | `.agents/skills/remotion-best-practices/SKILL.md` | Best practices for Remotion - Video creation in React |
+| `vercel-react-best-practices` | `.agents/skills/vercel-react-best-practices/SKILL.md` | Performance and optimization guidelines for React/Next.js |
+| `web-design-guidelines` | `.agents/skills/web-design-guidelines/SKILL.md` | When reviewing UI, checking accessibility, UX audits, or verifying best practices |
 
 ---
 
@@ -73,7 +73,7 @@ This repo ships local skills for various domains. **Load them before working on 
   ```ts
   // Good — only re-renders when activeFileId changes
   const activeFileId = useWorkspaceStore((s) => s.activeFileId);
-
+  
   // Bad — re-renders on any store update
   const store = useWorkspaceStore();
   ```
@@ -101,7 +101,7 @@ Glyph targets **macOS and Windows**. Every feature must be tested mentally (and 
 
 ### Path handling
 
-- **Never concatenate paths with `/` or `\`** — always use Node's `path.join()` / `path.normalize()` in the main process.
+- **Never concatenate paths with** `/` **or** `\` — always use Node's `path.join()` / `path.normalize()` in the main process.
 - Normalize incoming paths from the renderer with `path.normalize()` before any file-system operation.
 - Case sensitivity: Windows NTFS is case-insensitive; macOS HFS+ is case-insensitive by default. Write path comparisons case-insensitively: `a.toLowerCase() === b.toLowerCase()`.
 
@@ -175,7 +175,7 @@ There is currently **no test framework** set up. Update this section when tests 
 
 ## Project Structure
 
-```
+```plaintext
 glyph/
 ├── .agents/skills/
 │   └── electron/          # Local Electron skill (SKILL.md + api/ + examples/ + templates/)
@@ -201,8 +201,11 @@ glyph/
 ## TypeScript
 
 - **Strict mode** is enabled — no `any`, no `@ts-ignore` without justification.
+
 - Target: `ES2022`; renderer uses `ESNext` / `moduleResolution: Node`; Electron main/preload uses `NodeNext`.
+
 - `noEmit: true` for renderer — Vite handles transpilation.
+
 - Use `import type` for type-only imports:
 
   ```ts
@@ -220,14 +223,14 @@ glyph/
 
 ### Naming Conventions
 
-| Entity             | Convention           | Example                                |
-| ------------------ | -------------------- | -------------------------------------- |
-| React components   | PascalCase           | `MarkdownEditor`, `CommandPalette`     |
-| Functions / hooks  | camelCase            | `flattenFiles`, `useWorkspace`         |
-| Types / interfaces | PascalCase           | `AppSettings`, `DirectoryNode`         |
-| Constants          | SCREAMING_SNAKE_CASE | `DEFAULT_SHORTCUTS`, `MODIFIER_TOKENS` |
-| CSS class names    | kebab-case           | `editor-canvas`, `sidebar-file`        |
-| IPC channel names  | `domain:action`      | `workspace:open`, `settings:save`      |
+| Entity | Convention | Example |
+| --- | --- | --- |
+| React components | PascalCase | `MarkdownEditor`, `CommandPalette` |
+| Functions / hooks | camelCase | `flattenFiles`, `useWorkspace` |
+| Types / interfaces | PascalCase | `AppSettings`, `DirectoryNode` |
+| Constants | SCREAMING_SNAKE_CASE | `DEFAULT_SHORTCUTS`, `MODIFIER_TOKENS` |
+| CSS class names | kebab-case | `editor-canvas`, `sidebar-file` |
+| IPC channel names | `domain:action` | `workspace:open`, `settings:save` |
 
 ### Exports
 

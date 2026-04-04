@@ -452,7 +452,7 @@ export const Sidebar = ({
               <div>
                 <div className="space-y-1 px-2">
                   {skillCollections
-                    .filter((item) => item.iconKind)
+                    .filter((item) => item.group === "scope")
                     .map((item) => (
                       <SidebarSkillCollectionRow
                         key={item.id}
@@ -461,7 +461,7 @@ export const Sidebar = ({
                       />
                     ))}
                 </div>
-                {skillCollections.some((item) => !item.iconKind) ? (
+                {skillCollections.some((item) => item.group === "tool") ? (
                   <div className="mt-4">
                     <div className="px-4 py-1.5">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -470,7 +470,7 @@ export const Sidebar = ({
                     </div>
                     <div className="space-y-1 px-2">
                       {skillCollections
-                        .filter((item) => !item.iconKind)
+                        .filter((item) => item.group === "tool")
                         .map((item) => (
                           <SidebarSkillCollectionRow
                             key={item.id}

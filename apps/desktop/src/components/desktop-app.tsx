@@ -100,15 +100,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         group: "scope",
         matches: () => true,
       },
-      {
-        id: "all-agents",
-        fallbackLabel: "All Agents",
-        iconKind: "all-agents",
-        label: "All Agents",
-        count: countGroupedSkills(allSkills.filter((skill) => skill.hasAgentsFile)),
-        group: "scope",
-        matches: (skill) => skill.hasAgentsFile,
-      },
     ];
     const globalSkillCount = countGroupedSkills(globalSkills);
 
@@ -119,7 +110,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         iconKind: "global",
         label: "Global",
         count: globalSkillCount,
-        group: "scope",
+        group: "tool",
         matches: (skill) => skill.sourceId === "agents-global",
       });
     }
@@ -133,7 +124,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         iconKind: "project",
         label: "Project",
         count: projectSkillCount,
-        group: "scope",
+        group: "tool",
         matches: (skill) => skill.sourceId === "project-skills",
       });
     }
@@ -166,6 +157,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       skillCollections.map((collection) => ({
         id: collection.id,
         fallbackLabel: collection.fallbackLabel,
+        group: collection.group,
         iconKind: collection.iconKind,
         label: collection.label,
         sourceKind: collection.sourceKind,
@@ -221,16 +213,13 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   }, []);
 
   const openSkillInCollection = useCallback(
-    async (skillId: string, collectionId: string | null) => {
+    async (skillId: string) => {
       const matchingSkill = allSkills.find((skill) => skill.id === skillId);
       if (!matchingSkill) {
         return;
       }
 
-      const targetPath =
-        collectionId === "all-agents" && matchingSkill.agentsFilePath
-          ? matchingSkill.agentsFilePath
-          : matchingSkill.skillFilePath;
+      const targetPath = matchingSkill.skillFilePath;
 
       const opened = await skillsController.openSkillByPath(targetPath);
       if (!opened) {
@@ -252,19 +241,15 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       if (isSameCollection) {
         return;
       }
-
-      if (collectionId === "all-agents" && skillsController.activeSkill?.agentsFilePath) {
-        void openSkillInCollection(skillsController.activeSkill.id, collectionId);
-      }
     },
-    [openSkillInCollection, selectedSkillCollectionId, skillsController.activeSkill],
+    [selectedSkillCollectionId],
   );
 
   const handleSelectSkill = useCallback(
     async (skillId: string) => {
-      await openSkillInCollection(skillId, selectedSkillCollectionId);
+      await openSkillInCollection(skillId);
     },
-    [openSkillInCollection, selectedSkillCollectionId],
+    [openSkillInCollection],
   );
 
   useEffect(() => {
@@ -292,7 +277,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     if (!isActiveSkillVisible) {
       void openSkillInCollection(
         visibleSkillItems[0]?.representativeSkillId ?? visibleSkills[0].id,
-        selectedSkillCollectionId,
       );
     }
   }, [
@@ -325,9 +309,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       const openedSkill = await skillsController.openSkillByPath(targetPath);
       if (openedSkill) {
         if (matchingSkill) {
-          const nextCollectionId = isSamePath(matchingSkill.agentsFilePath, targetPath)
-            ? "all-agents"
-            : matchingSkill.sourceId === "agents-global"
+          const nextCollectionId =
+            matchingSkill.sourceId === "agents-global"
               ? "global-skills"
               : matchingSkill.sourceId === "project-skills"
                 ? "project-skills"
@@ -518,10 +501,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     if (visibleSkills.length === 0) {
       return {
         title: `No ${activeSkillCollection?.label ?? "skills"} yet`,
-        description:
-          activeSkillCollection?.id === "all-agents"
-            ? "Glyph could not find any local agents in the connected tool folders yet."
-            : "This source does not have any local skills available right now.",
+        description: "This source does not have any local skills available right now.",
       };
     }
 
@@ -549,13 +529,10 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         return;
       }
 
-      const preferredCollection =
-        matchingSkill.hasAgentsFile && controller.paletteQuery.toLowerCase().includes("agent")
-          ? "all-agents"
-          : "all-skills";
+      const preferredCollection = "all-skills";
 
       activateSkillCollection(preferredCollection);
-      await openSkillInCollection(matchingSkill.id, preferredCollection);
+      await openSkillInCollection(matchingSkill.id);
     },
     [
       activateSkillCollection,
@@ -725,7 +702,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       .map((collection) => ({
         id: `skill-collection-${collection.id}`,
         title: `Browse ${collection.label}`,
-        subtitle: `${collection.count} ${collection.label === "All Agents" ? "agents" : "skills"}`,
+        subtitle: `${collection.count} skills`,
         section: "Skills Library",
         kind: "command" as const,
         onSelect: () => {

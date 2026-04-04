@@ -12,6 +12,7 @@ export type SidebarTopLevelNode = {
 export type SidebarSkillCollectionItem = {
   id: string;
   fallbackLabel: string;
+  group: "scope" | "tool";
   iconKind?: "all-agents" | "all-skills" | "global" | "project";
   sourceKind?: SkillSourceKind;
   label: string;

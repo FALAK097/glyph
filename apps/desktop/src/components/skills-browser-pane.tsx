@@ -24,8 +24,8 @@ export function SkillsBrowserPane({
   onSelectSkill,
   title,
 }: SkillsBrowserPaneProps) {
-  const countLabel = title === "All Agents" ? "agent" : "skill";
-  const searchLabel = title === "All Agents" ? "agents" : "skills";
+  const countLabel = "skill";
+  const searchLabel = "skills";
   const isMacLike = navigator.platform.includes("Mac");
   const headerSpacingClass = isMacLike ? "pt-8" : "pt-4";
   const hasQuery = searchQuery.trim().length > 0;
@@ -60,12 +60,8 @@ export function SkillsBrowserPane({
         {items.length === 0 ? (
           <div className="rounded-xl px-3 py-3 text-sm text-muted-foreground">
             {hasQuery
-              ? title === "All Agents"
-                ? "No agents match your search yet."
-                : "No skills match your search yet."
-              : title === "All Agents"
-                ? "No agents are available in your connected tool folders yet."
-                : "No skills are available in this source yet."}
+              ? "No skills match your search yet."
+              : "No skills are available in this source yet."}
           </div>
         ) : (
           items.map((item) => {

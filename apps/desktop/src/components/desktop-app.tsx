@@ -842,9 +842,9 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         )}
 
         <main className="relative h-full min-h-0 overflow-hidden bg-background">
-          {controller.error && viewerMode === "note" ? (
+          {(viewerMode === "note" ? controller.error : skillsController.error) ? (
             <div className="mx-10 mt-4 mb-2 rounded-lg bg-destructive px-4 py-3 text-sm text-destructive-foreground">
-              {controller.error}
+              {viewerMode === "note" ? controller.error : skillsController.error}
             </div>
           ) : null}
 

@@ -28,8 +28,8 @@ function getLogoSources(sourceKind?: SkillSourceKind) {
       };
     case "opencode":
       return {
-        dark: `${skillLogoBasePath}/opencode_light.svg`,
-        light: `${skillLogoBasePath}/opencode_dark.svg`,
+        dark: `${skillLogoBasePath}/opencode_dark.svg`,
+        light: `${skillLogoBasePath}/opencode_light.svg`,
       };
     case "windsurf":
       return {

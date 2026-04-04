@@ -492,7 +492,11 @@ export function useSkillLibraryController(
       clearActiveSelection();
       return;
     }
-  }, [clearActiveSelection, snapshot]);
+
+    if (activeSkillId && !snapshot.skills.some((skill) => skill.id === activeSkillId)) {
+      clearActiveSelection();
+    }
+  }, [activeSkillId, clearActiveSelection, snapshot]);
 
   useEffect(() => {
     if (!activeSkill) {

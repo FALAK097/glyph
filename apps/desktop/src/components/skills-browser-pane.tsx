@@ -1,11 +1,15 @@
 import type { SkillBrowserItem } from "@/lib/skill-groups";
 import { cn } from "@/lib/utils";
 
+import { Input } from "./ui/input";
+import { SearchIcon } from "./icons";
 import { SkillSourceLogo, SkillSourceLogoStack } from "./skill-source-logo";
 
 type SkillsBrowserPaneProps = {
   activeSkillId: string | null;
   items: SkillBrowserItem[];
+  searchQuery: string;
+  onSearchQueryChange: (value: string) => void;
   onSelectSkill: (skillId: string) => void;
   title: string;
 };
@@ -13,13 +17,15 @@ type SkillsBrowserPaneProps = {
 export function SkillsBrowserPane({
   activeSkillId,
   items,
+  searchQuery,
+  onSearchQueryChange,
   onSelectSkill,
   title,
 }: SkillsBrowserPaneProps) {
   const countLabel = title === "All Agents" ? "agent" : "skill";
   const isMacLike = navigator.platform.includes("Mac");
-  const isAggregateView = title === "All Skills" || title === "All Agents";
   const headerSpacingClass = isMacLike ? "pt-8" : "pt-4";
+  const hasQuery = searchQuery.trim().length > 0;
 
   return (
     <aside className="flex h-full min-h-0 w-[292px] flex-col border-r border-border bg-background">
@@ -33,13 +39,30 @@ export function SkillsBrowserPane({
             {items.length === 1 ? "" : "s"}
           </p>
         </div>
+        <div className="relative mt-3">
+          <SearchIcon
+            size={14}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/80"
+          />
+          <Input
+            value={searchQuery}
+            onChange={(event) => onSearchQueryChange(event.target.value)}
+            placeholder="Search skills..."
+            aria-label="Search skills"
+            className="h-8 border-border/70 bg-background pl-8 pr-2.5 text-sm shadow-none"
+          />
+        </div>
       </div>
       <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto px-2 py-2">
         {items.length === 0 ? (
           <div className="rounded-xl px-3 py-3 text-sm text-muted-foreground">
-            {title === "All Agents"
-              ? "No agents are available in your connected tool folders yet."
-              : "No skills are available in this source yet."}
+            {hasQuery
+              ? title === "All Agents"
+                ? "No agents match your search yet."
+                : "No skills match your search yet."
+              : title === "All Agents"
+                ? "No agents are available in your connected tool folders yet."
+                : "No skills are available in this source yet."}
           </div>
         ) : (
           items.map((item) => {
@@ -69,7 +92,7 @@ export function SkillsBrowserPane({
                     )}
                     <p className="truncate text-sm font-medium text-foreground">{item.name}</p>
                   </div>
-                  {isAggregateView ? (
+                  {title === "All Skills" || title === "All Agents" ? (
                     <p className="mt-1 truncate pl-7 text-xs text-muted-foreground">
                       {item.sourceNames.join(", ")}
                     </p>

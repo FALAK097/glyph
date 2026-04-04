@@ -1,8 +1,14 @@
 import { cn } from "@/lib/utils";
 import type { SkillSourceKind } from "@/shared/skills";
-import { FileIcon, OutlineIcon, ShortcutIcon } from "./icons";
+import { FileIcon, FolderIcon, OutlineIcon, ShortcutIcon } from "./icons";
 
-type SkillIconKind = "all-agents" | "all-skills" | "global";
+type SkillIconKind = "all-agents" | "all-skills" | "global" | "project";
+
+type LogoSources = {
+  dark?: string;
+  light?: string;
+  single?: string;
+};
 
 type SkillSourceLogoProps = {
   className?: string;
@@ -14,7 +20,7 @@ type SkillSourceLogoProps = {
 
 const skillLogoBasePath = `${import.meta.env.BASE_URL}skills`;
 
-function getLogoSources(sourceKind?: SkillSourceKind) {
+function getLogoSources(sourceKind?: SkillSourceKind): LogoSources | null {
   switch (sourceKind) {
     case "codex":
       return {
@@ -41,10 +47,63 @@ function getLogoSources(sourceKind?: SkillSourceKind) {
         single: `${skillLogoBasePath}/claude-ai-icon.svg`,
       };
     case "amp":
-      return null;
+      return {
+        single: `${skillLogoBasePath}/amp-logo.svg`,
+      };
+    case "gemini":
+      return {
+        single: `${skillLogoBasePath}/gemini.svg`,
+      };
+    case "copilot":
+      return {
+        dark: `${skillLogoBasePath}/copilot_dark.svg`,
+        light: `${skillLogoBasePath}/copilot_light.svg`,
+      };
+    case "kimi":
+      return {
+        single: `${skillLogoBasePath}/kimi-icon.svg`,
+      };
+    case "kiro":
+      return {
+        single: `${skillLogoBasePath}/kiro.svg`,
+      };
+    case "kilocode":
+      return {
+        dark: `${skillLogoBasePath}/kilocode-dark.svg`,
+        light: `${skillLogoBasePath}/kilocode-light.svg`,
+      };
+    case "mistral":
+      return {
+        single: `${skillLogoBasePath}/mistral-ai_logo.svg`,
+      };
+    case "openclaw":
+      return {
+        single: `${skillLogoBasePath}/openclaw.svg`,
+      };
+    case "warp":
+      return {
+        single: `${skillLogoBasePath}/warp.svg`,
+      };
+    case "pi":
+      return {
+        single: `${skillLogoBasePath}/pi.svg`,
+      };
     default:
       return null;
   }
+}
+
+function getLogoImageClassName(
+  sourceKind: SkillSourceKind | undefined,
+  variant: "compact" | "badge",
+) {
+  const imageSizeClasses = variant === "badge" ? "size-3.5" : "size-3";
+
+  if (sourceKind === "pi") {
+    return cn("block object-contain invert dark:invert-0", imageSizeClasses);
+  }
+
+  return cn("block object-contain", imageSizeClasses);
 }
 
 function renderIcon({
@@ -61,7 +120,7 @@ function renderIcon({
   const sources = getLogoSources(sourceKind);
   const iconSize = variant === "badge" ? 16 : 14;
   const sizeClasses = variant === "badge" ? "size-6" : "size-5";
-  const imageSizeClasses = variant === "badge" ? "size-3.5" : "size-3";
+  const imageClassName = getLogoImageClassName(sourceKind, variant);
 
   if (iconKind === "all-skills") {
     return (
@@ -110,25 +169,53 @@ function renderIcon({
     );
   }
 
+  if (iconKind === "project" || sourceKind === "project") {
+    return (
+      <span
+        aria-hidden="true"
+        className={cn("inline-flex shrink-0 items-center justify-center", sizeClasses, className)}
+      >
+        <FolderIcon size={iconSize} className="text-muted-foreground" />
+      </span>
+    );
+  }
+
+  if (sourceKind === "agents") {
+    return (
+      <span
+        aria-hidden="true"
+        className={cn("inline-flex shrink-0 items-center justify-center", sizeClasses, className)}
+      >
+        <svg
+          viewBox="0 0 20 20"
+          className={
+            variant === "badge" ? "size-4 text-muted-foreground" : "size-3.5 text-muted-foreground"
+          }
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.5"
+        >
+          <circle cx="10" cy="10" r="6.75" />
+          <path d="M3.5 10h13" />
+          <path d="M10 3.5c1.9 1.9 3 4.1 3 6.5s-1.1 4.6-3 6.5c-1.9-1.9-3-4.1-3-6.5s1.1-4.6 3-6.5Z" />
+        </svg>
+      </span>
+    );
+  }
+
   return (
     <span
       aria-hidden="true"
       className={cn("inline-flex shrink-0 items-center justify-center", sizeClasses, className)}
     >
       {sources?.single ? (
-        <img src={sources.single} alt="" className={cn("block object-contain", imageSizeClasses)} />
+        <img src={sources.single} alt="" className={imageClassName} />
       ) : sources?.dark && sources.light ? (
         <>
-          <img
-            src={sources.light}
-            alt=""
-            className={cn("block object-contain dark:hidden", imageSizeClasses)}
-          />
-          <img
-            src={sources.dark}
-            alt=""
-            className={cn("hidden object-contain dark:block", imageSizeClasses)}
-          />
+          <img src={sources.light} alt="" className={cn("dark:hidden", imageClassName)} />
+          <img src={sources.dark} alt="" className={cn("hidden dark:block", imageClassName)} />
         </>
       ) : (
         <FileIcon size={iconSize} className="text-muted-foreground/85" />

@@ -451,15 +451,17 @@ export const Sidebar = ({
             {isSkillsExpanded ? (
               <div>
                 <div className="space-y-1 px-2">
-                  {skillCollections.slice(0, 2).map((item) => (
-                    <SidebarSkillCollectionRow
-                      key={item.id}
-                      item={item}
-                      onSelect={onSelectSkillCollection}
-                    />
-                  ))}
+                  {skillCollections
+                    .filter((item) => item.iconKind)
+                    .map((item) => (
+                      <SidebarSkillCollectionRow
+                        key={item.id}
+                        item={item}
+                        onSelect={onSelectSkillCollection}
+                      />
+                    ))}
                 </div>
-                {skillCollections.length > 2 ? (
+                {skillCollections.some((item) => !item.iconKind) ? (
                   <div className="mt-4">
                     <div className="px-4 py-1.5">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
@@ -467,13 +469,15 @@ export const Sidebar = ({
                       </p>
                     </div>
                     <div className="space-y-1 px-2">
-                      {skillCollections.slice(2).map((item) => (
-                        <SidebarSkillCollectionRow
-                          key={item.id}
-                          item={item}
-                          onSelect={onSelectSkillCollection}
-                        />
-                      ))}
+                      {skillCollections
+                        .filter((item) => !item.iconKind)
+                        .map((item) => (
+                          <SidebarSkillCollectionRow
+                            key={item.id}
+                            item={item}
+                            onSelect={onSelectSkillCollection}
+                          />
+                        ))}
                     </div>
                   </div>
                 ) : null}

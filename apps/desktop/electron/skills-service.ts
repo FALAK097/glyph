@@ -14,20 +14,26 @@ import {
   type SkillLibrarySnapshot,
   type SkillSource,
   type SkillSourceKind,
+  type SkillToolKind,
 } from "../src/shared/skills.js";
+import {
+  SKILL_AGENT_CATALOG,
+  SKILL_SOURCE_CATALOG,
+  type SkillSourceRootTemplate,
+} from "../src/shared/skill-agent-catalog.js";
 
-type SourceDefinition = {
+type ResolvedSkillSourceDefinition = {
   id: string;
   kind: SkillSourceKind;
   name: string;
   rootPath: string;
-  description: string | null;
+  description: string;
   isReadOnly: boolean;
   maxDepth: number;
 };
 
 type CreateSkillsServiceOptions = {
-  projectRoot: string;
+  projectRoot: string | null;
   onLibraryChanged: (event: SkillLibraryChangeEvent) => void;
 };
 
@@ -64,83 +70,44 @@ async function fileExists(targetPath: string) {
   }
 }
 
-function getSourceDefinitions(projectRoot: string): SourceDefinition[] {
-  const homePath = app.getPath("home");
+function getCompatibleToolKinds(sourceKind: SkillSourceKind): SkillToolKind[] {
+  if (sourceKind === "agents" || sourceKind === "project") {
+    return SKILL_AGENT_CATALOG.filter((entry) => entry.supportsUniversalScope).map(
+      (entry) => entry.kind,
+    );
+  }
 
-  return [
-    {
-      id: "codex-user",
-      kind: "codex",
-      name: "Codex",
-      rootPath: path.join(homePath, ".codex", "skills"),
-      description: "Editable local Codex skills",
-      isReadOnly: false,
-      maxDepth: 3,
-    },
-    {
-      id: "agents-global",
-      kind: "agents",
-      name: "Global",
-      rootPath: path.join(homePath, ".agents", "skills"),
-      description: "Editable cross-project agent skills",
-      isReadOnly: false,
-      maxDepth: 3,
-    },
-    {
-      id: "claude-user",
-      kind: "claude",
-      name: "Claude Code",
-      rootPath: path.join(homePath, ".claude", "skills"),
-      description: "Claude Code skills on this machine",
-      isReadOnly: false,
-      maxDepth: 3,
-    },
-    {
-      id: "cursor-user",
-      kind: "cursor",
-      name: "Cursor",
-      rootPath: path.join(homePath, ".cursor", "skills"),
-      description: "Cursor agent skills on this machine",
-      isReadOnly: false,
-      maxDepth: 3,
-    },
-    {
-      id: "opencode-user",
-      kind: "opencode",
-      name: "OpenCode",
-      rootPath: path.join(homePath, ".config", "opencode", "skills"),
-      description: "OpenCode skills on this machine",
-      isReadOnly: false,
-      maxDepth: 3,
-    },
-    {
-      id: "windsurf-user",
-      kind: "windsurf",
-      name: "Windsurf",
-      rootPath: path.join(homePath, ".windsurf", "skills"),
-      description: "Windsurf agent skills on this machine",
-      isReadOnly: false,
-      maxDepth: 3,
-    },
-    {
-      id: "amp-user",
-      kind: "amp",
-      name: "Amp",
-      rootPath: path.join(homePath, ".amp", "skills"),
-      description: "Amp agent skills on this machine",
-      isReadOnly: false,
-      maxDepth: 3,
-    },
-    {
-      id: "project-skills",
-      kind: "project",
-      name: "Project Skills",
-      rootPath: path.join(projectRoot, ".agents", "skills"),
-      description: "Skills checked into the active project",
-      isReadOnly: false,
-      maxDepth: 3,
-    },
-  ];
+  return [sourceKind as SkillToolKind];
+}
+
+function getSourceDefinitions(projectRoot: string | null): ResolvedSkillSourceDefinition[] {
+  const resolveRootPath = (template: SkillSourceRootTemplate) => {
+    if (template.base === "project" && !projectRoot) {
+      return null;
+    }
+
+    const basePath = template.base === "home" ? app.getPath("home") : projectRoot;
+    return basePath ? path.join(basePath, ...template.segments) : null;
+  };
+
+  return SKILL_SOURCE_CATALOG.flatMap((entry) => {
+    const rootPath = resolveRootPath(entry.root);
+    if (!rootPath) {
+      return [];
+    }
+
+    return [
+      {
+        id: entry.id,
+        kind: entry.kind,
+        name: entry.name,
+        rootPath,
+        description: entry.description,
+        isReadOnly: entry.isReadOnly,
+        maxDepth: entry.maxDepth,
+      },
+    ];
+  });
 }
 
 async function collectSkillFiles(
@@ -194,7 +161,7 @@ function toSlug(skillFilePath: string, rootPath: string) {
 }
 
 async function buildSkillEntry(
-  source: SourceDefinition,
+  source: ResolvedSkillSourceDefinition,
   skillFilePath: string,
 ): Promise<SkillEntry | null> {
   try {
@@ -214,6 +181,7 @@ async function buildSkillEntry(
       sourceId: source.id,
       sourceName: source.name,
       sourceKind: source.kind,
+      compatibleToolKinds: getCompatibleToolKinds(source.kind),
       sourceRootPath: source.rootPath,
       directoryPath,
       skillFilePath,
@@ -265,6 +233,7 @@ async function preserveLineEndings(filePath: string, content: string) {
 }
 
 export function createSkillsService({ projectRoot, onLibraryChanged }: CreateSkillsServiceOptions) {
+  let activeProjectRoot = projectRoot;
   let snapshot: SkillLibrarySnapshot = {
     sources: [],
     skills: [],
@@ -281,7 +250,7 @@ export function createSkillsService({ projectRoot, onLibraryChanged }: CreateSki
     }
 
     refreshPromise = (async () => {
-      const sourceDefinitions = getSourceDefinitions(projectRoot);
+      const sourceDefinitions = getSourceDefinitions(activeProjectRoot);
       const availableSources = await Promise.all(
         sourceDefinitions.map(async (source) => ({
           source,
@@ -446,11 +415,24 @@ export function createSkillsService({ projectRoot, onLibraryChanged }: CreateSki
     watchers.clear();
   };
 
+  const setProjectRoot = async (nextProjectRoot: string | null) => {
+    const normalizedCurrent = activeProjectRoot ? path.normalize(activeProjectRoot) : null;
+    const normalizedNext = nextProjectRoot ? path.normalize(nextProjectRoot) : null;
+
+    if (normalizedCurrent === normalizedNext) {
+      return snapshot;
+    }
+
+    activeProjectRoot = normalizedNext;
+    return refresh();
+  };
+
   return {
     dispose,
     getSnapshot,
     readDocument,
     refresh,
     saveDocument,
+    setProjectRoot,
   };
 }

@@ -9,7 +9,41 @@ export type SkillSourceKind =
   | "opencode"
   | "windsurf"
   | "amp"
+  | "gemini"
+  | "copilot"
+  | "kimi"
+  | "kiro"
+  | "kilocode"
+  | "mistral"
+  | "openclaw"
+  | "warp"
+  | "pi"
+  | "augment"
+  | "bob"
+  | "codebuddy"
+  | "commandcode"
+  | "continue"
+  | "cortex"
+  | "crush"
+  | "factory"
+  | "goose"
+  | "junie"
+  | "iflow"
+  | "kode"
+  | "mcpjam"
+  | "mux"
+  | "openhands"
+  | "qoder"
+  | "qwen"
+  | "roo"
+  | "trae"
+  | "zencoder"
+  | "neovate"
+  | "pochi"
+  | "adal"
   | "project";
+
+export type SkillToolKind = Exclude<SkillSourceKind, "agents" | "project">;
 
 export type SkillMetadataValue = string | number | boolean;
 
@@ -32,6 +66,7 @@ export type SkillEntry = {
   sourceId: string;
   sourceName: string;
   sourceKind: SkillSourceKind;
+  compatibleToolKinds: SkillToolKind[];
   sourceRootPath: string;
   directoryPath: string;
   skillFilePath: string;

@@ -69,7 +69,7 @@ let updateCheckInterval: NodeJS.Timeout | null = null;
 const MARKDOWN_EXTENSIONS = [".md", ".mdx", ".markdown"] as const;
 const UPDATE_CHECK_INTERVAL_MS = 1000 * 60 * 60 * 6;
 const skillsService = createSkillsService({
-  projectRoot: process.cwd(),
+  projectRoot: null,
   onLibraryChanged: (event) => {
     if (!mainWindow || mainWindow.isDestroyed()) {
       return;
@@ -1027,6 +1027,7 @@ function getPreferredWorkspaceFilePath(filePaths: string[]) {
 async function openWorkspace(dirPath: string): Promise<WorkspaceSnapshot> {
   await ensureWorkspace(dirPath);
   activeWorkspaceRoot = dirPath;
+  await skillsService.setProjectRoot(dirPath);
 
   const tree = await buildDirectoryTree(dirPath);
   searchableFilesCache = await collectMarkdownFiles(tree);

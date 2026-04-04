@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 import { getDisplayFileName, isSamePath } from "@/lib/paths";
 import { countGroupedSkills, groupSkillsForBrowse } from "@/lib/skill-groups";
 import { formatByteSize } from "@/lib/format-byte-size";
 import { getShortcutDisplay } from "@/shared/shortcuts";
-import type { SkillEntry, SkillSourceKind } from "@/shared/skills";
+import { SKILL_AGENT_CATALOG } from "@/shared/skill-agent-catalog";
+import type { SkillEntry, SkillSourceKind, SkillToolKind } from "@/shared/skills";
 import type { ThemeMode } from "@/shared/workspace";
 import type { DesktopAppProps } from "@/types/app";
 import type { CommandPaletteItem } from "@/types/command-palette";
@@ -34,10 +35,12 @@ import { TooltipProvider } from "./ui/tooltip";
 type SkillCollection = {
   id: string;
   fallbackLabel: string;
-  iconKind?: "all-agents" | "all-skills" | "global";
+  iconKind?: "all-agents" | "all-skills" | "global" | "project";
   label: string;
   sourceKind?: SkillSourceKind;
+  toolKind?: SkillToolKind;
   count: number;
+  group: "scope" | "tool";
   matches: (skill: SkillEntry) => boolean;
 };
 
@@ -73,11 +76,18 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const [pendingNoteRename, setPendingNoteRename] = useState<PendingNoteRename | null>(null);
   const [pendingNoteConfirm, setPendingNoteConfirm] = useState<PendingNoteConfirm | null>(null);
   const noteRenameInputRef = useRef<HTMLInputElement | null>(null);
+  const confirmCancelRef = useRef<HTMLButtonElement | null>(null);
+  const isSwitchingToAgentsRef = useRef(false);
+  const deferredSkillQuery = useDeferredValue(skillsController.searchQuery.trim().toLowerCase());
   const shouldCollapseSidebar =
     controller.isSidebarCollapsed || (viewerMode === "note" && controller.isFocusMode);
   const allSkills = skillsController.snapshot?.skills ?? [];
   const globalSkills = useMemo(
     () => allSkills.filter((skill) => skill.sourceId === "agents-global"),
+    [allSkills],
+  );
+  const projectSkills = useMemo(
+    () => allSkills.filter((skill) => skill.sourceId === "project-skills"),
     [allSkills],
   );
 
@@ -89,6 +99,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         iconKind: "all-skills",
         label: "All Skills",
         count: countGroupedSkills(allSkills),
+        group: "scope",
         matches: () => true,
       },
       {
@@ -97,6 +108,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         iconKind: "all-agents",
         label: "All Agents",
         count: countGroupedSkills(allSkills.filter((skill) => skill.hasAgentsFile)),
+        group: "scope",
         matches: (skill) => skill.hasAgentsFile,
       },
     ];
@@ -109,31 +121,47 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         iconKind: "global",
         label: "Global",
         count: globalSkillCount,
+        group: "scope",
         matches: (skill) => skill.sourceId === "agents-global",
       });
     }
 
-    skillsController.sources
-      .filter((source) => !["agents-global", "project-skills"].includes(source.id))
-      .forEach((source) => {
-        const sourceSkills = allSkills.filter((skill) => skill.sourceId === source.id);
-        const skillCount = countGroupedSkills(sourceSkills);
-        if (skillCount === 0) {
-          return;
-        }
+    const projectSkillCount = countGroupedSkills(projectSkills);
 
-        collections.push({
-          id: source.id,
-          fallbackLabel: source.name,
-          label: source.name,
-          sourceKind: source.kind,
-          count: skillCount,
-          matches: (skill) => skill.sourceId === source.id,
-        });
+    if (projectSkillCount > 0) {
+      collections.push({
+        id: "project-skills",
+        fallbackLabel: "Project",
+        iconKind: "project",
+        label: "Project",
+        count: projectSkillCount,
+        group: "scope",
+        matches: (skill) => skill.sourceId === "project-skills",
       });
+    }
+
+    SKILL_AGENT_CATALOG.forEach((tool) => {
+      const toolSkills = allSkills.filter((skill) => skill.compatibleToolKinds.includes(tool.kind));
+      const skillCount = countGroupedSkills(toolSkills);
+
+      if (skillCount === 0) {
+        return;
+      }
+
+      collections.push({
+        id: `${tool.kind}-tool`,
+        fallbackLabel: tool.label,
+        label: tool.label,
+        sourceKind: tool.kind,
+        toolKind: tool.kind,
+        count: skillCount,
+        group: "tool",
+        matches: (skill) => skill.compatibleToolKinds.includes(tool.kind),
+      });
+    });
 
     return collections;
-  }, [allSkills, globalSkills, skillsController.sources]);
+  }, [allSkills, globalSkills, projectSkills]);
 
   const sidebarSkillCollections = useMemo(
     () =>
@@ -170,7 +198,20 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
 
     return allSkills.filter((skill) => activeSkillCollection.matches(skill));
   }, [activeSkillCollection, allSkills]);
-  const visibleSkillItems = useMemo(() => groupSkillsForBrowse(visibleSkills), [visibleSkills]);
+  const visibleSkillItems = useMemo(() => {
+    const groupedItems = groupSkillsForBrowse(visibleSkills);
+
+    if (!deferredSkillQuery) {
+      return groupedItems;
+    }
+
+    return groupedItems.filter((item) =>
+      [item.name, item.description ?? "", item.sourceNames.join(" ")]
+        .join("\n")
+        .toLowerCase()
+        .includes(deferredSkillQuery),
+    );
+  }, [deferredSkillQuery, visibleSkills]);
 
   const handleToggleSkillsSection = useCallback(() => {
     const nextValue = !isSkillsExpanded;
@@ -235,6 +276,12 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   );
 
   useEffect(() => {
+    if (skillsController.selectedDocumentKind === "agents") {
+      isSwitchingToAgentsRef.current = false;
+    }
+  }, [skillsController.selectedDocumentKind]);
+
+  useEffect(() => {
     if (!selectedSkillCollectionId || viewerMode !== "skill") {
       return;
     }
@@ -245,22 +292,30 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       return;
     }
 
-    if (visibleSkills.length === 0) {
+    if (visibleSkills.length === 0 || visibleSkillItems.length === 0) {
       skillsController.clearActiveSelection();
       return;
     }
 
     const isActiveSkillVisible = skillsController.activeSkill
-      ? visibleSkills.some((skill) => skill.id === skillsController.activeSkill?.id)
+      ? visibleSkillItems.some((item) =>
+          item.memberSkillIds.includes(skillsController.activeSkill?.id ?? ""),
+        )
       : false;
 
     if (
       isActiveSkillVisible &&
       selectedSkillCollectionId === "all-agents" &&
       skillsController.activeSkill?.agentsFilePath &&
+      !isSwitchingToAgentsRef.current &&
       skillsController.selectedDocumentKind !== "agents"
     ) {
-      void skillsController.openDocumentTab("agents");
+      isSwitchingToAgentsRef.current = true;
+      void skillsController.openDocumentTab("agents").finally(() => {
+        if (skillsController.selectedDocumentKind !== "agents") {
+          isSwitchingToAgentsRef.current = false;
+        }
+      });
       return;
     }
 
@@ -304,8 +359,11 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         if (matchingSkill) {
           const nextCollectionId = isSamePath(matchingSkill.agentsFilePath, targetPath)
             ? "all-agents"
-            : (skillCollections.find((collection) => collection.matches(matchingSkill))?.id ??
-              "all-skills");
+            : matchingSkill.sourceId === "agents-global"
+              ? "global-skills"
+              : matchingSkill.sourceId === "project-skills"
+                ? "project-skills"
+                : `${matchingSkill.sourceKind}-tool`;
           activateSkillCollection(nextCollectionId);
         } else {
           activateSkillCollection("all-skills");
@@ -318,7 +376,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       setViewerMode("note");
       await controller.openFile(targetPath);
     },
-    [activateSkillCollection, allSkills, controller, skillCollections, skillsController],
+    [activateSkillCollection, allSkills, controller, skillsController],
   );
   const closePalette = useCallback(() => {
     controller.setIsPaletteOpen(false);
@@ -379,6 +437,18 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
 
     return () => window.cancelAnimationFrame(frame);
   }, [pendingNoteRename]);
+
+  useEffect(() => {
+    if (!pendingNoteConfirm) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      confirmCancelRef.current?.focus();
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [pendingNoteConfirm]);
 
   const handleOpenCurrentNoteConfirm = useCallback(
     (kind: PendingNoteConfirm["kind"]) => {
@@ -465,7 +535,9 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const isActiveSkillVisible =
     !selectedSkillCollectionId ||
     (skillsController.activeSkill
-      ? visibleSkills.some((skill) => skill.id === skillsController.activeSkill?.id)
+      ? visibleSkillItems.some((item) =>
+          item.memberSkillIds.includes(skillsController.activeSkill?.id ?? ""),
+        )
       : false);
   const skillEmptyState = useMemo(() => {
     if (!selectedSkillCollectionId) {
@@ -485,11 +557,23 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       };
     }
 
+    if (visibleSkillItems.length === 0) {
+      return {
+        title: "No matches",
+        description: "Try a broader skills search or switch to another collection.",
+      };
+    }
+
     return {
       title: "Select a skill",
       description: "Pick a skill from the list to preview its markdown content here.",
     };
-  }, [activeSkillCollection, selectedSkillCollectionId, visibleSkills.length]);
+  }, [
+    activeSkillCollection,
+    selectedSkillCollectionId,
+    visibleSkillItems.length,
+    visibleSkills.length,
+  ]);
   const openSkillFromSearchResult = useCallback(
     async (skillId: string) => {
       const matchingSkill = skillsController.snapshot?.skills.find((skill) => skill.id === skillId);
@@ -771,12 +855,20 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   }, [
     activateSkillCollection,
     closePalette,
-    controller,
+    controller.folderRevealLabel,
+    controller.paletteQuery,
     handleCopyCurrentSkillMarkdown,
     handleExportCurrentSkill,
     openSkillFromSearchResult,
     skillCollections,
-    skillsController,
+    skillsController.activeDocument,
+    skillsController.activeSkill,
+    skillsController.copyPath,
+    skillsController.documentTabs,
+    skillsController.openDocumentTab,
+    skillsController.refreshLibrary,
+    skillsController.revealInFinder,
+    skillsController.snapshot?.skills,
     viewerMode,
   ]);
 
@@ -861,7 +953,9 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                   viewerMode === "skill" ? (skillsController.activeSkill?.id ?? null) : null
                 }
                 items={visibleSkillItems}
+                searchQuery={skillsController.searchQuery}
                 onSelectSkill={(skillId) => void handleSelectSkill(skillId)}
+                onSearchQueryChange={skillsController.setSearchQuery}
                 title={activeSkillCollection?.label ?? "Skills"}
               />
             ) : null}
@@ -872,6 +966,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                   <SkillDocumentPane
                     activeDocument={skillsController.activeDocument}
                     draftContent={skillsController.draftContent}
+                    documentTabs={skillsController.documentTabs}
                     fileLabel={
                       skillsController.activeSkill?.name ?? skillsController.activeDocument.name
                     }
@@ -879,8 +974,10 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                       getShortcutDisplay(controller.shortcuts, "command-palette") ?? "⌘P"
                     }
                     isSidebarCollapsed={controller.isSidebarCollapsed}
+                    pendingExternalChange={skillsController.pendingExternalChange}
                     saveStateLabel={skillsController.saveStateLabel}
                     onChange={skillsController.setDraftContent}
+                    onKeepMineAfterExternalChange={skillsController.keepMineAfterExternalChange}
                     showOutline={controller.showOutline}
                     toggleSidebarShortcut={getShortcutDisplay(
                       controller.shortcuts,
@@ -890,6 +987,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                     onOpenCommandPalette={() => controller.setIsPaletteOpen(true)}
                     onOpenLinkedFile={(targetPath) => void handleOpenSkillLink(targetPath)}
                     onOpenSettings={() => controller.setIsSettingsOpen(true)}
+                    onReloadAfterExternalChange={skillsController.reloadAfterExternalChange}
+                    onSelectDocumentTab={(kind) => void skillsController.openDocumentTab(kind)}
                     onToggleSidebar={() =>
                       controller.setIsSidebarCollapsed(!controller.isSidebarCollapsed)
                     }
@@ -1083,7 +1182,12 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button variant="outline" type="button" onClick={() => setPendingNoteConfirm(null)}>
+                <Button
+                  ref={confirmCancelRef}
+                  variant="outline"
+                  type="button"
+                  onClick={() => setPendingNoteConfirm(null)}
+                >
                   Cancel
                 </Button>
                 <Button

@@ -106,7 +106,7 @@ export function useSkillLibraryController(
     }
 
     if (!searchResultIdSet) {
-      return [];
+      return skills;
     }
 
     return skills.filter((skill) => searchResultIdSet.has(skill.id));
@@ -461,8 +461,6 @@ export function useSkillLibraryController(
       setSearchResultIds(null);
       return;
     }
-
-    setSearchResultIds(null);
 
     searchRequestNonceRef.current += 1;
     const requestNonce = searchRequestNonceRef.current;

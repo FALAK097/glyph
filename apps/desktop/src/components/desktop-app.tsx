@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { getDisplayFileName, isSamePath } from "@/lib/paths";
 import { countGroupedSkills, groupSkillsForBrowse } from "@/lib/skill-groups";
 import { formatByteSize } from "@/lib/format-byte-size";
 import { getShortcutDisplay } from "@/shared/shortcuts";
 import type { SkillEntry, SkillSourceKind } from "@/shared/skills";
 import type { ThemeMode } from "@/shared/workspace";
 import type { DesktopAppProps } from "@/types/app";
+import type { CommandPaletteItem } from "@/types/command-palette";
 
 import { useDesktopAppController } from "@/hooks/use-desktop-app-controller";
 import { useSkillLibraryController } from "@/hooks/use-skill-library-controller";
@@ -17,6 +19,16 @@ import { Sidebar } from "./sidebar";
 import { SkillDocumentPane } from "./skill-document-pane";
 import { SkillsBrowserPane } from "./skills-browser-pane";
 import { SkillEmptyPane } from "./skill-empty-pane";
+import { Button } from "./ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
+import { Input } from "./ui/input";
 import { TooltipProvider } from "./ui/tooltip";
 
 type SkillCollection = {
@@ -29,6 +41,26 @@ type SkillCollection = {
   matches: (skill: SkillEntry) => boolean;
 };
 
+type PendingNoteRename = {
+  name: string;
+  path: string;
+  value: string;
+};
+
+type PendingNoteConfirm = {
+  kind: "delete" | "remove";
+  name: string;
+  path: string;
+};
+
+function matchesPaletteQuery(query: string, ...values: Array<string | null | undefined>) {
+  if (!query) {
+    return true;
+  }
+
+  return values.some((value) => value?.toLowerCase().includes(query));
+}
+
 export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const controller = useDesktopAppController(glyph);
   const skillsController = useSkillLibraryController(glyph, {
@@ -38,6 +70,9 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const [isSkillsExpanded, setIsSkillsExpanded] = useState(false);
   const [selectedSkillCollectionId, setSelectedSkillCollectionId] = useState<string | null>(null);
   const [viewerMode, setViewerMode] = useState<"note" | "skill">("note");
+  const [pendingNoteRename, setPendingNoteRename] = useState<PendingNoteRename | null>(null);
+  const [pendingNoteConfirm, setPendingNoteConfirm] = useState<PendingNoteConfirm | null>(null);
+  const noteRenameInputRef = useRef<HTMLInputElement | null>(null);
   const shouldCollapseSidebar =
     controller.isSidebarCollapsed || (viewerMode === "note" && controller.isFocusMode);
   const allSkills = skillsController.snapshot?.skills ?? [];
@@ -123,6 +158,10 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     const bytes = new TextEncoder().encode(controller.draftContent).length;
     return formatByteSize(bytes);
   }, [controller.draftContent]);
+  const currentNoteDisplayName = useMemo(
+    () => (controller.activeFile ? getDisplayFileName(controller.activeFile.name) : ""),
+    [controller.activeFile],
+  );
 
   const visibleSkills = useMemo(() => {
     if (!activeSkillCollection) {
@@ -132,6 +171,68 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     return allSkills.filter((skill) => activeSkillCollection.matches(skill));
   }, [activeSkillCollection, allSkills]);
   const visibleSkillItems = useMemo(() => groupSkillsForBrowse(visibleSkills), [visibleSkills]);
+
+  const handleToggleSkillsSection = useCallback(() => {
+    const nextValue = !isSkillsExpanded;
+    setIsSkillsExpanded(nextValue);
+
+    if (!nextValue) {
+      setSelectedSkillCollectionId(null);
+      setViewerMode("note");
+    }
+  }, [isSkillsExpanded]);
+
+  const handleToggleNotesSection = useCallback(() => {
+    setIsNotesExpanded((value) => !value);
+  }, []);
+
+  const activateSkillCollection = useCallback((collectionId: string) => {
+    setIsSkillsExpanded(true);
+    setSelectedSkillCollectionId(collectionId);
+    setViewerMode("skill");
+  }, []);
+
+  const handleSelectSkillCollection = useCallback(
+    (collectionId: string) => {
+      setIsSkillsExpanded(true);
+      const isSameCollection = selectedSkillCollectionId === collectionId;
+      setSelectedSkillCollectionId(isSameCollection ? null : collectionId);
+      setViewerMode(isSameCollection ? "note" : "skill");
+      if (!isSameCollection) {
+        skillsController.clearActiveSelection();
+      }
+    },
+    [selectedSkillCollectionId, skillsController],
+  );
+
+  const openSkillInCollection = useCallback(
+    async (skillId: string, collectionId: string | null) => {
+      const matchingSkill = allSkills.find((skill) => skill.id === skillId);
+      if (!matchingSkill) {
+        return;
+      }
+
+      const targetPath =
+        collectionId === "all-agents" && matchingSkill.agentsFilePath
+          ? matchingSkill.agentsFilePath
+          : matchingSkill.skillFilePath;
+
+      const opened = await skillsController.openSkillByPath(targetPath);
+      if (!opened) {
+        await skillsController.openSkill(skillId);
+      }
+
+      setViewerMode("skill");
+    },
+    [allSkills, skillsController],
+  );
+
+  const handleSelectSkill = useCallback(
+    async (skillId: string) => {
+      await openSkillInCollection(skillId, selectedSkillCollectionId);
+    },
+    [openSkillInCollection, selectedSkillCollectionId],
+  );
 
   useEffect(() => {
     if (!selectedSkillCollectionId || viewerMode !== "skill") {
@@ -153,56 +254,34 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       ? visibleSkills.some((skill) => skill.id === skillsController.activeSkill?.id)
       : false;
 
+    if (
+      isActiveSkillVisible &&
+      selectedSkillCollectionId === "all-agents" &&
+      skillsController.activeSkill?.agentsFilePath &&
+      skillsController.selectedDocumentKind !== "agents"
+    ) {
+      void skillsController.openDocumentTab("agents");
+      return;
+    }
+
     if (!isActiveSkillVisible) {
-      void skillsController.openSkill(
+      void openSkillInCollection(
         visibleSkillItems[0]?.representativeSkillId ?? visibleSkills[0].id,
+        selectedSkillCollectionId,
       );
     }
   }, [
     activeSkillCollection,
+    openSkillInCollection,
     selectedSkillCollectionId,
     skillsController.activeSkill,
     skillsController.clearActiveSelection,
-    skillsController.openSkill,
-    visibleSkillItems,
+    skillsController.openDocumentTab,
+    skillsController.selectedDocumentKind,
     viewerMode,
+    visibleSkillItems,
     visibleSkills,
   ]);
-
-  const handleToggleSkillsSection = useCallback(() => {
-    const nextValue = !isSkillsExpanded;
-    setIsSkillsExpanded(nextValue);
-
-    if (!nextValue) {
-      setSelectedSkillCollectionId(null);
-      setViewerMode("note");
-    }
-  }, [isSkillsExpanded]);
-
-  const handleToggleNotesSection = useCallback(() => {
-    setIsNotesExpanded((value) => !value);
-  }, []);
-
-  const handleSelectSkillCollection = useCallback(
-    (collectionId: string) => {
-      setIsSkillsExpanded(true);
-      const isSameCollection = selectedSkillCollectionId === collectionId;
-      setSelectedSkillCollectionId(isSameCollection ? null : collectionId);
-      setViewerMode(isSameCollection ? "note" : "skill");
-      if (!isSameCollection) {
-        skillsController.clearActiveSelection();
-      }
-    },
-    [selectedSkillCollectionId, skillsController],
-  );
-
-  const handleSelectSkill = useCallback(
-    async (skillId: string) => {
-      await skillsController.openSkill(skillId);
-      setViewerMode("skill");
-    },
-    [skillsController],
-  );
 
   const handleOpenNoteFile = useCallback(
     async (filePath: string) => {
@@ -215,8 +294,23 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
 
   const handleOpenSkillLink = useCallback(
     async (targetPath: string) => {
+      const matchingSkill = allSkills.find(
+        (skill) =>
+          isSamePath(skill.skillFilePath, targetPath) ||
+          isSamePath(skill.agentsFilePath, targetPath),
+      );
       const openedSkill = await skillsController.openSkillByPath(targetPath);
       if (openedSkill) {
+        if (matchingSkill) {
+          const nextCollectionId = isSamePath(matchingSkill.agentsFilePath, targetPath)
+            ? "all-agents"
+            : (skillCollections.find((collection) => collection.matches(matchingSkill))?.id ??
+              "all-skills");
+          activateSkillCollection(nextCollectionId);
+        } else {
+          activateSkillCollection("all-skills");
+        }
+
         setViewerMode("skill");
         return;
       }
@@ -224,8 +318,148 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       setViewerMode("note");
       await controller.openFile(targetPath);
     },
-    [controller, skillsController],
+    [activateSkillCollection, allSkills, controller, skillCollections, skillsController],
   );
+  const closePalette = useCallback(() => {
+    controller.setIsPaletteOpen(false);
+  }, [controller]);
+
+  const copyText = useCallback(async (value: string) => {
+    await navigator.clipboard.writeText(value);
+  }, []);
+
+  const exportDocumentToPdf = useCallback(
+    async (markdown: string, fileName: string) => {
+      const pdfName = fileName.replace(/\.(md|mdx|markdown)$/i, ".pdf");
+      const absolutePath = await glyph.exportMarkdownToPDF(markdown, pdfName);
+
+      if ((controller.settings?.autoOpenPDF ?? true) && absolutePath) {
+        await glyph.openExternal(absolutePath);
+      }
+    },
+    [controller.settings?.autoOpenPDF, glyph],
+  );
+
+  const handleRenameCurrentNote = useCallback(() => {
+    if (!controller.activeFile) {
+      return;
+    }
+
+    setPendingNoteRename({
+      path: controller.activeFile.path,
+      name: controller.activeFile.name,
+      value: getDisplayFileName(controller.activeFile.name),
+    });
+    closePalette();
+  }, [closePalette, controller.activeFile]);
+
+  const handleConfirmNoteRename = useCallback(async () => {
+    if (!pendingNoteRename) {
+      return;
+    }
+
+    const nextName = pendingNoteRename.value.trim();
+    if (!nextName) {
+      return;
+    }
+
+    await controller.handleRenameFile(pendingNoteRename.path, nextName);
+    setPendingNoteRename(null);
+  }, [controller, pendingNoteRename]);
+
+  useEffect(() => {
+    if (!pendingNoteRename) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      noteRenameInputRef.current?.focus();
+      noteRenameInputRef.current?.select();
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [pendingNoteRename]);
+
+  const handleOpenCurrentNoteConfirm = useCallback(
+    (kind: PendingNoteConfirm["kind"]) => {
+      if (!controller.activeFile) {
+        return;
+      }
+
+      setPendingNoteConfirm({
+        kind,
+        path: controller.activeFile.path,
+        name: controller.activeFile.name,
+      });
+      closePalette();
+    },
+    [closePalette, controller.activeFile],
+  );
+
+  const handleConfirmCurrentNoteAction = useCallback(async () => {
+    if (!pendingNoteConfirm) {
+      return;
+    }
+
+    if (pendingNoteConfirm.kind === "remove") {
+      await controller.handleRemoveFileFromGlyph(pendingNoteConfirm.path);
+    } else {
+      await controller.handleDeleteFile(pendingNoteConfirm.path);
+    }
+
+    setPendingNoteConfirm(null);
+  }, [controller, pendingNoteConfirm]);
+
+  const handleCopyCurrentNoteMarkdown = useCallback(async () => {
+    await copyText(controller.draftContent);
+    closePalette();
+  }, [closePalette, controller.draftContent, copyText]);
+
+  const handleCopyCurrentNotePath = useCallback(async () => {
+    if (!controller.activeFile) {
+      return;
+    }
+
+    await copyText(controller.activeFile.path);
+    closePalette();
+  }, [closePalette, controller.activeFile, copyText]);
+
+  const handleRevealCurrentNote = useCallback(async () => {
+    if (!controller.activeFile) {
+      return;
+    }
+
+    await controller.revealInFinder(controller.activeFile.path);
+    closePalette();
+  }, [closePalette, controller]);
+
+  const handleExportCurrentNote = useCallback(async () => {
+    if (!controller.activeFile) {
+      return;
+    }
+
+    await exportDocumentToPdf(controller.draftContent, controller.activeFile.name);
+    closePalette();
+  }, [closePalette, controller.activeFile, controller.draftContent, exportDocumentToPdf]);
+
+  const handleCopyCurrentSkillMarkdown = useCallback(async () => {
+    await copyText(skillsController.draftContent);
+    closePalette();
+  }, [closePalette, copyText, skillsController.draftContent]);
+
+  const handleExportCurrentSkill = useCallback(async () => {
+    if (!skillsController.activeDocument) {
+      return;
+    }
+
+    await exportDocumentToPdf(skillsController.draftContent, skillsController.activeDocument.name);
+    closePalette();
+  }, [
+    closePalette,
+    exportDocumentToPdf,
+    skillsController.activeDocument,
+    skillsController.draftContent,
+  ]);
 
   const isSkillSurfaceVisible = viewerMode === "skill";
   const isActiveSkillVisible =
@@ -256,6 +490,319 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       description: "Pick a skill from the list to preview its markdown content here.",
     };
   }, [activeSkillCollection, selectedSkillCollectionId, visibleSkills.length]);
+  const openSkillFromSearchResult = useCallback(
+    async (skillId: string) => {
+      const matchingSkill = skillsController.snapshot?.skills.find((skill) => skill.id === skillId);
+      if (!matchingSkill) {
+        return;
+      }
+
+      const preferredCollection =
+        matchingSkill.hasAgentsFile && controller.paletteQuery.toLowerCase().includes("agent")
+          ? "all-agents"
+          : "all-skills";
+
+      activateSkillCollection(preferredCollection);
+      await openSkillInCollection(matchingSkill.id, preferredCollection);
+    },
+    [
+      activateSkillCollection,
+      controller.paletteQuery,
+      openSkillInCollection,
+      skillsController.snapshot?.skills,
+    ],
+  );
+
+  const visibleNotePaletteItems = useMemo(() => {
+    const noteOnlyCommandIds = new Set(["new-note", "pin-note", "toggle-focus-mode"]);
+
+    const filteredItems = controller.paletteItems.filter((item) => {
+      if (viewerMode === "skill") {
+        if (item.section === "Pinned Notes") {
+          return false;
+        }
+
+        if (item.kind === "command" && noteOnlyCommandIds.has(item.id)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    if (viewerMode !== "skill") {
+      return filteredItems;
+    }
+
+    return filteredItems.map((item) => {
+      if (item.kind !== "file") {
+        return item;
+      }
+
+      return {
+        ...item,
+        onSelect: () => {
+          setSelectedSkillCollectionId(null);
+          setViewerMode("note");
+          item.onSelect();
+        },
+      };
+    });
+  }, [controller.paletteItems, viewerMode]);
+
+  const currentNotePaletteItems = useMemo<CommandPaletteItem[]>(() => {
+    if (viewerMode !== "note" || !controller.activeFile) {
+      return [];
+    }
+
+    const query = controller.paletteQuery.trim().toLowerCase();
+    const items: CommandPaletteItem[] = [
+      {
+        id: "rename-current-note",
+        title: "Rename Current Note",
+        subtitle: "Change the file name from the command palette",
+        section: "Note",
+        kind: "command",
+        onSelect: handleRenameCurrentNote,
+      },
+      {
+        id: "remove-current-note",
+        title: "Remove Current Note From Glyph",
+        subtitle: "Hide it from Glyph without deleting the file",
+        section: "Note",
+        kind: "command",
+        onSelect: () => handleOpenCurrentNoteConfirm("remove"),
+      },
+      {
+        id: "delete-current-note",
+        title: "Delete Current Note",
+        subtitle: "Delete the file from disk",
+        section: "Note",
+        kind: "command",
+        onSelect: () => handleOpenCurrentNoteConfirm("delete"),
+      },
+      {
+        id: "copy-current-note-markdown",
+        title: "Copy Current Note as Markdown",
+        subtitle: "Copy the note contents to the clipboard",
+        section: "Note",
+        kind: "command",
+        onSelect: () => {
+          void handleCopyCurrentNoteMarkdown();
+        },
+      },
+      {
+        id: "copy-current-note-path",
+        title: "Copy Current Note Path",
+        subtitle: controller.activeFile.path,
+        section: "Note",
+        kind: "command",
+        onSelect: () => {
+          void handleCopyCurrentNotePath();
+        },
+      },
+      {
+        id: "reveal-current-note",
+        title: `Reveal in ${controller.folderRevealLabel}`,
+        subtitle: "Show the current note in the file manager",
+        section: "Note",
+        kind: "command",
+        onSelect: () => {
+          void handleRevealCurrentNote();
+        },
+      },
+      {
+        id: "export-current-note",
+        title: "Export Current Note as PDF",
+        subtitle: "Create a PDF from the current note",
+        section: "Note",
+        kind: "command",
+        onSelect: () => {
+          void handleExportCurrentNote();
+        },
+      },
+    ];
+
+    return items.filter((item) => matchesPaletteQuery(query, item.title, item.subtitle));
+  }, [
+    controller.activeFile,
+    controller.folderRevealLabel,
+    controller.paletteQuery,
+    handleCopyCurrentNoteMarkdown,
+    handleCopyCurrentNotePath,
+    handleExportCurrentNote,
+    handleOpenCurrentNoteConfirm,
+    handleRenameCurrentNote,
+    handleRevealCurrentNote,
+    viewerMode,
+  ]);
+
+  const skillPaletteItems = useMemo<CommandPaletteItem[]>(() => {
+    const query = controller.paletteQuery.trim().toLowerCase();
+
+    const skillItems = query
+      ? groupSkillsForBrowse(
+          (skillsController.snapshot?.skills ?? []).filter((skill) =>
+            [skill.name, skill.description ?? "", skill.slug, skill.sourceName]
+              .join("\n")
+              .toLowerCase()
+              .includes(query),
+          ),
+        ).slice(0, 12)
+      : [];
+
+    const searchItems: CommandPaletteItem[] = skillItems.map((item) => ({
+      id: `skill-${item.id}`,
+      title: item.name,
+      subtitle:
+        item.sourceNames.length > 1
+          ? `${item.sourceNames.join(", ")}${item.description ? ` · ${item.description}` : ""}`
+          : (item.description ?? item.sourceNames[0] ?? "Skill"),
+      hint: item.hasAgentsFile ? "Agent" : "Skill",
+      section: "Skills",
+      kind: "command",
+      onSelect: () => {
+        void openSkillFromSearchResult(item.representativeSkillId);
+        closePalette();
+      },
+    }));
+
+    const currentSkill = skillsController.activeSkill;
+    const currentDocument = skillsController.activeDocument;
+    const collectionItems: CommandPaletteItem[] = skillCollections
+      .map((collection) => ({
+        id: `skill-collection-${collection.id}`,
+        title: `Browse ${collection.label}`,
+        subtitle: `${collection.count} ${collection.label === "All Agents" ? "agents" : "skills"}`,
+        section: "Skills Library",
+        kind: "command" as const,
+        onSelect: () => {
+          activateSkillCollection(collection.id);
+          closePalette();
+        },
+      }))
+      .filter((item) => matchesPaletteQuery(query, item.title, item.subtitle));
+
+    const actionItems: CommandPaletteItem[] =
+      viewerMode === "skill" && currentSkill && currentDocument
+        ? [
+            {
+              id: "open-skills-library",
+              title: "Open Skills Library",
+              subtitle: "Jump to the skills browser",
+              section: "Current Skill",
+              kind: "command" as const,
+              onSelect: () => {
+                activateSkillCollection("all-skills");
+                closePalette();
+              },
+            },
+            ...(skillsController.documentTabs.length > 1
+              ? skillsController.documentTabs.map((tab) => ({
+                  id: `skill-tab-${tab.kind}`,
+                  title: tab.kind === currentDocument.kind ? `${tab.label} (current)` : tab.label,
+                  subtitle:
+                    tab.kind === currentDocument.kind ? "Already open" : `Switch to ${tab.label}`,
+                  section: "Current Skill",
+                  kind: "command" as const,
+                  onSelect: () => {
+                    void skillsController.openDocumentTab(tab.kind);
+                    closePalette();
+                  },
+                }))
+              : []),
+            {
+              id: "skill-copy-markdown",
+              title: `Copy Current ${currentDocument.kind === "agents" ? "Agent" : "Skill"} as Markdown`,
+              subtitle: "Copy the current document contents to the clipboard",
+              section: "Current Skill",
+              kind: "command" as const,
+              onSelect: () => {
+                void handleCopyCurrentSkillMarkdown();
+              },
+            },
+            {
+              id: "skill-copy-path",
+              title: `Copy Current ${currentDocument.kind === "agents" ? "Agent" : "Skill"} Path`,
+              subtitle: "Copy the current skill file path",
+              section: "Current Skill",
+              kind: "command" as const,
+              onSelect: () => {
+                void skillsController.copyPath(currentDocument.path);
+                closePalette();
+              },
+            },
+            {
+              id: "skill-reveal",
+              title: `Reveal in ${controller.folderRevealLabel}`,
+              subtitle: "Show the current skill file in the file manager",
+              section: "Current Skill",
+              kind: "command" as const,
+              onSelect: () => {
+                void skillsController.revealInFinder(currentDocument.path);
+                closePalette();
+              },
+            },
+            {
+              id: "skill-export-pdf",
+              title: `Export Current ${currentDocument.kind === "agents" ? "Agent" : "Skill"} as PDF`,
+              subtitle: "Create a PDF from the current document",
+              section: "Current Skill",
+              kind: "command" as const,
+              onSelect: () => {
+                void handleExportCurrentSkill();
+              },
+            },
+            {
+              id: "skill-refresh",
+              title: "Refresh Skills Library",
+              subtitle: "Rescan installed skills",
+              section: "Current Skill",
+              kind: "command" as const,
+              onSelect: () => {
+                void skillsController.refreshLibrary();
+                closePalette();
+              },
+            },
+          ].filter((item) => matchesPaletteQuery(query, item.title, item.subtitle))
+        : [];
+
+    return [...collectionItems, ...searchItems, ...actionItems];
+  }, [
+    activateSkillCollection,
+    closePalette,
+    controller,
+    handleCopyCurrentSkillMarkdown,
+    handleExportCurrentSkill,
+    openSkillFromSearchResult,
+    skillCollections,
+    skillsController,
+    viewerMode,
+  ]);
+
+  const paletteItems = useMemo(() => {
+    if (viewerMode === "skill") {
+      return [...skillPaletteItems, ...visibleNotePaletteItems];
+    }
+
+    const noteItems = visibleNotePaletteItems.filter((item) => item.section === "Note");
+    const themeItems = visibleNotePaletteItems.filter((item) => item.section === "Theme");
+    const otherItems = visibleNotePaletteItems.filter(
+      (item) => item.section !== "Note" && item.section !== "Theme",
+    );
+
+    return [
+      ...otherItems,
+      ...noteItems,
+      ...currentNotePaletteItems,
+      ...themeItems,
+      ...skillPaletteItems,
+    ];
+  }, [currentNotePaletteItems, skillPaletteItems, viewerMode, visibleNotePaletteItems]);
+
+  useEffect(() => {
+    controller.setSelectedIndex(0);
+  }, [controller.setSelectedIndex, paletteItems.length, viewerMode]);
 
   return (
     <TooltipProvider>
@@ -334,6 +881,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                     isSidebarCollapsed={controller.isSidebarCollapsed}
                     saveStateLabel={skillsController.saveStateLabel}
                     onChange={skillsController.setDraftContent}
+                    showOutline={controller.showOutline}
                     toggleSidebarShortcut={getShortcutDisplay(
                       controller.shortcuts,
                       "toggle-sidebar",
@@ -382,6 +930,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                   newNoteShortcut={getShortcutDisplay(controller.shortcuts, "new-note")}
                   onOpenSettings={() => controller.setIsSettingsOpen(true)}
                   onOpenCommandPalette={() => controller.setIsPaletteOpen(true)}
+                  commandPaletteLabel="Search notes and skills"
                   onOpenLinkedFile={(path) => void handleOpenNoteFile(path)}
                   commandPaletteShortcut={
                     getShortcutDisplay(controller.shortcuts, "command-palette") ?? "⌘P"
@@ -431,7 +980,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         <CommandPalette
           isOpen={controller.isPaletteOpen}
           query={controller.paletteQuery}
-          items={controller.paletteItems}
+          items={paletteItems}
           selectedIndex={controller.selectedIndex}
           onChangeQuery={controller.setPaletteQuery}
           onClose={() => {
@@ -439,17 +988,15 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
           }}
           onHoverItem={controller.setSelectedIndex}
           onMove={(direction) => {
-            if (controller.paletteItems.length === 0) {
+            if (paletteItems.length === 0) {
               return;
             }
 
             controller.setSelectedIndex(
-              (value) =>
-                (value + direction + controller.paletteItems.length) %
-                controller.paletteItems.length,
+              (value) => (value + direction + paletteItems.length) % paletteItems.length,
             );
           }}
-          onSelect={() => controller.paletteItems[controller.selectedIndex]?.onSelect()}
+          onSelect={() => paletteItems[controller.selectedIndex]?.onSelect()}
         />
         <SettingsPanel
           isOpen={controller.isSettingsOpen}
@@ -461,6 +1008,95 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
           onChangeShortcuts={(shortcuts) => void controller.changeShortcuts(shortcuts)}
           onChangeAutoOpenPDF={(enabled) => void controller.saveSettings({ autoOpenPDF: enabled })}
         />
+        {pendingNoteRename ? (
+          <Dialog
+            open={true}
+            onOpenChange={(open) => {
+              if (!open) {
+                setPendingNoteRename(null);
+              }
+            }}
+          >
+            <DialogContent className="sm:max-w-[420px]">
+              <DialogHeader>
+                <DialogTitle>Rename Current Note</DialogTitle>
+                <DialogDescription>
+                  Update{" "}
+                  <span className="font-semibold text-foreground">
+                    "{currentNoteDisplayName || pendingNoteRename.name}"
+                  </span>{" "}
+                  without leaving the keyboard.
+                </DialogDescription>
+              </DialogHeader>
+              <Input
+                ref={noteRenameInputRef}
+                autoFocus
+                value={pendingNoteRename.value}
+                onChange={(event) =>
+                  setPendingNoteRename((current) =>
+                    current
+                      ? {
+                          ...current,
+                          value: event.target.value,
+                        }
+                      : current,
+                  )
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void handleConfirmNoteRename();
+                  }
+                }}
+              />
+              <DialogFooter>
+                <Button variant="outline" type="button" onClick={() => setPendingNoteRename(null)}>
+                  Cancel
+                </Button>
+                <Button type="button" onClick={() => void handleConfirmNoteRename()}>
+                  Rename
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        ) : null}
+        {pendingNoteConfirm ? (
+          <Dialog
+            open={true}
+            onOpenChange={(open) => {
+              if (!open) {
+                setPendingNoteConfirm(null);
+              }
+            }}
+          >
+            <DialogContent className="sm:max-w-[420px]">
+              <DialogHeader>
+                <DialogTitle>
+                  {pendingNoteConfirm.kind === "remove"
+                    ? "Remove Current Note From Glyph"
+                    : "Delete Current Note"}
+                </DialogTitle>
+                <DialogDescription>
+                  {pendingNoteConfirm.kind === "remove"
+                    ? `Remove "${pendingNoteConfirm.name}" from Glyph? This only hides it from the app and does not delete the file from your device.`
+                    : `Delete "${pendingNoteConfirm.name}" from your device? This action cannot be undone.`}
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="outline" type="button" onClick={() => setPendingNoteConfirm(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant={pendingNoteConfirm.kind === "delete" ? "destructive" : "default"}
+                  type="button"
+                  onClick={() => void handleConfirmCurrentNoteAction()}
+                >
+                  {pendingNoteConfirm.kind === "remove" ? "Remove" : "Delete"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        ) : null}
       </div>
     </TooltipProvider>
   );

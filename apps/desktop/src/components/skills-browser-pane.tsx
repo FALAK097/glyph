@@ -42,48 +42,51 @@ export function SkillsBrowserPane({
               : "No skills are available in this source yet."}
           </div>
         ) : (
-          items.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onSelectSkill(item.representativeSkillId)}
-              className={cn(
-                "mb-0.5 flex w-full items-start justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.99]",
-                item.memberSkillIds.includes(activeSkillId ?? "")
-                  ? "bg-accent text-accent-foreground"
-                  : "hover:bg-muted/70",
-              )}
-            >
-              <div className="min-w-0">
-                <div className="flex min-w-0 items-center gap-2">
-                  {item.sourceKinds.length > 1 ? (
-                    <SkillSourceLogoStack sourceKinds={item.sourceKinds} variant="compact" />
-                  ) : (
-                    <SkillSourceLogo
-                      fallbackLabel={item.sourceNames[0] ?? item.name}
-                      sourceKind={item.sourceKinds[0]}
-                      variant="compact"
-                    />
-                  )}
-                  <p className="truncate text-sm font-medium text-foreground">{item.name}</p>
+          items.map((item) => {
+            const isActive = item.memberSkillIds.includes(activeSkillId ?? "");
+
+            return (
+              <button
+                key={item.id}
+                type="button"
+                aria-current={isActive ? "true" : undefined}
+                onClick={() => onSelectSkill(item.representativeSkillId)}
+                className={cn(
+                  "mb-0.5 flex w-full items-start justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.99]",
+                  isActive ? "bg-accent text-accent-foreground" : "hover:bg-muted/70",
+                )}
+              >
+                <div className="min-w-0">
+                  <div className="flex min-w-0 items-center gap-2">
+                    {item.sourceKinds.length > 1 ? (
+                      <SkillSourceLogoStack sourceKinds={item.sourceKinds} variant="compact" />
+                    ) : (
+                      <SkillSourceLogo
+                        fallbackLabel={item.sourceNames[0] ?? item.name}
+                        sourceKind={item.sourceKinds[0]}
+                        variant="compact"
+                      />
+                    )}
+                    <p className="truncate text-sm font-medium text-foreground">{item.name}</p>
+                  </div>
+                  {isAggregateView ? (
+                    <p className="mt-1 truncate pl-7 text-xs text-muted-foreground">
+                      {item.sourceNames.join(", ")}
+                    </p>
+                  ) : item.description ? (
+                    <p className="mt-1 line-clamp-2 pl-7 text-xs text-muted-foreground">
+                      {item.description}
+                    </p>
+                  ) : null}
                 </div>
-                {isAggregateView ? (
-                  <p className="mt-1 truncate pl-7 text-xs text-muted-foreground">
-                    {item.sourceNames.join(", ")}
-                  </p>
-                ) : item.description ? (
-                  <p className="mt-1 line-clamp-2 pl-7 text-xs text-muted-foreground">
-                    {item.description}
-                  </p>
+                {item.hasAgentsFile ? (
+                  <span className="rounded-full bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                    Agent
+                  </span>
                 ) : null}
-              </div>
-              {item.hasAgentsFile ? (
-                <span className="rounded-full bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Agent
-                </span>
-              ) : null}
-            </button>
-          ))
+              </button>
+            );
+          })
         )}
       </div>
     </aside>

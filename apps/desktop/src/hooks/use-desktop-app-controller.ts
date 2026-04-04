@@ -1057,6 +1057,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     );
 
     const pinnedPathKeys = new Set(pinnedNotes.map((note) => toPathKey(note.path)));
+    const noteResultKeys = new Set<string>();
 
     // Match files by name or path
     const matchingFiles = allSearchableFiles.filter(
@@ -1067,12 +1068,13 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     );
 
     matchingFiles.slice(0, 12).forEach((file) => {
+      noteResultKeys.add(toPathKey(file.path));
       items.push({
         id: file.path,
         title: file.name,
         subtitle: file.relativePath,
         hint: "File",
-        section: "Files",
+        section: "Notes",
         kind: "file",
         onSelect: () => void openFile(file.path),
       });
@@ -1080,16 +1082,18 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
 
     // Full-text content search results
     searchResults.slice(0, 8).forEach((result) => {
-      if (hiddenFileKeys.has(toPathKey(result.path))) {
+      const pathKey = toPathKey(result.path);
+      if (hiddenFileKeys.has(pathKey) || noteResultKeys.has(pathKey)) {
         return;
       }
 
+      noteResultKeys.add(pathKey);
       items.push({
         id: `search-${result.path}-${result.line}`,
         title: result.name,
         subtitle: `${result.snippet} · line ${result.line}`,
         hint: "Match",
-        section: "Matches",
+        section: "Notes",
         kind: "file",
         onSelect: () => void openFile(result.path),
       });
@@ -1413,6 +1417,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     shortcuts,
     showOutline,
     toggleFocusMode,
+    toggleOutline,
     togglePinnedFile,
     triggerUpdateAction,
     updateState,

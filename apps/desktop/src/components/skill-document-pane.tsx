@@ -19,6 +19,7 @@ type SkillDocumentPaneProps = {
   onOpenCommandPalette?: () => void;
   onOpenSettings?: () => void;
   onToggleSidebar?: () => void;
+  showOutline?: boolean;
   toggleSidebarShortcut?: string;
 };
 
@@ -35,9 +36,14 @@ export function SkillDocumentPane({
   onOpenCommandPalette,
   onOpenSettings,
   onToggleSidebar,
+  showOutline = true,
   toggleSidebarShortcut,
 }: SkillDocumentPaneProps) {
   const parsed = useMemo(() => parseSkillDocument(draftContent), [draftContent]);
+  const outlineHeadingCount = useMemo(
+    () => parsed.body.split("\n").filter((line) => /^#{1,4}\s+\S/.test(line.trim())).length,
+    [parsed.body],
+  );
   const fileSizeLabel = useMemo(() => {
     const bytes = new TextEncoder().encode(draftContent).length;
     return formatByteSize(bytes);
@@ -69,6 +75,8 @@ export function SkillDocumentPane({
     },
     [onChange, parsed.body],
   );
+  const shouldShowOutline =
+    showOutline && (outlineHeadingCount >= 2 || (outlineHeadingCount >= 1 && wordCount >= 250));
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-background">
@@ -93,7 +101,7 @@ export function SkillDocumentPane({
           toggleSidebarShortcut={toggleSidebarShortcut}
           folderRevealLabel={folderRevealLabel}
           onOpenLinkedFile={onOpenLinkedFile}
-          showOutline={false}
+          showOutline={shouldShowOutline}
           topContent={
             parsed.frontmatterText ? (
               <div className="border-l-2 border-border/60 pl-4">

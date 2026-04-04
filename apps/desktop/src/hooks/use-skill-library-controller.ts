@@ -214,6 +214,13 @@ export function useSkillLibraryController(
     async (nextPath: string) => {
       documentRequestNonceRef.current += 1;
       const requestNonce = documentRequestNonceRef.current;
+      setActiveDocument(null);
+      setDraftContent("");
+      draftContentRef.current = "";
+      lastSyncedContentRef.current = "";
+      setLastSavedAt(null);
+      setPendingExternalChange(null);
+      setError(null);
 
       try {
         const nextDocument = await glyph.readSkillDocument(nextPath);
@@ -233,6 +240,12 @@ export function useSkillLibraryController(
           return;
         }
 
+        setActiveDocument(null);
+        setDraftContent("");
+        draftContentRef.current = "";
+        lastSyncedContentRef.current = "";
+        setLastSavedAt(null);
+        setPendingExternalChange(null);
         setError(getErrorMessage(nextError));
       }
     },
@@ -402,7 +415,7 @@ export function useSkillLibraryController(
 
       const didFlush = await flushActiveDocument();
       if (!didFlush) {
-        return true;
+        return false;
       }
 
       setSelectedSourceId(matchingSkill.sourceId);
@@ -458,6 +471,7 @@ export function useSkillLibraryController(
       }
 
       if (draftContentRef.current !== lastSyncedContentRef.current) {
+        clearAutosaveTimeout();
         setPendingExternalChange({
           path: currentDocument.path,
           name: currentDocument.name,
@@ -467,7 +481,7 @@ export function useSkillLibraryController(
 
       void loadActiveDocument(currentDocument.path);
     });
-  }, [enabled, glyph, loadActiveDocument]);
+  }, [clearAutosaveTimeout, enabled, glyph, loadActiveDocument]);
 
   useEffect(() => {
     if (!snapshot) {
@@ -499,7 +513,7 @@ export function useSkillLibraryController(
   }, [activeDocumentPath, enabled, loadActiveDocument]);
 
   useEffect(() => {
-    if (!enabled || !activeDocument?.isEditable || !isDirty) {
+    if (!enabled || pendingExternalChange || !activeDocument?.isEditable || !isDirty) {
       clearAutosaveTimeout();
       return;
     }
@@ -517,6 +531,7 @@ export function useSkillLibraryController(
     enabled,
     flushActiveDocument,
     isDirty,
+    pendingExternalChange,
   ]);
 
   useEffect(() => {

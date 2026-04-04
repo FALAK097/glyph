@@ -90,10 +90,10 @@ export function SkillsBrowserPane({
             );
             const sourceSummary = isAggregateView
               ? scopeLabels.length > 0
-                ? `${scopeLabels.join(", ")}${compatibilityLabels.length > 0 ? ` · Works with ${summarizeLabels(compatibilityLabels)}` : ""}`
+                ? `${scopeLabels.join(", ")}${compatibilityLabels.length > 0 ? ` · ${summarizeLabels(compatibilityLabels)}` : ""}`
                 : summarizeLabels(item.sourceNames)
               : compatibilityLabels.length > 0
-                ? `Works with ${summarizeLabels(compatibilityLabels)}`
+                ? summarizeLabels(compatibilityLabels)
                 : item.sourceNames.join(", ");
 
             return (

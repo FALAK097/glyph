@@ -64,6 +64,16 @@ function matchesPaletteQuery(query: string, ...values: Array<string | null | und
   return values.some((value) => value?.toLowerCase().includes(query));
 }
 
+function matchesSkillPaletteFallback(query: string, skill: SkillEntry) {
+  if (!query) {
+    return true;
+  }
+
+  return [skill.name, skill.description, skill.slug, skill.sourceName, skill.tags.join(" ")].some(
+    (value) => value?.toLowerCase().includes(query),
+  );
+}
+
 export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const controller = useDesktopAppController(glyph);
   const skillsController = useSkillLibraryController(glyph, {
@@ -81,6 +91,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const confirmCancelRef = useRef<HTMLButtonElement | null>(null);
   const paletteSkillSearchNonceRef = useRef(0);
   const deferredPaletteQuery = useDeferredValue(controller.paletteQuery);
+  const paletteFilterQuery = deferredPaletteQuery.trim().toLowerCase();
   const shouldCollapseSidebar =
     controller.isSidebarCollapsed || (viewerMode === "note" && controller.isFocusMode);
   const allSkills = skillsController.snapshot?.skills ?? [];
@@ -555,6 +566,9 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       return;
     }
 
+    setPaletteSkillResultIds(null);
+    setResolvedPaletteSkillQuery("");
+
     paletteSkillSearchNonceRef.current += 1;
     const requestNonce = paletteSkillSearchNonceRef.current;
 
@@ -620,7 +634,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       return [];
     }
 
-    const query = controller.paletteQuery.trim().toLowerCase();
+    const query = paletteFilterQuery;
     const items: CommandPaletteItem[] = [
       {
         id: "rename-current-note",
@@ -692,21 +706,20 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   }, [
     controller.activeFile,
     controller.folderRevealLabel,
-    controller.paletteQuery,
     handleCopyCurrentNoteMarkdown,
     handleCopyCurrentNotePath,
     handleExportCurrentNote,
     handleOpenCurrentNoteConfirm,
     handleRenameCurrentNote,
     handleRevealCurrentNote,
+    paletteFilterQuery,
     viewerMode,
   ]);
 
   const skillPaletteItems = useMemo<CommandPaletteItem[]>(() => {
-    const query = controller.paletteQuery.trim().toLowerCase();
+    const query = paletteFilterQuery;
     const paletteSkillResultIdSet = paletteSkillResultIds ? new Set(paletteSkillResultIds) : null;
-
-    const skillItems =
+    const fullTextSkillItems =
       query && resolvedPaletteSkillQuery === query && paletteSkillResultIdSet
         ? groupSkillsForBrowse(
             (skillsController.snapshot?.skills ?? []).filter((skill) =>
@@ -714,6 +727,14 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
             ),
           ).slice(0, 12)
         : [];
+    const fallbackSkillItems = query
+      ? groupSkillsForBrowse(
+          (skillsController.snapshot?.skills ?? []).filter((skill) =>
+            matchesSkillPaletteFallback(query, skill),
+          ),
+        ).slice(0, 12)
+      : [];
+    const skillItems = fullTextSkillItems.length > 0 ? fullTextSkillItems : fallbackSkillItems;
 
     const searchItems: CommandPaletteItem[] = skillItems.map((item) => ({
       id: `skill-${item.id}`,
@@ -836,10 +857,10 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     activateSkillCollection,
     closePalette,
     controller.folderRevealLabel,
-    controller.paletteQuery,
     handleCopyCurrentSkillMarkdown,
     handleExportCurrentSkill,
     openSkillFromSearchResult,
+    paletteFilterQuery,
     paletteSkillResultIds,
     resolvedPaletteSkillQuery,
     skillCollections,
@@ -877,7 +898,20 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
 
   useEffect(() => {
     controller.setSelectedIndex(0);
-  }, [controller.setSelectedIndex, paletteItems.length, viewerMode]);
+  }, [controller.setSelectedIndex, deferredPaletteQuery, viewerMode]);
+
+  useEffect(() => {
+    if (paletteItems.length === 0) {
+      if (controller.selectedIndex !== 0) {
+        controller.setSelectedIndex(0);
+      }
+      return;
+    }
+
+    if (controller.selectedIndex >= paletteItems.length) {
+      controller.setSelectedIndex(paletteItems.length - 1);
+    }
+  }, [controller.selectedIndex, controller.setSelectedIndex, paletteItems.length]);
 
   return (
     <TooltipProvider>

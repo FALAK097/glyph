@@ -1028,7 +1028,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     [settings?.pinnedFiles, toShortcutItems],
   );
   const paletteItems = useMemo<CommandPaletteItem[]>(() => {
-    const query = paletteQuery.trim().toLowerCase();
+    const query = deferredPaletteQuery.trim().toLowerCase();
     const pinnedPaletteItems = pinnedNotes.slice(0, 8).map((note) => ({
       id: `pinned-${note.path}`,
       title: note.title,
@@ -1105,7 +1105,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     baseCommands,
     hiddenFileKeys,
     openFile,
-    paletteQuery,
+    deferredPaletteQuery,
     pinnedNotes,
     searchResults,
   ]);

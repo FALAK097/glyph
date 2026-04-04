@@ -26,6 +26,16 @@ function formatSaveTime(timestamp: string | null) {
   })}`;
 }
 
+function matchesSkillFallbackQuery(query: string, skill: SkillLibrarySnapshot["skills"][number]) {
+  if (!query) {
+    return true;
+  }
+
+  return [skill.name, skill.description, skill.slug, skill.sourceName, skill.tags.join(" ")].some(
+    (value) => value?.toLowerCase().includes(query),
+  );
+}
+
 export function useSkillLibraryController(
   glyph: NonNullable<Window["glyph"]>,
   { enabled = true }: UseSkillLibraryControllerOptions = {},
@@ -106,7 +116,7 @@ export function useSkillLibraryController(
     }
 
     if (!searchResultIdSet) {
-      return skills;
+      return skills.filter((skill) => matchesSkillFallbackQuery(query, skill));
     }
 
     return skills.filter((skill) => searchResultIdSet.has(skill.id));
@@ -461,6 +471,8 @@ export function useSkillLibraryController(
       setSearchResultIds(null);
       return;
     }
+
+    setSearchResultIds(null);
 
     searchRequestNonceRef.current += 1;
     const requestNonce = searchRequestNonceRef.current;

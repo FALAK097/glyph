@@ -78,6 +78,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const noteRenameInputRef = useRef<HTMLInputElement | null>(null);
   const confirmCancelRef = useRef<HTMLButtonElement | null>(null);
   const isSwitchingToAgentsRef = useRef(false);
+  const lastAutoOpenedAgentsSkillIdRef = useRef<string | null>(null);
   const shouldCollapseSidebar =
     controller.isSidebarCollapsed || (viewerMode === "note" && controller.isFocusMode);
   const allSkills = skillsController.snapshot?.skills ?? [];
@@ -140,7 +141,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     }
 
     SKILL_AGENT_CATALOG.forEach((tool) => {
-      const toolSkills = allSkills.filter((skill) => skill.compatibleToolKinds.includes(tool.kind));
+      const toolSkills = allSkills.filter((skill) => skill.sourceKind === tool.kind);
       const skillCount = countGroupedSkills(toolSkills);
 
       if (skillCount === 0) {
@@ -155,7 +156,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         toolKind: tool.kind,
         count: skillCount,
         group: "tool",
-        matches: (skill) => skill.compatibleToolKinds.includes(tool.kind),
+        matches: (skill) => skill.sourceKind === tool.kind,
       });
     });
 
@@ -264,10 +265,14 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   );
 
   useEffect(() => {
+    if (selectedSkillCollectionId !== "all-agents") {
+      lastAutoOpenedAgentsSkillIdRef.current = null;
+    }
+
     if (skillsController.selectedDocumentKind === "agents") {
       isSwitchingToAgentsRef.current = false;
     }
-  }, [skillsController.selectedDocumentKind]);
+  }, [selectedSkillCollectionId, skillsController.selectedDocumentKind]);
 
   useEffect(() => {
     if (!selectedSkillCollectionId || viewerMode !== "skill") {
@@ -291,13 +296,18 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         )
       : false;
 
+    const currentSkillId = skillsController.activeSkill?.id ?? null;
+
     if (
       isActiveSkillVisible &&
       selectedSkillCollectionId === "all-agents" &&
       skillsController.activeSkill?.agentsFilePath &&
+      currentSkillId &&
+      lastAutoOpenedAgentsSkillIdRef.current !== currentSkillId &&
       !isSwitchingToAgentsRef.current &&
       skillsController.selectedDocumentKind !== "agents"
     ) {
+      lastAutoOpenedAgentsSkillIdRef.current = currentSkillId;
       isSwitchingToAgentsRef.current = true;
       void skillsController.openDocumentTab("agents").finally(() => {
         if (skillsController.selectedDocumentKind !== "agents") {
@@ -962,6 +972,9 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                       getShortcutDisplay(controller.shortcuts, "command-palette") ?? "⌘P"
                     }
                     isSidebarCollapsed={controller.isSidebarCollapsed}
+                    isSwitchingDocuments={
+                      skillsController.isDocumentLoading || skillsController.isSaving
+                    }
                     pendingExternalChange={skillsController.pendingExternalChange}
                     saveStateLabel={skillsController.saveStateLabel}
                     onChange={skillsController.setDraftContent}

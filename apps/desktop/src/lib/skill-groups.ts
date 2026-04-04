@@ -1,4 +1,4 @@
-import type { SkillEntry, SkillSourceKind } from "@/shared/skills";
+import type { SkillEntry, SkillSourceKind, SkillToolKind } from "@/shared/skills";
 
 export type SkillBrowserItem = {
   description: string | null;
@@ -74,6 +74,27 @@ function compareSkillEntries(left: SkillEntry, right: SkillEntry) {
   });
 }
 
+function sortKinds(kinds: SkillSourceKind[]) {
+  return [...kinds].sort((left, right) => SOURCE_PRIORITY[left] - SOURCE_PRIORITY[right]);
+}
+
+function getDisplayKinds(entries: SkillEntry[]): SkillSourceKind[] {
+  const kinds = new Set<SkillSourceKind>();
+
+  for (const entry of entries) {
+    if (entry.sourceKind === "agents" || entry.sourceKind === "project") {
+      entry.compatibleToolKinds.forEach((kind) => {
+        kinds.add(kind as SkillToolKind);
+      });
+      continue;
+    }
+
+    kinds.add(entry.sourceKind);
+  }
+
+  return sortKinds(Array.from(kinds));
+}
+
 export function groupSkillsForBrowse(skills: SkillEntry[]): SkillBrowserItem[] {
   const groups = new Map<string, SkillEntry[]>();
 
@@ -101,7 +122,7 @@ export function groupSkillsForBrowse(skills: SkillEntry[]): SkillBrowserItem[] {
         memberSkillIds: sortedEntries.map((entry) => entry.id),
         name: representative.name,
         representativeSkillId: representative.id,
-        sourceKinds: Array.from(new Set(sortedEntries.map((entry) => entry.sourceKind))),
+        sourceKinds: getDisplayKinds(sortedEntries),
         sourceNames: Array.from(new Set(sortedEntries.map((entry) => entry.sourceName))),
       };
     })

@@ -306,6 +306,7 @@ export const MarkdownEditor = ({
   onChange,
   onToggleSidebar,
   isSidebarCollapsed,
+  headerAccessory,
   topContent,
   onCreateNote,
   toggleSidebarShortcut,
@@ -483,18 +484,36 @@ export const MarkdownEditor = ({
 
     const nodeDom = nextEditor.view.nodeDOM(item.pos - 1);
     const container = scrollContainerRef.current;
+    let targetScrollTop: number | null = null;
 
     if (nodeDom instanceof HTMLElement && container) {
       const containerRect = container.getBoundingClientRect();
       const nodeRect = nodeDom.getBoundingClientRect();
 
-      const targetScrollTop = container.scrollTop + (nodeRect.top - containerRect.top) - 40;
-      container.scrollTo({ top: targetScrollTop, behavior: "smooth" });
+      targetScrollTop = container.scrollTop + (nodeRect.top - containerRect.top) - 40;
     } else {
-      nextEditor.chain().focus().setTextSelection(item.pos).scrollIntoView().run();
+      const containerRect = container?.getBoundingClientRect();
+      const coords = nextEditor.view.coordsAtPos(item.pos);
+
+      if (container && containerRect) {
+        targetScrollTop = container.scrollTop + (coords.top - containerRect.top) - 40;
+      }
     }
 
-    nextEditor.chain().focus().setTextSelection(item.pos).run();
+    const selection = TextSelection.create(nextEditor.state.doc, item.pos);
+    nextEditor.view.dispatch(nextEditor.state.tr.setSelection(selection));
+    nextEditor.view.dom.focus({
+      preventScroll: true,
+    });
+
+    if (container && targetScrollTop !== null) {
+      window.requestAnimationFrame(() => {
+        container.scrollTo({
+          top: Math.max(0, targetScrollTop ?? 0),
+          behavior: "smooth",
+        });
+      });
+    }
   }, []);
 
   const handleScrollToTop = useCallback(() => {
@@ -1252,6 +1271,7 @@ export const MarkdownEditor = ({
               </TooltipContent>
             </Tooltip>
           ) : null}
+          {headerAccessory ? <div className="mr-1 flex items-center">{headerAccessory}</div> : null}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button

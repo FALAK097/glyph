@@ -123,6 +123,7 @@ async function collectSkillFiles(
     name: string;
     isDirectory: () => boolean;
     isFile: () => boolean;
+    isSymbolicLink: () => boolean;
   }>;
 
   try {
@@ -142,9 +143,30 @@ async function collectSkillFiles(
     return [path.join(targetPath, SKILL_FILE_NAME)];
   }
 
-  const directories = entries.filter(
-    (entry) => entry.isDirectory() && !IGNORED_DIRECTORY_NAMES.has(entry.name),
-  );
+  const directories = (
+    await Promise.all(
+      entries.map(async (entry) => {
+        if (IGNORED_DIRECTORY_NAMES.has(entry.name)) {
+          return null;
+        }
+
+        if (entry.isDirectory()) {
+          return entry;
+        }
+
+        if (!entry.isSymbolicLink()) {
+          return null;
+        }
+
+        try {
+          const resolvedStats = await fs.stat(path.join(targetPath, entry.name));
+          return resolvedStats.isDirectory() ? entry : null;
+        } catch {
+          return null;
+        }
+      }),
+    )
+  ).filter((entry): entry is (typeof entries)[number] => entry !== null);
 
   const nestedResults = await Promise.all(
     directories.map((directory) =>

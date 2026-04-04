@@ -80,8 +80,9 @@ export const SKILL_AGENT_CATALOG: SkillAgentCatalogEntry[] = [
   {
     kind: "gemini",
     label: "Gemini CLI",
-    description: "Universal skills compatible with Gemini CLI",
+    description: "Gemini CLI skills on this machine",
     supportsUniversalScope: true,
+    globalRootSegments: [".gemini", "skills"],
   },
   {
     kind: "copilot",
@@ -127,7 +128,7 @@ export const SKILL_AGENT_CATALOG: SkillAgentCatalogEntry[] = [
     label: "Pi",
     description: "Pi skills on this machine",
     supportsUniversalScope: false,
-    globalRootSegments: [".pi", "skills"],
+    globalRootSegments: [".pi", "agent", "skills"],
   },
   {
     kind: "openclaw",
@@ -183,7 +184,7 @@ export const SKILL_AGENT_CATALOG: SkillAgentCatalogEntry[] = [
     label: "Crush",
     description: "Crush skills on this machine",
     supportsUniversalScope: false,
-    globalRootSegments: [".crush", "skills"],
+    globalRootSegments: [".config", "crush", "skills"],
   },
   {
     kind: "factory",

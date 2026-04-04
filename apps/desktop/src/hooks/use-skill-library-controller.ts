@@ -33,6 +33,7 @@ export function useSkillLibraryController(
   const [snapshot, setSnapshot] = useState<SkillLibrarySnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isDocumentLoading, setIsDocumentLoading] = useState(false);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -210,6 +211,7 @@ export function useSkillLibraryController(
     async (nextPath: string) => {
       documentRequestNonceRef.current += 1;
       const requestNonce = documentRequestNonceRef.current;
+      setIsDocumentLoading(true);
       setActiveDocument(null);
       setDraftContent("");
       draftContentRef.current = "";
@@ -243,6 +245,10 @@ export function useSkillLibraryController(
         setLastSavedAt(null);
         setPendingExternalChange(null);
         setError(getErrorMessage(nextError));
+      } finally {
+        if (requestNonce === documentRequestNonceRef.current) {
+          setIsDocumentLoading(false);
+        }
       }
     },
     [glyph],
@@ -552,6 +558,7 @@ export function useSkillLibraryController(
     hasLoadedOnce,
     headings,
     isDirty,
+    isDocumentLoading,
     isLoading,
     isRefreshing,
     isSaving,

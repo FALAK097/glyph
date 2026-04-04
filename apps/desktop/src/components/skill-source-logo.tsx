@@ -1,5 +1,8 @@
+import { useEffect, useState } from "react";
+
 import { cn } from "@/lib/utils";
 import type { SkillSourceKind } from "@/shared/skills";
+
 import { FileIcon, FolderIcon, OutlineIcon, ShortcutIcon } from "./icons";
 
 type SkillIconKind = "all-agents" | "all-skills" | "global" | "project";
@@ -93,11 +96,25 @@ function getLogoSources(sourceKind?: SkillSourceKind): LogoSources | null {
   }
 }
 
+function resolveLogoSource(sources: LogoSources | null, isDarkMode: boolean) {
+  if (!sources) {
+    return null;
+  }
+
+  if (sources.single) {
+    return sources.single;
+  }
+
+  return isDarkMode
+    ? (sources.dark ?? sources.light ?? null)
+    : (sources.light ?? sources.dark ?? null);
+}
+
 function getLogoImageClassName(
   sourceKind: SkillSourceKind | undefined,
   variant: "compact" | "badge",
 ) {
-  const imageSizeClasses = variant === "badge" ? "size-3.5" : "size-3";
+  const imageSizeClasses = variant === "badge" ? "h-[18px] w-[18px]" : "h-4 w-4";
 
   if (sourceKind === "pi") {
     return cn("block object-contain invert dark:invert-0", imageSizeClasses);
@@ -106,21 +123,55 @@ function getLogoImageClassName(
   return cn("block object-contain", imageSizeClasses);
 }
 
+function useIsDarkMode() {
+  const getSnapshot = () =>
+    typeof document !== "undefined" && document.documentElement.classList.contains("dark");
+  const [isDarkMode, setIsDarkMode] = useState(getSnapshot);
+
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const root = document.documentElement;
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const sync = () => setIsDarkMode(root.classList.contains("dark"));
+    const observer = new MutationObserver(sync);
+
+    observer.observe(root, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    mediaQuery.addEventListener("change", sync);
+    sync();
+
+    return () => {
+      observer.disconnect();
+      mediaQuery.removeEventListener("change", sync);
+    };
+  }, []);
+
+  return isDarkMode;
+}
+
 function renderIcon({
   className,
   iconKind,
+  isDarkMode,
   sourceKind,
   variant,
 }: {
   className?: string;
   iconKind?: SkillIconKind;
+  isDarkMode: boolean;
   sourceKind?: SkillSourceKind;
   variant: "compact" | "badge";
 }) {
   const sources = getLogoSources(sourceKind);
   const iconSize = variant === "badge" ? 16 : 14;
-  const sizeClasses = variant === "badge" ? "size-6" : "size-5";
+  const sizeClasses = variant === "badge" ? "size-6" : "h-[22px] w-[22px]";
   const imageClassName = getLogoImageClassName(sourceKind, variant);
+  const logoSource = resolveLogoSource(sources, isDarkMode);
 
   if (iconKind === "all-skills") {
     return (
@@ -210,13 +261,8 @@ function renderIcon({
       aria-hidden="true"
       className={cn("inline-flex shrink-0 items-center justify-center", sizeClasses, className)}
     >
-      {sources?.single ? (
-        <img src={sources.single} alt="" className={imageClassName} />
-      ) : sources?.dark && sources.light ? (
-        <>
-          <img src={sources.light} alt="" className={cn("dark:hidden", imageClassName)} />
-          <img src={sources.dark} alt="" className={cn("hidden dark:block", imageClassName)} />
-        </>
+      {logoSource ? (
+        <img src={logoSource} alt="" className={imageClassName} />
       ) : (
         <FileIcon size={iconSize} className="text-muted-foreground/85" />
       )}
@@ -230,7 +276,8 @@ export function SkillSourceLogo({
   sourceKind,
   variant = "compact",
 }: SkillSourceLogoProps) {
-  return renderIcon({ className, iconKind, sourceKind, variant });
+  const isDarkMode = useIsDarkMode();
+  return renderIcon({ className, iconKind, isDarkMode, sourceKind, variant });
 }
 
 type SkillSourceLogoStackProps = {
@@ -244,15 +291,23 @@ export function SkillSourceLogoStack({
   sourceKinds,
   variant = "compact",
 }: SkillSourceLogoStackProps) {
-  const uniqueKinds = Array.from(new Set(sourceKinds)).slice(0, 3);
+  const isDarkMode = useIsDarkMode();
+  const uniqueKinds = Array.from(new Set(sourceKinds));
+  const visibleKinds = uniqueKinds.slice(0, 4);
+  const hiddenCount = Math.max(0, uniqueKinds.length - visibleKinds.length);
 
   return (
     <span className={cn("inline-flex items-center", className)}>
-      {uniqueKinds.map((sourceKind, index) => (
+      {visibleKinds.map((sourceKind, index) => (
         <span key={sourceKind} className={cn("inline-flex shrink-0", index > 0 ? "-ml-1.5" : "")}>
-          {renderIcon({ sourceKind, variant })}
+          {renderIcon({ isDarkMode, sourceKind, variant })}
         </span>
       ))}
+      {hiddenCount > 0 ? (
+        <span className="-ml-1.5 inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full border border-border/70 bg-background px-1 text-[10px] font-semibold text-muted-foreground">
+          +{hiddenCount}
+        </span>
+      ) : null}
     </span>
   );
 }

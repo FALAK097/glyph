@@ -10,7 +10,6 @@ import {
 
 import { MarkdownEditor } from "./markdown-editor";
 import { Button } from "./ui/button";
-import { Textarea } from "./ui/textarea";
 
 type SkillDocumentPaneProps = {
   activeDocument: SkillDocument;
@@ -23,6 +22,7 @@ type SkillDocumentPaneProps = {
     path: string;
   } | null;
   isSidebarCollapsed: boolean;
+  isSwitchingDocuments?: boolean;
   saveStateLabel: string;
   commandPaletteShortcut?: string;
   onChange: (value: string) => void;
@@ -45,6 +45,7 @@ export function SkillDocumentPane({
   folderRevealLabel,
   pendingExternalChange,
   isSidebarCollapsed,
+  isSwitchingDocuments = false,
   saveStateLabel,
   commandPaletteShortcut,
   onChange,
@@ -72,6 +73,7 @@ export function SkillDocumentPane({
     return text ? text.split(/\s+/).length : 0;
   }, [parsed.body]);
   const readingTime = Math.max(1, Math.round(wordCount / 200));
+  const frontmatterRows = Math.max(2, parsed.frontmatterText?.split("\n").length ?? 0);
   const handleBodyChange = useCallback(
     (nextBody: string) => {
       onChange(
@@ -96,47 +98,38 @@ export function SkillDocumentPane({
   );
   const shouldShowOutline =
     showOutline && (outlineHeadingCount >= 2 || (outlineHeadingCount >= 1 && wordCount >= 250));
-
-  return (
-    <section className="flex h-full min-h-0 flex-col bg-background">
-      <div className="border-b border-border/70 px-4 py-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              {activeDocument.kind === "agents" ? "Agent document" : "Skill document"}
-            </p>
-            <p className="truncate text-sm text-muted-foreground">{fileLabel}</p>
-          </div>
-
-          {documentTabs.length > 0 ? (
-            <div
-              role="tablist"
-              aria-label="Skill document tabs"
-              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border/70 bg-muted/30 p-1"
+  const headerAccessory =
+    documentTabs.length > 1 ? (
+      <div
+        role="tablist"
+        aria-label="Skill document tabs"
+        className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-muted/35 p-1"
+      >
+        {documentTabs.map((tab) => {
+          const isActive = tab.kind === activeDocument.kind;
+          return (
+            <Button
+              key={tab.kind}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              variant={isActive ? "secondary" : "ghost"}
+              size="sm"
+              disabled={isSwitchingDocuments}
+              className="h-7 rounded-full px-3 text-xs"
+              onClick={() => onSelectDocumentTab(tab.kind)}
             >
-              {documentTabs.map((tab) => {
-                const isActive = tab.kind === activeDocument.kind;
-                return (
-                  <Button
-                    key={tab.kind}
-                    type="button"
-                    role="tab"
-                    aria-selected={isActive}
-                    variant={isActive ? "secondary" : "ghost"}
-                    size="sm"
-                    className="h-7 rounded-full px-3 text-xs"
-                    onClick={() => onSelectDocumentTab(tab.kind)}
-                  >
-                    {tab.label}
-                  </Button>
-                );
-              })}
-            </div>
-          ) : null}
-        </div>
-
+              {tab.label}
+            </Button>
+          );
+        })}
+      </div>
+    ) : null;
+  const topContent =
+    pendingExternalChange || parsed.frontmatterText ? (
+      <div className="space-y-4">
         {pendingExternalChange ? (
-          <div className="mt-3 rounded-xl border border-border/70 bg-muted/50 p-3">
+          <div className="rounded-xl border border-border/70 bg-muted/45 px-4 py-3 transition-opacity duration-150 ease-out">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-foreground">External change detected</p>
@@ -169,57 +162,55 @@ export function SkillDocumentPane({
             </div>
           </div>
         ) : null}
+        {parsed.frontmatterText ? (
+          <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3 font-mono text-[13px] leading-6 text-muted-foreground transition-opacity duration-150 ease-out">
+            <div className="text-muted-foreground/70">---</div>
+            {activeDocument.isEditable ? (
+              <textarea
+                aria-label="Skill frontmatter"
+                className="mt-1 block w-full resize-none overflow-hidden border-0 bg-transparent p-0 font-mono text-[13px] leading-6 text-muted-foreground outline-none"
+                spellCheck={false}
+                rows={frontmatterRows}
+                value={parsed.frontmatterText}
+                onChange={(event) => handleFrontmatterChange(event.target.value)}
+              />
+            ) : (
+              <pre className="mt-1 overflow-x-auto whitespace-pre-wrap font-mono text-[13px] leading-6 text-muted-foreground">
+                {parsed.frontmatterText}
+              </pre>
+            )}
+            <div className="mt-1 text-muted-foreground/70">---</div>
+          </div>
+        ) : null}
       </div>
+    ) : null;
 
-      <div className="min-h-0 flex-1">
-        <MarkdownEditor
-          content={parsed.body}
-          fileName={fileLabel}
-          filePath={activeDocument.path}
-          documentLabel={activeDocument.kind === "agents" ? "agent" : "skill"}
-          isEditable={activeDocument.isEditable}
-          saveStateLabel={saveStateLabel}
-          footerMetaLabel={fileSizeLabel}
-          wordCount={wordCount}
-          readingTime={readingTime}
-          onChange={handleBodyChange}
-          onOpenCommandPalette={onOpenCommandPalette}
-          commandPaletteLabel="Search notes and skills"
-          commandPaletteShortcut={commandPaletteShortcut}
-          onOpenSettings={onOpenSettings}
-          onToggleSidebar={onToggleSidebar}
-          isSidebarCollapsed={isSidebarCollapsed}
-          toggleSidebarShortcut={toggleSidebarShortcut}
-          folderRevealLabel={folderRevealLabel}
-          onOpenLinkedFile={onOpenLinkedFile}
-          showOutline={shouldShowOutline}
-          topContent={
-            parsed.frontmatterText ? (
-              <div className="border-l-2 border-border/60 pl-4">
-                <pre className="m-0 whitespace-pre-wrap font-mono text-[13px] leading-6 text-muted-foreground">
-                  ---
-                </pre>
-                {activeDocument.isEditable ? (
-                  <Textarea
-                    aria-label="Skill frontmatter"
-                    className="min-h-0 resize-none border-0 bg-transparent px-0 py-0 font-mono text-[13px] leading-6 text-muted-foreground shadow-none focus-visible:ring-0"
-                    spellCheck={false}
-                    value={parsed.frontmatterText}
-                    onChange={(event) => handleFrontmatterChange(event.target.value)}
-                  />
-                ) : (
-                  <pre className="m-0 overflow-x-auto whitespace-pre-wrap font-mono text-[13px] leading-6 text-muted-foreground">
-                    {parsed.frontmatterText}
-                  </pre>
-                )}
-                <pre className="m-0 whitespace-pre-wrap font-mono text-[13px] leading-6 text-muted-foreground">
-                  ---
-                </pre>
-              </div>
-            ) : null
-          }
-        />
-      </div>
+  return (
+    <section className="flex h-full min-h-0 flex-col bg-background">
+      <MarkdownEditor
+        content={parsed.body}
+        fileName={fileLabel}
+        filePath={activeDocument.path}
+        documentLabel={activeDocument.kind === "agents" ? "agent" : "skill"}
+        isEditable={activeDocument.isEditable}
+        saveStateLabel={saveStateLabel}
+        footerMetaLabel={fileSizeLabel}
+        wordCount={wordCount}
+        readingTime={readingTime}
+        headerAccessory={headerAccessory}
+        onChange={handleBodyChange}
+        onOpenCommandPalette={onOpenCommandPalette}
+        commandPaletteLabel="Search notes and skills"
+        commandPaletteShortcut={commandPaletteShortcut}
+        onOpenSettings={onOpenSettings}
+        onToggleSidebar={onToggleSidebar}
+        isSidebarCollapsed={isSidebarCollapsed}
+        toggleSidebarShortcut={toggleSidebarShortcut}
+        folderRevealLabel={folderRevealLabel}
+        onOpenLinkedFile={onOpenLinkedFile}
+        showOutline={shouldShowOutline}
+        topContent={topContent}
+      />
     </section>
   );
 }

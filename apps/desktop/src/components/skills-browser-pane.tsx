@@ -1,5 +1,6 @@
 import type { SkillBrowserItem } from "@/lib/skill-groups";
 import { cn } from "@/lib/utils";
+import { getCatalogEntryForTool } from "@/shared/skill-agent-catalog";
 
 import { Input } from "./ui/input";
 import { SearchIcon } from "./icons";
@@ -26,6 +27,20 @@ export function SkillsBrowserPane({
   const isMacLike = navigator.platform.includes("Mac");
   const headerSpacingClass = isMacLike ? "pt-8" : "pt-4";
   const hasQuery = searchQuery.trim().length > 0;
+  const isAggregateView =
+    title === "All Skills" || title === "All Agents" || title === "Global" || title === "Project";
+
+  const summarizeLabels = (labels: string[]) => {
+    if (labels.length === 0) {
+      return "";
+    }
+
+    if (labels.length <= 3) {
+      return labels.join(", ");
+    }
+
+    return `${labels.slice(0, 3).join(", ")} +${labels.length - 3}`;
+  };
 
   return (
     <aside className="flex h-full min-h-0 w-[292px] flex-col border-r border-border bg-background">
@@ -67,6 +82,19 @@ export function SkillsBrowserPane({
         ) : (
           items.map((item) => {
             const isActive = item.memberSkillIds.includes(activeSkillId ?? "");
+            const compatibilityLabels = item.sourceKinds
+              .map((kind) => getCatalogEntryForTool(kind)?.label ?? null)
+              .filter((label): label is string => Boolean(label));
+            const scopeLabels = item.sourceNames.filter(
+              (name) => name === "Global" || name === "Project",
+            );
+            const sourceSummary = isAggregateView
+              ? scopeLabels.length > 0
+                ? `${scopeLabels.join(", ")}${compatibilityLabels.length > 0 ? ` · Works with ${summarizeLabels(compatibilityLabels)}` : ""}`
+                : summarizeLabels(item.sourceNames)
+              : compatibilityLabels.length > 0
+                ? `Works with ${summarizeLabels(compatibilityLabels)}`
+                : item.sourceNames.join(", ");
 
             return (
               <button
@@ -75,12 +103,20 @@ export function SkillsBrowserPane({
                 aria-current={isActive ? "true" : undefined}
                 onClick={() => onSelectSkill(item.representativeSkillId)}
                 className={cn(
-                  "mb-0.5 flex w-full items-start justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.99]",
+                  "mb-1 flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.99]",
                   isActive ? "bg-accent text-accent-foreground" : "hover:bg-muted/70",
                 )}
               >
-                <div className="min-w-0">
-                  <div className="flex min-w-0 items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <p className="truncate text-sm font-medium text-foreground">{item.name}</p>
+                    {item.hasAgentsFile ? (
+                      <span className="shrink-0 rounded-full bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                        Agent
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-2">
                     {item.sourceKinds.length > 1 ? (
                       <SkillSourceLogoStack sourceKinds={item.sourceKinds} variant="compact" />
                     ) : (
@@ -90,23 +126,14 @@ export function SkillsBrowserPane({
                         variant="compact"
                       />
                     )}
-                    <p className="truncate text-sm font-medium text-foreground">{item.name}</p>
+                    <p className="truncate text-[12px] text-muted-foreground">{sourceSummary}</p>
                   </div>
-                  {title === "All Skills" || title === "All Agents" ? (
-                    <p className="mt-1 truncate pl-7 text-xs text-muted-foreground">
-                      {item.sourceNames.join(", ")}
-                    </p>
-                  ) : item.description ? (
-                    <p className="mt-1 line-clamp-2 pl-7 text-xs text-muted-foreground">
+                  {item.description ? (
+                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
                       {item.description}
                     </p>
                   ) : null}
                 </div>
-                {item.hasAgentsFile ? (
-                  <span className="rounded-full bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                    Agent
-                  </span>
-                ) : null}
               </button>
             );
           })

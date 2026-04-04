@@ -15,6 +15,7 @@ import { watch } from "chokidar";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { createSkillsService } from "./skills-service.js";
 import type {
   AppCommand,
   AppInfo,
@@ -67,6 +68,16 @@ let pendingExternalPath: string | null = null;
 let updateCheckInterval: NodeJS.Timeout | null = null;
 const MARKDOWN_EXTENSIONS = [".md", ".mdx", ".markdown"] as const;
 const UPDATE_CHECK_INTERVAL_MS = 1000 * 60 * 60 * 6;
+const skillsService = createSkillsService({
+  projectRoot: process.cwd(),
+  onLibraryChanged: (event) => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return;
+    }
+
+    mainWindow.webContents.send("skills:changed", event);
+  },
+});
 
 function buildRendererFailurePage() {
   const message = isDev
@@ -460,6 +471,7 @@ function getDefaultSettings(): AppSettings {
     defaultWorkspacePath: getDefaultWorkspacePath(),
     themeId: "aura",
     themeMode: "light",
+    hiddenFiles: [],
     pinnedFiles: [],
     shortcuts: DEFAULT_SHORTCUTS,
     sidebar: {
@@ -656,7 +668,9 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
 
   const candidate = input as Partial<AppSettings>;
   const validPinnedFiles: string[] = [];
+  const validHiddenFiles: string[] = [];
   const persistedFileGroups = [
+    [normalizePersistedFileList(candidate.hiddenFiles), validHiddenFiles],
     [normalizePersistedFileList(candidate.pinnedFiles), validPinnedFiles],
   ] as const;
 
@@ -711,6 +725,7 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
         ? candidate.themeId
         : defaults.themeId,
     themeMode: isThemeMode(candidate.themeMode) ? candidate.themeMode : defaults.themeMode,
+    hiddenFiles: Array.from(new Set(validHiddenFiles)),
     pinnedFiles: Array.from(new Set(validPinnedFiles)),
     shortcuts: Array.isArray(candidate.shortcuts)
       ? normalizeShortcutSettings(
@@ -776,6 +791,17 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
     nextPatch.pinnedFiles = candidate.pinnedFiles;
   }
 
+  if ("hiddenFiles" in candidate) {
+    if (
+      !Array.isArray(candidate.hiddenFiles) ||
+      candidate.hiddenFiles.some((entry) => typeof entry !== "string")
+    ) {
+      throw new Error("hiddenFiles must be an array of strings.");
+    }
+
+    nextPatch.hiddenFiles = candidate.hiddenFiles;
+  }
+
   if ("shortcuts" in candidate) {
     if (
       !Array.isArray(candidate.shortcuts) ||
@@ -827,6 +853,7 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
         "defaultWorkspacePath",
         "themeId",
         "themeMode",
+        "hiddenFiles",
         "pinnedFiles",
         "shortcuts",
         "sidebar",
@@ -1300,6 +1327,18 @@ ipcMain.handle("workspace:openDocument", async () => {
   return readMarkdownFile(selection.path);
 });
 
+ipcMain.handle("skills:getLibrary", async () => skillsService.getSnapshot());
+
+ipcMain.handle("skills:refresh", async () => skillsService.refresh());
+
+ipcMain.handle("skills:readDocument", async (_event, filePath: string) =>
+  skillsService.readDocument(filePath),
+);
+
+ipcMain.handle("skills:saveDocument", async (_event, filePath: string, content: string) =>
+  skillsService.saveDocument(filePath, content),
+);
+
 ipcMain.handle("settings:get", async () => loadSettings());
 
 ipcMain.handle("settings:update", async (_event, patch: unknown) => {
@@ -1532,6 +1571,10 @@ app.on("window-all-closed", async () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+app.on("before-quit", () => {
+  void skillsService.dispose();
 });
 
 app.on("activate", async () => {

@@ -20,10 +20,12 @@ import type {
   SidebarDeleteTarget,
   SidebarProps,
   SidebarRemoveTarget,
+  SidebarSkillCollectionItem,
 } from "../types/sidebar";
 
 import { LogoComponent } from "./logo-component";
-import { MoreVerticalIcon, PencilIcon, PinIcon, TrashIcon } from "./icons";
+import { SkillSourceLogo } from "./skill-source-logo";
+import { ChevronRightIcon, MoreVerticalIcon, PencilIcon, PinIcon, TrashIcon, XIcon } from "./icons";
 import { SidebarTreeNode } from "./sidebar-tree-node";
 
 const normalizePathKey = (path: string) => normalizePath(path).toLowerCase();
@@ -34,6 +36,7 @@ type SidebarShortcutRowProps = {
   onOpenFile: (filePath: string) => void;
   onTogglePinnedFile?: (filePath: string) => void;
   onDeleteFile: (filePath: string) => void;
+  onRequestRemoveFile?: (file: SidebarRemoveTarget) => void;
   onRenameFile: (filePath: string, newName: string) => void;
 };
 
@@ -43,6 +46,7 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
   onOpenFile,
   onTogglePinnedFile,
   onDeleteFile,
+  onRequestRemoveFile,
   onRenameFile,
 }: SidebarShortcutRowProps) {
   const [showMenu, setShowMenu] = useState(false);
@@ -147,6 +151,20 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
           >
             <PencilIcon size={14} className="opacity-70" />
             Rename
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
+            onClick={(event) => {
+              event.stopPropagation();
+              onRequestRemoveFile?.({ path: item.path, name: item.title });
+              setShowMenu(false);
+            }}
+            type="button"
+          >
+            <XIcon size={14} className="opacity-70" />
+            Remove
           </Button>
           <Button
             variant="ghost"
@@ -260,6 +278,7 @@ type SidebarShortcutListProps = {
   onOpenFile: (filePath: string) => void;
   onTogglePinnedFile?: (filePath: string) => void;
   onDeleteFile: (filePath: string) => void;
+  onRequestRemoveFile?: (file: SidebarRemoveTarget) => void;
   onRenameFile: (filePath: string, newName: string) => void;
 };
 
@@ -269,6 +288,7 @@ const SidebarShortcutList = memo(function SidebarShortcutList({
   onOpenFile,
   onTogglePinnedFile,
   onDeleteFile,
+  onRequestRemoveFile,
   onRenameFile,
 }: SidebarShortcutListProps) {
   if (items.length === 0) {
@@ -285,6 +305,7 @@ const SidebarShortcutList = memo(function SidebarShortcutList({
           onOpenFile={onOpenFile}
           onTogglePinnedFile={onTogglePinnedFile}
           onDeleteFile={onDeleteFile}
+          onRequestRemoveFile={onRequestRemoveFile}
           onRenameFile={onRenameFile}
         />
       ))}
@@ -292,15 +313,55 @@ const SidebarShortcutList = memo(function SidebarShortcutList({
   );
 });
 
+function SidebarSkillCollectionRow({
+  item,
+  onSelect,
+}: {
+  item: SidebarSkillCollectionItem;
+  onSelect?: (collectionId: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect?.(item.id)}
+      className={`group flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.99] ${
+        item.isActive
+          ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-accent/30"
+          : "text-sidebar-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
+      }`}
+    >
+      <span className="flex min-w-0 items-center gap-2">
+        <SkillSourceLogo
+          fallbackLabel={item.fallbackLabel}
+          iconKind={item.iconKind}
+          sourceKind={item.sourceKind}
+          variant="compact"
+        />
+        <span className="truncate text-sm font-medium">{item.label}</span>
+      </span>
+      <span className="ml-3 rounded-full bg-background/80 px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
+        {item.count}
+      </span>
+    </button>
+  );
+}
+
 export const Sidebar = ({
   tree,
   activePath,
   isCollapsed,
+  isNotesExpanded = true,
+  isSkillsExpanded = false,
   folderRevealLabel,
   openInFolderLabel,
   pinnedNotes,
+  skillCollections,
+  onToggleNotesSection,
+  onToggleSkillsSection,
+  onSelectSkillCollection,
   onOpenFile,
   onDeleteFile,
+  onRemoveFileFromGlyph,
   onTogglePinnedFile,
   onRemoveFolder,
   onRenameFile,
@@ -309,6 +370,7 @@ export const Sidebar = ({
   onReorderNodes,
 }: SidebarProps) => {
   const [nodeToDelete, setNodeToDelete] = useState<SidebarDeleteTarget | null>(null);
+  const [fileToRemove, setFileToRemove] = useState<SidebarRemoveTarget | null>(null);
   const [folderToRemove, setFolderToRemove] = useState<SidebarRemoveTarget | null>(null);
   const [draggedPath, setDraggedPath] = useState<string | null>(null);
   const pinnedList = pinnedNotes ?? [];
@@ -339,6 +401,13 @@ export const Sidebar = ({
     setNodeToDelete(null);
   };
 
+  const handleConfirmRemoveFile = () => {
+    if (fileToRemove) {
+      onRemoveFileFromGlyph?.(fileToRemove.path);
+    }
+    setFileToRemove(null);
+  };
+
   const handleConfirmRemove = () => {
     if (folderToRemove) {
       onRemoveFolder(folderToRemove.path);
@@ -362,60 +431,126 @@ export const Sidebar = ({
       </div>
 
       <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-3">
-        {pinnedList.length > 0 && (
-          <div className="mb-2 px-2">
-            <SidebarShortcutList
-              activePath={activePath}
-              items={pinnedList}
-              onOpenFile={onOpenFile}
-              onTogglePinnedFile={onTogglePinnedFile}
-              onDeleteFile={(filePath) => {
-                const segments = filePath.replace(/\\/g, "/").split("/");
-                const name = segments.pop() ?? filePath;
-                setNodeToDelete({ path: filePath, name });
-              }}
-              onRenameFile={onRenameFile}
-            />
+        {skillCollections && skillCollections.length > 0 ? (
+          <div className="mb-3">
+            <button
+              type="button"
+              onClick={onToggleSkillsSection}
+              className="flex w-full items-center justify-between px-4 py-1.5 text-left"
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                SKILLS
+              </p>
+              <ChevronRightIcon
+                size={14}
+                className={`text-muted-foreground transition-transform duration-150 ${
+                  isSkillsExpanded ? "rotate-90" : ""
+                }`}
+              />
+            </button>
+            {isSkillsExpanded ? (
+              <div>
+                <div className="space-y-1 px-2">
+                  {skillCollections.slice(0, 2).map((item) => (
+                    <SidebarSkillCollectionRow
+                      key={item.id}
+                      item={item}
+                      onSelect={onSelectSkillCollection}
+                    />
+                  ))}
+                </div>
+                {skillCollections.length > 2 ? (
+                  <div className="mt-4">
+                    <div className="px-4 py-1.5">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        TOOLS
+                      </p>
+                    </div>
+                    <div className="space-y-1 px-2">
+                      {skillCollections.slice(2).map((item) => (
+                        <SidebarSkillCollectionRow
+                          key={item.id}
+                          item={item}
+                          onSelect={onSelectSkillCollection}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
-        )}
+        ) : null}
 
         <div>
-          <div className="px-4 py-1.5">
+          <button
+            type="button"
+            onClick={onToggleNotesSection}
+            className="flex w-full items-center justify-between px-4 py-1.5 text-left"
+          >
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               NOTES
             </p>
-          </div>
-          <div className="px-2">
-            {tree.length === 0 && !activePath ? (
-              <p className="px-2 py-2 text-sm text-muted-foreground">
-                Create your first note or open the palette to start navigating.
-              </p>
-            ) : (
-              <div className="space-y-0.5">
-                {tree.map((entry) => (
-                  <SidebarTreeNode
-                    key={entry.node.path}
-                    node={entry.node}
+            <ChevronRightIcon
+              size={14}
+              className={`text-muted-foreground transition-transform duration-150 ${
+                isNotesExpanded ? "rotate-90" : ""
+              }`}
+            />
+          </button>
+          {isNotesExpanded ? (
+            <>
+              {pinnedList.length > 0 ? (
+                <div className="mb-2 px-2">
+                  <SidebarShortcutList
                     activePath={activePath}
-                    depth={0}
-                    folderRevealLabel={revealLabel}
-                    isExpanded={entry.isExpanded}
-                    pinnedPaths={pinnedPaths}
+                    items={pinnedList}
                     onOpenFile={onOpenFile}
-                    onRequestRemoveFolder={handleRequestRemoveFolder}
-                    onRevealInFinder={onRevealInFinder}
-                    onRequestDelete={handleRequestDelete}
-                    onRenameFile={onRenameFile}
-                    onToggleFolder={onToggleFolder}
                     onTogglePinnedFile={onTogglePinnedFile}
-                    draggable
-                    onDragStartTopLevel={setDraggedPath}
-                    onDropNode={handleDropNode}
+                    onRequestRemoveFile={setFileToRemove}
+                    onDeleteFile={(filePath) => {
+                      const segments = filePath.replace(/\\/g, "/").split("/");
+                      const name = segments.pop() ?? filePath;
+                      setNodeToDelete({ path: filePath, name });
+                    }}
+                    onRenameFile={onRenameFile}
                   />
-                ))}
+                </div>
+              ) : null}
+              <div className="px-2">
+                {tree.length === 0 && !activePath ? (
+                  <p className="px-2 py-2 text-sm text-muted-foreground">
+                    Create your first note or open the palette to start navigating.
+                  </p>
+                ) : (
+                  <div className="space-y-0.5">
+                    {tree.map((entry) => (
+                      <SidebarTreeNode
+                        key={entry.node.path}
+                        node={entry.node}
+                        activePath={activePath}
+                        depth={0}
+                        folderRevealLabel={revealLabel}
+                        isExpanded={entry.isExpanded}
+                        pinnedPaths={pinnedPaths}
+                        onOpenFile={onOpenFile}
+                        onRequestRemoveFolder={handleRequestRemoveFolder}
+                        onRequestRemoveFile={setFileToRemove}
+                        onRevealInFinder={onRevealInFinder}
+                        onRequestDelete={handleRequestDelete}
+                        onRenameFile={onRenameFile}
+                        onToggleFolder={onToggleFolder}
+                        onTogglePinnedFile={onTogglePinnedFile}
+                        draggable
+                        onDragStartTopLevel={setDraggedPath}
+                        onDropNode={handleDropNode}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          ) : null}
         </div>
       </div>
 
@@ -473,6 +608,36 @@ export const Sidebar = ({
                 Cancel
               </Button>
               <Button type="button" onClick={handleConfirmRemove}>
+                Remove
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+
+      {fileToRemove ? (
+        <Dialog
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) {
+              setFileToRemove(null);
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-[420px]">
+            <DialogHeader>
+              <DialogTitle>Remove Note From Glyph</DialogTitle>
+              <DialogDescription>
+                Remove <span className="font-semibold text-foreground">"{fileToRemove.name}"</span>{" "}
+                from Glyph? This only hides it from the app and does not delete the file from your
+                device.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" type="button" onClick={() => setFileToRemove(null)}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={handleConfirmRemoveFile}>
                 Remove
               </Button>
             </DialogFooter>

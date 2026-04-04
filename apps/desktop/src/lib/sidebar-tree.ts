@@ -124,6 +124,28 @@ export function removeSidebarPath(nodes: DirectoryNode[], targetPath: string): D
   });
 }
 
+export function filterSidebarNodes(
+  nodes: DirectoryNode[],
+  shouldExcludePath: (targetPath: string) => boolean,
+): DirectoryNode[] {
+  return nodes.flatMap<DirectoryNode>((node) => {
+    if (shouldExcludePath(node.path)) {
+      return [];
+    }
+
+    if (node.type === "directory") {
+      return [
+        {
+          ...node,
+          children: filterSidebarNodes(node.children, shouldExcludePath),
+        },
+      ];
+    }
+
+    return [node];
+  });
+}
+
 export function renameSidebarFile(
   nodes: DirectoryNode[],
   oldPath: string,

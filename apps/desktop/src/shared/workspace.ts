@@ -82,6 +82,7 @@ export type AppSettings = {
   defaultWorkspacePath: string;
   themeId: string;
   themeMode: ThemeMode;
+  hiddenFiles: string[];
   pinnedFiles: string[];
   shortcuts: ShortcutSetting[];
   sidebar: SidebarState;

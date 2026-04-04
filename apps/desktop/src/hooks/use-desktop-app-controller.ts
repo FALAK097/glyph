@@ -23,6 +23,7 @@ import { buildBreadcrumbs, extractMarkdownOutline } from "@/lib/note-navigation"
 import { isFileInsideWorkspace, isPathInside, isSamePath, normalizePath } from "@/lib/paths";
 import { getFolderRevealLabel } from "@/lib/platform";
 import {
+  filterSidebarNodes,
   orderSidebarNodes,
   removeSidebarPath,
   reorderSidebarNodes,
@@ -143,15 +144,24 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
   const isActiveFilePinned = activeFile
     ? (settings?.pinnedFiles ?? []).some((filePath) => isSamePath(filePath, activeFile.path))
     : false;
+  const hiddenFilePaths = settings?.hiddenFiles ?? [];
+  const hiddenFileKeys = useMemo(
+    () => new Set(hiddenFilePaths.map((filePath) => toPathKey(filePath))),
+    [hiddenFilePaths],
+  );
 
   const visibleSidebarNodes = useMemo<SidebarTopLevelNode[]>(() => {
     const expanded = new Set(expandedFolderPaths.map((p) => normalizePath(p).toLowerCase()));
-    return sidebarNodes.map((node) => ({
+    const filteredNodes = filterSidebarNodes(sidebarNodes, (targetPath) =>
+      hiddenFileKeys.has(toPathKey(targetPath)),
+    );
+
+    return filteredNodes.map((node) => ({
       node,
       isExpanded:
         node.type === "directory" ? expanded.has(normalizePath(node.path).toLowerCase()) : true,
     }));
-  }, [expandedFolderPaths, sidebarNodes]);
+  }, [expandedFolderPaths, hiddenFileKeys, sidebarNodes]);
 
   const persistedSidebar = useMemo(
     () => ({
@@ -191,22 +201,6 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
       });
     });
   }, []);
-
-  const syncOpenedFile = useCallback(
-    async (file: FileDocument, options?: { recordHistory?: boolean }) => {
-      setActiveFile(file);
-      setIsWorkspaceMode(isFileInsideWorkspace(file.path, rootPath));
-      setSidebarNodes((prev) => upsertSidebarFile(prev, file));
-      const nextSettings = await glyph.getSettings();
-      setSettings(nextSettings);
-      setIsPaletteOpen(false);
-      if (options?.recordHistory) {
-        pushHistory(file.path);
-      }
-      requestEditorFocus("end");
-    },
-    [glyph, pushHistory, requestEditorFocus, rootPath, setActiveFile],
-  );
 
   useEffect(() => {
     const boot = async () => {
@@ -319,10 +313,41 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
         );
 
       await saveSettings({
+        hiddenFiles: remap(settings.hiddenFiles),
         pinnedFiles: remap(settings.pinnedFiles),
       });
     },
     [saveSettings, settings],
+  );
+
+  const ensureFileVisible = useCallback(
+    async (filePath: string) => {
+      if (!(settings?.hiddenFiles ?? []).some((entry) => isSamePath(entry, filePath))) {
+        return;
+      }
+
+      await saveSettings({
+        hiddenFiles: (settings?.hiddenFiles ?? []).filter((entry) => !isSamePath(entry, filePath)),
+      });
+    },
+    [saveSettings, settings?.hiddenFiles],
+  );
+
+  const syncOpenedFile = useCallback(
+    async (file: FileDocument, options?: { recordHistory?: boolean }) => {
+      await ensureFileVisible(file.path);
+      setActiveFile(file);
+      setIsWorkspaceMode(isFileInsideWorkspace(file.path, rootPath));
+      setSidebarNodes((prev) => upsertSidebarFile(prev, file));
+      const nextSettings = await glyph.getSettings();
+      setSettings(nextSettings);
+      setIsPaletteOpen(false);
+      if (options?.recordHistory) {
+        pushHistory(file.path);
+      }
+      requestEditorFocus("end");
+    },
+    [ensureFileVisible, glyph, pushHistory, requestEditorFocus, rootPath, setActiveFile],
   );
 
   useEffect(() => {
@@ -637,6 +662,50 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     [activeFile?.path, glyph, removeHistoryPath, setActiveFile, setError, syncTrackedPaths],
   );
 
+  const handleRemoveFileFromGlyph = useCallback(
+    async (filePath: string) => {
+      try {
+        if (activeFile?.path && isSamePath(activeFile.path, filePath) && isDirty) {
+          const savedFile = await glyph.saveFile(filePath, draftContent);
+          markSaved(savedFile);
+        }
+
+        const nextHiddenFiles = [
+          filePath,
+          ...(settings?.hiddenFiles ?? []).filter((entry) => !isSamePath(entry, filePath)),
+        ];
+        const nextPinnedFiles = (settings?.pinnedFiles ?? []).filter(
+          (entry) => !isSamePath(entry, filePath),
+        );
+
+        await saveSettings({
+          hiddenFiles: nextHiddenFiles,
+          pinnedFiles: nextPinnedFiles,
+        });
+        removeHistoryPath(filePath);
+
+        if (activeFile?.path && isSamePath(activeFile.path, filePath)) {
+          setActiveFile(null);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to remove note from Glyph");
+      }
+    },
+    [
+      activeFile?.path,
+      draftContent,
+      glyph,
+      isDirty,
+      markSaved,
+      removeHistoryPath,
+      saveSettings,
+      setActiveFile,
+      setError,
+      settings?.hiddenFiles,
+      settings?.pinnedFiles,
+    ],
+  );
+
   const revealInFinder = useCallback(
     async (targetPath: string) => {
       try {
@@ -886,7 +955,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
       for (const node of nodes) {
         if (node.type === "file") {
           const pathKey = toPathKey(node.path);
-          if (!seenPaths.has(pathKey)) {
+          if (!hiddenFileKeys.has(pathKey) && !seenPaths.has(pathKey)) {
             seenPaths.add(pathKey);
             result.push({
               path: node.path,
@@ -903,14 +972,14 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
 
     for (const f of files) {
       const pathKey = toPathKey(f.path);
-      if (!seenPaths.has(pathKey)) {
+      if (!hiddenFileKeys.has(pathKey) && !seenPaths.has(pathKey)) {
         seenPaths.add(pathKey);
         result.push(f);
       }
     }
 
     return result;
-  }, [files, sidebarNodes]);
+  }, [files, hiddenFileKeys, sidebarNodes]);
 
   const noteShortcutLookup = useMemo(() => {
     const lookup = new Map<string, NoteShortcutItem>();
@@ -1011,6 +1080,10 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
 
     // Full-text content search results
     searchResults.slice(0, 8).forEach((result) => {
+      if (hiddenFileKeys.has(toPathKey(result.path))) {
+        return;
+      }
+
       items.push({
         id: `search-${result.path}-${result.line}`,
         title: result.name,
@@ -1023,7 +1096,15 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     });
 
     return items;
-  }, [allSearchableFiles, baseCommands, paletteQuery, openFile, pinnedNotes, searchResults]);
+  }, [
+    allSearchableFiles,
+    baseCommands,
+    hiddenFileKeys,
+    openFile,
+    paletteQuery,
+    pinnedNotes,
+    searchResults,
+  ]);
 
   // Reset query when palette closes
   useEffect(() => {
@@ -1297,6 +1378,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     files,
     folderRevealLabel,
     handleDeleteFile,
+    handleRemoveFileFromGlyph,
     handleRemoveFolder,
     handleRenameFile,
     handleReorderNodes,

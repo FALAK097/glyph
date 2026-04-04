@@ -15,6 +15,11 @@ import type {
   WorkspaceSnapshot,
   ExternalFileTarget,
 } from "../src/shared/workspace.js";
+import type {
+  SkillDocument,
+  SkillLibraryChangeEvent,
+  SkillLibrarySnapshot,
+} from "../src/shared/skills.js";
 
 async function invokeWithRetry<T>(channel: string, ...args: unknown[]) {
   for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -59,6 +64,18 @@ const api = {
   },
   readFile(filePath: string) {
     return invokeWithRetry<FileDocument>("workspace:openFile", filePath);
+  },
+  getSkillLibrary() {
+    return invokeWithRetry<SkillLibrarySnapshot>("skills:getLibrary");
+  },
+  refreshSkillLibrary() {
+    return invokeWithRetry<SkillLibrarySnapshot>("skills:refresh");
+  },
+  readSkillDocument(filePath: string) {
+    return invokeWithRetry<SkillDocument>("skills:readDocument", filePath);
+  },
+  saveSkillDocument(filePath: string, content: string) {
+    return invokeWithRetry<SkillDocument>("skills:saveDocument", filePath, content);
   },
   saveFile(filePath: string, content: string) {
     return invokeWithRetry<FileDocument>("workspace:saveFile", filePath, content);
@@ -119,6 +136,17 @@ const api = {
 
     return () => {
       ipcRenderer.removeListener("workspace:changed", wrapped);
+    };
+  },
+  onSkillLibraryChanged(listener: (event: SkillLibraryChangeEvent) => void) {
+    const wrapped = (_event: Electron.IpcRendererEvent, payload: SkillLibraryChangeEvent) => {
+      listener(payload);
+    };
+
+    ipcRenderer.on("skills:changed", wrapped);
+
+    return () => {
+      ipcRenderer.removeListener("skills:changed", wrapped);
     };
   },
   onCommand(listener: (command: AppCommand) => void) {

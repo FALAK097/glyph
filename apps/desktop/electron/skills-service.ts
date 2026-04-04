@@ -135,12 +135,12 @@ async function collectSkillFiles(
     return [];
   }
 
-  const hasSkillFile = entries.some(
+  const skillFileEntry = entries.find(
     (entry) => entry.isFile() && entry.name.toLowerCase() === SKILL_FILE_NAME.toLowerCase(),
   );
 
-  if (hasSkillFile) {
-    return [path.join(targetPath, SKILL_FILE_NAME)];
+  if (skillFileEntry) {
+    return [path.join(targetPath, skillFileEntry.name)];
   }
 
   const directories = (
@@ -262,12 +262,18 @@ export function createSkillsService({ projectRoot, onLibraryChanged }: CreateSki
     scannedAt: new Date(0).toISOString(),
   };
   let refreshPromise: Promise<SkillLibrarySnapshot> | null = null;
+  let needsRefreshAfterCurrent = false;
+  let queuedRefreshChangedPaths = new Set<string>();
   let scheduledRefresh: NodeJS.Timeout | null = null;
   let pendingChangedPaths = new Set<string>();
   const watchers = new Map<string, ReturnType<typeof watch>>();
 
   const refresh = async (changedPaths?: string[]) => {
     if (refreshPromise) {
+      needsRefreshAfterCurrent = true;
+      changedPaths?.forEach((changedPath) => {
+        queuedRefreshChangedPaths.add(path.normalize(changedPath));
+      });
       return refreshPromise;
     }
 
@@ -321,7 +327,7 @@ export function createSkillsService({ projectRoot, onLibraryChanged }: CreateSki
       };
 
       for (const [rootPath, watcher] of watchers.entries()) {
-        if (nextSources.some((source) => toPathKey(source.rootPath) === toPathKey(rootPath))) {
+        if (nextSources.some((source) => toPathKey(source.rootPath) === rootPath)) {
           continue;
         }
 
@@ -330,7 +336,9 @@ export function createSkillsService({ projectRoot, onLibraryChanged }: CreateSki
       }
 
       for (const source of activeSources) {
-        if (watchers.has(source.rootPath)) {
+        const sourceKey = toPathKey(source.rootPath);
+
+        if (watchers.has(sourceKey)) {
           continue;
         }
 
@@ -358,7 +366,7 @@ export function createSkillsService({ projectRoot, onLibraryChanged }: CreateSki
           }, WATCH_DEBOUNCE_MS);
         });
 
-        watchers.set(source.rootPath, watcher);
+        watchers.set(sourceKey, watcher);
       }
 
       snapshot = nextSnapshot;
@@ -373,6 +381,16 @@ export function createSkillsService({ projectRoot, onLibraryChanged }: CreateSki
       return nextSnapshot;
     })().finally(() => {
       refreshPromise = null;
+
+      if (!needsRefreshAfterCurrent) {
+        return;
+      }
+
+      const nextChangedPaths =
+        queuedRefreshChangedPaths.size > 0 ? Array.from(queuedRefreshChangedPaths) : undefined;
+      needsRefreshAfterCurrent = false;
+      queuedRefreshChangedPaths = new Set<string>();
+      void refresh(nextChangedPaths);
     });
 
     return refreshPromise;
@@ -440,8 +458,10 @@ export function createSkillsService({ projectRoot, onLibraryChanged }: CreateSki
   const setProjectRoot = async (nextProjectRoot: string | null) => {
     const normalizedCurrent = activeProjectRoot ? path.normalize(activeProjectRoot) : null;
     const normalizedNext = nextProjectRoot ? path.normalize(nextProjectRoot) : null;
+    const currentKey = normalizedCurrent ? toPathKey(normalizedCurrent) : null;
+    const nextKey = normalizedNext ? toPathKey(normalizedNext) : null;
 
-    if (normalizedCurrent === normalizedNext) {
+    if (currentKey === nextKey) {
       return snapshot;
     }
 

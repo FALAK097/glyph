@@ -77,8 +77,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const [pendingNoteConfirm, setPendingNoteConfirm] = useState<PendingNoteConfirm | null>(null);
   const noteRenameInputRef = useRef<HTMLInputElement | null>(null);
   const confirmCancelRef = useRef<HTMLButtonElement | null>(null);
-  const isSwitchingToAgentsRef = useRef(false);
-  const lastAutoOpenedAgentsSkillIdRef = useRef<string | null>(null);
   const shouldCollapseSidebar =
     controller.isSidebarCollapsed || (viewerMode === "note" && controller.isFocusMode);
   const allSkills = skillsController.snapshot?.skills ?? [];
@@ -222,19 +220,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     setViewerMode("skill");
   }, []);
 
-  const handleSelectSkillCollection = useCallback(
-    (collectionId: string) => {
-      setIsSkillsExpanded(true);
-      const isSameCollection = selectedSkillCollectionId === collectionId;
-      setSelectedSkillCollectionId(isSameCollection ? null : collectionId);
-      setViewerMode(isSameCollection ? "note" : "skill");
-      if (!isSameCollection) {
-        skillsController.clearActiveSelection();
-      }
-    },
-    [selectedSkillCollectionId, skillsController],
-  );
-
   const openSkillInCollection = useCallback(
     async (skillId: string, collectionId: string | null) => {
       const matchingSkill = allSkills.find((skill) => skill.id === skillId);
@@ -257,22 +242,30 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     [allSkills, skillsController],
   );
 
+  const handleSelectSkillCollection = useCallback(
+    (collectionId: string) => {
+      setIsSkillsExpanded(true);
+      const isSameCollection = selectedSkillCollectionId === collectionId;
+      setSelectedSkillCollectionId(isSameCollection ? null : collectionId);
+      setViewerMode(isSameCollection ? "note" : "skill");
+
+      if (isSameCollection) {
+        return;
+      }
+
+      if (collectionId === "all-agents" && skillsController.activeSkill?.agentsFilePath) {
+        void openSkillInCollection(skillsController.activeSkill.id, collectionId);
+      }
+    },
+    [openSkillInCollection, selectedSkillCollectionId, skillsController.activeSkill],
+  );
+
   const handleSelectSkill = useCallback(
     async (skillId: string) => {
       await openSkillInCollection(skillId, selectedSkillCollectionId);
     },
     [openSkillInCollection, selectedSkillCollectionId],
   );
-
-  useEffect(() => {
-    if (selectedSkillCollectionId !== "all-agents") {
-      lastAutoOpenedAgentsSkillIdRef.current = null;
-    }
-
-    if (skillsController.selectedDocumentKind === "agents") {
-      isSwitchingToAgentsRef.current = false;
-    }
-  }, [selectedSkillCollectionId, skillsController.selectedDocumentKind]);
 
   useEffect(() => {
     if (!selectedSkillCollectionId || viewerMode !== "skill") {
@@ -296,27 +289,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         )
       : false;
 
-    const currentSkillId = skillsController.activeSkill?.id ?? null;
-
-    if (
-      isActiveSkillVisible &&
-      selectedSkillCollectionId === "all-agents" &&
-      skillsController.activeSkill?.agentsFilePath &&
-      currentSkillId &&
-      lastAutoOpenedAgentsSkillIdRef.current !== currentSkillId &&
-      !isSwitchingToAgentsRef.current &&
-      skillsController.selectedDocumentKind !== "agents"
-    ) {
-      lastAutoOpenedAgentsSkillIdRef.current = currentSkillId;
-      isSwitchingToAgentsRef.current = true;
-      void skillsController.openDocumentTab("agents").finally(() => {
-        if (skillsController.selectedDocumentKind !== "agents") {
-          isSwitchingToAgentsRef.current = false;
-        }
-      });
-      return;
-    }
-
     if (!isActiveSkillVisible) {
       void openSkillInCollection(
         visibleSkillItems[0]?.representativeSkillId ?? visibleSkills[0].id,
@@ -329,8 +301,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     selectedSkillCollectionId,
     skillsController.activeSkill,
     skillsController.clearActiveSelection,
-    skillsController.openDocumentTab,
-    skillsController.selectedDocumentKind,
     viewerMode,
     visibleSkillItems,
     visibleSkills,
@@ -1031,7 +1001,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                   onOpenSettings={() => controller.setIsSettingsOpen(true)}
                   onOpenCommandPalette={() => controller.setIsPaletteOpen(true)}
                   commandPaletteLabel="Search notes and skills"
-                  onOpenLinkedFile={(path) => void handleOpenNoteFile(path)}
+                  onOpenLinkedFile={(path) => void handleOpenSkillLink(path)}
                   commandPaletteShortcut={
                     getShortcutDisplay(controller.shortcuts, "command-palette") ?? "⌘P"
                   }

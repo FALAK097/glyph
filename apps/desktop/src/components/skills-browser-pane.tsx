@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { getCatalogEntryForTool } from "@/shared/skill-agent-catalog";
 
 import { Input } from "./ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { SearchIcon } from "./icons";
 import { SkillSourceLogo, SkillSourceLogoStack } from "./skill-source-logo";
 
@@ -24,23 +25,10 @@ export function SkillsBrowserPane({
   title,
 }: SkillsBrowserPaneProps) {
   const countLabel = title === "All Agents" ? "agent" : "skill";
+  const searchLabel = title === "All Agents" ? "agents" : "skills";
   const isMacLike = navigator.platform.includes("Mac");
   const headerSpacingClass = isMacLike ? "pt-8" : "pt-4";
   const hasQuery = searchQuery.trim().length > 0;
-  const isAggregateView =
-    title === "All Skills" || title === "All Agents" || title === "Global" || title === "Project";
-
-  const summarizeLabels = (labels: string[]) => {
-    if (labels.length === 0) {
-      return "";
-    }
-
-    if (labels.length <= 3) {
-      return labels.join(", ");
-    }
-
-    return `${labels.slice(0, 3).join(", ")} +${labels.length - 3}`;
-  };
 
   return (
     <aside className="flex h-full min-h-0 w-[292px] flex-col border-r border-border bg-background">
@@ -62,8 +50,8 @@ export function SkillsBrowserPane({
           <Input
             value={searchQuery}
             onChange={(event) => onSearchQueryChange(event.target.value)}
-            placeholder="Search skills..."
-            aria-label="Search skills"
+            placeholder={`Search ${searchLabel}...`}
+            aria-label={`Search ${searchLabel}`}
             className="h-8 border-border/70 bg-background pl-8 pr-2.5 text-sm shadow-none"
           />
         </div>
@@ -85,16 +73,8 @@ export function SkillsBrowserPane({
             const compatibilityLabels = item.sourceKinds
               .map((kind) => getCatalogEntryForTool(kind)?.label ?? null)
               .filter((label): label is string => Boolean(label));
-            const scopeLabels = item.sourceNames.filter(
-              (name) => name === "Global" || name === "Project",
-            );
-            const sourceSummary = isAggregateView
-              ? scopeLabels.length > 0
-                ? `${scopeLabels.join(", ")}${compatibilityLabels.length > 0 ? ` · ${summarizeLabels(compatibilityLabels)}` : ""}`
-                : summarizeLabels(item.sourceNames)
-              : compatibilityLabels.length > 0
-                ? summarizeLabels(compatibilityLabels)
-                : item.sourceNames.join(", ");
+            const tooltipLabels =
+              compatibilityLabels.length > 0 ? compatibilityLabels : item.sourceNames;
 
             return (
               <button
@@ -116,18 +96,34 @@ export function SkillsBrowserPane({
                       </span>
                     ) : null}
                   </div>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    {item.sourceKinds.length > 1 ? (
-                      <SkillSourceLogoStack sourceKinds={item.sourceKinds} variant="compact" />
-                    ) : (
-                      <SkillSourceLogo
-                        fallbackLabel={item.sourceNames[0] ?? item.name}
-                        sourceKind={item.sourceKinds[0]}
-                        variant="compact"
-                      />
-                    )}
-                    <p className="truncate text-[12px] text-muted-foreground">{sourceSummary}</p>
-                  </div>
+                  {tooltipLabels.length > 0 ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="mt-1.5 inline-flex w-fit items-center">
+                          {item.sourceKinds.length > 1 ? (
+                            <SkillSourceLogoStack
+                              sourceKinds={item.sourceKinds}
+                              variant="compact"
+                            />
+                          ) : (
+                            <SkillSourceLogo
+                              fallbackLabel={item.sourceNames[0] ?? item.name}
+                              sourceKind={item.sourceKinds[0]}
+                              variant="compact"
+                            />
+                          )}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="right"
+                        align="start"
+                        sideOffset={8}
+                        className="max-w-[240px] text-left leading-5"
+                      >
+                        {tooltipLabels.join(", ")}
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : null}
                   {item.description ? (
                     <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
                       {item.description}

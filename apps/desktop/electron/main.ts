@@ -1334,13 +1334,25 @@ ipcMain.handle("skills:refresh", async (_event, changedPaths?: string[]) =>
   skillsService.refresh(changedPaths),
 );
 
-ipcMain.handle("skills:readDocument", async (_event, filePath: string) =>
-  skillsService.readDocument(filePath),
-);
+ipcMain.handle("skills:readDocument", async (_event, filePath: unknown) => {
+  if (typeof filePath !== "string" || filePath.trim().length === 0) {
+    throw new Error("filePath must be a non-empty string.");
+  }
 
-ipcMain.handle("skills:saveDocument", async (_event, filePath: string, content: string) =>
-  skillsService.saveDocument(filePath, content),
-);
+  return skillsService.readDocument(path.normalize(filePath));
+});
+
+ipcMain.handle("skills:saveDocument", async (_event, filePath: unknown, content: unknown) => {
+  if (typeof filePath !== "string" || filePath.trim().length === 0) {
+    throw new Error("filePath must be a non-empty string.");
+  }
+
+  if (typeof content !== "string") {
+    throw new Error("content must be a string.");
+  }
+
+  return skillsService.saveDocument(path.normalize(filePath), content);
+});
 
 ipcMain.handle("settings:get", async () => loadSettings());
 

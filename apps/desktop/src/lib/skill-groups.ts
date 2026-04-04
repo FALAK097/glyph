@@ -1,4 +1,4 @@
-import type { SkillEntry, SkillSourceKind, SkillToolKind } from "@/shared/skills";
+import type { SkillEntry, SkillSourceKind } from "@/shared/skills";
 
 export type SkillBrowserItem = {
   description: string | null;
@@ -55,6 +55,11 @@ const SOURCE_PRIORITY: Record<SkillSourceKind, number> = {
 };
 
 function getSkillGroupKey(skill: SkillEntry) {
+  const resolvedDirectoryPath = skill.resolvedDirectoryPath.trim().replace(/[\\/]+/g, "/");
+  if (resolvedDirectoryPath) {
+    return resolvedDirectoryPath.toLowerCase();
+  }
+
   const slug = skill.slug.trim().toLowerCase();
   if (slug) {
     return slug;
@@ -79,20 +84,7 @@ function sortKinds(kinds: SkillSourceKind[]) {
 }
 
 function getDisplayKinds(entries: SkillEntry[]): SkillSourceKind[] {
-  const kinds = new Set<SkillSourceKind>();
-
-  for (const entry of entries) {
-    if (entry.sourceKind === "agents" || entry.sourceKind === "project") {
-      entry.compatibleToolKinds.forEach((kind) => {
-        kinds.add(kind as SkillToolKind);
-      });
-      continue;
-    }
-
-    kinds.add(entry.sourceKind);
-  }
-
-  return sortKinds(Array.from(kinds));
+  return sortKinds(Array.from(new Set(entries.map((entry) => entry.sourceKind))));
 }
 
 export function groupSkillsForBrowse(skills: SkillEntry[]): SkillBrowserItem[] {

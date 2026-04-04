@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 import { getDisplayFileName, isSamePath } from "@/lib/paths";
 import { countGroupedSkills, groupSkillsForBrowse } from "@/lib/skill-groups";
@@ -75,8 +75,12 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const [viewerMode, setViewerMode] = useState<"note" | "skill">("note");
   const [pendingNoteRename, setPendingNoteRename] = useState<PendingNoteRename | null>(null);
   const [pendingNoteConfirm, setPendingNoteConfirm] = useState<PendingNoteConfirm | null>(null);
+  const [paletteSkillResultIds, setPaletteSkillResultIds] = useState<string[] | null>(null);
+  const [resolvedPaletteSkillQuery, setResolvedPaletteSkillQuery] = useState("");
   const noteRenameInputRef = useRef<HTMLInputElement | null>(null);
   const confirmCancelRef = useRef<HTMLButtonElement | null>(null);
+  const paletteSkillSearchNonceRef = useRef(0);
+  const deferredPaletteQuery = useDeferredValue(controller.paletteQuery);
   const shouldCollapseSidebar =
     controller.isSidebarCollapsed || (viewerMode === "note" && controller.isFocusMode);
   const allSkills = skillsController.snapshot?.skills ?? [];
@@ -534,13 +538,45 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       activateSkillCollection(preferredCollection);
       await openSkillInCollection(matchingSkill.id);
     },
-    [
-      activateSkillCollection,
-      controller.paletteQuery,
-      openSkillInCollection,
-      skillsController.snapshot?.skills,
-    ],
+    [activateSkillCollection, openSkillInCollection, skillsController.snapshot?.skills],
   );
+
+  useEffect(() => {
+    if (!controller.isPaletteOpen) {
+      setPaletteSkillResultIds(null);
+      setResolvedPaletteSkillQuery("");
+      return;
+    }
+
+    const query = deferredPaletteQuery.trim();
+    if (!query) {
+      setPaletteSkillResultIds(null);
+      setResolvedPaletteSkillQuery("");
+      return;
+    }
+
+    paletteSkillSearchNonceRef.current += 1;
+    const requestNonce = paletteSkillSearchNonceRef.current;
+
+    void skillsController
+      .searchSkillIds(query)
+      .then((nextResultIds) => {
+        if (requestNonce !== paletteSkillSearchNonceRef.current) {
+          return;
+        }
+
+        setPaletteSkillResultIds(nextResultIds);
+        setResolvedPaletteSkillQuery(query.toLowerCase());
+      })
+      .catch(() => {
+        if (requestNonce !== paletteSkillSearchNonceRef.current) {
+          return;
+        }
+
+        setPaletteSkillResultIds([]);
+        setResolvedPaletteSkillQuery(query.toLowerCase());
+      });
+  }, [controller.isPaletteOpen, deferredPaletteQuery, skillsController.searchSkillIds]);
 
   const visibleNotePaletteItems = useMemo(() => {
     const noteOnlyCommandIds = new Set(["new-note", "pin-note", "toggle-focus-mode"]);
@@ -668,17 +704,16 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
 
   const skillPaletteItems = useMemo<CommandPaletteItem[]>(() => {
     const query = controller.paletteQuery.trim().toLowerCase();
+    const paletteSkillResultIdSet = paletteSkillResultIds ? new Set(paletteSkillResultIds) : null;
 
-    const skillItems = query
-      ? groupSkillsForBrowse(
-          (skillsController.snapshot?.skills ?? []).filter((skill) =>
-            [skill.name, skill.description ?? "", skill.slug, skill.sourceName]
-              .join("\n")
-              .toLowerCase()
-              .includes(query),
-          ),
-        ).slice(0, 12)
-      : [];
+    const skillItems =
+      query && resolvedPaletteSkillQuery === query && paletteSkillResultIdSet
+        ? groupSkillsForBrowse(
+            (skillsController.snapshot?.skills ?? []).filter((skill) =>
+              paletteSkillResultIdSet.has(skill.id),
+            ),
+          ).slice(0, 12)
+        : [];
 
     const searchItems: CommandPaletteItem[] = skillItems.map((item) => ({
       id: `skill-${item.id}`,
@@ -805,6 +840,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     handleCopyCurrentSkillMarkdown,
     handleExportCurrentSkill,
     openSkillFromSearchResult,
+    paletteSkillResultIds,
+    resolvedPaletteSkillQuery,
     skillCollections,
     skillsController.activeDocument,
     skillsController.activeSkill,
@@ -813,6 +850,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     skillsController.openDocumentTab,
     skillsController.refreshLibrary,
     skillsController.revealInFinder,
+    skillsController.searchSkillIds,
     skillsController.snapshot?.skills,
     viewerMode,
   ]);

@@ -41,6 +41,7 @@ export function useSkillLibraryController(
   const [activeSkillId, setActiveSkillId] = useState<string | null>(null);
   const [selectedDocumentKind, setSelectedDocumentKind] = useState<SkillDocumentKind>("skill");
   const [activeDocument, setActiveDocument] = useState<SkillDocument | null>(null);
+  const [searchResultIds, setSearchResultIds] = useState<string[] | null>(null);
   const [draftContent, setDraftContent] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
@@ -55,6 +56,7 @@ export function useSkillLibraryController(
   const isSavingRef = useRef(false);
   const autosaveTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const documentRequestNonceRef = useRef(0);
+  const searchRequestNonceRef = useRef(0);
 
   useEffect(() => {
     activeDocumentRef.current = activeDocument;
@@ -90,22 +92,25 @@ export function useSkillLibraryController(
     () => snapshot?.skills.find((skill) => skill.id === activeSkillId) ?? null,
     [activeSkillId, snapshot?.skills],
   );
+  const searchResultIdSet = useMemo(
+    () => (searchResultIds ? new Set(searchResultIds) : null),
+    [searchResultIds],
+  );
 
   const filteredSkills = useMemo(() => {
     const skills = snapshot?.skills ?? [];
     const query = deferredSearchQuery.trim().toLowerCase();
 
-    return skills.filter((skill) => {
-      if (!query) {
-        return true;
-      }
+    if (!query) {
+      return skills;
+    }
 
-      return [skill.name, skill.description ?? "", skill.slug, skill.sourceName]
-        .join("\n")
-        .toLowerCase()
-        .includes(query);
-    });
-  }, [deferredSearchQuery, snapshot?.skills]);
+    if (!searchResultIdSet) {
+      return [];
+    }
+
+    return skills.filter((skill) => searchResultIdSet.has(skill.id));
+  }, [deferredSearchQuery, searchResultIdSet, snapshot?.skills]);
 
   const activeDocumentPath = useMemo(() => {
     if (!activeSkill) {
@@ -349,6 +354,19 @@ export function useSkillLibraryController(
     }
   }, []);
 
+  const searchSkillIds = useCallback(
+    async (query: string) => {
+      const normalizedQuery = query.trim();
+
+      if (!normalizedQuery) {
+        return snapshot?.skills.map((skill) => skill.id) ?? [];
+      }
+
+      return glyph.searchSkillLibrary(normalizedQuery);
+    },
+    [glyph, snapshot?.skills],
+  );
+
   const selectSource = useCallback(
     async (sourceId: string) => {
       if (sourceId === selectedSourceId) {
@@ -362,21 +380,9 @@ export function useSkillLibraryController(
 
       setSelectedSourceId(sourceId);
 
-      const query = searchQuery.trim().toLowerCase();
-      const nextMatches = (snapshot?.skills ?? []).filter((skill) => {
-        if (sourceId !== ALL_SKILL_SOURCES_ID && skill.sourceId !== sourceId) {
-          return false;
-        }
-
-        if (!query) {
-          return true;
-        }
-
-        return [skill.name, skill.description ?? "", skill.slug, skill.sourceName]
-          .join("\n")
-          .toLowerCase()
-          .includes(query);
-      });
+      const nextMatches = filteredSkills.filter((skill) =>
+        sourceId === ALL_SKILL_SOURCES_ID ? true : skill.sourceId === sourceId,
+      );
 
       if (nextMatches.length === 0) {
         clearActiveSelection();
@@ -388,14 +394,7 @@ export function useSkillLibraryController(
         setSelectedDocumentKind("skill");
       }
     },
-    [
-      activeSkillId,
-      clearActiveSelection,
-      flushActiveDocument,
-      searchQuery,
-      selectedSourceId,
-      snapshot?.skills,
-    ],
+    [activeSkillId, clearActiveSelection, flushActiveDocument, filteredSkills, selectedSourceId],
   );
 
   const resolveSkillByPath = useCallback(
@@ -450,6 +449,41 @@ export function useSkillLibraryController(
 
     void loadLibrary();
   }, [enabled, hasLoadedOnce, loadLibrary]);
+
+  useEffect(() => {
+    if (!enabled) {
+      setSearchResultIds(null);
+      return;
+    }
+
+    const query = deferredSearchQuery.trim();
+    if (!query) {
+      setSearchResultIds(null);
+      return;
+    }
+
+    setSearchResultIds(null);
+
+    searchRequestNonceRef.current += 1;
+    const requestNonce = searchRequestNonceRef.current;
+
+    void searchSkillIds(query)
+      .then((nextResultIds) => {
+        if (requestNonce !== searchRequestNonceRef.current) {
+          return;
+        }
+
+        setSearchResultIds(nextResultIds);
+      })
+      .catch((nextError) => {
+        if (requestNonce !== searchRequestNonceRef.current) {
+          return;
+        }
+
+        setSearchResultIds([]);
+        setError(getErrorMessage(nextError));
+      });
+  }, [deferredSearchQuery, enabled, searchSkillIds]);
 
   useEffect(() => {
     if (!enabled) {
@@ -574,6 +608,7 @@ export function useSkillLibraryController(
     revealInFinder,
     saveStateLabel,
     searchQuery,
+    searchSkillIds,
     selectSource,
     selectedDocumentKind,
     selectedSourceId,

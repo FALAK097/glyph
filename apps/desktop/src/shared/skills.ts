@@ -1,3 +1,5 @@
+import { parseDocument } from "yaml";
+
 export const SKILL_FILE_NAME = "SKILL.md";
 export const AGENTS_FILE_NAME = "AGENTS.md";
 
@@ -45,7 +47,13 @@ export type SkillSourceKind =
 
 export type SkillToolKind = Exclude<SkillSourceKind, "agents" | "project">;
 
-export type SkillMetadataValue = string | number | boolean;
+export type SkillMetadataScalar = string | number | boolean | null;
+export type SkillMetadataValue =
+  | SkillMetadataScalar
+  | SkillMetadataValue[]
+  | {
+      [key: string]: SkillMetadataValue;
+    };
 
 export type SkillSource = {
   id: string;
@@ -63,12 +71,14 @@ export type SkillEntry = {
   name: string;
   description: string | null;
   version: string | null;
+  tags: string[];
   sourceId: string;
   sourceName: string;
   sourceKind: SkillSourceKind;
   compatibleToolKinds: SkillToolKind[];
   sourceRootPath: string;
   directoryPath: string;
+  resolvedDirectoryPath: string;
   skillFilePath: string;
   agentsFilePath: string | null;
   isReadOnly: boolean;
@@ -110,7 +120,49 @@ export type ParsedSkillDocument = {
   body: string;
   title: string | null;
   description: string | null;
+  tags: string[];
 };
+
+export function getSkillMetadataValue(
+  frontmatter: Record<string, SkillMetadataValue>,
+  ...paths: string[][]
+): SkillMetadataValue | undefined {
+  for (const path of paths) {
+    let current: SkillMetadataValue | Record<string, SkillMetadataValue> | undefined = frontmatter;
+
+    for (const segment of path) {
+      if (!current || Array.isArray(current) || typeof current !== "object") {
+        current = undefined;
+        break;
+      }
+
+      current = current[segment];
+    }
+
+    if (current !== undefined) {
+      return current;
+    }
+  }
+
+  return undefined;
+}
+
+export function getSkillMetadataString(
+  frontmatter: Record<string, SkillMetadataValue>,
+  ...paths: string[][]
+) {
+  const value = getSkillMetadataValue(frontmatter, ...paths);
+
+  if (typeof value === "string") {
+    return value.trim().length > 0 ? value.trim() : null;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  return null;
+}
 
 export function serializeSkillDocument({
   frontmatterText,
@@ -133,23 +185,102 @@ export function serializeSkillDocument({
   return `---\n${normalizedFrontmatter}\n---\n\n${normalizedBody}`;
 }
 
-function parseFrontmatterValue(rawValue: string): SkillMetadataValue {
-  const trimmed = rawValue.trim();
-  const unquoted =
-    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
-    (trimmed.startsWith("'") && trimmed.endsWith("'"))
-      ? trimmed.slice(1, -1)
-      : trimmed;
-
-  if (/^(true|false)$/i.test(unquoted)) {
-    return unquoted.toLowerCase() === "true";
+function normalizeFrontmatterValue(value: unknown): SkillMetadataValue {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
   }
 
-  if (/^-?\d+(?:\.\d+)?$/.test(unquoted)) {
-    return Number(unquoted);
+  if (value instanceof Date) {
+    return value.toISOString();
   }
 
-  return unquoted;
+  if (Array.isArray(value)) {
+    return value.map((entry) => normalizeFrontmatterValue(entry));
+  }
+
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, normalizeFrontmatterValue(entry)]),
+    );
+  }
+
+  return String(value);
+}
+
+function parseFrontmatter(frontmatterText: string) {
+  if (!frontmatterText.trim()) {
+    return {};
+  }
+
+  try {
+    const document = parseDocument(frontmatterText, {
+      merge: true,
+      prettyErrors: false,
+      strict: false,
+      uniqueKeys: false,
+    });
+
+    if (document.errors.length > 0) {
+      return {};
+    }
+
+    const value = document.toJS({
+      mapAsMap: false,
+      maxAliasCount: 50,
+    });
+
+    if (!value || Array.isArray(value) || typeof value !== "object") {
+      return {};
+    }
+
+    return normalizeFrontmatterValue(value) as Record<string, SkillMetadataValue>;
+  } catch {
+    return {};
+  }
+}
+
+function toStringArray(value: SkillMetadataValue | undefined): string[] {
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((entry) => {
+    if (typeof entry === "string") {
+      const trimmed = entry.trim();
+      return trimmed ? [trimmed] : [];
+    }
+
+    return [];
+  });
+}
+
+function normalizeTags(frontmatter: Record<string, SkillMetadataValue>) {
+  const topLevelTags = getSkillMetadataValue(frontmatter, ["tags"], ["keywords"]);
+  const nestedTags = getSkillMetadataValue(
+    frontmatter,
+    ["metadata", "tags"],
+    ["metadata", "keywords"],
+  );
+
+  return Array.from(
+    new Set(
+      [...toStringArray(topLevelTags), ...toStringArray(nestedTags)].map((tag) =>
+        tag.toLowerCase(),
+      ),
+    ),
+  );
 }
 
 function extractBodyTitle(body: string) {
@@ -206,7 +337,7 @@ function extractBodyDescription(body: string) {
 export function parseSkillDocument(content: string): ParsedSkillDocument {
   const normalizedContent = content.replace(/\r\n?/g, "\n");
   const lines = normalizedContent.split("\n");
-  const frontmatter: Record<string, SkillMetadataValue> = {};
+  let frontmatter: Record<string, SkillMetadataValue> = {};
   let body = normalizedContent;
   let frontmatterText: string | null = null;
 
@@ -216,15 +347,7 @@ export function parseSkillDocument(content: string): ParsedSkillDocument {
     if (endIndex > 0) {
       const frontmatterLines = lines.slice(1, endIndex);
       frontmatterText = frontmatterLines.join("\n").trim() || null;
-
-      for (const line of frontmatterLines) {
-        const match = line.match(/^([A-Za-z0-9_-]+)\s*:\s*(.+)$/);
-        if (!match) {
-          continue;
-        }
-
-        frontmatter[match[1]] = parseFrontmatterValue(match[2]);
-      }
+      frontmatter = frontmatterText ? parseFrontmatter(frontmatterText) : {};
 
       body = lines
         .slice(endIndex + 1)
@@ -233,14 +356,21 @@ export function parseSkillDocument(content: string): ParsedSkillDocument {
     }
   }
 
-  const titleFromFrontmatter =
-    typeof frontmatter.name === "string" && frontmatter.name.trim().length > 0
-      ? frontmatter.name.trim()
-      : null;
-  const descriptionFromFrontmatter =
-    typeof frontmatter.description === "string" && frontmatter.description.trim().length > 0
-      ? frontmatter.description.trim()
-      : null;
+  const titleFromFrontmatter = getSkillMetadataString(
+    frontmatter,
+    ["name"],
+    ["title"],
+    ["metadata", "name"],
+    ["metadata", "title"],
+  );
+  const descriptionFromFrontmatter = getSkillMetadataString(
+    frontmatter,
+    ["description"],
+    ["summary"],
+    ["metadata", "description"],
+    ["metadata", "summary"],
+  );
+  const tags = normalizeTags(frontmatter);
 
   return {
     frontmatter,
@@ -248,5 +378,6 @@ export function parseSkillDocument(content: string): ParsedSkillDocument {
     body,
     title: titleFromFrontmatter ?? extractBodyTitle(body),
     description: descriptionFromFrontmatter ?? extractBodyDescription(body),
+    tags,
   };
 }

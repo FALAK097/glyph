@@ -1,7 +1,5 @@
 import type { SkillBrowserItem } from "@/lib/skill-groups";
 import { cn } from "@/lib/utils";
-import { getCatalogEntryForTool } from "@/shared/skill-agent-catalog";
-
 import { Input } from "./ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { SearchIcon } from "./icons";
@@ -66,11 +64,7 @@ export function SkillsBrowserPane({
         ) : (
           items.map((item) => {
             const isActive = item.memberSkillIds.includes(activeSkillId ?? "");
-            const compatibilityLabels = item.sourceKinds
-              .map((kind) => getCatalogEntryForTool(kind)?.label ?? null)
-              .filter((label): label is string => Boolean(label));
-            const tooltipLabels =
-              compatibilityLabels.length > 0 ? compatibilityLabels : item.sourceNames;
+            const tooltipLabels = item.sourceNames;
 
             return (
               <button

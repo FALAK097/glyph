@@ -71,6 +71,9 @@ const api = {
   refreshSkillLibrary(changedPaths?: string[]) {
     return invokeWithRetry<SkillLibrarySnapshot>("skills:refresh", changedPaths);
   },
+  searchSkillLibrary(query: string) {
+    return invokeWithRetry<string[]>("skills:search", query);
+  },
   readSkillDocument(filePath: string) {
     return ipcRenderer.invoke("skills:readDocument", filePath) as Promise<SkillDocument>;
   },

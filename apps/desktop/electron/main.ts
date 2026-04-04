@@ -1334,6 +1334,14 @@ ipcMain.handle("skills:refresh", async (_event, changedPaths?: string[]) =>
   skillsService.refresh(changedPaths),
 );
 
+ipcMain.handle("skills:search", async (_event, query: unknown) => {
+  if (typeof query !== "string") {
+    throw new Error("query must be a string.");
+  }
+
+  return skillsService.search(query);
+});
+
 ipcMain.handle("skills:readDocument", async (_event, filePath: unknown) => {
   if (typeof filePath !== "string" || filePath.trim().length === 0) {
     throw new Error("filePath must be a non-empty string.");

@@ -6,6 +6,7 @@ import path from "node:path";
 import {
   AGENTS_FILE_NAME,
   SKILL_FILE_NAME,
+  getSkillMetadataString,
   parseSkillDocument,
   type SkillDocument,
   type SkillDocumentKind,
@@ -37,6 +38,21 @@ type CreateSkillsServiceOptions = {
   onLibraryChanged: (event: SkillLibraryChangeEvent) => void;
 };
 
+type SkillSearchRecord = {
+  combinedText: string;
+  description: string;
+  id: string;
+  name: string;
+  slug: string;
+  sourceName: string;
+  tags: string[];
+};
+
+type IndexedSkillEntry = {
+  entry: SkillEntry;
+  searchRecord: SkillSearchRecord;
+};
+
 const IGNORED_DIRECTORY_NAMES = new Set([
   ".git",
   ".svn",
@@ -50,6 +66,17 @@ const WATCH_DEBOUNCE_MS = 180;
 
 function toPathKey(targetPath: string) {
   return path.normalize(targetPath).toLowerCase();
+}
+
+function normalizeSearchText(value: string) {
+  return value.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function tokenizeSearchQuery(query: string) {
+  return normalizeSearchText(query)
+    .split(" ")
+    .map((term) => term.trim())
+    .filter(Boolean);
 }
 
 async function directoryExists(targetPath: string) {
@@ -182,34 +209,119 @@ function toSlug(skillFilePath: string, rootPath: string) {
   return relativePath.split(path.sep).join("/");
 }
 
+function buildSkillSearchText({
+  body,
+  description,
+  frontmatterText,
+  name,
+  slug,
+  sourceName,
+  tags,
+}: {
+  body: string;
+  description: string | null;
+  frontmatterText: string | null;
+  name: string;
+  slug: string;
+  sourceName: string;
+  tags: string[];
+}) {
+  return [name, description ?? "", slug, sourceName, tags.join(" "), frontmatterText ?? "", body]
+    .join("\n")
+    .toLowerCase();
+}
+
+function getSkillSearchScore(
+  record: SkillSearchRecord,
+  queryTerms: string[],
+  normalizedQuery: string,
+) {
+  if (queryTerms.length === 0) {
+    return -1;
+  }
+
+  if (!queryTerms.every((term) => record.combinedText.includes(term))) {
+    return -1;
+  }
+
+  let score = 0;
+
+  if (record.name === normalizedQuery) {
+    score += 240;
+  } else if (record.name.startsWith(normalizedQuery)) {
+    score += 180;
+  } else if (record.name.includes(normalizedQuery)) {
+    score += 120;
+  }
+
+  if (record.slug.startsWith(normalizedQuery)) {
+    score += 100;
+  } else if (record.slug.includes(normalizedQuery)) {
+    score += 60;
+  }
+
+  if (record.tags.some((tag) => tag === normalizedQuery)) {
+    score += 80;
+  } else if (record.tags.some((tag) => tag.includes(normalizedQuery))) {
+    score += 40;
+  }
+
+  if (record.description.includes(normalizedQuery)) {
+    score += 30;
+  }
+
+  if (record.sourceName.includes(normalizedQuery)) {
+    score += 20;
+  }
+
+  return score;
+}
+
 async function buildSkillEntry(
   source: ResolvedSkillSourceDefinition,
   skillFilePath: string,
-): Promise<SkillEntry | null> {
+): Promise<IndexedSkillEntry | null> {
   try {
     const skillStats = await fs.stat(skillFilePath);
     const content = (await fs.readFile(skillFilePath, "utf8")).replace(/\r\n?/g, "\n");
     const parsed = parseSkillDocument(content);
     const directoryPath = path.dirname(skillFilePath);
+    const resolvedDirectoryPath = await fs.realpath(directoryPath).catch(() => directoryPath);
     const agentsFilePath = path.join(directoryPath, AGENTS_FILE_NAME);
     const hasAgentsFile = await fileExists(agentsFilePath);
+    let readableAgentsFilePath: string | null = null;
+    let agentsContent = "";
 
-    return {
-      id: `${source.id}:${toSlug(skillFilePath, source.rootPath)}`,
-      slug: toSlug(skillFilePath, source.rootPath),
-      name: parsed.title ?? path.basename(directoryPath),
-      description: parsed.description,
-      version: typeof parsed.frontmatter.version === "string" ? parsed.frontmatter.version : null,
+    if (hasAgentsFile) {
+      try {
+        agentsContent = (await fs.readFile(agentsFilePath, "utf8")).replace(/\r\n?/g, "\n");
+        readableAgentsFilePath = agentsFilePath;
+      } catch {
+        // Keep optional sidecars from dropping the whole skill entry.
+      }
+    }
+
+    const slug = toSlug(skillFilePath, source.rootPath);
+    const name = parsed.title ?? path.basename(directoryPath);
+    const description = parsed.description;
+    const entry: SkillEntry = {
+      id: `${source.id}:${slug}`,
+      slug,
+      name,
+      description,
+      version: getSkillMetadataString(parsed.frontmatter, ["version"], ["metadata", "version"]),
+      tags: parsed.tags,
       sourceId: source.id,
       sourceName: source.name,
       sourceKind: source.kind,
       compatibleToolKinds: getCompatibleToolKinds(source.kind),
       sourceRootPath: source.rootPath,
       directoryPath,
+      resolvedDirectoryPath,
       skillFilePath,
-      agentsFilePath: hasAgentsFile ? agentsFilePath : null,
+      agentsFilePath: readableAgentsFilePath,
       isReadOnly: source.isReadOnly,
-      hasAgentsFile,
+      hasAgentsFile: readableAgentsFilePath !== null,
       hasScripts: await directoryExists(path.join(directoryPath, "scripts")),
       hasAssets: await directoryExists(path.join(directoryPath, "assets")),
       hasReferences: await directoryExists(path.join(directoryPath, "references")),
@@ -217,6 +329,29 @@ async function buildSkillEntry(
       hasExamples: await directoryExists(path.join(directoryPath, "examples")),
       lastModifiedAt: skillStats.mtime.toISOString(),
       frontmatter: parsed.frontmatter,
+    };
+
+    return {
+      entry,
+      searchRecord: {
+        id: entry.id,
+        combinedText: normalizeSearchText(
+          buildSkillSearchText({
+            description,
+            frontmatterText: parsed.frontmatterText,
+            name,
+            slug,
+            sourceName: source.name,
+            tags: parsed.tags,
+            body: `${parsed.body}\n${agentsContent}`.trim(),
+          }),
+        ),
+        description: normalizeSearchText(description ?? ""),
+        name: normalizeSearchText(name),
+        slug: normalizeSearchText(slug),
+        sourceName: normalizeSearchText(source.name),
+        tags: parsed.tags.map((tag) => normalizeSearchText(tag)).filter(Boolean),
+      },
     };
   } catch {
     return null;
@@ -266,6 +401,7 @@ export function createSkillsService({ projectRoot, onLibraryChanged }: CreateSki
   let queuedRefreshChangedPaths = new Set<string>();
   let scheduledRefresh: NodeJS.Timeout | null = null;
   let pendingChangedPaths = new Set<string>();
+  let searchIndex = new Map<string, SkillSearchRecord>();
   const watchers = new Map<string, ReturnType<typeof watch>>();
 
   const refresh = async (changedPaths?: string[]) => {
@@ -296,9 +432,17 @@ export function createSkillsService({ projectRoot, onLibraryChanged }: CreateSki
           const entries = await Promise.all(
             files.map((skillFilePath) => buildSkillEntry(source, skillFilePath)),
           );
+
+          const indexedEntries = entries.filter(
+            (entry): entry is IndexedSkillEntry => entry !== null,
+          );
+
           return {
             source,
-            skills: entries.filter((entry): entry is SkillEntry => entry !== null).sort(sortSkills),
+            searchIndex: new Map(
+              indexedEntries.map((entry) => [entry.entry.id, entry.searchRecord] as const),
+            ),
+            skills: indexedEntries.map((entry) => entry.entry).sort(sortSkills),
           };
         }),
       );
@@ -325,6 +469,13 @@ export function createSkillsService({ projectRoot, onLibraryChanged }: CreateSki
         skills: skillGroups.flatMap((group) => group.skills),
         scannedAt: new Date().toISOString(),
       };
+      const nextSearchIndex = new Map<string, SkillSearchRecord>();
+
+      for (const group of skillGroups) {
+        for (const [skillId, searchRecord] of group.searchIndex.entries()) {
+          nextSearchIndex.set(skillId, searchRecord);
+        }
+      }
 
       for (const [rootPath, watcher] of watchers.entries()) {
         if (nextSources.some((source) => toPathKey(source.rootPath) === rootPath)) {
@@ -370,6 +521,7 @@ export function createSkillsService({ projectRoot, onLibraryChanged }: CreateSki
       }
 
       snapshot = nextSnapshot;
+      searchIndex = nextSearchIndex;
 
       if (changedPaths && changedPaths.length > 0) {
         onLibraryChanged({
@@ -445,6 +597,40 @@ export function createSkillsService({ projectRoot, onLibraryChanged }: CreateSki
     return readDocument(filePath);
   };
 
+  const search = async (query: string) => {
+    const currentSnapshot = await getSnapshot();
+    const normalizedQuery = normalizeSearchText(query);
+    const queryTerms = tokenizeSearchQuery(query);
+
+    if (!normalizedQuery || queryTerms.length === 0) {
+      return [];
+    }
+
+    return currentSnapshot.skills
+      .map((skill, index) => {
+        const record = searchIndex.get(skill.id);
+        if (!record) {
+          return null;
+        }
+
+        const score = getSkillSearchScore(record, queryTerms, normalizedQuery);
+        if (score < 0) {
+          return null;
+        }
+
+        return { id: skill.id, index, score };
+      })
+      .filter((entry): entry is { id: string; index: number; score: number } => entry !== null)
+      .sort((left, right) => {
+        if (left.score !== right.score) {
+          return right.score - left.score;
+        }
+
+        return left.index - right.index;
+      })
+      .map((entry) => entry.id);
+  };
+
   const dispose = async () => {
     if (scheduledRefresh) {
       clearTimeout(scheduledRefresh);
@@ -475,6 +661,7 @@ export function createSkillsService({ projectRoot, onLibraryChanged }: CreateSki
     readDocument,
     refresh,
     saveDocument,
+    search,
     setProjectRoot,
   };
 }

@@ -15,6 +15,7 @@ import type {
   WorkspaceSnapshot,
   ExternalFileTarget,
 } from "./shared/workspace";
+import type { SkillDocument, SkillLibraryChangeEvent, SkillLibrarySnapshot } from "./shared/skills";
 
 declare global {
   interface Window {
@@ -29,6 +30,10 @@ declare global {
       openDefaultWorkspace: () => Promise<WorkspaceSnapshot | null>;
       openDocument: () => Promise<FileDocument | null>;
       readFile: (filePath: string) => Promise<FileDocument>;
+      getSkillLibrary: () => Promise<SkillLibrarySnapshot>;
+      refreshSkillLibrary: (changedPaths?: string[]) => Promise<SkillLibrarySnapshot>;
+      readSkillDocument: (filePath: string) => Promise<SkillDocument>;
+      saveSkillDocument: (filePath: string, content: string) => Promise<SkillDocument>;
       saveFile: (filePath: string, content: string) => Promise<FileDocument>;
       createFile: (parentDir: string, fileName: string) => Promise<FileDocument>;
       renameFile: (oldPath: string, newName: string) => Promise<FileDocument>;
@@ -47,6 +52,7 @@ declare global {
       downloadUpdate: () => Promise<UpdateState>;
       installUpdate: () => Promise<void>;
       onWorkspaceChanged: (listener: (event: WorkspaceChangeEvent) => void) => () => void;
+      onSkillLibraryChanged: (listener: (event: SkillLibraryChangeEvent) => void) => () => void;
       onCommand: (listener: (command: AppCommand) => void) => () => void;
       getPendingExternalPath: () => Promise<ExternalFileTarget | null>;
       revealInFinder: (targetPath: string) => Promise<boolean>;

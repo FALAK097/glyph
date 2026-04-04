@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import type { UpdateState } from "../shared/workspace";
 import type { OutlineItem } from "@/types/navigation";
 
@@ -10,14 +12,18 @@ export type MarkdownEditorProps = {
   content: string;
   fileName: string | null;
   filePath: string | null;
+  isEditable?: boolean;
   editorFocusRequest?: EditorFocusRequest | null;
   workspaceRootPath?: string | null;
   saveStateLabel: string;
+  footerMetaLabel?: string;
   wordCount: number;
   readingTime: number;
   onChange: (value: string) => void;
   onToggleSidebar?: () => void;
   isSidebarCollapsed?: boolean;
+  headerAccessory?: ReactNode;
+  topContent?: ReactNode;
   onCreateNote?: () => void;
   toggleSidebarShortcut?: string;
   newNoteShortcut?: string;
@@ -25,6 +31,7 @@ export type MarkdownEditorProps = {
   onOpenCommandPalette?: () => void;
   onOpenLinkedFile?: (path: string) => void;
   commandPaletteShortcut?: string;
+  commandPaletteLabel?: string;
   onNavigateBack?: () => void;
   onNavigateForward?: () => void;
   navigateBackShortcut?: string;
@@ -46,6 +53,7 @@ export type MarkdownEditorProps = {
   onDeleteNote?: () => void;
   onTogglePinnedFile?: () => void;
   folderRevealLabel?: string;
+  documentLabel?: string;
   outlineItems?: OutlineItem[];
   outlineJumpRequest?: { id: string; nonce: number } | null;
 };

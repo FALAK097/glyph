@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getDisplayFileName, isSamePath } from "@/lib/paths";
 
+import { FileManagerLogo } from "./file-manager-logo";
 import {
   ChevronRightIcon,
   FileIcon,
@@ -14,7 +15,6 @@ import {
   MoreVerticalIcon,
   PinIcon,
   PencilIcon,
-  RevealInFolderIcon,
   TrashIcon,
   XIcon,
 } from "./icons";
@@ -34,6 +34,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
   pinnedPaths,
   onOpenFile,
   onRequestRemoveFolder,
+  onRequestRemoveFile,
   onRevealInFinder,
   onTogglePinnedFile,
   onRequestDelete,
@@ -265,6 +266,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
                 depth={depth + 1}
                 onOpenFile={onOpenFile}
                 onRequestRemoveFolder={onRequestRemoveFolder}
+                onRequestRemoveFile={onRequestRemoveFile}
                 onRevealInFinder={onRevealInFinder}
                 folderRevealLabel={folderRevealLabel}
                 pinnedPaths={pinnedPaths}
@@ -291,7 +293,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
               }}
               type="button"
             >
-              <RevealInFolderIcon size={14} className="shrink-0 opacity-70" />
+              <FileManagerLogo label={revealLabel} size={14} className="opacity-70" />
               {revealLabel}
             </Button>
             <Button
@@ -431,6 +433,20 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
           >
             <PencilIcon size={14} className="opacity-70" />
             Rename
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
+            onClick={(event) => {
+              event.stopPropagation();
+              onRequestRemoveFile?.({ path: node.path, name: node.name });
+              setShowMenu(false);
+            }}
+            type="button"
+          >
+            <XIcon size={14} className="opacity-70" />
+            Remove
           </Button>
           <Button
             variant="ghost"

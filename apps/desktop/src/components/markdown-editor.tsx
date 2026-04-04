@@ -35,6 +35,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 
 import { SlashCommand } from "./slash-command";
 import { TableOfContents } from "./table-of-contents";
+import { FileManagerLogo } from "./file-manager-logo";
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
@@ -51,7 +52,6 @@ import {
   PinIcon,
   PinOffIcon,
   PlusIcon,
-  RevealInFolderIcon,
   SearchIcon,
   TrashIcon,
   OutlineIcon,
@@ -297,13 +297,17 @@ export const MarkdownEditor = ({
   content,
   fileName,
   filePath,
+  isEditable = true,
   editorFocusRequest,
   saveStateLabel,
+  footerMetaLabel,
   wordCount,
   readingTime,
   onChange,
   onToggleSidebar,
   isSidebarCollapsed,
+  headerAccessory,
+  topContent,
   onCreateNote,
   toggleSidebarShortcut,
   newNoteShortcut,
@@ -311,6 +315,7 @@ export const MarkdownEditor = ({
   onOpenCommandPalette,
   onOpenLinkedFile,
   commandPaletteShortcut,
+  commandPaletteLabel,
   onNavigateBack,
   onNavigateForward,
   navigateBackShortcut,
@@ -328,6 +333,7 @@ export const MarkdownEditor = ({
   focusModeShortcut,
   onTogglePinnedFile,
   folderRevealLabel,
+  documentLabel = "note",
   outlineJumpRequest,
 }: MarkdownEditorProps) => {
   const lastSyncedMarkdown = useRef(content);
@@ -478,18 +484,36 @@ export const MarkdownEditor = ({
 
     const nodeDom = nextEditor.view.nodeDOM(item.pos - 1);
     const container = scrollContainerRef.current;
+    let targetScrollTop: number | null = null;
 
     if (nodeDom instanceof HTMLElement && container) {
       const containerRect = container.getBoundingClientRect();
       const nodeRect = nodeDom.getBoundingClientRect();
 
-      const targetScrollTop = container.scrollTop + (nodeRect.top - containerRect.top) - 40;
-      container.scrollTo({ top: targetScrollTop, behavior: "smooth" });
+      targetScrollTop = container.scrollTop + (nodeRect.top - containerRect.top) - 40;
     } else {
-      nextEditor.chain().focus().setTextSelection(item.pos).scrollIntoView().run();
+      const containerRect = container?.getBoundingClientRect();
+      const coords = nextEditor.view.coordsAtPos(item.pos);
+
+      if (container && containerRect) {
+        targetScrollTop = container.scrollTop + (coords.top - containerRect.top) - 40;
+      }
     }
 
-    nextEditor.chain().focus().setTextSelection(item.pos).run();
+    const selection = TextSelection.create(nextEditor.state.doc, item.pos);
+    nextEditor.view.dispatch(nextEditor.state.tr.setSelection(selection));
+    nextEditor.view.dom.focus({
+      preventScroll: true,
+    });
+
+    if (container && targetScrollTop !== null) {
+      window.requestAnimationFrame(() => {
+        container.scrollTo({
+          top: Math.max(0, targetScrollTop ?? 0),
+          behavior: "smooth",
+        });
+      });
+    }
   }, []);
 
   const handleScrollToTop = useCallback(() => {
@@ -818,8 +842,8 @@ export const MarkdownEditor = ({
     }
 
     liveEditorRef.current = editor;
-    editor.setEditable(true);
-  }, [editor]);
+    editor.setEditable(isEditable);
+  }, [editor, isEditable]);
 
   useEffect(() => {
     if (!editorFocusRequest || !editor) {
@@ -1015,10 +1039,10 @@ export const MarkdownEditor = ({
     if (filePath) {
       try {
         await navigator.clipboard.writeText(filePath);
-        showToast("Note path copied", "");
+        showToast(`${normalizedDocumentLabel} path copied`, "");
       } catch (err) {
         console.error("Failed to copy path:", err);
-        showToast("Could not copy note path", "");
+        showToast(`Could not copy ${normalizedDocumentLabel} path`, "");
       }
     }
   };
@@ -1040,11 +1064,11 @@ export const MarkdownEditor = ({
       try {
         const didReveal = await window.glyph.revealInFinder(filePath);
         if (!didReveal) {
-          showToast("Could not reveal note", "");
+          showToast(`Could not reveal ${normalizedDocumentLabel}`, "");
         }
       } catch (err) {
-        console.error("Failed to reveal note:", err);
-        showToast("Could not reveal note", "");
+        console.error(`Failed to reveal ${normalizedDocumentLabel}:`, err);
+        showToast(`Could not reveal ${normalizedDocumentLabel}`, "");
       }
     }
   };
@@ -1085,6 +1109,8 @@ export const MarkdownEditor = ({
   const shouldShowOutlineRail = !isFocusLayout && showOutline;
   const shouldShowCommandPalette = Boolean(onOpenCommandPalette);
   const modeButtonsVisible = Boolean(onToggleFocusMode);
+  const searchButtonLabel = commandPaletteLabel ?? "Search notes";
+  const normalizedDocumentLabel = documentLabel.trim() || "note";
   const backTooltipLabel = `Back (${navigateBackShortcut ?? "⌘["})`;
   const forwardTooltipLabel = `Forward (${navigateForwardShortcut ?? "⌘]"})`;
 
@@ -1115,50 +1141,56 @@ export const MarkdownEditor = ({
               </TooltipContent>
             </Tooltip>
           )}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                disabled={!canGoBack}
-                onClick={onNavigateBack}
-                className="flex-shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted disabled:text-muted-foreground/40 disabled:opacity-40"
-                type="button"
-              >
-                <ArrowLeftIcon size={14} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">{backTooltipLabel}</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                disabled={!canGoForward}
-                onClick={onNavigateForward}
-                className="flex-shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted disabled:text-muted-foreground/40 disabled:opacity-40"
-                type="button"
-              >
-                <ArrowRightIcon size={14} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">{forwardTooltipLabel}</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="text-muted-foreground hover:text-foreground hover:bg-muted flex-shrink-0"
-                onClick={onCreateNote}
-                type="button"
-              >
-                <PlusIcon size={16} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">{`New Note (${newNoteShortcut ?? "⌘N"})`}</TooltipContent>
-          </Tooltip>
+          {onNavigateBack ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  disabled={!canGoBack}
+                  onClick={onNavigateBack}
+                  className="flex-shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted disabled:text-muted-foreground/40 disabled:opacity-40"
+                  type="button"
+                >
+                  <ArrowLeftIcon size={14} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">{backTooltipLabel}</TooltipContent>
+            </Tooltip>
+          ) : null}
+          {onNavigateForward ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  disabled={!canGoForward}
+                  onClick={onNavigateForward}
+                  className="flex-shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted disabled:text-muted-foreground/40 disabled:opacity-40"
+                  type="button"
+                >
+                  <ArrowRightIcon size={14} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">{forwardTooltipLabel}</TooltipContent>
+            </Tooltip>
+          ) : null}
+          {onCreateNote ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="text-muted-foreground hover:text-foreground hover:bg-muted flex-shrink-0"
+                  onClick={onCreateNote}
+                  type="button"
+                >
+                  <PlusIcon size={16} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">{`New Note (${newNoteShortcut ?? "⌘N"})`}</TooltipContent>
+            </Tooltip>
+          ) : null}
           {fileName ? (
             <span
               className="max-w-[220px] truncate pl-1 text-sm font-medium text-foreground"
@@ -1181,7 +1213,7 @@ export const MarkdownEditor = ({
             >
               <div className="flex items-center gap-2">
                 <SearchIcon size={13} className="opacity-60 flex-shrink-0" />
-                <span>Search notes</span>
+                <span>{searchButtonLabel}</span>
               </div>
               <span className="font-mono text-xs opacity-50 ml-4 flex-shrink-0">
                 {commandPaletteShortcut ?? "⌘P"}
@@ -1239,6 +1271,7 @@ export const MarkdownEditor = ({
               </TooltipContent>
             </Tooltip>
           ) : null}
+          {headerAccessory ? <div className="mr-1 flex items-center">{headerAccessory}</div> : null}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -1305,7 +1338,7 @@ export const MarkdownEditor = ({
                   type="button"
                 >
                   <LinkIcon size={14} className="opacity-70" />
-                  Copy note path
+                  {`Copy ${normalizedDocumentLabel} path`}
                 </Button>
                 <Button
                   variant="ghost"
@@ -1318,7 +1351,7 @@ export const MarkdownEditor = ({
                   disabled={!filePath}
                   type="button"
                 >
-                  <RevealInFolderIcon size={14} className="opacity-70 shrink-0" />
+                  <FileManagerLogo label={revealInFolderLabel} size={14} className="opacity-70" />
                   {revealInFolderLabel}
                 </Button>
                 <Button
@@ -1408,6 +1441,7 @@ export const MarkdownEditor = ({
           setActiveHeadingId(activeId);
         }}
       >
+        {topContent ? <div className="mx-auto max-w-[800px] px-10 pt-5">{topContent}</div> : null}
         {tableControls.active ? (
           <div className="sticky top-4 z-20 h-0 overflow-visible">
             <div
@@ -1557,6 +1591,12 @@ export const MarkdownEditor = ({
         </div>
         <div className="w-[1px] h-3 bg-border" />
         <span className="text-xs text-muted-foreground">{readingTime} min read</span>
+        {footerMetaLabel ? (
+          <>
+            <div className="w-[1px] h-3 bg-border" />
+            <span className="text-xs text-muted-foreground">{footerMetaLabel}</span>
+          </>
+        ) : null}
         <div className="w-[1px] h-3 bg-border" />
         <p className="text-xs font-medium text-foreground m-0">{saveStateLabel}</p>
       </div>

@@ -31,7 +31,7 @@ declare global {
       openDocument: () => Promise<FileDocument | null>;
       readFile: (filePath: string) => Promise<FileDocument>;
       getSkillLibrary: () => Promise<SkillLibrarySnapshot>;
-      refreshSkillLibrary: () => Promise<SkillLibrarySnapshot>;
+      refreshSkillLibrary: (changedPaths?: string[]) => Promise<SkillLibrarySnapshot>;
       readSkillDocument: (filePath: string) => Promise<SkillDocument>;
       saveSkillDocument: (filePath: string, content: string) => Promise<SkillDocument>;
       saveFile: (filePath: string, content: string) => Promise<FileDocument>;

@@ -68,14 +68,14 @@ const api = {
   getSkillLibrary() {
     return invokeWithRetry<SkillLibrarySnapshot>("skills:getLibrary");
   },
-  refreshSkillLibrary() {
-    return invokeWithRetry<SkillLibrarySnapshot>("skills:refresh");
+  refreshSkillLibrary(changedPaths?: string[]) {
+    return invokeWithRetry<SkillLibrarySnapshot>("skills:refresh", changedPaths);
   },
   readSkillDocument(filePath: string) {
-    return invokeWithRetry<SkillDocument>("skills:readDocument", filePath);
+    return ipcRenderer.invoke("skills:readDocument", filePath) as Promise<SkillDocument>;
   },
   saveSkillDocument(filePath: string, content: string) {
-    return invokeWithRetry<SkillDocument>("skills:saveDocument", filePath, content);
+    return ipcRenderer.invoke("skills:saveDocument", filePath, content) as Promise<SkillDocument>;
   },
   saveFile(filePath: string, content: string) {
     return invokeWithRetry<FileDocument>("workspace:saveFile", filePath, content);

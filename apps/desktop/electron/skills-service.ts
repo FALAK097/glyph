@@ -375,7 +375,7 @@ export function createSkillsService({ projectRoot, onLibraryChanged }: CreateSki
     const content = (await fs.readFile(filePath, "utf8")).replace(/\r\n?/g, "\n");
     const stats = await fs.stat(filePath);
     const documentKind: SkillDocumentKind =
-      path.basename(filePath).toUpperCase() === AGENTS_FILE_NAME ? "agents" : "skill";
+      path.basename(filePath).toUpperCase() === AGENTS_FILE_NAME.toUpperCase() ? "agents" : "skill";
 
     return {
       kind: documentKind,

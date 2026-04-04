@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getDisplayFileName, isSamePath } from "@/lib/paths";
 import { countGroupedSkills, groupSkillsForBrowse } from "@/lib/skill-groups";
@@ -78,7 +78,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const noteRenameInputRef = useRef<HTMLInputElement | null>(null);
   const confirmCancelRef = useRef<HTMLButtonElement | null>(null);
   const isSwitchingToAgentsRef = useRef(false);
-  const deferredSkillQuery = useDeferredValue(skillsController.searchQuery.trim().toLowerCase());
   const shouldCollapseSidebar =
     controller.isSidebarCollapsed || (viewerMode === "note" && controller.isFocusMode);
   const allSkills = skillsController.snapshot?.skills ?? [];
@@ -196,22 +195,11 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       return [];
     }
 
-    return allSkills.filter((skill) => activeSkillCollection.matches(skill));
-  }, [activeSkillCollection, allSkills]);
+    return skillsController.filteredSkills.filter((skill) => activeSkillCollection.matches(skill));
+  }, [activeSkillCollection, skillsController.filteredSkills]);
   const visibleSkillItems = useMemo(() => {
-    const groupedItems = groupSkillsForBrowse(visibleSkills);
-
-    if (!deferredSkillQuery) {
-      return groupedItems;
-    }
-
-    return groupedItems.filter((item) =>
-      [item.name, item.description ?? "", item.sourceNames.join(" ")]
-        .join("\n")
-        .toLowerCase()
-        .includes(deferredSkillQuery),
-    );
-  }, [deferredSkillQuery, visibleSkills]);
+    return groupSkillsForBrowse(visibleSkills);
+  }, [visibleSkills]);
 
   const handleToggleSkillsSection = useCallback(() => {
     const nextValue = !isSkillsExpanded;

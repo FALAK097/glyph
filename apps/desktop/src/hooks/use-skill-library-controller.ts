@@ -95,10 +95,6 @@ export function useSkillLibraryController(
     const query = deferredSearchQuery.trim().toLowerCase();
 
     return skills.filter((skill) => {
-      if (selectedSourceId !== ALL_SKILL_SOURCES_ID && skill.sourceId !== selectedSourceId) {
-        return false;
-      }
-
       if (!query) {
         return true;
       }
@@ -108,7 +104,7 @@ export function useSkillLibraryController(
         .toLowerCase()
         .includes(query);
     });
-  }, [deferredSearchQuery, selectedSourceId, snapshot?.skills]);
+  }, [deferredSearchQuery, snapshot?.skills]);
 
   const activeDocumentPath = useMemo(() => {
     if (!activeSkill) {

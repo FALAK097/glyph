@@ -1330,7 +1330,9 @@ ipcMain.handle("workspace:openDocument", async () => {
 
 ipcMain.handle("skills:getLibrary", async () => skillsService.getSnapshot());
 
-ipcMain.handle("skills:refresh", async () => skillsService.refresh());
+ipcMain.handle("skills:refresh", async (_event, changedPaths?: string[]) =>
+  skillsService.refresh(changedPaths),
+);
 
 ipcMain.handle("skills:readDocument", async (_event, filePath: string) =>
   skillsService.readDocument(filePath),

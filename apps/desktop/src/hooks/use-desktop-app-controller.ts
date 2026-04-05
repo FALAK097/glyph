@@ -1,41 +1,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { BreadcrumbItem, NoteShortcutItem, OutlineItem } from "@/types/navigation";
-import type { DragPosition, SidebarTopLevelNode } from "@/types/sidebar";
+import type { BreadcrumbItem, OutlineItem } from "@/types/navigation";
 
-import { getShortcutDisplay, matchShortcut, mergeShortcutSettings } from "@/shared/shortcuts";
-import type {
-  AppInfo,
-  AppSettings,
-  DirectoryNode,
-  FileDocument,
-  SearchResult,
-  SidebarItemSetting,
-  ThemeMode,
-  UpdateState,
-  WorkspaceSnapshot,
-} from "@/shared/workspace";
+import { getShortcutDisplay } from "@/shared/shortcuts";
+import type { DirectoryNode, FileDocument } from "@/shared/workspace";
 import { useSessionStore } from "@/store/session";
 import { useWorkspaceStore } from "@/store/workspace";
 import { applyTheme } from "@/theme/themes";
 
 import { getErrorMessage } from "@/lib/errors";
 import { buildBreadcrumbs, extractMarkdownOutline } from "@/lib/note-navigation";
-import { isFileInsideWorkspace, isPathInside, isSamePath, normalizePath } from "@/lib/paths";
+import { isFileInsideWorkspace, isSamePath, normalizePath } from "@/lib/paths";
 import { getFolderRevealLabel } from "@/lib/platform";
 import {
-  filterSidebarNodes,
   orderSidebarNodes,
   removeSidebarPath,
-  reorderSidebarNodes,
   renameSidebarFile,
-  toSidebarItemSetting,
   upsertSidebarFile,
   upsertSidebarFolder,
 } from "@/lib/sidebar-tree";
 import { flattenFiles } from "@/lib/workspace-tree";
 
 import type { CommandPaletteItem } from "@/types/command-palette";
+
+import { useSettingsController } from "./use-settings-controller";
+import { useSidebarController } from "./use-sidebar-controller";
+import { usePaletteController } from "./use-palette-controller";
+import { useNavigationController } from "./use-navigation-controller";
+import { useKeyboardShortcuts } from "./use-keyboard-shortcuts";
 
 const toPathKey = (path: string) => normalizePath(path).toLowerCase();
 const EMPTY_NOTE_NAME = "Untitled";
@@ -107,24 +99,13 @@ export const useDesktopAppController = (
     pushHistory,
     replaceHistoryPath,
     removeHistoryPath,
-    canGoBack,
-    canGoForward,
-    goBack,
-    goForward,
   } = useWorkspaceStore();
   const setNoteSession = useSessionStore((state) => state.setNoteSession);
 
-  const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
-  const [updateState, setUpdateState] = useState<UpdateState | null>(null);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [paletteQuery, setPaletteQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isWorkspaceMode, setIsWorkspaceMode] = useState(true);
   const [sidebarNodes, setSidebarNodes] = useState<DirectoryNode[]>([]);
-  const [expandedFolderPaths, setExpandedFolderPaths] = useState<string[]>([]);
   const [hasHydratedSidebar, setHasHydratedSidebar] = useState(false);
   const [editorFocusRequest, setEditorFocusRequest] = useState<{
     mode: "start" | "end" | "preserve";
@@ -135,9 +116,50 @@ export const useDesktopAppController = (
     id: string;
     nonce: number;
   } | null>(null);
-  const draftFileCreationRef = useRef<Promise<FileDocument | null> | null>(null);
   const editorFocusNonceRef = useRef(0);
+  const draftFileCreationRef = useRef<Promise<FileDocument | null> | null>(null);
 
+  // Settings controller
+  const settingsController = useSettingsController({ glyph });
+  const {
+    settings,
+    setSettings,
+    appInfo,
+    setAppInfo,
+    updateState,
+    setUpdateState,
+    isSettingsOpen,
+    setIsSettingsOpen,
+    saveSettings,
+    changeThemeMode,
+    changeShortcuts,
+    shortcuts,
+  } = settingsController;
+
+  // Sidebar controller
+  const sidebarController = useSidebarController({
+    glyph,
+    settings,
+    saveSettings,
+    rootPath,
+    setWorkspace,
+    sidebarNodes,
+    setSidebarNodes,
+    hasHydratedSidebar,
+    _setHasHydratedSidebar: setHasHydratedSidebar,
+  });
+  const {
+    visibleSidebarNodes,
+    hiddenFileKeys,
+    setExpandedFolderPaths,
+    restoreSidebarNodes,
+    syncWorkspace,
+    handleToggleFolder,
+    handleReorderNodes,
+    handleRemoveFolder,
+  } = sidebarController;
+
+  // Derived values
   const files = useMemo(() => flattenFiles(tree, rootPath), [rootPath, tree]);
   const wordCount = useMemo(() => {
     const text = draftContent.trim();
@@ -159,53 +181,6 @@ export const useDesktopAppController = (
   const isActiveFilePinned = activeFile
     ? (settings?.pinnedFiles ?? []).some((filePath) => isSamePath(filePath, activeFile.path))
     : false;
-  const hiddenFilePaths = settings?.hiddenFiles ?? [];
-  const hiddenFileKeys = useMemo(
-    () => new Set(hiddenFilePaths.map((filePath) => toPathKey(filePath))),
-    [hiddenFilePaths],
-  );
-
-  const visibleSidebarNodes = useMemo<SidebarTopLevelNode[]>(() => {
-    const expanded = new Set(expandedFolderPaths.map((p) => normalizePath(p).toLowerCase()));
-    const filteredNodes = filterSidebarNodes(sidebarNodes, (targetPath) =>
-      hiddenFileKeys.has(toPathKey(targetPath)),
-    );
-
-    return filteredNodes.map((node) => ({
-      node,
-      isExpanded:
-        node.type === "directory" ? expanded.has(normalizePath(node.path).toLowerCase()) : true,
-    }));
-  }, [expandedFolderPaths, hiddenFileKeys, sidebarNodes]);
-
-  const persistedSidebar = useMemo(
-    () => ({
-      items: sidebarNodes.map(toSidebarItemSetting),
-      expandedFolders: expandedFolderPaths,
-    }),
-    [expandedFolderPaths, sidebarNodes],
-  );
-
-  const restoreSidebarNodes = useCallback(
-    async (items: SidebarItemSetting[]) => {
-      const resolved = await Promise.all(
-        items.map((item) => glyph.getSidebarNode(item.kind, item.path)),
-      );
-      return resolved.filter((node): node is DirectoryNode => node !== null);
-    },
-    [glyph],
-  );
-
-  const syncWorkspace = useCallback(
-    (workspace: WorkspaceSnapshot) => {
-      setWorkspace(workspace);
-      setSidebarNodes((prev) => upsertSidebarFolder(prev, workspace));
-      setExpandedFolderPaths((prev) =>
-        prev.some((p) => isSamePath(p, workspace.rootPath)) ? prev : [...prev, workspace.rootPath],
-      );
-    },
-    [setWorkspace],
-  );
 
   const requestEditorFocus = useCallback((mode: "start" | "end" | "preserve") => {
     window.requestAnimationFrame(() => {
@@ -216,162 +191,6 @@ export const useDesktopAppController = (
       });
     });
   }, []);
-
-  useEffect(() => {
-    if (!sessionReady) {
-      return;
-    }
-
-    let isCancelled = false;
-
-    const boot = async () => {
-      setHasBooted(false);
-      const [nextSettings, nextAppInfo, nextUpdateState] = await Promise.all([
-        glyph.getSettings(),
-        glyph.getAppInfo(),
-        glyph.getUpdateState(),
-      ]);
-      setSettings(nextSettings);
-      setAppInfo(nextAppInfo);
-      setUpdateState(nextUpdateState);
-      applyTheme(nextSettings.themeMode);
-
-      let nextSidebarNodes = orderSidebarNodes(
-        await restoreSidebarNodes(nextSettings.sidebar.items),
-        nextSettings.sidebar.items,
-      );
-      const nextExpandedFolders = new Set(nextSettings.sidebar.expandedFolders);
-      let bootFocusMode: "start" | "end" | "preserve" = "start";
-      const tryOpenWorkspace = async (targetPath: string | null) => {
-        if (targetPath) {
-          try {
-            const existingWorkspace = await glyph.getSidebarNode("directory", targetPath);
-            if (existingWorkspace) {
-              return await glyph.openFolder(targetPath);
-            }
-          } catch {
-            // Fall back to the default workspace if the persisted root is no longer available.
-          }
-        }
-
-        try {
-          return await glyph.openDefaultWorkspace();
-        } catch {
-          return null;
-        }
-      };
-      const tryReadPersistedFile = async (targetPath: string | null) => {
-        if (!targetPath) {
-          return null;
-        }
-
-        try {
-          return await glyph.readFile(targetPath);
-        } catch {
-          return null;
-        }
-      };
-
-      const target = await glyph.getPendingExternalPath();
-      if (target) {
-        if (target.isDirectory) {
-          const workspace = await glyph.openFolder(target.path);
-          if (workspace) {
-            setWorkspace(workspace);
-            setIsWorkspaceMode(true);
-            nextSidebarNodes = upsertSidebarFolder(nextSidebarNodes, workspace);
-            if (workspace.activeFile) {
-              nextSidebarNodes = upsertSidebarFile(nextSidebarNodes, workspace.activeFile);
-              bootFocusMode = "end";
-            }
-            nextExpandedFolders.add(workspace.rootPath);
-          }
-        } else {
-          const workspace = await glyph.openDefaultWorkspace();
-          if (workspace) {
-            setWorkspace(workspace);
-            nextSidebarNodes = upsertSidebarFolder(nextSidebarNodes, workspace);
-            nextExpandedFolders.add(workspace.rootPath);
-          }
-          const file = await glyph.readFile(target.path);
-          setActiveFile(file);
-          pushHistory(file.path);
-          const refreshedSettings = await glyph.getSettings();
-          setSettings(refreshedSettings);
-          setIsWorkspaceMode(
-            Boolean(workspace && isFileInsideWorkspace(file.path, workspace.rootPath)),
-          );
-          nextSidebarNodes = upsertSidebarFile(nextSidebarNodes, file);
-          bootFocusMode = "end";
-        }
-      } else {
-        const workspace = await tryOpenWorkspace(initialWorkspacePath);
-        if (workspace) {
-          setWorkspace(workspace);
-          setIsWorkspaceMode(true);
-          nextSidebarNodes = upsertSidebarFolder(nextSidebarNodes, workspace);
-          if (workspace.activeFile) {
-            nextSidebarNodes = upsertSidebarFile(nextSidebarNodes, workspace.activeFile);
-            bootFocusMode = "end";
-          }
-          nextExpandedFolders.add(workspace.rootPath);
-        }
-
-        const restoredFile = await tryReadPersistedFile(initialFilePath);
-        if (restoredFile) {
-          setActiveFile(restoredFile);
-          setIsWorkspaceMode(
-            Boolean(workspace && isFileInsideWorkspace(restoredFile.path, workspace.rootPath)),
-          );
-          nextSidebarNodes = upsertSidebarFile(nextSidebarNodes, restoredFile);
-          bootFocusMode = "preserve";
-        }
-      }
-
-      if (isCancelled) {
-        return;
-      }
-
-      setSidebarNodes(nextSidebarNodes);
-      setExpandedFolderPaths(Array.from(nextExpandedFolders));
-      setHasHydratedSidebar(true);
-      requestEditorFocus(bootFocusMode);
-      setHasBooted(true);
-    };
-
-    void boot();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [
-    glyph,
-    initialFilePath,
-    initialWorkspacePath,
-    pushHistory,
-    requestEditorFocus,
-    restoreSidebarNodes,
-    sessionReady,
-    setActiveFile,
-    setWorkspace,
-  ]);
-
-  useEffect(
-    () =>
-      glyph.onUpdateStateChange((nextUpdateState) => {
-        setUpdateState(nextUpdateState);
-      }),
-    [glyph],
-  );
-
-  const saveSettings = useCallback(
-    async (patch: Partial<AppSettings>) => {
-      const next = await glyph.updateSettings(patch);
-      setSettings(next);
-      return next;
-    },
-    [glyph],
-  );
 
   const syncTrackedPaths = useCallback(
     async (oldPath: string, nextPath?: string) => {
@@ -421,192 +240,14 @@ export const useDesktopAppController = (
       setActiveFile(file);
       setIsWorkspaceMode(isFileInsideWorkspace(file.path, currentRootPath));
       setSidebarNodes((prev) => upsertSidebarFile(prev, file));
-      const nextSettings = await glyph.getSettings();
-      setSettings(nextSettings);
-      setIsPaletteOpen(false);
       if (options?.recordHistory) {
         pushHistory(file.path);
       }
       requestEditorFocus(shouldPreserveFocus ? "preserve" : "end");
+      setIsPaletteOpen(false);
     },
-    [ensureFileVisible, glyph, pushHistory, requestEditorFocus, setActiveFile],
+    [ensureFileVisible, pushHistory, requestEditorFocus, setActiveFile],
   );
-
-  useEffect(() => {
-    return glyph.onExternalFile(async (target) => {
-      if (target.isDirectory) {
-        const workspace = await glyph.openFolder(target.path);
-        if (workspace) {
-          syncWorkspace(workspace);
-          setIsWorkspaceMode(true);
-        }
-      } else {
-        const file = await glyph.readFile(target.path);
-        await syncOpenedFile(file, { recordHistory: true });
-      }
-    });
-  }, [syncOpenedFile, syncWorkspace, glyph]);
-
-  useEffect(() => {
-    return glyph.onWorkspaceChanged(
-      async ({ rootPath: changedRootPath, tree: nextTree, changedPath }) => {
-        setTree(nextTree);
-        setSidebarNodes((prev) =>
-          upsertSidebarFolder(prev, {
-            rootPath: changedRootPath,
-            tree: nextTree,
-            activeFile: null,
-          }),
-        );
-
-        if (changedPath === activeFile?.path && !isDirty) {
-          const refreshedFile = await glyph.readFile(changedPath);
-          updateActiveFile(refreshedFile);
-        }
-      },
-    );
-  }, [activeFile?.path, isDirty, updateActiveFile, setTree, glyph]);
-
-  useEffect(() => {
-    if (!activeFile || !isDirty || isSaving) {
-      return;
-    }
-
-    const timer = window.setTimeout(async () => {
-      setSaving(true);
-      try {
-        let currentPath = activeFile.path;
-        let finalFile = activeFile;
-        const isUntitled = activeFile.name.startsWith("Untitled-");
-        const committedFileName = getCommittedDraftFileName(draftContent);
-
-        if (isUntitled && committedFileName) {
-          const previousPath = currentPath;
-          finalFile = await glyph.renameFile(currentPath, committedFileName);
-          setSidebarNodes((prev) =>
-            upsertSidebarFile(renameSidebarFile(prev, currentPath, finalFile), finalFile),
-          );
-          currentPath = finalFile.path;
-          updateActiveFile(finalFile);
-          replaceHistoryPath(previousPath, finalFile.path);
-          await syncTrackedPaths(previousPath, finalFile.path);
-          requestEditorFocus("preserve");
-        }
-
-        const savedFile = await glyph.saveFile(currentPath, draftContent);
-        markSaved(savedFile);
-      } catch (saveError) {
-        setSaving(false);
-        setError(saveError instanceof Error ? saveError.message : "Unable to save file.");
-      }
-    }, 800);
-
-    return () => window.clearTimeout(timer);
-  }, [
-    activeFile?.path,
-    draftContent,
-    glyph,
-    isDirty,
-    isSaving,
-    markSaved,
-    replaceHistoryPath,
-    requestEditorFocus,
-    setError,
-    setSaving,
-    syncTrackedPaths,
-  ]);
-
-  useEffect(() => {
-    if (!isPaletteOpen) {
-      setSearchResults([]);
-      return;
-    }
-
-    const query = paletteQuery.trim().toLowerCase();
-
-    if (!isWorkspaceMode || !query || query.startsWith("theme")) {
-      setSearchResults([]);
-      return;
-    }
-
-    const timer = window.setTimeout(async () => {
-      const results = await glyph.searchWorkspace(query);
-      setSearchResults(results);
-    }, 120);
-
-    return () => window.clearTimeout(timer);
-  }, [glyph, isPaletteOpen, isWorkspaceMode, paletteQuery]);
-
-  useEffect(() => {
-    if (!settings) {
-      return;
-    }
-
-    applyTheme(settings.themeMode);
-  }, [settings]);
-
-  const togglePinnedFile = useCallback(
-    async (filePath: string) => {
-      const current = settings?.pinnedFiles ?? [];
-      const nextPinnedFiles = current.some((entry) => isSamePath(entry, filePath))
-        ? current.filter((entry) => !isSamePath(entry, filePath))
-        : [filePath, ...current.filter((entry) => !isSamePath(entry, filePath))].slice(0, 12);
-
-      await saveSettings({ pinnedFiles: nextPinnedFiles });
-    },
-    [saveSettings, settings?.pinnedFiles],
-  );
-
-  const toggleFocusMode = useCallback(async () => {
-    await saveSettings({
-      editorPreferences: {
-        focusMode: !isFocusMode,
-        showOutline,
-      },
-    });
-  }, [isFocusMode, showOutline, saveSettings]);
-
-  const toggleOutline = useCallback(async () => {
-    await saveSettings({
-      editorPreferences: {
-        focusMode: isFocusMode,
-        showOutline: !showOutline,
-      },
-    });
-  }, [isFocusMode, showOutline, saveSettings]);
-
-  const requestOutlineJump = useCallback((id: string) => {
-    setOutlineJumpRequest({
-      id,
-      nonce: Date.now(),
-    });
-  }, []);
-
-  const clearOutlineJumpRequest = useCallback(() => {
-    setOutlineJumpRequest(null);
-  }, []);
-
-  useEffect(() => {
-    if (!settings || !hasHydratedSidebar) {
-      return;
-    }
-
-    const currentSidebar = JSON.stringify(persistedSidebar);
-    const savedSidebar = JSON.stringify(settings.sidebar);
-    if (currentSidebar === savedSidebar) {
-      return;
-    }
-
-    void saveSettings({ sidebar: persistedSidebar });
-  }, [hasHydratedSidebar, persistedSidebar, saveSettings, settings]);
-
-  useEffect(() => {
-    if (!sessionReady || !hasBooted) {
-      return;
-    }
-
-    setNoteSession(rootPath || null, activeFile?.path ?? null);
-  }, [activeFile?.path, hasBooted, rootPath, sessionReady, setNoteSession]);
 
   const openFile = useCallback(
     async (filePath: string) => {
@@ -628,8 +269,6 @@ export const useDesktopAppController = (
     setActiveFile(file);
     setIsWorkspaceMode(true);
     setSidebarNodes((prev) => upsertSidebarFile(prev, file));
-    const nextSettings = await glyph.getSettings();
-    setSettings(nextSettings);
     pushHistory(file.path);
     requestEditorFocus("start");
   }, [
@@ -678,8 +317,6 @@ export const useDesktopAppController = (
         attachActiveFile(file);
         setIsWorkspaceMode(true);
         setSidebarNodes((prev) => upsertSidebarFile(prev, file));
-        const nextSettings = await glyph.getSettings();
-        setSettings(nextSettings);
         pushHistory(file.path);
         requestEditorFocus("preserve");
         return file;
@@ -717,22 +354,6 @@ export const useDesktopAppController = (
     },
     [activeFile, ensureActiveDraftFile, setError, updateDraftContent],
   );
-
-  const navigateBack = useCallback(async () => {
-    const prevPath = goBack();
-    if (prevPath) {
-      const file = await glyph.readFile(prevPath);
-      await syncOpenedFile(file);
-    }
-  }, [goBack, glyph, syncOpenedFile]);
-
-  const navigateForward = useCallback(async () => {
-    const nextPath = goForward();
-    if (nextPath) {
-      const file = await glyph.readFile(nextPath);
-      await syncOpenedFile(file);
-    }
-  }, [goForward, glyph, syncOpenedFile]);
 
   const handleDeleteFile = useCallback(
     async (filePath: string) => {
@@ -796,19 +417,6 @@ export const useDesktopAppController = (
     ],
   );
 
-  const revealInFinder = useCallback(
-    async (targetPath: string) => {
-      try {
-        await glyph.revealInFinder(targetPath);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : `Failed to ${folderRevealLabel.toLowerCase()}`,
-        );
-      }
-    },
-    [folderRevealLabel, glyph, setError],
-  );
-
   const handleRenameFile = useCallback(
     async (filePath: string, newName: string) => {
       if (!newName.trim()) {
@@ -832,33 +440,35 @@ export const useDesktopAppController = (
     [activeFile?.path, glyph, replaceHistoryPath, setActiveFile, setError, syncTrackedPaths],
   );
 
-  const handleRemoveFolder = useCallback(
-    (folderPath: string) => {
-      setSidebarNodes((prev) => removeSidebarPath(prev, folderPath));
-      setExpandedFolderPaths((prev) => prev.filter((path) => !isPathInside(path, folderPath)));
+  const togglePinnedFile = useCallback(
+    async (filePath: string) => {
+      const current = settings?.pinnedFiles ?? [];
+      const nextPinnedFiles = current.some((entry) => isSamePath(entry, filePath))
+        ? current.filter((entry) => !isSamePath(entry, filePath))
+        : [filePath, ...current.filter((entry) => !isSamePath(entry, filePath))].slice(0, 12);
 
-      if (rootPath && isSamePath(rootPath, folderPath)) {
-        setWorkspace({ rootPath: "", tree: [], activeFile: null });
-        setIsWorkspaceMode(false);
-      }
+      await saveSettings({ pinnedFiles: nextPinnedFiles });
     },
-    [rootPath, setWorkspace],
+    [saveSettings, settings?.pinnedFiles],
   );
 
-  const handleToggleFolder = useCallback((folderPath: string) => {
-    setExpandedFolderPaths((prev) =>
-      prev.some((path) => isSamePath(path, folderPath))
-        ? prev.filter((path) => !isSamePath(path, folderPath))
-        : [...prev, folderPath],
-    );
-  }, []);
+  const toggleFocusMode = useCallback(async () => {
+    await saveSettings({
+      editorPreferences: {
+        focusMode: !isFocusMode,
+        showOutline,
+      },
+    });
+  }, [isFocusMode, showOutline, saveSettings]);
 
-  const handleReorderNodes = useCallback(
-    (sourcePath: string, targetPath: string, position: DragPosition) => {
-      setSidebarNodes((prev) => reorderSidebarNodes(prev, sourcePath, targetPath, position));
-    },
-    [],
-  );
+  const toggleOutline = useCallback(async () => {
+    await saveSettings({
+      editorPreferences: {
+        focusMode: isFocusMode,
+        showOutline: !showOutline,
+      },
+    });
+  }, [isFocusMode, showOutline, saveSettings]);
 
   const triggerUpdateAction = useCallback(async () => {
     if (!updateState) {
@@ -912,11 +522,6 @@ export const useDesktopAppController = (
       await glyph.checkForUpdates();
     }
   }, [appInfo?.updatesEnabled, appInfo?.updatesMode, glyph, updateState]);
-
-  const shortcuts = useMemo(
-    () => mergeShortcutSettings(settings?.shortcuts),
-    [settings?.shortcuts],
-  );
 
   const updateActionConfig = useMemo(() => {
     if (!appInfo?.updatesEnabled || !updateState) {
@@ -997,7 +602,49 @@ export const useDesktopAppController = (
     };
   }, [appInfo?.updatesEnabled, appInfo?.updatesMode, updateState]);
 
-  // Stable commands list — only rebuilds when actions/shortcuts change, never on query change
+  // All searchable files for palette
+  const allSearchableFiles = useMemo(() => {
+    const seenPaths = new Set<string>();
+    const result: Array<{ path: string; name: string; relativePath: string }> = [];
+
+    const traverseSidebar = (nodes: DirectoryNode[], parentPath: string = "") => {
+      for (const node of nodes) {
+        if (node.type === "file") {
+          const pathKey = toPathKey(node.path);
+          if (!hiddenFileKeys.has(pathKey) && !seenPaths.has(pathKey)) {
+            seenPaths.add(pathKey);
+            result.push({
+              path: node.path,
+              name: node.name,
+              relativePath: parentPath ? `${parentPath}/${node.name}` : node.name,
+            });
+          }
+        } else {
+          traverseSidebar(node.children, parentPath ? `${parentPath}/${node.name}` : node.name);
+        }
+      }
+    };
+    traverseSidebar(sidebarNodes);
+
+    for (const f of files) {
+      const pathKey = toPathKey(f.path);
+      if (!hiddenFileKeys.has(pathKey) && !seenPaths.has(pathKey)) {
+        seenPaths.add(pathKey);
+        result.push(f);
+      }
+    }
+
+    return result;
+  }, [files, hiddenFileKeys, sidebarNodes]);
+
+  // Navigation controller
+  const navigationController = useNavigationController({
+    glyph,
+    syncOpenedFile,
+  });
+  const { canGoBack, canGoForward, navigateBack, navigateForward } = navigationController;
+
+  // Base commands — only rebuilds when actions/shortcuts change
   const baseCommands = useMemo<CommandPaletteItem[]>(
     () => [
       {
@@ -1187,298 +834,336 @@ export const useDesktopAppController = (
     ],
   );
 
-  // Stable deduplicated file list — only rebuilds when sidebarNodes or files change, never on query change
-  const allSearchableFiles = useMemo(() => {
-    const seenPaths = new Set<string>();
-    const result: Array<{ path: string; name: string; relativePath: string }> = [];
-
-    const traverseSidebar = (nodes: DirectoryNode[], parentPath: string = "") => {
-      for (const node of nodes) {
-        if (node.type === "file") {
-          const pathKey = toPathKey(node.path);
-          if (!hiddenFileKeys.has(pathKey) && !seenPaths.has(pathKey)) {
-            seenPaths.add(pathKey);
-            result.push({
-              path: node.path,
-              name: node.name,
-              relativePath: parentPath ? `${parentPath}/${node.name}` : node.name,
-            });
-          }
-        } else {
-          traverseSidebar(node.children, parentPath ? `${parentPath}/${node.name}` : node.name);
-        }
-      }
-    };
-    traverseSidebar(sidebarNodes);
-
-    for (const f of files) {
-      const pathKey = toPathKey(f.path);
-      if (!hiddenFileKeys.has(pathKey) && !seenPaths.has(pathKey)) {
-        seenPaths.add(pathKey);
-        result.push(f);
-      }
-    }
-
-    return result;
-  }, [files, hiddenFileKeys, sidebarNodes]);
-
-  const noteShortcutLookup = useMemo(() => {
-    const lookup = new Map<string, NoteShortcutItem>();
-
-    for (const file of allSearchableFiles) {
-      lookup.set(toPathKey(file.path), {
-        path: file.path,
-        title: file.name.replace(/\.(md|mdx|markdown)$/i, ""),
-        subtitle: file.relativePath,
-      });
-    }
-
-    if (activeFile && !lookup.has(toPathKey(activeFile.path))) {
-      lookup.set(toPathKey(activeFile.path), {
-        path: activeFile.path,
-        title: activeFile.name.replace(/\.(md|mdx|markdown)$/i, ""),
-        subtitle: activeFile.path,
-      });
-    }
-
-    return lookup;
-  }, [activeFile, allSearchableFiles]);
-
-  const toShortcutItems = useCallback(
-    (paths: string[], badge?: string) =>
-      paths.map((targetPath) => {
-        const match = noteShortcutLookup.get(toPathKey(targetPath));
-        if (match) {
-          return { ...match, badge };
-        }
-
-        const segments = targetPath.replace(/\\/g, "/").split("/");
-        const fileName = segments.pop() ?? targetPath;
-        return {
-          path: targetPath,
-          title: fileName.replace(/\.(md|mdx|markdown)$/i, ""),
-          subtitle: targetPath,
-          badge,
-        };
-      }),
-    [noteShortcutLookup],
-  );
-
-  const pinnedNotes = useMemo(
-    () => toShortcutItems(settings?.pinnedFiles ?? []),
-    [settings?.pinnedFiles, toShortcutItems],
-  );
-  const paletteItems = useMemo<CommandPaletteItem[]>(() => {
-    const query = paletteQuery.trim().toLowerCase();
-    const pinnedPaletteItems = pinnedNotes.slice(0, 8).map((note) => ({
-      id: `pinned-${note.path}`,
-      title: note.title,
-      subtitle: note.subtitle,
-      hint: "Pinned",
-      section: "Pinned Notes",
-      kind: "file" as const,
-      onSelect: () => void openFile(note.path),
-    }));
-
-    // No query: show pinned notes + all commands
-    if (!query) {
-      return [...pinnedPaletteItems, ...baseCommands];
-    }
-
-    const items: CommandPaletteItem[] = [];
-
-    // Match commands by title only — never subtitle (prevents false positives)
-    const matchedCommands = baseCommands.filter((cmd) => cmd.title.toLowerCase().includes(query));
-    items.push(...matchedCommands);
-    items.push(
-      ...pinnedPaletteItems.filter(
-        (note) =>
-          note.title.toLowerCase().includes(query) || note.subtitle?.toLowerCase().includes(query),
-      ),
-    );
-
-    const pinnedPathKeys = new Set(pinnedNotes.map((note) => toPathKey(note.path)));
-    const noteResultKeys = new Set<string>();
-
-    // Match files by name or path
-    const matchingFiles = allSearchableFiles.filter(
-      (file) =>
-        (file.name.toLowerCase().includes(query) ||
-          file.relativePath.toLowerCase().includes(query)) &&
-        !pinnedPathKeys.has(toPathKey(file.path)),
-    );
-
-    matchingFiles.slice(0, 12).forEach((file) => {
-      noteResultKeys.add(toPathKey(file.path));
-      items.push({
-        id: file.path,
-        title: file.name,
-        subtitle: file.relativePath,
-        hint: "File",
-        section: "Notes",
-        kind: "file",
-        onSelect: () => void openFile(file.path),
-      });
-    });
-
-    // Full-text content search results
-    searchResults.slice(0, 8).forEach((result) => {
-      const pathKey = toPathKey(result.path);
-      if (hiddenFileKeys.has(pathKey) || noteResultKeys.has(pathKey)) {
-        return;
-      }
-
-      noteResultKeys.add(pathKey);
-      items.push({
-        id: `search-${result.path}-${result.line}`,
-        title: result.name,
-        subtitle: `${result.snippet} · line ${result.line}`,
-        hint: "Match",
-        section: "Notes",
-        kind: "file",
-        onSelect: () => void openFile(result.path),
-      });
-    });
-
-    return items;
-  }, [
-    allSearchableFiles,
-    baseCommands,
+  // Palette controller
+  const paletteController = usePaletteController({
+    glyph,
+    settings,
+    shortcuts,
+    isWorkspaceMode,
+    sidebarNodes,
     hiddenFileKeys,
+    allSearchableFiles,
+    activeFile,
+    baseCommands,
     openFile,
-    paletteQuery,
-    pinnedNotes,
-    searchResults,
-  ]);
+    setIsPaletteOpen,
+  });
+  const { paletteQuery, setPaletteQuery, paletteItems, pinnedNotes } = paletteController;
 
-  // Reset query when palette closes
-  useEffect(() => {
-    if (!isPaletteOpen) {
-      setPaletteQuery("");
-    }
-  }, [isPaletteOpen]);
-
-  useEffect(() => {
-    const onKeyDown = async (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement;
-      const isEditableInput =
-        target &&
-        (target instanceof HTMLInputElement ||
-          target instanceof HTMLTextAreaElement ||
-          target.isContentEditable);
-
-      if (event.key === "Escape" && !isEditableInput) {
-        setIsPaletteOpen(false);
-        setIsSettingsOpen(false);
-        return;
-      }
-
-      // These shortcuts fire globally — even when the editor (contenteditable) is focused.
-      const globalShortcutIds = new Set([
-        "toggle-sidebar",
-        "command-palette",
-        "settings",
-        "navigate-back",
-        "navigate-forward",
-        "focus-mode",
-        "check-updates",
-      ]);
-      const globalShortcut = shortcuts.find(
-        (entry) => globalShortcutIds.has(entry.id) && matchShortcut(event, entry.keys),
-      );
-      if (globalShortcut) {
-        event.preventDefault();
-        switch (globalShortcut.id) {
-          case "toggle-sidebar":
-            setIsSidebarCollapsed((prev) => !prev);
-            break;
-          case "command-palette":
-            setIsPaletteOpen((value) => !value);
-            break;
-          case "settings":
-            setIsSettingsOpen((value) => !value);
-            break;
-          case "navigate-back":
-            void navigateBack();
-            break;
-          case "navigate-forward":
-            void navigateForward();
-            break;
-          case "focus-mode":
-            void toggleFocusMode();
-            break;
-          case "check-updates":
-            void triggerUpdateAction();
-            break;
-        }
-        return;
-      }
-
-      if (!isEditableInput) {
-        const shortcut = shortcuts.find(
-          (entry) => !globalShortcutIds.has(entry.id) && matchShortcut(event, entry.keys),
-        );
-
-        if (shortcut) {
-          event.preventDefault();
-
-          switch (shortcut.id) {
-            case "new-note":
-              void createNote();
-              break;
-            case "open-file": {
-              const file = await glyph.openDocument();
-              if (file) {
-                await syncOpenedFile(file, { recordHistory: true });
-              }
-              break;
-            }
-            case "open-folder": {
-              const workspace = await glyph.openFolder();
-              if (workspace) {
-                syncWorkspace(workspace);
-                setIsWorkspaceMode(true);
-              }
-              break;
-            }
-            case "save":
-              if (activeFile) {
-                setSaving(true);
-                try {
-                  const savedFile = await glyph.saveFile(activeFile.path, draftContent);
-                  markSaved(savedFile);
-                } catch (saveError) {
-                  console.error("Manual save failed:", saveError);
-                  setError(getErrorMessage(saveError));
-                } finally {
-                  setSaving(false);
-                }
-              }
-              break;
-          }
-          return;
-        }
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    glyph,
     shortcuts,
     activeFile,
     draftContent,
     markSaved,
     setError,
     setSaving,
-    glyph,
     createNote,
     syncOpenedFile,
     syncWorkspace,
     navigateBack,
     navigateForward,
     triggerUpdateAction,
+    setIsPaletteOpen,
+    setIsSettingsOpen,
+    setIsSidebarCollapsed,
+    toggleFocusMode,
+  });
+
+  // Boot sequence
+  useEffect(() => {
+    if (!sessionReady) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const boot = async () => {
+      setHasBooted(false);
+      const [nextSettings, nextAppInfo, nextUpdateState] = await Promise.all([
+        glyph.getSettings(),
+        glyph.getAppInfo(),
+        glyph.getUpdateState(),
+      ]);
+      setSettings(nextSettings);
+      setAppInfo(nextAppInfo);
+      setUpdateState(nextUpdateState);
+      applyTheme(nextSettings.themeMode);
+
+      let nextSidebarNodes = orderSidebarNodes(
+        await restoreSidebarNodes(nextSettings.sidebar.items),
+        nextSettings.sidebar.items,
+      );
+      const nextExpandedFolders = new Set(nextSettings.sidebar.expandedFolders);
+      let bootFocusMode: "start" | "end" | "preserve" = "start";
+      const tryOpenWorkspace = async (targetPath: string | null) => {
+        if (targetPath) {
+          try {
+            const existingWorkspace = await glyph.getSidebarNode("directory", targetPath);
+            if (existingWorkspace) {
+              return await glyph.openFolder(targetPath);
+            }
+          } catch {
+            // Fall back to the default workspace if the persisted root is no longer available.
+          }
+        }
+
+        try {
+          return await glyph.openDefaultWorkspace();
+        } catch {
+          return null;
+        }
+      };
+      const tryReadPersistedFile = async (targetPath: string | null) => {
+        if (!targetPath) {
+          return null;
+        }
+
+        try {
+          return await glyph.readFile(targetPath);
+        } catch {
+          return null;
+        }
+      };
+
+      const target = await glyph.getPendingExternalPath();
+      if (target) {
+        if (target.isDirectory) {
+          const workspace = await glyph.openFolder(target.path);
+          if (workspace) {
+            setWorkspace(workspace);
+            setIsWorkspaceMode(true);
+            nextSidebarNodes = upsertSidebarFolder(nextSidebarNodes, workspace);
+            if (workspace.activeFile) {
+              nextSidebarNodes = upsertSidebarFile(nextSidebarNodes, workspace.activeFile);
+              bootFocusMode = "end";
+            }
+            nextExpandedFolders.add(workspace.rootPath);
+          }
+        } else {
+          const workspace = await glyph.openDefaultWorkspace();
+          if (workspace) {
+            setWorkspace(workspace);
+            nextSidebarNodes = upsertSidebarFolder(nextSidebarNodes, workspace);
+            nextExpandedFolders.add(workspace.rootPath);
+          }
+          const file = await glyph.readFile(target.path);
+          setActiveFile(file);
+          pushHistory(file.path);
+          const refreshedSettings = await glyph.getSettings();
+          setSettings(refreshedSettings);
+          setIsWorkspaceMode(
+            Boolean(workspace && isFileInsideWorkspace(file.path, workspace.rootPath)),
+          );
+          nextSidebarNodes = upsertSidebarFile(nextSidebarNodes, file);
+          bootFocusMode = "end";
+        }
+      } else {
+        const workspace = await tryOpenWorkspace(initialWorkspacePath);
+        if (workspace) {
+          setWorkspace(workspace);
+          setIsWorkspaceMode(true);
+          nextSidebarNodes = upsertSidebarFolder(nextSidebarNodes, workspace);
+          if (workspace.activeFile) {
+            nextSidebarNodes = upsertSidebarFile(nextSidebarNodes, workspace.activeFile);
+            bootFocusMode = "end";
+          }
+          nextExpandedFolders.add(workspace.rootPath);
+        }
+
+        const restoredFile = await tryReadPersistedFile(initialFilePath);
+        if (restoredFile) {
+          setActiveFile(restoredFile);
+          setIsWorkspaceMode(
+            Boolean(workspace && isFileInsideWorkspace(restoredFile.path, workspace.rootPath)),
+          );
+          nextSidebarNodes = upsertSidebarFile(nextSidebarNodes, restoredFile);
+          bootFocusMode = "preserve";
+        }
+      }
+
+      if (isCancelled) {
+        return;
+      }
+
+      setSidebarNodes(nextSidebarNodes);
+      setExpandedFolderPaths(Array.from(nextExpandedFolders));
+      setHasHydratedSidebar(true);
+      requestEditorFocus(bootFocusMode);
+      setHasBooted(true);
+    };
+
+    void boot();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    glyph,
+    initialFilePath,
+    initialWorkspacePath,
+    pushHistory,
+    requestEditorFocus,
+    restoreSidebarNodes,
+    sessionReady,
+    setActiveFile,
+    setWorkspace,
+    setSettings,
+    setAppInfo,
+    setUpdateState,
+    setExpandedFolderPaths,
   ]);
 
+  // External file handler
+  useEffect(() => {
+    return glyph.onExternalFile(async (target) => {
+      if (target.isDirectory) {
+        const workspace = await glyph.openFolder(target.path);
+        if (workspace) {
+          syncWorkspace(workspace);
+          setIsWorkspaceMode(true);
+        }
+      } else {
+        const file = await glyph.readFile(target.path);
+        await syncOpenedFile(file, { recordHistory: true });
+      }
+    });
+  }, [syncOpenedFile, syncWorkspace, glyph]);
+
+  // Workspace change handler
+  useEffect(() => {
+    return glyph.onWorkspaceChanged(
+      async ({ rootPath: changedRootPath, tree: nextTree, changedPath }) => {
+        setTree(nextTree);
+        setSidebarNodes((prev) =>
+          upsertSidebarFolder(prev, {
+            rootPath: changedRootPath,
+            tree: nextTree,
+            activeFile: null,
+          }),
+        );
+
+        if (changedPath === activeFile?.path && !isDirty) {
+          const refreshedFile = await glyph.readFile(changedPath);
+          updateActiveFile(refreshedFile);
+        }
+      },
+    );
+  }, [activeFile?.path, isDirty, updateActiveFile, setTree, glyph]);
+
+  // Auto-save draft content
+  useEffect(() => {
+    if (!activeFile || !isDirty || isSaving) {
+      return;
+    }
+
+    const timer = window.setTimeout(async () => {
+      setSaving(true);
+      try {
+        let currentPath = activeFile.path;
+        let finalFile = activeFile;
+        const isUntitled = activeFile.name.startsWith("Untitled-");
+        const committedFileName = getCommittedDraftFileName(draftContent);
+
+        if (isUntitled && committedFileName) {
+          const previousPath = currentPath;
+          finalFile = await glyph.renameFile(currentPath, committedFileName);
+          setSidebarNodes((prev) =>
+            upsertSidebarFile(renameSidebarFile(prev, currentPath, finalFile), finalFile),
+          );
+          currentPath = finalFile.path;
+          updateActiveFile(finalFile);
+          replaceHistoryPath(previousPath, finalFile.path);
+          await syncTrackedPaths(previousPath, finalFile.path);
+          requestEditorFocus("preserve");
+        }
+
+        const savedFile = await glyph.saveFile(currentPath, draftContent);
+        markSaved(savedFile);
+      } catch (saveError) {
+        setSaving(false);
+        setError(saveError instanceof Error ? saveError.message : "Unable to save file.");
+      }
+    }, 800);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    activeFile?.path,
+    draftContent,
+    glyph,
+    isDirty,
+    isSaving,
+    markSaved,
+    replaceHistoryPath,
+    requestEditorFocus,
+    setError,
+    setSaving,
+    syncTrackedPaths,
+  ]);
+
+  // Session sync
+  useEffect(() => {
+    if (!sessionReady || !hasBooted) {
+      return;
+    }
+
+    setNoteSession(rootPath || null, activeFile?.path ?? null);
+  }, [activeFile?.path, hasBooted, rootPath, sessionReady, setNoteSession]);
+
+  const requestOutlineJump = useCallback((id: string) => {
+    setOutlineJumpRequest({
+      id,
+      nonce: Date.now(),
+    });
+  }, []);
+
+  const clearOutlineJumpRequest = useCallback(() => {
+    setOutlineJumpRequest(null);
+  }, []);
+
+  const revealInFinder = useCallback(
+    async (targetPath: string) => {
+      try {
+        await glyph.revealInFinder(targetPath);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : `Failed to ${folderRevealLabel.toLowerCase()}`,
+        );
+      }
+    },
+    [folderRevealLabel, glyph, setError],
+  );
+
+  const saveStateLabel = useMemo(
+    () =>
+      isSaving
+        ? "Saving..."
+        : isDirty
+          ? "Unsaved"
+          : lastSavedAt
+            ? `Saved ${new Date(lastSavedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+            : "Ready",
+    [isSaving, isDirty, lastSavedAt],
+  );
+
+  const chooseFolderAndUpdateWorkspace = useCallback(async () => {
+    const selection = await glyph.openDialog("directory");
+    if (!selection) {
+      return;
+    }
+
+    const nextSettings = await saveSettings({
+      defaultWorkspacePath: selection.path,
+    });
+    const workspace = await glyph.openFolder(nextSettings.defaultWorkspacePath);
+    if (workspace) {
+      syncWorkspace(workspace);
+      setIsWorkspaceMode(true);
+    }
+  }, [saveSettings, syncWorkspace, glyph]);
+
+  // Command IPC handler
   useEffect(() => {
     return glyph.onCommand(async (command) => {
       if (command === "quick-open") {
@@ -1548,45 +1233,9 @@ export const useDesktopAppController = (
     glyph,
     toggleFocusMode,
     triggerUpdateAction,
+    setIsPaletteOpen,
+    setIsSidebarCollapsed,
   ]);
-
-  const saveStateLabel = isSaving
-    ? "Saving..."
-    : isDirty
-      ? "Unsaved"
-      : lastSavedAt
-        ? `Saved ${new Date(lastSavedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
-        : "Ready";
-
-  const chooseFolderAndUpdateWorkspace = useCallback(async () => {
-    const selection = await glyph.openDialog("directory");
-    if (!selection) {
-      return;
-    }
-
-    const nextSettings = await saveSettings({
-      defaultWorkspacePath: selection.path,
-    });
-    const workspace = await glyph.openFolder(nextSettings.defaultWorkspacePath);
-    if (workspace) {
-      syncWorkspace(workspace);
-      setIsWorkspaceMode(true);
-    }
-  }, [saveSettings, syncWorkspace, glyph]);
-
-  const changeThemeMode = useCallback(
-    async (mode: ThemeMode) => {
-      await saveSettings({ themeMode: mode });
-    },
-    [saveSettings],
-  );
-
-  const changeShortcuts = useCallback(
-    async (nextShortcuts: AppSettings["shortcuts"]) => {
-      await saveSettings({ shortcuts: nextShortcuts });
-    },
-    [saveSettings],
-  );
 
   return {
     activeFile,

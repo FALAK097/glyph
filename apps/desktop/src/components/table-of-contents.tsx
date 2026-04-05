@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { OutlineItem } from "./../types/navigation";
 export type EditorOutlineItem = OutlineItem & { pos: number };
 
@@ -147,11 +147,13 @@ export function TableOfContents({
     });
   }, [items, activeId]);
 
+  const pathKey = useMemo(() => JSON.stringify(items.map((i) => [i.id, i.line])), [items]);
+
   useEffect(() => {
     // Small delay to allow layout to settle
     const timeoutId = window.setTimeout(buildPath, 50);
     return () => window.clearTimeout(timeoutId);
-  }, [buildPath]);
+  }, [buildPath, pathKey]);
 
   // The dashoffset positions the active segment so the line ends at the dot
   const dashOffset = ACTIVE_LINE_LENGTH - activeOffset;

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useIsDarkMode } from "@/hooks/use-is-dark-mode";
 
 import { cn } from "@/lib/utils";
 import type { SkillSourceKind } from "@/shared/skills";
@@ -137,37 +137,6 @@ function getLogoImageClassName(
   }
 
   return cn("block object-contain", imageSizeClasses);
-}
-
-function useIsDarkMode() {
-  const getSnapshot = () =>
-    typeof document !== "undefined" && document.documentElement.classList.contains("dark");
-  const [isDarkMode, setIsDarkMode] = useState(getSnapshot);
-
-  useEffect(() => {
-    if (typeof document === "undefined") {
-      return;
-    }
-
-    const root = document.documentElement;
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const sync = () => setIsDarkMode(root.classList.contains("dark"));
-    const observer = new MutationObserver(sync);
-
-    observer.observe(root, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-    mediaQuery.addEventListener("change", sync);
-    sync();
-
-    return () => {
-      observer.disconnect();
-      mediaQuery.removeEventListener("change", sync);
-    };
-  }, []);
-
-  return isDarkMode;
 }
 
 function renderIcon({

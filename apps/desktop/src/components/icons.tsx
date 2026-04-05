@@ -5,7 +5,6 @@ import {
   ArrowRight01Icon as ArrowRight01Svg,
   ArrowUp01Icon as ArrowUp01Svg,
   ArrowDown01Icon as ArrowDown01Svg,
-  BookOpen01Icon as BookOpen01Svg,
   Cancel01Icon as Cancel01Svg,
   CheckmarkCircle01Icon as CheckmarkCircle01Svg,
   CopyIcon as CopySvg,
@@ -13,10 +12,8 @@ import {
   File01Icon as File01Svg,
   FileDownIcon as FileDownSvg,
   Folder01Icon as Folder01Svg,
-  FolderOpenIcon as FolderOpenSvg,
   KeyboardIcon as KeyboardSvg,
   Link01Icon as Link01Svg,
-  LinkSquare01Icon as LinkSquare01Svg,
   ListViewIcon as ListViewSvg,
   Maximize01Icon as Maximize01Svg,
   MoreHorizontalIcon as MoreHorizontalSvg,
@@ -28,7 +25,6 @@ import {
   PencilEdit02Icon as PencilEdit02Svg,
   Search01Icon as Search01Svg,
   Settings01Icon as Settings01Svg,
-  StarIcon as StarSvg,
   UnfoldMoreIcon as UnfoldMoreSvg,
   Tick02Icon as Tick02Svg,
 } from "@hugeicons/core-free-icons";
@@ -64,9 +60,6 @@ export const PanelRightIcon = (props: IconProps) => (
 );
 export const ArrowLeftIcon = (props: IconProps) => <HugeIcon icon={ArrowLeft01Svg} {...props} />;
 export const ArrowRightIcon = (props: IconProps) => <HugeIcon icon={ArrowRight01Svg} {...props} />;
-export const ExternalLinkIcon = (props: IconProps) => (
-  <HugeIcon icon={LinkSquare01Svg} {...props} />
-);
 export const ArrowUpIcon = (props: IconProps) => <HugeIcon icon={ArrowUp01Svg} {...props} />;
 export const ArrowDownIcon = (props: IconProps) => <HugeIcon icon={ArrowDown01Svg} {...props} />;
 export const UnfoldMoreIcon = (props: IconProps) => <HugeIcon icon={UnfoldMoreSvg} {...props} />;
@@ -81,9 +74,6 @@ export const DotsHorizontalIcon = (props: IconProps) => (
 );
 export const CopyIcon = (props: IconProps) => <HugeIcon icon={CopySvg} {...props} />;
 export const LinkIcon = (props: IconProps) => <HugeIcon icon={Link01Svg} {...props} />;
-export const RevealInFolderIcon = (props: IconProps) => (
-  <HugeIcon icon={FolderOpenSvg} {...props} />
-);
 export const FileDownIcon = (props: IconProps) => <HugeIcon icon={FileDownSvg} {...props} />;
 export const CheckCircleIcon = (props: IconProps) => (
   <HugeIcon icon={CheckmarkCircle01Svg} {...props} />
@@ -92,22 +82,5 @@ export const XIcon = (props: IconProps) => <HugeIcon icon={Cancel01Svg} {...prop
 export const PinIcon = (props: IconProps) => <HugeIcon icon={HugePinIcon} {...props} />;
 export const PinOffIcon = (props: IconProps) => <HugeIcon icon={HugePinOffIcon} {...props} />;
 
-export const StarIcon = (props: IconProps) => <HugeIcon icon={StarSvg} {...props} />;
 export const FocusIcon = (props: IconProps) => <HugeIcon icon={Maximize01Svg} {...props} />;
-export const ReadingModeIcon = (props: IconProps) => <HugeIcon icon={BookOpen01Svg} {...props} />;
 export const OutlineIcon = (props: IconProps) => <HugeIcon icon={ListViewSvg} {...props} />;
-
-const glyphLogoMarkSrc = `${import.meta.env.BASE_URL}icon.png`;
-
-export const GlyphLogoMark = ({ size = 128, className }: IconProps) => {
-  return (
-    <img
-      src={glyphLogoMarkSrc}
-      alt="Glyph Logo"
-      width={size}
-      height={size}
-      aria-hidden="true"
-      className={className}
-    />
-  );
-};

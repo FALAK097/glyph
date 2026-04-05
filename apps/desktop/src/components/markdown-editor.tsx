@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
@@ -22,40 +22,14 @@ import { CustomCodeBlockLowlight } from "./tiptap-extension/code-block-lowlight"
 import { MarkdownShortcuts } from "./tiptap-extension/markdown-shortcuts";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
+import { EditorToolbar } from "./editor-toolbar";
+import { EditorFooter } from "./editor-footer";
+import { EditorDialogs } from "./editor-dialogs";
+import { useUpdateStateFlags } from "./update-notification";
 import { SlashCommand } from "./slash-command";
 import { TableOfContents } from "./table-of-contents";
-import { FileManagerLogo } from "./file-manager-logo";
-import {
-  ArrowLeftIcon,
-  ArrowRightIcon,
-  ArrowUpIcon,
-  CheckCircleIcon,
-  CopyIcon,
-  DotsHorizontalIcon,
-  FileDownIcon,
-  FocusIcon,
-  GearIcon,
-  LinkIcon,
-  PanelLeftIcon,
-  PanelRightIcon,
-  PinIcon,
-  PinOffIcon,
-  PlusIcon,
-  SearchIcon,
-  TrashIcon,
-  OutlineIcon,
-} from "./icons";
+import { ArrowUpIcon, TrashIcon, OutlineIcon } from "./icons";
 
 import type { MarkdownEditorProps, MarkdownEditorToast } from "../types/markdown-editor";
 import type { OutlineItem } from "@/types/navigation";
@@ -67,21 +41,6 @@ type EditorActionType = "insert-table" | "insert-link" | "insert-image";
 
 type EditorActionDetail = {
   type: EditorActionType;
-};
-
-type TableFormState = {
-  rows: string;
-  cols: string;
-};
-
-type LinkFormState = {
-  text: string;
-  href: string;
-};
-
-type ImageFormState = {
-  alt: string;
-  src: string;
 };
 
 type ImageControlsState = {
@@ -382,21 +341,8 @@ export const MarkdownEditor = ({
     key: null,
     top: -1,
   });
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [toast, setToast] = useState<MarkdownEditorToast | null>(null);
   const [activeDialog, setActiveDialog] = useState<EditorActionType | null>(null);
-  const [tableForm, setTableForm] = useState<TableFormState>({
-    rows: "3",
-    cols: "3",
-  });
-  const [linkForm, setLinkForm] = useState<LinkFormState>({
-    text: "",
-    href: "",
-  });
-  const [imageForm, setImageForm] = useState<ImageFormState>({
-    alt: "",
-    src: "",
-  });
   const [imageControls, setImageControls] = useState<ImageControlsState | null>(null);
   const [hoveredLink, setHoveredLink] = useState<HoveredLinkState | null>(null);
   const [tableControls, setTableControls] = useState<TableControlsState>(INACTIVE_TABLE_CONTROLS);
@@ -407,19 +353,10 @@ export const MarkdownEditor = ({
 
   useEffect(() => {
     onChangeRef.current = onChange;
-  }, [onChange]);
-
-  useEffect(() => {
     onScrollPositionChangeRef.current = onScrollPositionChange;
-  }, [onScrollPositionChange]);
-
-  useEffect(() => {
     filePathRef.current = filePath;
-  }, [filePath]);
-
-  useEffect(() => {
     onOpenLinkedFileRef.current = onOpenLinkedFile;
-  }, [onOpenLinkedFile]);
+  }, [onChange, onScrollPositionChange, filePath, onOpenLinkedFile]);
 
   const refreshOutline = useCallback((nextEditor: Editor) => {
     const items = collectEditorOutline(nextEditor);
@@ -463,80 +400,54 @@ export const MarkdownEditor = ({
     [],
   );
 
-  const effectiveUpdateState = devPreviewUpdateState ?? updateState;
-
-  const shouldShowUpdateButton =
-    effectiveUpdateState?.status === "error" ||
-    effectiveUpdateState?.status === "available" ||
-    effectiveUpdateState?.status === "downloading" ||
-    effectiveUpdateState?.status === "downloaded";
-  const shouldShowChangelogButton =
-    (effectiveUpdateState?.status === "idle" || effectiveUpdateState?.status === "not-available") &&
-    Boolean(effectiveUpdateState?.recentlyInstalledVersion);
-  const shouldShowUpdateActionButton = shouldShowUpdateButton || shouldShowChangelogButton;
-  const isManualReleaseButton =
-    effectiveUpdateState?.status === "available" && Boolean(effectiveUpdateState?.releasePageUrl);
-
-  const updateButtonLabel = shouldShowChangelogButton
-    ? "View changelog"
-    : isManualReleaseButton
-      ? "Download latest release"
-      : effectiveUpdateState?.status === "downloaded"
-        ? "Restart to Update"
-        : effectiveUpdateState?.status === "downloading"
-          ? `Downloading ${Math.round(effectiveUpdateState.progressPercent ?? 0)}%`
-          : effectiveUpdateState?.errorMessage
-            ? "Retry update"
-            : "Update available";
-  const updateButtonTooltip = shouldShowChangelogButton
-    ? `See what's new in Glyph ${effectiveUpdateState?.recentlyInstalledVersion ?? ""}`.trim()
-    : isManualReleaseButton
-      ? "A newer Glyph release is available on GitHub. Download and install it manually."
-      : effectiveUpdateState?.status === "downloaded"
-        ? effectiveUpdateState.errorMessage
-          ? `Restart Glyph to retry the update. ${effectiveUpdateState.errorMessage}`
-          : "Restart Glyph to install the downloaded release"
-        : effectiveUpdateState?.status === "downloading"
-          ? "Glyph is downloading the latest release in the background"
-          : effectiveUpdateState?.errorMessage
-            ? `Glyph hit an update error. ${effectiveUpdateState.errorMessage}`
-            : "Glyph is downloading the latest release in the background";
-  const isUpdateButtonDisabled = effectiveUpdateState?.status === "downloading";
-  const updateButtonVariant =
-    shouldShowChangelogButton || isManualReleaseButton ? "outline" : "default";
+  const effectiveUpdateState = devPreviewUpdateState ?? updateState ?? null;
+  const updateStateFlags = useUpdateStateFlags(effectiveUpdateState);
   const isFocusLayout = Boolean(isFocusMode);
   const revealInFolderLabel = folderRevealLabel ?? getFolderRevealLabel(navigator.platform);
-  const editorSurfaceClassName = [
-    "tiptap-editor mx-auto max-w-[800px] px-10 py-5 pb-32 text-[15px] leading-[1.7] text-foreground outline-none",
-    "[&>p]:mb-4",
-    "[&>ul]:mb-4 [&>ol]:mb-4 [&>blockquote]:mb-4 [&>hr]:my-8",
-    "[&>pre]:mb-4 [&>pre]:rounded-lg [&>pre]:overflow-auto",
-    "[&>h1]:mt-10 [&>h1]:mb-3 [&>h1]:text-3xl [&>h1]:font-semibold [&>h1]:leading-tight",
-    "[&>h2]:mt-8 [&>h2]:mb-3 [&>h2]:text-2xl [&>h2]:font-semibold [&>h2]:leading-tight",
-    "[&>h3]:mt-7 [&>h3]:mb-2 [&>h3]:text-xl [&>h3]:font-semibold [&>h3]:leading-tight",
-    "[&>h4]:mt-6 [&>h4]:mb-2 [&>h4]:text-lg [&>h4]:font-semibold [&>h4]:leading-tight",
-    "[&>ul]:list-disc [&>ol]:list-decimal [&>ul]:pl-6 [&>ol]:pl-6",
-    "[&>ul[data-type='taskList']]:list-none [&>ul[data-type='taskList']]:pl-0",
-    "[&>ul[data-type='taskList']_li]:flex [&>ul[data-type='taskList']_li]:gap-2.5 [&>ul[data-type='taskList']_li]:items-start",
-    "[&>ul[data-type='taskList']_li>label]:inline-flex [&>ul[data-type='taskList']_li>label]:items-center [&>ul[data-type='taskList']_li>label]:mt-0.5 [&>ul[data-type='taskList']_li>label]:shrink-0 [&>ul[data-type='taskList']_li>label]:cursor-pointer",
-    "[&>ul[data-type='taskList']_li>label>input]:mt-0.5 [&>ul[data-type='taskList']_li>label>input]:cursor-pointer",
-    "[&>ul[data-type='taskList']_li>div]:flex-1",
-    "[&>blockquote]:pl-4 [&>blockquote]:border-l-2 [&>blockquote]:border-border [&>blockquote]:text-muted-foreground",
-    "[&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded-md [&_code]:bg-muted [&_code]:font-mono [&_code]:text-[0.875em]",
-    "[&>pre]:mb-4 [&>pre]:rounded-lg [&>pre]:overflow-auto",
-    "[&>pre_code]:p-0 [&>pre_code]:bg-transparent [&>pre_code]:color-inherit",
-    "[&_a]:font-medium [&_a]:underline [&_a]:underline-offset-2 [&_a]:cursor-pointer",
-    "[&_.tableWrapper]:my-5 [&_.tableWrapper]:overflow-x-auto",
-    "[&_.tableWrapper_table]:w-full [&_.tableWrapper_table]:border-collapse [&_.tableWrapper_table]:border-spacing-0 [&_.tableWrapper_table]:min-w-[440px]",
-    "[&_.tableWrapper_th]:bg-muted [&_.tableWrapper_th]:font-semibold",
-    "[&_.tableWrapper_th]:border [&_.tableWrapper_th]:border-border [&_.tableWrapper_th]:px-3 [&_.tableWrapper_th]:py-2 [&_.tableWrapper_th]:align-top",
-    "[&_.tableWrapper_td]:border [&_.tableWrapper_td]:border-border [&_.tableWrapper_td]:px-3 [&_.tableWrapper_td]:py-2 [&_.tableWrapper_td]:align-top",
-    "[&>img]:max-w-full [&>img]:h-auto [&>img]:rounded-xl",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const isMacLike = useMemo(() => navigator.platform.includes("Mac"), []);
+  const linkOpenShortcutHint = isMacLike ? "Open link (Cmd+Click)" : "Open link (Ctrl+Click)";
+  const headerPaddingClass =
+    (isSidebarCollapsed || isFocusLayout) && isMacLike ? "pl-20 pr-4" : "px-4";
+  const shouldShowOutlineRail = !isFocusLayout && showOutline;
+  const shouldShowCommandPalette = Boolean(onOpenCommandPalette);
+  const _modeButtonsVisible = Boolean(onToggleFocusMode);
+  const normalizedDocumentLabel = documentLabel.trim() || "note";
 
-  const showToast = (title: string, description: string) => {
+  const editorSurfaceClassName = useMemo(
+    () =>
+      [
+        "tiptap-editor mx-auto max-w-[800px] px-10 py-5 pb-32 text-[15px] leading-[1.7] text-foreground outline-none",
+        "[&>p]:mb-4",
+        "[&>ul]:mb-4 [&>ol]:mb-4 [&>blockquote]:mb-4 [&>hr]:my-8",
+        "[&>pre]:mb-4 [&>pre]:rounded-lg [&>pre]:overflow-auto",
+        "[&>h1]:mt-10 [&>h1]:mb-3 [&>h1]:text-3xl [&>h1]:font-semibold [&>h1]:leading-tight",
+        "[&>h2]:mt-8 [&>h2]:mb-3 [&>h2]:text-2xl [&>h2]:font-semibold [&>h2]:leading-tight",
+        "[&>h3]:mt-7 [&>h3]:mb-2 [&>h3]:text-xl [&>h3]:font-semibold [&>h3]:leading-tight",
+        "[&>h4]:mt-6 [&>h4]:mb-2 [&>h4]:text-lg [&>h4]:font-semibold [&>h4]:leading-tight",
+        "[&>ul]:list-disc [&>ol]:list-decimal [&>ul]:pl-6 [&>ol]:pl-6",
+        "[&>ul[data-type='taskList']]:list-none [&>ul[data-type='taskList']]:pl-0",
+        "[&>ul[data-type='taskList']_li]:flex [&>ul[data-type='taskList']_li]:gap-2.5 [&>ul[data-type='taskList']_li]:items-start",
+        "[&>ul[data-type='taskList']_li>label]:inline-flex [&>ul[data-type='taskList']_li>label]:items-center [&>ul[data-type='taskList']_li>label]:mt-0.5 [&>ul[data-type='taskList']_li>label]:shrink-0 [&>ul[data-type='taskList']_li>label]:cursor-pointer",
+        "[&>ul[data-type='taskList']_li>label>input]:mt-0.5 [&>ul[data-type='taskList']_li>label>input]:cursor-pointer",
+        "[&>ul[data-type='taskList']_li>div]:flex-1",
+        "[&>blockquote]:pl-4 [&>blockquote]:border-l-2 [&>blockquote]:border-border [&>blockquote]:text-muted-foreground",
+        "[&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded-md [&_code]:bg-muted [&_code]:font-mono [&_code]:text-[0.875em]",
+        "[&>pre]:mb-4 [&>pre]:rounded-lg [&>pre]:overflow-auto",
+        "[&>pre_code]:p-0 [&>pre_code]:bg-transparent [&>pre_code]:color-inherit",
+        "[&_a]:font-medium [&_a]:underline [&_a]:underline-offset-2 [&_a]:cursor-pointer",
+        "[&_.tableWrapper]:my-5 [&_.tableWrapper]:overflow-x-auto",
+        "[&_.tableWrapper_table]:w-full [&_.tableWrapper_table]:border-collapse [&_.tableWrapper_table]:border-spacing-0 [&_.tableWrapper_table]:min-w-[440px]",
+        "[&_.tableWrapper_th]:bg-muted [&_.tableWrapper_th]:font-semibold",
+        "[&_.tableWrapper_th]:border [&_.tableWrapper_th]:border-border [&_.tableWrapper_th]:px-3 [&_.tableWrapper_th]:py-2 [&_.tableWrapper_th]:align-top",
+        "[&_.tableWrapper_td]:border [&_.tableWrapper_td]:border-border [&_.tableWrapper_td]:px-3 [&_.tableWrapper_td]:py-2 [&_.tableWrapper_td]:align-top",
+        "[&>img]:max-w-full [&>img]:h-auto [&>img]:rounded-xl",
+      ]
+        .filter(Boolean)
+        .join(" "),
+    [],
+  );
+
+  const showToast = useCallback((title: string, description: string) => {
     if (toastTimeoutRef.current) {
       window.clearTimeout(toastTimeoutRef.current);
     }
@@ -546,7 +457,7 @@ export const MarkdownEditor = ({
       setToast(null);
       toastTimeoutRef.current = null;
     }, 2000);
-  };
+  }, []);
 
   const handleJumpToHeading = useCallback((item: EditorOutlineItem) => {
     const nextEditor = liveEditorRef.current;
@@ -1050,26 +961,13 @@ export const MarkdownEditor = ({
 
       switch (detail.type) {
         case "insert-table":
-          setTableForm({ rows: "3", cols: "3" });
           setActiveDialog("insert-table");
           break;
         case "insert-link": {
-          const selectedText = editor.state.doc.textBetween(
-            editor.state.selection.from,
-            editor.state.selection.to,
-            "",
-            "",
-          );
-          const currentHref = String(editor.getAttributes("link").href ?? "");
-          setLinkForm({
-            text: selectedText || "Link label",
-            href: currentHref,
-          });
           setActiveDialog("insert-link");
           break;
         }
         case "insert-image":
-          setImageForm({ alt: "Image", src: "" });
           setActiveDialog("insert-image");
           break;
       }
@@ -1080,6 +978,8 @@ export const MarkdownEditor = ({
       window.removeEventListener("glyph:editor-action", handleEditorAction as EventListener);
     };
   }, [editor]);
+
+  const [_imageFormState, setImageFormState] = useState<{ alt: string; src: string } | null>(null);
 
   const handlePickImageFile = async () => {
     if (!window.glyph) {
@@ -1093,82 +993,13 @@ export const MarkdownEditor = ({
     }
 
     const baseName = asset.name.replace(/\.[^.]+$/, "");
-    setImageForm({
+    setImageFormState({
       alt: baseName || "Image",
       src: asset.url,
     });
   };
 
-  const handleInsertTable = () => {
-    if (!editor) {
-      return;
-    }
-
-    const rows = Math.min(12, Math.max(2, Number.parseInt(tableForm.rows, 10) || 3));
-    const cols = Math.min(8, Math.max(1, Number.parseInt(tableForm.cols, 10) || 3));
-
-    editor.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();
-    setActiveDialog(null);
-    showToast("Table inserted", `${rows} rows and ${cols} columns ready.`);
-  };
-
-  const handleInsertLink = () => {
-    if (!editor) {
-      return;
-    }
-
-    const href = normalizeLinkTarget(linkForm.href);
-    if (!href) {
-      showToast("Link missing", "Add a URL or choose a file.");
-      return;
-    }
-
-    const text = linkForm.text.trim() || href.replace(/^https?:\/\//i, "");
-    editor
-      .chain()
-      .focus()
-      .insertContent([
-        {
-          type: "text",
-          text,
-          marks: [
-            {
-              type: "link",
-              attrs: { href },
-            },
-          ],
-        },
-      ])
-      .run();
-    setActiveDialog(null);
-    showToast("Link inserted", href);
-  };
-
-  const handleInsertImage = () => {
-    if (!editor) {
-      return;
-    }
-
-    const src = normalizeLinkTarget(imageForm.src);
-    if (!src) {
-      showToast("Image missing", "Add an image URL or choose a local image.");
-      return;
-    }
-
-    editor
-      .chain()
-      .focus()
-      .setImage({
-        src,
-        alt: imageForm.alt.trim() || "Image",
-        title: imageForm.alt.trim() || undefined,
-      })
-      .run();
-    setActiveDialog(null);
-    showToast("Image inserted", imageForm.alt.trim() || "Image");
-  };
-
-  const handleDeleteSelectedImage = () => {
+  const handleDeleteSelectedImage = useCallback(() => {
     if (!editor?.isActive("image")) {
       return;
     }
@@ -1176,7 +1007,7 @@ export const MarkdownEditor = ({
     editor.chain().focus().deleteSelection().run();
     setImageControls(null);
     showToast("Image removed", "");
-  };
+  }, [editor, showToast]);
 
   const handleCopyPath = async () => {
     if (filePath) {
@@ -1245,293 +1076,49 @@ export const MarkdownEditor = ({
     }
   };
 
-  const isMacLike = navigator.platform.includes("Mac");
-  const linkOpenShortcutHint = isMacLike ? "Open link (Cmd+Click)" : "Open link (Ctrl+Click)";
-  const headerPaddingClass =
-    (isSidebarCollapsed || isFocusLayout) && isMacLike ? "pl-20 pr-4" : "px-4";
-  const shouldShowOutlineRail = !isFocusLayout && showOutline;
-  const shouldShowCommandPalette = Boolean(onOpenCommandPalette);
-  const modeButtonsVisible = Boolean(onToggleFocusMode);
-  const searchButtonLabel = commandPaletteLabel ?? "Search notes";
-  const normalizedDocumentLabel = documentLabel.trim() || "note";
-  const backTooltipLabel = `Back (${navigateBackShortcut ?? "⌘["})`;
-  const forwardTooltipLabel = `Forward (${navigateForwardShortcut ?? "⌘]"})`;
-
   return (
     <section className="relative h-full min-h-0 flex flex-col bg-background">
-      <div
-        className={`flex items-center py-2 border-b border-border/40 gap-2 ${headerPaddingClass}`}
-      >
-        {/* Left: toolbar + title */}
-        <div className="flex items-center gap-1 flex-shrink-0 min-w-0">
-          {onToggleSidebar && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-muted-foreground hover:text-foreground hover:bg-muted flex-shrink-0"
-                  onClick={onToggleSidebar}
-                  type="button"
-                >
-                  {isSidebarCollapsed ? <PanelRightIcon size={16} /> : <PanelLeftIcon size={16} />}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                {isSidebarCollapsed
-                  ? `Show Sidebar (${toggleSidebarShortcut ?? "⌘B"})`
-                  : `Hide Sidebar (${toggleSidebarShortcut ?? "⌘B"})`}
-              </TooltipContent>
-            </Tooltip>
-          )}
-          {onNavigateBack ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  disabled={!canGoBack}
-                  onClick={onNavigateBack}
-                  className="flex-shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted disabled:text-muted-foreground/40 disabled:opacity-40"
-                  type="button"
-                >
-                  <ArrowLeftIcon size={14} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">{backTooltipLabel}</TooltipContent>
-            </Tooltip>
-          ) : null}
-          {onNavigateForward ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  disabled={!canGoForward}
-                  onClick={onNavigateForward}
-                  className="flex-shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted disabled:text-muted-foreground/40 disabled:opacity-40"
-                  type="button"
-                >
-                  <ArrowRightIcon size={14} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">{forwardTooltipLabel}</TooltipContent>
-            </Tooltip>
-          ) : null}
-          {onCreateNote ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-muted-foreground hover:text-foreground hover:bg-muted flex-shrink-0"
-                  onClick={onCreateNote}
-                  type="button"
-                >
-                  <PlusIcon size={16} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">{`New Note (${newNoteShortcut ?? "⌘N"})`}</TooltipContent>
-            </Tooltip>
-          ) : null}
-          {fileName ? (
-            <span
-              className="max-w-[220px] truncate pl-1 text-sm font-medium text-foreground"
-              title={filePath ?? fileName}
-            >
-              {fileName.replace(MARKDOWN_FILE_SUFFIX_PATTERN, "")}
-            </span>
-          ) : null}
-        </div>
-
-        {/* Center: search bar */}
-        {shouldShowCommandPalette && onOpenCommandPalette ? (
-          <div className="flex-1 flex justify-center px-2 min-w-0">
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full max-w-sm justify-between px-3 py-1.5 text-sm text-muted-foreground shadow-sm hover:bg-accent hover:text-accent-foreground"
-              onClick={onOpenCommandPalette}
-              type="button"
-            >
-              <div className="flex items-center gap-2">
-                <SearchIcon size={13} className="opacity-60 flex-shrink-0" />
-                <span>{searchButtonLabel}</span>
-              </div>
-              <span className="font-mono text-xs opacity-50 ml-4 flex-shrink-0">
-                {commandPaletteShortcut ?? "⌘P"}
-              </span>
-            </Button>
-          </div>
-        ) : null}
-
-        {/* Right: actions */}
-        <div className="flex items-center gap-1 relative flex-shrink-0">
-          {modeButtonsVisible ? (
-            <div className="flex items-center gap-0.5 relative after:absolute after:right-0 after:-mr-1.5 after:h-4 after:w-px after:bg-border/50 pr-2.5 mr-1">
-              {onToggleFocusMode ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className={`text-muted-foreground transition-colors ${
-                        isFocusLayout ? "text-foreground" : "hover:text-foreground hover:bg-muted"
-                      }`}
-                      onClick={onToggleFocusMode}
-                      aria-pressed={isFocusLayout}
-                      type="button"
-                    >
-                      <FocusIcon size={16} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    {isFocusLayout ? "Exit Focus Mode" : "Enter Focus Mode"}
-                    {focusModeShortcut ? ` (${focusModeShortcut})` : ""}
-                  </TooltipContent>
-                </Tooltip>
-              ) : null}
-            </div>
-          ) : null}
-          {shouldShowUpdateActionButton && onUpdateAction ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={updateButtonVariant}
-                  size="sm"
-                  className="h-8 shrink-0 rounded-full px-3 text-xs font-semibold shadow-sm"
-                  onClick={onUpdateAction}
-                  disabled={isUpdateButtonDisabled}
-                  type="button"
-                >
-                  {updateButtonLabel}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">{updateButtonTooltip}</TooltipContent>
-            </Tooltip>
-          ) : null}
-          {headerAccessory ? <div className="mr-1 flex items-center">{headerAccessory}</div> : null}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="text-muted-foreground hover:text-foreground hover:bg-muted"
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                type="button"
-              >
-                <DotsHorizontalIcon size={16} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">More options</TooltipContent>
-          </Tooltip>
-          {onOpenSettings && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className="text-muted-foreground hover:text-foreground hover:bg-muted"
-                  onClick={onOpenSettings}
-                  type="button"
-                >
-                  <GearIcon size={16} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">Settings</TooltipContent>
-            </Tooltip>
-          )}
-
-          {isMenuOpen && (
-            <>
-              <button
-                aria-label="Close menu"
-                className="fixed inset-0 z-40 cursor-default bg-transparent outline-none"
-                onClick={() => setIsMenuOpen(false)}
-                type="button"
-              />
-              <div className="absolute right-0 top-full mt-1 w-48 bg-card border border-border rounded-md shadow-lg z-50 py-1 overflow-hidden">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-auto w-full justify-start gap-2 rounded-none px-3 py-1.5 text-sm"
-                  onClick={() => {
-                    handleCopy();
-                    setIsMenuOpen(false);
-                  }}
-                  disabled={!content}
-                  type="button"
-                >
-                  <CopyIcon size={14} className="opacity-70" />
-                  Copy as Markdown
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-auto w-full justify-start gap-2 rounded-none px-3 py-1.5 text-sm"
-                  onClick={() => {
-                    handleCopyPath();
-                    setIsMenuOpen(false);
-                  }}
-                  disabled={!filePath}
-                  type="button"
-                >
-                  <LinkIcon size={14} className="opacity-70" />
-                  {`Copy ${normalizedDocumentLabel} path`}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-auto w-full justify-start gap-2 rounded-none px-3 py-1.5 text-sm"
-                  onClick={() => {
-                    handleOpenExternal();
-                    setIsMenuOpen(false);
-                  }}
-                  disabled={!filePath}
-                  type="button"
-                >
-                  <FileManagerLogo label={revealInFolderLabel} size={14} className="opacity-70" />
-                  {revealInFolderLabel}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-auto w-full justify-start gap-2 rounded-none px-3 py-1.5 text-sm"
-                  onClick={() => {
-                    void handleExportPDF();
-                    setIsMenuOpen(false);
-                  }}
-                  disabled={!filePath}
-                  type="button"
-                >
-                  <FileDownIcon size={14} className="opacity-70" />
-                  Export as PDF
-                </Button>
-                {onTogglePinnedFile ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto w-full justify-start gap-2 rounded-none px-3 py-1.5 text-sm"
-                    onClick={() => {
-                      onTogglePinnedFile();
-                      setIsMenuOpen(false);
-                    }}
-                    disabled={!filePath}
-                    type="button"
-                  >
-                    {isActiveFilePinned ? (
-                      <PinOffIcon size={14} className="opacity-70" />
-                    ) : (
-                      <PinIcon size={14} className="opacity-70" />
-                    )}
-                    {isActiveFilePinned ? "Unpin note" : "Pin note"}
-                  </Button>
-                ) : null}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+      <EditorToolbar
+        _isMacLike={isMacLike}
+        isSidebarCollapsed={isSidebarCollapsed}
+        toggleSidebarShortcut={toggleSidebarShortcut}
+        onToggleSidebar={onToggleSidebar}
+        canGoBack={canGoBack}
+        canGoForward={canGoForward}
+        navigateBackShortcut={navigateBackShortcut}
+        navigateForwardShortcut={navigateForwardShortcut}
+        onNavigateBack={onNavigateBack}
+        onNavigateForward={onNavigateForward}
+        onCreateNote={onCreateNote}
+        newNoteShortcut={newNoteShortcut}
+        fileName={fileName}
+        filePath={filePath}
+        shouldShowCommandPalette={shouldShowCommandPalette}
+        onOpenCommandPalette={onOpenCommandPalette}
+        commandPaletteShortcut={commandPaletteShortcut}
+        commandPaletteLabel={commandPaletteLabel}
+        isFocusMode={isFocusLayout}
+        onToggleFocusMode={onToggleFocusMode}
+        focusModeShortcut={focusModeShortcut}
+        shouldShowUpdateActionButton={updateStateFlags.shouldShowUpdateActionButton}
+        updateButtonVariant={updateStateFlags.updateButtonVariant}
+        isUpdateButtonDisabled={updateStateFlags.isUpdateButtonDisabled}
+        updateButtonLabel={updateStateFlags.updateButtonLabel}
+        updateButtonTooltip={updateStateFlags.updateButtonTooltip}
+        onUpdateAction={onUpdateAction}
+        headerPaddingClass={headerPaddingClass}
+        onOpenSettings={onOpenSettings}
+        headerAccessory={headerAccessory}
+        content={content}
+        documentLabel={normalizedDocumentLabel}
+        revealInFolderLabel={revealInFolderLabel}
+        onCopy={handleCopy}
+        onCopyPath={handleCopyPath}
+        onOpenExternal={handleOpenExternal}
+        onExportPDF={handleExportPDF}
+        onTogglePinnedFile={onTogglePinnedFile}
+        isActiveFilePinned={isActiveFilePinned}
+      />
       <div
         ref={scrollContainerRef}
         className={`flex-1 min-h-0 overflow-y-auto relative [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${
@@ -1732,223 +1319,20 @@ export const MarkdownEditor = ({
           </div>
         </aside>
       ) : null}
-      <div className="absolute bottom-6 right-10 flex items-center gap-3 rounded-full border border-border bg-card/80 px-3 py-1.5 shadow-sm z-30 pointer-events-none">
-        <div className="flex items-center gap-2 text-muted-foreground text-xs">
-          <span>{wordCount} words</span>
-        </div>
-        <div className="w-[1px] h-3 bg-border" />
-        <span className="text-xs text-muted-foreground">{readingTime} min read</span>
-        {footerMetaLabel ? (
-          <>
-            <div className="w-[1px] h-3 bg-border" />
-            <span className="text-xs text-muted-foreground">{footerMetaLabel}</span>
-          </>
-        ) : null}
-        <div className="w-[1px] h-3 bg-border" />
-        <p className="text-xs font-medium text-foreground m-0">{saveStateLabel}</p>
-      </div>
-      <Dialog
-        open={activeDialog === "insert-table"}
-        onOpenChange={(open) => !open && setActiveDialog(null)}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Insert Table</DialogTitle>
-            <DialogDescription>
-              Start with the right shape, then use the table controls to add or remove rows and
-              columns anytime.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="grid gap-2 text-sm" htmlFor="table-rows-input">
-              <span className="font-medium text-foreground">Rows</span>
-              <Input
-                id="table-rows-input"
-                min={2}
-                max={12}
-                type="number"
-                value={tableForm.rows}
-                onChange={(event) =>
-                  setTableForm((current) => ({
-                    ...current,
-                    rows: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <label className="grid gap-2 text-sm" htmlFor="table-cols-input">
-              <span className="font-medium text-foreground">Columns</span>
-              <Input
-                id="table-cols-input"
-                min={1}
-                max={8}
-                type="number"
-                value={tableForm.cols}
-                onChange={(event) =>
-                  setTableForm((current) => ({
-                    ...current,
-                    cols: event.target.value,
-                  }))
-                }
-              />
-            </label>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" type="button" onClick={() => setActiveDialog(null)}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleInsertTable}>
-              Insert Table
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={activeDialog === "insert-link"}
-        onOpenChange={(open) => !open && setActiveDialog(null)}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Insert Link</DialogTitle>
-            <DialogDescription>
-              Paste a URL and Glyph will normalize bare domains like `example.com` to `https://`
-              automatically.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4">
-            <label className="grid gap-2 text-sm" htmlFor="link-label-input">
-              <span className="font-medium text-foreground">Label</span>
-              <Input
-                id="link-label-input"
-                value={linkForm.text}
-                onChange={(event) =>
-                  setLinkForm((current) => ({
-                    ...current,
-                    text: event.target.value,
-                  }))
-                }
-                placeholder="Open site"
-              />
-            </label>
-            <label className="grid gap-2 text-sm" htmlFor="link-url-input">
-              <span className="font-medium text-foreground">URL</span>
-              <Input
-                id="link-url-input"
-                value={linkForm.href}
-                onChange={(event) =>
-                  setLinkForm((current) => ({
-                    ...current,
-                    href: event.target.value,
-                  }))
-                }
-                placeholder="https://example.com"
-              />
-            </label>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" type="button" onClick={() => setActiveDialog(null)}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleInsertLink}>
-              Insert Link
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={activeDialog === "insert-image"}
-        onOpenChange={(open) => !open && setActiveDialog(null)}
-      >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Insert Image</DialogTitle>
-            <DialogDescription>
-              Paste an image URL or choose a local file. Local images are served through Glyph so
-              they render reliably while editing.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4">
-            <label className="grid gap-2 text-sm" htmlFor="image-alt-input">
-              <span className="font-medium text-foreground">Alt text</span>
-              <Input
-                id="image-alt-input"
-                value={imageForm.alt}
-                onChange={(event) =>
-                  setImageForm((current) => ({
-                    ...current,
-                    alt: event.target.value,
-                  }))
-                }
-                placeholder="Team logo"
-              />
-            </label>
-            <label className="grid gap-2 text-sm" htmlFor="image-src-input">
-              <span className="font-medium text-foreground">Image source</span>
-              <Input
-                id="image-src-input"
-                value={imageForm.src}
-                onChange={(event) =>
-                  setImageForm((current) => ({
-                    ...current,
-                    src: event.target.value,
-                  }))
-                }
-                placeholder="https://example.com/logo.png"
-              />
-            </label>
-            <div className="rounded-xl border border-border/70 bg-muted/30 p-3">
-              <p className="m-0 text-xs text-muted-foreground">
-                Local images open a native file picker and avoid broken `file://` previews.
-              </p>
-              <Button
-                className="mt-3"
-                variant="outline"
-                size="sm"
-                type="button"
-                onClick={() => void handlePickImageFile()}
-              >
-                Choose Local Image
-              </Button>
-            </div>
-            {imageForm.src ? (
-              <div className="overflow-hidden rounded-xl border border-border/70 bg-muted/20 p-2">
-                <img
-                  alt={imageForm.alt || "Image preview"}
-                  className="max-h-40 w-full rounded-lg object-contain"
-                  src={normalizeLinkTarget(imageForm.src)}
-                />
-              </div>
-            ) : null}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" type="button" onClick={() => setActiveDialog(null)}>
-              Cancel
-            </Button>
-            <Button type="button" onClick={handleInsertImage}>
-              Insert Image
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      {toast ? (
-        <div
-          className="fixed bottom-4 right-4 z-50 flex items-start gap-3 max-w-[360px] px-4 py-3 bg-card border border-border rounded-lg shadow-lg"
-          role="status"
-          aria-live="polite"
-        >
-          <div className="mt-0.5 text-foreground" aria-hidden="true">
-            <CheckCircleIcon size={16} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="m-0 text-sm font-medium text-foreground leading-snug">{toast.title}</p>
-            {toast.description ? (
-              <p className="m-0 mt-0.5 text-xs text-muted-foreground leading-snug break-words">
-                {toast.description}
-              </p>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+      <EditorFooter
+        wordCount={wordCount}
+        readingTime={readingTime}
+        footerMetaLabel={footerMetaLabel}
+        saveStateLabel={saveStateLabel}
+        toast={toast}
+      />
+      <EditorDialogs
+        activeDialog={activeDialog}
+        onDialogChange={setActiveDialog}
+        editor={editor}
+        showToast={showToast}
+        onPickImageFile={handlePickImageFile}
+      />
     </section>
   );
 };

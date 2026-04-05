@@ -84,6 +84,8 @@
     "concurrently": "^9.1.2",
     "electron": "^35.0.0",
     "electron-builder": "^26.0.12",
+    "knip": "^6.3.0",
+    "rollup-plugin-visualizer": "^7.0.1",
     "shadcn": "^4.0.6",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.8.2",

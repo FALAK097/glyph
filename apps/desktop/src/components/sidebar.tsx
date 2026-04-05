@@ -331,12 +331,7 @@ function SidebarSkillCollectionRow({
       }`}
     >
       <span className="flex min-w-0 items-center gap-2">
-        <SkillSourceLogo
-          fallbackLabel={item.fallbackLabel}
-          iconKind={item.iconKind}
-          sourceKind={item.sourceKind}
-          variant="compact"
-        />
+        <SkillSourceLogo iconKind={item.iconKind} sourceKind={item.sourceKind} variant="compact" />
         <span className="truncate text-sm font-medium">{item.label}</span>
       </span>
       <span className="ml-3 rounded-full bg-background/80 px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground">

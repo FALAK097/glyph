@@ -1332,6 +1332,8 @@ export const MarkdownEditor = ({
         editor={editor}
         showToast={showToast}
         onPickImageFile={handlePickImageFile}
+        imageFormState={_imageFormState}
+        onClearImageFormState={() => setImageFormState(null)}
       />
     </section>
   );

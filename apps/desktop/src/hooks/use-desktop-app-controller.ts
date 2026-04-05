@@ -143,6 +143,7 @@ export const useDesktopAppController = (
     saveSettings,
     rootPath,
     setWorkspace,
+    setIsWorkspaceMode,
     sidebarNodes,
     setSidebarNodes,
     hasHydratedSidebar,
@@ -839,6 +840,7 @@ export const useDesktopAppController = (
     glyph,
     settings,
     shortcuts,
+    isPaletteOpen,
     isWorkspaceMode,
     sidebarNodes,
     hiddenFileKeys,
@@ -862,9 +864,12 @@ export const useDesktopAppController = (
     createNote,
     syncOpenedFile,
     syncWorkspace,
+    setIsWorkspaceMode,
     navigateBack,
     navigateForward,
     triggerUpdateAction,
+    isPaletteOpen,
+    isSettingsOpen,
     setIsPaletteOpen,
     setIsSettingsOpen,
     setIsSidebarCollapsed,
@@ -942,7 +947,7 @@ export const useDesktopAppController = (
             nextExpandedFolders.add(workspace.rootPath);
           }
         } else {
-          const workspace = await glyph.openDefaultWorkspace();
+          const workspace = await tryOpenWorkspace(null);
           if (workspace) {
             setWorkspace(workspace);
             nextSidebarNodes = upsertSidebarFolder(nextSidebarNodes, workspace);
@@ -1082,8 +1087,9 @@ export const useDesktopAppController = (
         const savedFile = await glyph.saveFile(currentPath, draftContent);
         markSaved(savedFile);
       } catch (saveError) {
-        setSaving(false);
         setError(saveError instanceof Error ? saveError.message : "Unable to save file.");
+      } finally {
+        setSaving(false);
       }
     }, 800);
 

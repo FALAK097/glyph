@@ -133,7 +133,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const [pendingSkillRestorePath, setPendingSkillRestorePath] = useState<string | null>(null);
   const [isInitialSkillRestorePending, setIsInitialSkillRestorePending] = useState(false);
   const paletteSkillSearchNonceRef = useRef(0);
-  const noteRenameInputRef = useRef<HTMLInputElement | null>(null);
   const paletteFilterQuery = controller.paletteQuery.trim().toLowerCase();
   const shouldCollapseSidebar =
     controller.isSidebarCollapsed || (viewerMode === "note" && controller.isFocusMode);
@@ -557,19 +556,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     await controller.handleRenameFile(pendingNoteRename.path, nextName);
     setPendingNoteRename(null);
   }, [controller, pendingNoteRename]);
-
-  useEffect(() => {
-    if (!pendingNoteRename) {
-      return;
-    }
-
-    const frame = window.requestAnimationFrame(() => {
-      noteRenameInputRef.current?.focus();
-      noteRenameInputRef.current?.select();
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [pendingNoteRename]);
 
   const handleOpenCurrentNoteConfirm = useCallback(
     (kind: PendingNoteConfirm["kind"]) => {

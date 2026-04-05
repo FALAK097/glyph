@@ -24,6 +24,7 @@ type UseSidebarControllerOptions = {
     tree: DirectoryNode[];
     activeFile: FileDocument | null;
   }) => void;
+  setIsWorkspaceMode: React.Dispatch<React.SetStateAction<boolean>>;
   sidebarNodes: DirectoryNode[];
   setSidebarNodes: React.Dispatch<React.SetStateAction<DirectoryNode[]>>;
   hasHydratedSidebar: boolean;
@@ -36,6 +37,7 @@ export function useSidebarController({
   saveSettings,
   rootPath,
   setWorkspace,
+  setIsWorkspaceMode,
   sidebarNodes,
   setSidebarNodes,
   hasHydratedSidebar,
@@ -113,9 +115,10 @@ export function useSidebarController({
 
       if (rootPath && isSamePath(rootPath, folderPath)) {
         setWorkspace({ rootPath: "", tree: [], activeFile: null });
+        setIsWorkspaceMode(false);
       }
     },
-    [rootPath, setWorkspace, setSidebarNodes],
+    [rootPath, setWorkspace, setIsWorkspaceMode, setSidebarNodes],
   );
 
   useEffect(() => {

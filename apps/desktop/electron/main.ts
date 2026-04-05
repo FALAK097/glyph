@@ -84,6 +84,7 @@ let activeWatcher: ReturnType<typeof watch> | null = null;
 let activeWorkspaceRoot: string | null = null;
 let searchableFilesCache: string[] = [];
 let settingsUpdatePromise: Promise<AppSettings> | null = null;
+let cachedSettings: AppSettings | null = null;
 let pendingExternalPath: string | null = null;
 let updateCheckInterval: NodeJS.Timeout | null = null;
 const MARKDOWN_EXTENSIONS = [".md", ".mdx", ".markdown"] as const;
@@ -1029,44 +1030,54 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
   ] as const;
 
   for (const [inputPaths, target] of persistedFileGroups) {
-    for (const filePath of inputPaths) {
-      try {
-        await fs.access(filePath);
-        target.push(filePath);
-      } catch {
-        // Skip files that don't exist or can't be accessed.
-      }
+    const validated = await Promise.all(
+      inputPaths.map(async (filePath) => {
+        try {
+          await fs.access(filePath);
+          return filePath;
+        } catch {
+          return null;
+        }
+      }),
+    );
+    for (const filePath of validated) {
+      if (filePath) target.push(filePath);
     }
   }
 
   const validSidebar = normalizeSidebarState(candidate.sidebar);
-  const validSidebarItems: AppSettings["sidebar"]["items"] = [];
 
-  for (const item of validSidebar.items) {
-    try {
-      const stats = await fs.stat(item.path);
-      if (
-        (item.kind === "file" && stats.isFile()) ||
-        (item.kind === "directory" && stats.isDirectory())
-      ) {
-        validSidebarItems.push(item);
-      }
-    } catch {
-      // Skip sidebar entries that no longer exist.
-    }
-  }
+  const validSidebarItems = (
+    await Promise.all(
+      validSidebar.items.map(async (item) => {
+        try {
+          const stats = await fs.stat(item.path);
+          if (
+            (item.kind === "file" && stats.isFile()) ||
+            (item.kind === "directory" && stats.isDirectory())
+          ) {
+            return item;
+          }
+        } catch {
+          // Skip sidebar entries that no longer exist.
+        }
+        return null;
+      }),
+    )
+  ).filter((item): item is NonNullable<typeof item> => item !== null);
 
-  const validExpandedFolders: string[] = [];
-  for (const folderPath of validSidebar.expandedFolders) {
-    try {
-      const stats = await fs.stat(folderPath);
-      if (stats.isDirectory()) {
-        validExpandedFolders.push(folderPath);
-      }
-    } catch {
-      // Skip folders that no longer exist.
-    }
-  }
+  const validExpandedFolders = (
+    await Promise.all(
+      validSidebar.expandedFolders.map(async (folderPath) => {
+        try {
+          const stats = await fs.stat(folderPath);
+          return stats.isDirectory() ? folderPath : null;
+        } catch {
+          return null;
+        }
+      }),
+    )
+  ).filter((p): p is string => p !== null);
 
   return {
     defaultWorkspacePath:

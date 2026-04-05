@@ -114,11 +114,7 @@ export function SkillsBrowserPane({
                               variant="compact"
                             />
                           ) : (
-                            <SkillSourceLogo
-                              fallbackLabel={item.sourceNames[0] ?? item.name}
-                              sourceKind={item.sourceKinds[0]}
-                              variant="compact"
-                            />
+                            <SkillSourceLogo sourceKind={item.sourceKinds[0]} variant="compact" />
                           )}
                         </div>
                       </TooltipTrigger>

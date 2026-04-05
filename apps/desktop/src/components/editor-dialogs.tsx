@@ -35,6 +35,7 @@ type EditorDialogsProps = {
   showToast: (title: string, description: string) => void;
   onPickImageFile: () => Promise<void>;
   imageFormState?: { alt: string; src: string } | null;
+  onClearImageFormState?: () => void;
 };
 
 const normalizeLinkTarget = (value: string) => {
@@ -65,6 +66,7 @@ export function EditorDialogs({
   showToast,
   onPickImageFile,
   imageFormState,
+  onClearImageFormState,
 }: EditorDialogsProps) {
   const [tableForm, setTableForm] = useState<TableFormState>({
     rows: "3",
@@ -80,10 +82,10 @@ export function EditorDialogs({
   });
 
   useEffect(() => {
-    if (imageFormState) {
+    if (imageFormState && activeDialog === "insert-image") {
       setImageForm(imageFormState);
     }
-  }, [imageFormState]);
+  }, [imageFormState, activeDialog]);
 
   const handleInsertTable = useCallback(() => {
     if (!editor) {
@@ -288,7 +290,13 @@ export function EditorDialogs({
       </Dialog>
       <Dialog
         open={activeDialog === "insert-image"}
-        onOpenChange={(open) => !open && onDialogChange(null)}
+        onOpenChange={(open) => {
+          if (!open) {
+            onDialogChange(null);
+            onClearImageFormState?.();
+            setImageForm({ alt: "", src: "" });
+          }
+        }}
       >
         <DialogContent className="max-w-lg">
           <DialogHeader>

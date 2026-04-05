@@ -15,7 +15,6 @@ type LogoSources = {
 
 type SkillSourceLogoProps = {
   className?: string;
-  fallbackLabel: string;
   iconKind?: SkillIconKind;
   sourceKind?: SkillSourceKind;
   variant?: "compact" | "badge";

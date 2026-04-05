@@ -16,9 +16,12 @@ type UseKeyboardShortcutsOptions = {
   createNote: () => Promise<void>;
   syncOpenedFile: (file: FileDocument, options?: { recordHistory?: boolean }) => Promise<void>;
   syncWorkspace: (workspace: WorkspaceSnapshot) => void;
+  setIsWorkspaceMode: React.Dispatch<React.SetStateAction<boolean>>;
   navigateBack: () => Promise<void>;
   navigateForward: () => Promise<void>;
   triggerUpdateAction: () => Promise<void>;
+  isPaletteOpen: boolean;
+  isSettingsOpen: boolean;
   setIsPaletteOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setIsSettingsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setIsSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
@@ -36,9 +39,12 @@ export function useKeyboardShortcuts({
   createNote,
   syncOpenedFile,
   syncWorkspace,
+  setIsWorkspaceMode,
   navigateBack,
   navigateForward,
   triggerUpdateAction,
+  isPaletteOpen,
+  isSettingsOpen,
   setIsPaletteOpen,
   setIsSettingsOpen,
   setIsSidebarCollapsed,
@@ -53,10 +59,18 @@ export function useKeyboardShortcuts({
           target instanceof HTMLTextAreaElement ||
           target.isContentEditable);
 
-      if (event.key === "Escape" && !isEditableInput) {
-        setIsPaletteOpen(false);
-        setIsSettingsOpen(false);
-        return;
+      // Escape always closes overlays, even from editable inputs
+      if (event.key === "Escape") {
+        if (isPaletteOpen || isSettingsOpen) {
+          event.preventDefault();
+          setIsPaletteOpen(false);
+          setIsSettingsOpen(false);
+          return;
+        }
+
+        if (!isEditableInput) {
+          return;
+        }
       }
 
       const globalShortcutIds = new Set([
@@ -99,6 +113,28 @@ export function useKeyboardShortcuts({
         return;
       }
 
+      // Allow save shortcut even inside editable inputs (e.g. the editor)
+      if (isEditableInput) {
+        const saveShortcut = shortcuts.find(
+          (entry) => entry.id === "save" && matchShortcut(event, entry.keys),
+        );
+
+        if (saveShortcut && activeFile) {
+          event.preventDefault();
+          setSaving(true);
+          try {
+            const savedFile = await glyph.saveFile(activeFile.path, draftContent);
+            markSaved(savedFile);
+          } catch (saveError) {
+            console.error("Manual save failed:", saveError);
+            setError(getErrorMessage(saveError));
+          } finally {
+            setSaving(false);
+          }
+          return;
+        }
+      }
+
       if (!isEditableInput) {
         const shortcut = shortcuts.find(
           (entry) => !globalShortcutIds.has(entry.id) && matchShortcut(event, entry.keys),
@@ -122,6 +158,7 @@ export function useKeyboardShortcuts({
               const workspace = await glyph.openFolder();
               if (workspace) {
                 syncWorkspace(workspace);
+                setIsWorkspaceMode(true);
               }
               break;
             }
@@ -158,9 +195,12 @@ export function useKeyboardShortcuts({
     createNote,
     syncOpenedFile,
     syncWorkspace,
+    setIsWorkspaceMode,
     navigateBack,
     navigateForward,
     triggerUpdateAction,
+    isPaletteOpen,
+    isSettingsOpen,
     setIsPaletteOpen,
     setIsSettingsOpen,
     setIsSidebarCollapsed,

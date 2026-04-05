@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 
 let sharedObserver: MutationObserver | null = null;
 let sharedMediaQuery: MediaQueryList | null = null;
-let listenerCount = 0;
-let cachedIsDarkMode = false;
+let cachedIsDarkMode = getSnapshot();
 const listeners = new Set<(value: boolean) => void>();
 
 function getSnapshot() {
@@ -46,21 +45,17 @@ export function useIsDarkMode() {
   const [isDarkMode, setIsDarkMode] = useState(getSnapshot);
 
   useEffect(() => {
-    setIsDarkMode(cachedIsDarkMode);
-
     const handler = (value: boolean) => setIsDarkMode(value);
     listeners.add(handler);
-    listenerCount += 1;
 
-    if (listenerCount === 1) {
+    if (listeners.size === 1) {
       startSharedObserver();
     }
 
     return () => {
       listeners.delete(handler);
-      listenerCount -= 1;
 
-      if (listenerCount === 0) {
+      if (listeners.size === 0) {
         stopSharedObserver();
       }
     };

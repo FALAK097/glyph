@@ -92,6 +92,7 @@ export function NoteRenameDialog({
         </DialogHeader>
         <Input
           ref={noteRenameInputRef}
+          aria-label="New note name"
           autoFocus
           value={pending.value}
           onChange={handleChange}

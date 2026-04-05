@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { NoteShortcutItem } from "@/types/navigation";
 import type { CommandPaletteItem } from "@/types/command-palette";
@@ -19,6 +19,7 @@ type UsePaletteControllerOptions = {
   glyph: NonNullable<Window["glyph"]>;
   settings: AppSettings | null;
   shortcuts: ShortcutSetting[];
+  isPaletteOpen: boolean;
   isWorkspaceMode: boolean;
   sidebarNodes: DirectoryNode[];
   hiddenFileKeys: Set<string>;
@@ -32,6 +33,7 @@ type UsePaletteControllerOptions = {
 export function usePaletteController({
   glyph,
   settings,
+  isPaletteOpen,
   isWorkspaceMode,
   hiddenFileKeys,
   allSearchableFiles,
@@ -40,17 +42,9 @@ export function usePaletteController({
   openFile,
   setIsPaletteOpen,
 }: UsePaletteControllerOptions) {
-  const [isPaletteOpen, setIsPaletteOpenLocal] = useState(false);
   const [paletteQuery, setPaletteQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-
-  const setIsPaletteOpenUnified = useCallback(
-    (value: boolean | ((prev: boolean) => boolean)) => {
-      setIsPaletteOpenLocal(value);
-      setIsPaletteOpen(value);
-    },
-    [setIsPaletteOpen],
-  );
+  const searchVersionRef = useRef(0);
 
   useEffect(() => {
     if (!isPaletteOpen) {
@@ -65,12 +59,20 @@ export function usePaletteController({
       return;
     }
 
+    searchVersionRef.current += 1;
+    const currentVersion = searchVersionRef.current;
+
     const timer = window.setTimeout(async () => {
       const results = await glyph.searchWorkspace(query);
-      setSearchResults(results);
+      if (currentVersion === searchVersionRef.current) {
+        setSearchResults(results);
+      }
     }, 120);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      searchVersionRef.current += 1;
+    };
   }, [glyph, isPaletteOpen, isWorkspaceMode, paletteQuery]);
 
   useEffect(() => {
@@ -207,7 +209,7 @@ export function usePaletteController({
 
   return {
     isPaletteOpen,
-    setIsPaletteOpen: setIsPaletteOpenUnified,
+    setIsPaletteOpen,
     paletteQuery,
     setPaletteQuery,
     searchResults,

@@ -9,7 +9,10 @@ type UseNavigationControllerOptions = {
 };
 
 export function useNavigationController({ glyph, syncOpenedFile }: UseNavigationControllerOptions) {
-  const { canGoBack, canGoForward, goBack, goForward } = useWorkspaceStore();
+  const canGoBack = useWorkspaceStore((s) => s.canGoBack);
+  const canGoForward = useWorkspaceStore((s) => s.canGoForward);
+  const goBack = useWorkspaceStore((s) => s.goBack);
+  const goForward = useWorkspaceStore((s) => s.goForward);
 
   const navigateBack = useCallback(async () => {
     const prevPath = goBack();

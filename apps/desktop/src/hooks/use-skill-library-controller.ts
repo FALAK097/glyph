@@ -8,6 +8,7 @@ import {
   type SkillDocumentKind,
   type SkillLibrarySnapshot,
 } from "@/shared/skills";
+import { useSessionStore } from "@/store/session";
 
 export const ALL_SKILL_SOURCES_ID = "all-skills";
 
@@ -26,10 +27,25 @@ function formatSaveTime(timestamp: string | null) {
   })}`;
 }
 
+function matchesSkillFallbackQuery(query: string, skill: SkillLibrarySnapshot["skills"][number]) {
+  if (!query) {
+    return true;
+  }
+
+  return [skill.name, skill.description, skill.slug, skill.sourceName, skill.tags.join(" ")].some(
+    (value) => value?.toLowerCase().includes(query),
+  );
+}
+
 export function useSkillLibraryController(
   glyph: NonNullable<Window["glyph"]>,
   { enabled = true }: UseSkillLibraryControllerOptions = {},
 ) {
+  const clearSkillSession = useSessionStore((state) => state.clearSkillSession);
+  const setPreferredSkillDocumentKind = useSessionStore(
+    (state) => state.setPreferredSkillDocumentKind,
+  );
+  const setSkillSession = useSessionStore((state) => state.setSkillSession);
   const [snapshot, setSnapshot] = useState<SkillLibrarySnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -41,6 +57,8 @@ export function useSkillLibraryController(
   const [activeSkillId, setActiveSkillId] = useState<string | null>(null);
   const [selectedDocumentKind, setSelectedDocumentKind] = useState<SkillDocumentKind>("skill");
   const [activeDocument, setActiveDocument] = useState<SkillDocument | null>(null);
+  const [searchResultIds, setSearchResultIds] = useState<string[] | null>(null);
+  const [searchResultQuery, setSearchResultQuery] = useState<string | null>(null);
   const [draftContent, setDraftContent] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
@@ -55,6 +73,7 @@ export function useSkillLibraryController(
   const isSavingRef = useRef(false);
   const autosaveTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const documentRequestNonceRef = useRef(0);
+  const searchRequestNonceRef = useRef(0);
 
   useEffect(() => {
     activeDocumentRef.current = activeDocument;
@@ -90,22 +109,28 @@ export function useSkillLibraryController(
     () => snapshot?.skills.find((skill) => skill.id === activeSkillId) ?? null,
     [activeSkillId, snapshot?.skills],
   );
+  const skillsById = useMemo(
+    () => new Map((snapshot?.skills ?? []).map((skill) => [skill.id, skill])),
+    [snapshot?.skills],
+  );
 
   const filteredSkills = useMemo(() => {
     const skills = snapshot?.skills ?? [];
     const query = deferredSearchQuery.trim().toLowerCase();
 
-    return skills.filter((skill) => {
-      if (!query) {
-        return true;
-      }
+    if (!query) {
+      return skills;
+    }
 
-      return [skill.name, skill.description ?? "", skill.slug, skill.sourceName]
-        .join("\n")
-        .toLowerCase()
-        .includes(query);
+    if (!searchResultIds || searchResultQuery !== query) {
+      return skills.filter((skill) => matchesSkillFallbackQuery(query, skill));
+    }
+
+    return searchResultIds.flatMap((skillId) => {
+      const skill = skillsById.get(skillId);
+      return skill ? [skill] : [];
     });
-  }, [deferredSearchQuery, snapshot?.skills]);
+  }, [deferredSearchQuery, searchResultIds, searchResultQuery, skillsById, snapshot?.skills]);
 
   const activeDocumentPath = useMemo(() => {
     if (!activeSkill) {
@@ -349,6 +374,19 @@ export function useSkillLibraryController(
     }
   }, []);
 
+  const searchSkillIds = useCallback(
+    async (query: string) => {
+      const normalizedQuery = query.trim();
+
+      if (!normalizedQuery) {
+        return snapshot?.skills.map((skill) => skill.id) ?? [];
+      }
+
+      return glyph.searchSkillLibrary(normalizedQuery);
+    },
+    [glyph, snapshot?.skills],
+  );
+
   const selectSource = useCallback(
     async (sourceId: string) => {
       if (sourceId === selectedSourceId) {
@@ -362,21 +400,9 @@ export function useSkillLibraryController(
 
       setSelectedSourceId(sourceId);
 
-      const query = searchQuery.trim().toLowerCase();
-      const nextMatches = (snapshot?.skills ?? []).filter((skill) => {
-        if (sourceId !== ALL_SKILL_SOURCES_ID && skill.sourceId !== sourceId) {
-          return false;
-        }
-
-        if (!query) {
-          return true;
-        }
-
-        return [skill.name, skill.description ?? "", skill.slug, skill.sourceName]
-          .join("\n")
-          .toLowerCase()
-          .includes(query);
-      });
+      const nextMatches = filteredSkills.filter((skill) =>
+        sourceId === ALL_SKILL_SOURCES_ID ? true : skill.sourceId === sourceId,
+      );
 
       if (nextMatches.length === 0) {
         clearActiveSelection();
@@ -388,14 +414,7 @@ export function useSkillLibraryController(
         setSelectedDocumentKind("skill");
       }
     },
-    [
-      activeSkillId,
-      clearActiveSelection,
-      flushActiveDocument,
-      searchQuery,
-      selectedSourceId,
-      snapshot?.skills,
-    ],
+    [activeSkillId, clearActiveSelection, flushActiveDocument, filteredSkills, selectedSourceId],
   );
 
   const resolveSkillByPath = useCallback(
@@ -450,6 +469,48 @@ export function useSkillLibraryController(
 
     void loadLibrary();
   }, [enabled, hasLoadedOnce, loadLibrary]);
+
+  useEffect(() => {
+    if (!enabled) {
+      searchRequestNonceRef.current += 1;
+      setSearchResultIds(null);
+      setSearchResultQuery(null);
+      return;
+    }
+
+    const query = deferredSearchQuery.trim().toLowerCase();
+    if (!query) {
+      searchRequestNonceRef.current += 1;
+      setSearchResultIds(null);
+      setSearchResultQuery(null);
+      return;
+    }
+
+    setSearchResultIds(null);
+    setSearchResultQuery(null);
+
+    searchRequestNonceRef.current += 1;
+    const requestNonce = searchRequestNonceRef.current;
+
+    void searchSkillIds(query)
+      .then((nextResultIds) => {
+        if (requestNonce !== searchRequestNonceRef.current) {
+          return;
+        }
+
+        setSearchResultIds(nextResultIds);
+        setSearchResultQuery(query);
+      })
+      .catch((nextError) => {
+        if (requestNonce !== searchRequestNonceRef.current) {
+          return;
+        }
+
+        setSearchResultIds([]);
+        setSearchResultQuery(query);
+        setError(getErrorMessage(nextError));
+      });
+  }, [deferredSearchQuery, enabled, searchSkillIds]);
 
   useEffect(() => {
     if (!enabled) {
@@ -519,6 +580,28 @@ export function useSkillLibraryController(
   }, [activeDocumentPath, enabled, loadActiveDocument]);
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    if (!activeDocumentPath) {
+      clearSkillSession();
+      return;
+    }
+
+    setSkillSession(activeDocumentPath, selectedDocumentKind);
+    setPreferredSkillDocumentKind(activeSkillId, selectedDocumentKind);
+  }, [
+    activeDocumentPath,
+    activeSkillId,
+    clearSkillSession,
+    enabled,
+    selectedDocumentKind,
+    setPreferredSkillDocumentKind,
+    setSkillSession,
+  ]);
+
+  useEffect(() => {
     if (!enabled || pendingExternalChange || !activeDocument?.isEditable || !isDirty) {
       clearAutosaveTimeout();
       return;
@@ -546,43 +629,83 @@ export function useSkillLibraryController(
     };
   }, [clearAutosaveTimeout]);
 
-  return {
-    activeDocument,
-    activeSkill,
-    clearActiveSelection,
-    copyPath,
-    documentTabs,
-    draftContent,
-    error,
-    filteredSkills,
-    hasLoadedOnce,
-    headings,
-    isDirty,
-    isDocumentLoading,
-    isLoading,
-    isRefreshing,
-    isSaving,
-    lastScannedAt: snapshot?.scannedAt ?? null,
-    lineCount,
-    openDocumentTab,
-    openSkill,
-    openSkillByPath,
-    parsedActiveDocument,
-    pendingExternalChange,
-    refreshLibrary,
-    reloadAfterExternalChange,
-    revealInFinder,
-    saveStateLabel,
-    searchQuery,
-    selectSource,
-    selectedDocumentKind,
-    selectedSourceId,
-    setDraftContent,
-    setSearchQuery,
-    snapshot,
-    sources: snapshot?.sources ?? [],
-    totalSkillCount: snapshot?.skills.length ?? 0,
-    wordCount,
-    keepMineAfterExternalChange,
-  };
+  return useMemo(
+    () => ({
+      activeDocument,
+      activeSkill,
+      clearActiveSelection,
+      copyPath,
+      documentTabs,
+      draftContent,
+      error,
+      filteredSkills,
+      hasLoadedOnce,
+      headings,
+      isDirty,
+      isDocumentLoading,
+      isLoading,
+      isRefreshing,
+      isSaving,
+      lastScannedAt: snapshot?.scannedAt ?? null,
+      lineCount,
+      openDocumentTab,
+      openSkill,
+      openSkillByPath,
+      parsedActiveDocument,
+      pendingExternalChange,
+      refreshLibrary,
+      reloadAfterExternalChange,
+      revealInFinder,
+      saveStateLabel,
+      searchQuery,
+      searchSkillIds,
+      selectSource,
+      selectedDocumentKind,
+      selectedSourceId,
+      setDraftContent,
+      setSearchQuery,
+      snapshot,
+      sources: snapshot?.sources ?? [],
+      totalSkillCount: snapshot?.skills.length ?? 0,
+      wordCount,
+      keepMineAfterExternalChange,
+    }),
+    [
+      activeDocument,
+      activeSkill,
+      clearActiveSelection,
+      copyPath,
+      documentTabs,
+      draftContent,
+      error,
+      filteredSkills,
+      hasLoadedOnce,
+      headings,
+      isDirty,
+      isDocumentLoading,
+      isLoading,
+      isRefreshing,
+      isSaving,
+      lineCount,
+      openDocumentTab,
+      openSkill,
+      openSkillByPath,
+      parsedActiveDocument,
+      pendingExternalChange,
+      refreshLibrary,
+      reloadAfterExternalChange,
+      revealInFinder,
+      saveStateLabel,
+      searchQuery,
+      searchSkillIds,
+      selectSource,
+      selectedDocumentKind,
+      selectedSourceId,
+      setDraftContent,
+      setSearchQuery,
+      snapshot,
+      wordCount,
+      keepMineAfterExternalChange,
+    ],
+  );
 }

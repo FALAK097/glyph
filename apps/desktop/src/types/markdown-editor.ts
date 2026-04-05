@@ -13,6 +13,8 @@ export type MarkdownEditorProps = {
   fileName: string | null;
   filePath: string | null;
   isEditable?: boolean;
+  initialScrollTop?: number | null;
+  scrollRestorationKey?: string | null;
   editorFocusRequest?: EditorFocusRequest | null;
   workspaceRootPath?: string | null;
   saveStateLabel: string;
@@ -52,6 +54,7 @@ export type MarkdownEditorProps = {
   onOpenNewWindow?: () => void;
   onDeleteNote?: () => void;
   onTogglePinnedFile?: () => void;
+  onScrollPositionChange?: (targetPath: string | null, scrollTop: number) => void;
   folderRevealLabel?: string;
   documentLabel?: string;
   outlineItems?: OutlineItem[];

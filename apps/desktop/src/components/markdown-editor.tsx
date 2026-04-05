@@ -298,6 +298,8 @@ export const MarkdownEditor = ({
   fileName,
   filePath,
   isEditable = true,
+  initialScrollTop = 0,
+  scrollRestorationKey = null,
   editorFocusRequest,
   saveStateLabel,
   footerMetaLabel,
@@ -332,12 +334,14 @@ export const MarkdownEditor = ({
   onToggleFocusMode,
   focusModeShortcut,
   onTogglePinnedFile,
+  onScrollPositionChange,
   folderRevealLabel,
   documentLabel = "note",
   outlineJumpRequest,
 }: MarkdownEditorProps) => {
   const lastSyncedMarkdown = useRef(content);
   const onChangeRef = useRef(onChange);
+  const onScrollPositionChangeRef = useRef(onScrollPositionChange);
   const filePathRef = useRef(filePath);
   const onOpenLinkedFileRef = useRef(onOpenLinkedFile);
   const isAutoConvertingRef = useRef(false);
@@ -346,8 +350,16 @@ export const MarkdownEditor = ({
   const tableControlsRef = useRef<TableControlsState>(INACTIVE_TABLE_CONTROLS);
   const toastTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const hoveredLinkHideTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const scrollPositionTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const selectionSnapshotRef = useRef({ from: 1, to: 1 });
   const lastHandledFocusRequestRef = useRef<number | null>(null);
+  const lastRestoredScrollStateRef = useRef<{
+    key: string | null;
+    top: number;
+  }>({
+    key: null,
+    top: -1,
+  });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [toast, setToast] = useState<MarkdownEditorToast | null>(null);
   const [activeDialog, setActiveDialog] = useState<EditorActionType | null>(null);
@@ -376,6 +388,10 @@ export const MarkdownEditor = ({
   }, [onChange]);
 
   useEffect(() => {
+    onScrollPositionChangeRef.current = onScrollPositionChange;
+  }, [onScrollPositionChange]);
+
+  useEffect(() => {
     filePathRef.current = filePath;
   }, [filePath]);
 
@@ -388,6 +404,14 @@ export const MarkdownEditor = ({
     setOutlineItems(items);
     outlineItemsRef.current = items;
   }, []);
+
+  const flushScrollPosition = useCallback(() => {
+    if (!scrollContainerRef.current || !onScrollPositionChangeRef.current) {
+      return;
+    }
+
+    onScrollPositionChangeRef.current(scrollRestorationKey, scrollContainerRef.current.scrollTop);
+  }, [scrollRestorationKey]);
 
   const focusEditorWithoutScroll = useCallback(
     (selection: { from: number; to: number }, resetScrollTop: boolean) => {
@@ -837,6 +861,73 @@ export const MarkdownEditor = ({
   }, [content, editor, refreshOutline]);
 
   useEffect(() => {
+    if (!editor || !scrollContainerRef.current || !scrollRestorationKey) {
+      return;
+    }
+
+    const normalizedScrollTop = Math.max(0, initialScrollTop ?? 0);
+    const lastRestoredScrollState = lastRestoredScrollStateRef.current;
+    if (
+      lastRestoredScrollState.key === scrollRestorationKey &&
+      lastRestoredScrollState.top === normalizedScrollTop
+    ) {
+      return;
+    }
+
+    lastRestoredScrollStateRef.current = {
+      key: scrollRestorationKey,
+      top: normalizedScrollTop,
+    };
+
+    const frame = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        if (!scrollContainerRef.current) {
+          return;
+        }
+
+        scrollContainerRef.current.scrollTop = normalizedScrollTop;
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [editor, initialScrollTop, scrollRestorationKey]);
+
+  useEffect(() => {
+    return () => {
+      flushScrollPosition();
+    };
+  }, [flushScrollPosition, scrollRestorationKey]);
+
+  useEffect(() => {
+    const flushPendingScrollPosition = () => {
+      if (scrollPositionTimeoutRef.current) {
+        window.clearTimeout(scrollPositionTimeoutRef.current);
+        scrollPositionTimeoutRef.current = null;
+      }
+
+      flushScrollPosition();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        flushPendingScrollPosition();
+      }
+    };
+
+    window.addEventListener("pagehide", flushPendingScrollPosition);
+    window.addEventListener("beforeunload", flushPendingScrollPosition);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("pagehide", flushPendingScrollPosition);
+      window.removeEventListener("beforeunload", flushPendingScrollPosition);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [flushScrollPosition]);
+
+  useEffect(() => {
     if (!editor) {
       return;
     }
@@ -888,11 +979,15 @@ export const MarkdownEditor = ({
   useEffect(() => {
     return () => {
       clearHoveredLinkHideTimeout();
+      if (scrollPositionTimeoutRef.current) {
+        window.clearTimeout(scrollPositionTimeoutRef.current);
+      }
+      flushScrollPosition();
       if (toastTimeoutRef.current) {
         window.clearTimeout(toastTimeoutRef.current);
       }
     };
-  }, []);
+  }, [flushScrollPosition]);
 
   useEffect(() => {
     if (!editor) {
@@ -1406,6 +1501,14 @@ export const MarkdownEditor = ({
           if (!editor) return;
           const container = scrollContainerRef.current;
           if (!container) return;
+
+          if (scrollPositionTimeoutRef.current) {
+            window.clearTimeout(scrollPositionTimeoutRef.current);
+          }
+          scrollPositionTimeoutRef.current = window.setTimeout(() => {
+            flushScrollPosition();
+            scrollPositionTimeoutRef.current = null;
+          }, 120);
 
           const headings = outlineItemsRef.current;
           if (headings.length === 0) {

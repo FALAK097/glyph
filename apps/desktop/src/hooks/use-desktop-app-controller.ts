@@ -15,6 +15,7 @@ import type {
   UpdateState,
   WorkspaceSnapshot,
 } from "@/shared/workspace";
+import { useSessionStore } from "@/store/session";
 import { useWorkspaceStore } from "@/store/workspace";
 import { applyTheme } from "@/theme/themes";
 
@@ -70,7 +71,20 @@ const getCommittedDraftFileName = (content: string) => {
   return `${safeName}.md`;
 };
 
-export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => {
+type UseDesktopAppControllerOptions = {
+  initialFilePath?: string | null;
+  initialWorkspacePath?: string | null;
+  sessionReady?: boolean;
+};
+
+export const useDesktopAppController = (
+  glyph: NonNullable<Window["glyph"]>,
+  {
+    initialFilePath = null,
+    initialWorkspacePath = null,
+    sessionReady = true,
+  }: UseDesktopAppControllerOptions = {},
+) => {
   const {
     rootPath,
     tree,
@@ -97,6 +111,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     goBack,
     goForward,
   } = useWorkspaceStore();
+  const setNoteSession = useSessionStore((state) => state.setNoteSession);
 
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
@@ -115,6 +130,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     mode: "start" | "end" | "preserve";
     nonce: number;
   } | null>(null);
+  const [hasBooted, setHasBooted] = useState(false);
   const [outlineJumpRequest, setOutlineJumpRequest] = useState<{
     id: string;
     nonce: number;
@@ -203,7 +219,14 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
   }, []);
 
   useEffect(() => {
+    if (!sessionReady) {
+      return;
+    }
+
+    let isCancelled = false;
+
     const boot = async () => {
+      setHasBooted(false);
       const [nextSettings, nextAppInfo, nextUpdateState] = await Promise.all([
         glyph.getSettings(),
         glyph.getAppInfo(),
@@ -219,7 +242,36 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
         nextSettings.sidebar.items,
       );
       const nextExpandedFolders = new Set(nextSettings.sidebar.expandedFolders);
-      let bootFocusMode: "start" | "end" = "start";
+      let bootFocusMode: "start" | "end" | "preserve" = "start";
+      const tryOpenWorkspace = async (targetPath: string | null) => {
+        if (targetPath) {
+          try {
+            const existingWorkspace = await glyph.getSidebarNode("directory", targetPath);
+            if (existingWorkspace) {
+              return await glyph.openFolder(targetPath);
+            }
+          } catch {
+            // Fall back to the default workspace if the persisted root is no longer available.
+          }
+        }
+
+        try {
+          return await glyph.openDefaultWorkspace();
+        } catch {
+          return null;
+        }
+      };
+      const tryReadPersistedFile = async (targetPath: string | null) => {
+        if (!targetPath) {
+          return null;
+        }
+
+        try {
+          return await glyph.readFile(targetPath);
+        } catch {
+          return null;
+        }
+      };
 
       const target = await glyph.getPendingExternalPath();
       if (target) {
@@ -254,7 +306,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
           bootFocusMode = "end";
         }
       } else {
-        const workspace = await glyph.openDefaultWorkspace();
+        const workspace = await tryOpenWorkspace(initialWorkspacePath);
         if (workspace) {
           setWorkspace(workspace);
           setIsWorkspaceMode(true);
@@ -265,16 +317,45 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
           }
           nextExpandedFolders.add(workspace.rootPath);
         }
+
+        const restoredFile = await tryReadPersistedFile(initialFilePath);
+        if (restoredFile) {
+          setActiveFile(restoredFile);
+          setIsWorkspaceMode(
+            Boolean(workspace && isFileInsideWorkspace(restoredFile.path, workspace.rootPath)),
+          );
+          nextSidebarNodes = upsertSidebarFile(nextSidebarNodes, restoredFile);
+          bootFocusMode = "preserve";
+        }
+      }
+
+      if (isCancelled) {
+        return;
       }
 
       setSidebarNodes(nextSidebarNodes);
       setExpandedFolderPaths(Array.from(nextExpandedFolders));
       setHasHydratedSidebar(true);
       requestEditorFocus(bootFocusMode);
+      setHasBooted(true);
     };
 
     void boot();
-  }, [pushHistory, requestEditorFocus, restoreSidebarNodes, setActiveFile, setWorkspace, glyph]);
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    glyph,
+    initialFilePath,
+    initialWorkspacePath,
+    pushHistory,
+    requestEditorFocus,
+    restoreSidebarNodes,
+    sessionReady,
+    setActiveFile,
+    setWorkspace,
+  ]);
 
   useEffect(
     () =>
@@ -336,8 +417,10 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
   const syncOpenedFile = useCallback(
     async (file: FileDocument, options?: { recordHistory?: boolean }) => {
       await ensureFileVisible(file.path);
+      const currentRootPath = useWorkspaceStore.getState().rootPath;
+      const shouldPreserveFocus = useSessionStore.getState().hasDocumentScroll(file.path);
       setActiveFile(file);
-      setIsWorkspaceMode(isFileInsideWorkspace(file.path, rootPath));
+      setIsWorkspaceMode(isFileInsideWorkspace(file.path, currentRootPath));
       setSidebarNodes((prev) => upsertSidebarFile(prev, file));
       const nextSettings = await glyph.getSettings();
       setSettings(nextSettings);
@@ -345,9 +428,9 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
       if (options?.recordHistory) {
         pushHistory(file.path);
       }
-      requestEditorFocus("end");
+      requestEditorFocus(shouldPreserveFocus ? "preserve" : "end");
     },
-    [ensureFileVisible, glyph, pushHistory, requestEditorFocus, rootPath, setActiveFile],
+    [ensureFileVisible, glyph, pushHistory, requestEditorFocus, setActiveFile],
   );
 
   useEffect(() => {
@@ -517,6 +600,14 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
 
     void saveSettings({ sidebar: persistedSidebar });
   }, [hasHydratedSidebar, persistedSidebar, saveSettings, settings]);
+
+  useEffect(() => {
+    if (!sessionReady || !hasBooted) {
+      return;
+    }
+
+    setNoteSession(rootPath || null, activeFile?.path ?? null);
+  }, [activeFile?.path, hasBooted, rootPath, sessionReady, setNoteSession]);
 
   const openFile = useCallback(
     async (filePath: string) => {
@@ -1028,7 +1119,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     [settings?.pinnedFiles, toShortcutItems],
   );
   const paletteItems = useMemo<CommandPaletteItem[]>(() => {
-    const query = paletteQuery.trim().toLowerCase();
+    const query = deferredPaletteQuery.trim().toLowerCase();
     const pinnedPaletteItems = pinnedNotes.slice(0, 8).map((note) => ({
       id: `pinned-${note.path}`,
       title: note.title,
@@ -1105,7 +1196,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     baseCommands,
     hiddenFileKeys,
     openFile,
-    paletteQuery,
+    deferredPaletteQuery,
     pinnedNotes,
     searchResults,
   ]);
@@ -1424,5 +1515,6 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     updateDraftContent: handleDraftChange,
     visibleSidebarNodes,
     wordCount,
+    hasBooted,
   };
 };

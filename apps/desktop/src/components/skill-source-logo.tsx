@@ -79,6 +79,14 @@ function getLogoSources(sourceKind?: SkillSourceKind): LogoSources | null {
       return {
         single: `${skillLogoBasePath}/mistral-ai_logo.svg`,
       };
+    case "mux":
+      return {
+        single: `${skillLogoBasePath}/mux.svg`,
+      };
+    case "openhands":
+      return {
+        single: `${skillLogoBasePath}/openhands.svg`,
+      };
     case "openclaw":
       return {
         single: `${skillLogoBasePath}/openclaw.svg`,
@@ -90,6 +98,14 @@ function getLogoSources(sourceKind?: SkillSourceKind): LogoSources | null {
     case "pi":
       return {
         single: `${skillLogoBasePath}/pi.svg`,
+      };
+    case "qwen":
+      return {
+        single: `${skillLogoBasePath}/qwen.svg`,
+      };
+    case "zencoder":
+      return {
+        single: `${skillLogoBasePath}/zencoder.svg`,
       };
     default:
       return null;

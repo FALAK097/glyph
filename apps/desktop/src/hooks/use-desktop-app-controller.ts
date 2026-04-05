@@ -1,4 +1,4 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { BreadcrumbItem, NoteShortcutItem, OutlineItem } from "@/types/navigation";
 import type { DragPosition, SidebarTopLevelNode } from "@/types/sidebar";
@@ -121,7 +121,6 @@ export const useDesktopAppController = (
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [paletteQuery, setPaletteQuery] = useState("");
-  const [selectedIndex, setSelectedIndex] = useState(0);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isWorkspaceMode, setIsWorkspaceMode] = useState(true);
   const [sidebarNodes, setSidebarNodes] = useState<DirectoryNode[]>([]);
@@ -138,7 +137,6 @@ export const useDesktopAppController = (
   } | null>(null);
   const draftFileCreationRef = useRef<Promise<FileDocument | null> | null>(null);
   const editorFocusNonceRef = useRef(0);
-  const deferredPaletteQuery = useDeferredValue(paletteQuery);
 
   const files = useMemo(() => flattenFiles(tree, rootPath), [rootPath, tree]);
   const wordCount = useMemo(() => {
@@ -524,7 +522,7 @@ export const useDesktopAppController = (
       return;
     }
 
-    const query = deferredPaletteQuery.trim().toLowerCase();
+    const query = paletteQuery.trim().toLowerCase();
 
     if (!isWorkspaceMode || !query || query.startsWith("theme")) {
       setSearchResults([]);
@@ -537,7 +535,7 @@ export const useDesktopAppController = (
     }, 120);
 
     return () => window.clearTimeout(timer);
-  }, [deferredPaletteQuery, isPaletteOpen, isWorkspaceMode, glyph]);
+  }, [glyph, isPaletteOpen, isWorkspaceMode, paletteQuery]);
 
   useEffect(() => {
     if (!settings) {
@@ -1271,7 +1269,7 @@ export const useDesktopAppController = (
     [settings?.pinnedFiles, toShortcutItems],
   );
   const paletteItems = useMemo<CommandPaletteItem[]>(() => {
-    const query = deferredPaletteQuery.trim().toLowerCase();
+    const query = paletteQuery.trim().toLowerCase();
     const pinnedPaletteItems = pinnedNotes.slice(0, 8).map((note) => ({
       id: `pinned-${note.path}`,
       title: note.title,
@@ -1348,7 +1346,7 @@ export const useDesktopAppController = (
     baseCommands,
     hiddenFileKeys,
     openFile,
-    deferredPaletteQuery,
+    paletteQuery,
     pinnedNotes,
     searchResults,
   ]);
@@ -1359,11 +1357,6 @@ export const useDesktopAppController = (
       setPaletteQuery("");
     }
   }, [isPaletteOpen]);
-
-  // Reset selected index whenever the query or results change
-  useEffect(() => {
-    setSelectedIndex(0);
-  }, [deferredPaletteQuery]);
 
   useEffect(() => {
     const onKeyDown = async (event: KeyboardEvent) => {
@@ -1637,12 +1630,10 @@ export const useDesktopAppController = (
     requestOutlineJump,
     saveSettings,
     saveStateLabel,
-    selectedIndex,
     setIsPaletteOpen,
     setIsSettingsOpen,
     setIsSidebarCollapsed,
     setPaletteQuery,
-    setSelectedIndex,
     settings,
     shortcuts,
     showOutline,

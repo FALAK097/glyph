@@ -1,12 +1,4 @@
-import {
-  useCallback,
-  useDeferredValue,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { getDisplayFileName, isSamePath } from "@/lib/paths";
 import { countGroupedSkills, groupSkillsForBrowse } from "@/lib/skill-groups";
@@ -153,8 +145,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const noteRenameInputRef = useRef<HTMLInputElement | null>(null);
   const confirmCancelRef = useRef<HTMLButtonElement | null>(null);
   const paletteSkillSearchNonceRef = useRef(0);
-  const deferredPaletteQuery = useDeferredValue(controller.paletteQuery);
-  const paletteFilterQuery = deferredPaletteQuery.trim().toLowerCase();
+  const paletteFilterQuery = controller.paletteQuery.trim().toLowerCase();
   const shouldCollapseSidebar =
     controller.isSidebarCollapsed || (viewerMode === "note" && controller.isFocusMode);
   const allSkills = skillsController.snapshot?.skills ?? [];
@@ -761,15 +752,12 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       return;
     }
 
-    const query = deferredPaletteQuery.trim();
+    const query = controller.paletteQuery.trim();
     if (!query) {
       setPaletteSkillResultIds(null);
       setResolvedPaletteSkillQuery("");
       return;
     }
-
-    setPaletteSkillResultIds(null);
-    setResolvedPaletteSkillQuery("");
 
     paletteSkillSearchNonceRef.current += 1;
     const requestNonce = paletteSkillSearchNonceRef.current;
@@ -792,7 +780,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         setPaletteSkillResultIds([]);
         setResolvedPaletteSkillQuery(query.toLowerCase());
       });
-  }, [controller.isPaletteOpen, deferredPaletteQuery, skillsController.searchSkillIds]);
+  }, [controller.isPaletteOpen, controller.paletteQuery, skillsController.searchSkillIds]);
 
   const visibleNotePaletteItems = useMemo(() => {
     const noteOnlyCommandIds = new Set(["new-note", "pin-note", "toggle-focus-mode"]);
@@ -884,7 +872,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       },
       {
         id: "reveal-current-note",
-        title: `Reveal in ${controller.folderRevealLabel}`,
+        title: controller.folderRevealLabel,
         subtitle: "Show the current note in the file manager",
         section: "Note",
         kind: "command",
@@ -1021,7 +1009,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
             },
             {
               id: "skill-reveal",
-              title: `Reveal in ${controller.folderRevealLabel}`,
+              title: controller.folderRevealLabel,
               subtitle: "Show the current skill file in the file manager",
               section: "Current Skill",
               kind: "command" as const,
@@ -1097,23 +1085,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       ...skillPaletteItems,
     ];
   }, [currentNotePaletteItems, skillPaletteItems, viewerMode, visibleNotePaletteItems]);
-
-  useEffect(() => {
-    controller.setSelectedIndex(0);
-  }, [controller.setSelectedIndex, deferredPaletteQuery, viewerMode]);
-
-  useEffect(() => {
-    if (paletteItems.length === 0) {
-      if (controller.selectedIndex !== 0) {
-        controller.setSelectedIndex(0);
-      }
-      return;
-    }
-
-    if (controller.selectedIndex >= paletteItems.length) {
-      controller.setSelectedIndex(paletteItems.length - 1);
-    }
-  }, [controller.selectedIndex, controller.setSelectedIndex, paletteItems.length]);
 
   return (
     <TooltipProvider>
@@ -1349,22 +1320,10 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
           isOpen={controller.isPaletteOpen}
           query={controller.paletteQuery}
           items={paletteItems}
-          selectedIndex={controller.selectedIndex}
           onChangeQuery={controller.setPaletteQuery}
           onClose={() => {
             controller.setIsPaletteOpen(false);
           }}
-          onHoverItem={controller.setSelectedIndex}
-          onMove={(direction) => {
-            if (paletteItems.length === 0) {
-              return;
-            }
-
-            controller.setSelectedIndex(
-              (value) => (value + direction + paletteItems.length) % paletteItems.length,
-            );
-          }}
-          onSelect={() => paletteItems[controller.selectedIndex]?.onSelect()}
         />
         <SettingsPanel
           isOpen={controller.isSettingsOpen}

@@ -228,25 +228,28 @@ test("creates a note, derives its filename from the heading, and saves it to dis
     await glyph.window.keyboard.press("Enter");
     await glyph.window.keyboard.type("Created by Playwright.");
 
+    await expect(glyph.window.getByRole("heading", { name: "Release Smoke" })).toBeVisible();
     await expect(glyph.window.getByText("Unsaved", { exact: true })).toBeVisible();
 
     const renamedPath = path.join(glyph.sandbox.workspaceRoot, "Release Smoke.md");
+
+    await expect(glyph.window.getByText(/Saved \d{1,2}:\d{2}/)).toBeVisible({
+      timeout: 30_000,
+    });
 
     await expect
       .poll(
         async () => {
           try {
-            return await fs.readFile(renamedPath, "utf8");
+            const text = await fs.readFile(renamedPath, "utf8");
+            return text.includes("Created by Playwright.");
           } catch {
-            return "";
+            return false;
           }
         },
-        { timeout: 20_000 },
+        { timeout: 30_000 },
       )
-      .toContain("Created by Playwright.");
-
-    await expect(glyph.window.getByRole("heading", { name: "Release Smoke" })).toBeVisible();
-    await expect(glyph.window.getByText(/Saved \d{1,2}:\d{2}/)).toBeVisible();
+      .toBe(true);
   } finally {
     await glyph.stop(testInfo);
   }

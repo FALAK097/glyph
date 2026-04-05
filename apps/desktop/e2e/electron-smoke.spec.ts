@@ -18,11 +18,8 @@ const modKey = isMac ? "Meta" : "Control";
 
 type GlyphSandbox = {
   cleanup: () => Promise<void>;
-  nestedNotePath: string;
-  sandboxRoot: string;
   settingsPath: string;
   userDataRoot: string;
-  welcomeNotePath: string;
   workspaceRoot: string;
 };
 
@@ -55,11 +52,8 @@ async function createGlyphSandbox(): Promise<GlyphSandbox> {
         await fs.rm(sandboxRoot, { force: true, recursive: true });
       }
     },
-    nestedNotePath,
-    sandboxRoot,
     settingsPath: path.join(userDataRoot, "settings.json"),
     userDataRoot,
-    welcomeNotePath,
     workspaceRoot,
   };
 }
@@ -156,6 +150,7 @@ async function selectPaletteItem(window: Page, query: string, name: RegExp) {
   const option = window.getByRole("option", { name }).first();
   await expect(option).toBeVisible();
   await option.click();
+  await expect(paletteInput).toBeHidden({ timeout: 15_000 });
 }
 
 async function openWorkspace(window: Page, workspaceRoot: string) {
@@ -278,50 +273,32 @@ test("persists theme mode changes from settings", async ({}, testInfo) => {
   }
 });
 
-test("restores the last opened note after relaunch", async ({}, testInfo) => {
-  const sandbox = await createGlyphSandbox();
-  let firstLaunch: GlyphHarness | null = null;
-  let secondLaunch: GlyphHarness | null = null;
-
+test("pins and unpins the current note from the command palette", async ({}, testInfo) => {
+  const glyph = await launchGlyph();
   try {
-    firstLaunch = await launchGlyph(sandbox);
-    await expectAppShell(firstLaunch.window);
-    await openWorkspace(firstLaunch.window, sandbox.workspaceRoot);
-    await selectPaletteItem(firstLaunch.window, "nested", /nested-note\.md/i);
+    await expectAppShell(glyph.window);
+    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
+    await selectPaletteItem(glyph.window, "nested", /nested-note\.md/i);
+    await expect(glyph.window.getByText("Nested note body.")).toBeVisible();
 
-    await expect(firstLaunch.window.getByText("Nested note body.")).toBeVisible();
+    const nestedNotePath = path.join(glyph.sandbox.workspaceRoot, "notes", "nested-note.md");
 
+    await selectPaletteItem(glyph.window, "pin current note", /pin current note/i);
     await expect
       .poll(async () => {
-        const sessionJson = await firstLaunch?.window.evaluate(() =>
-          window.localStorage.getItem("glyph.editor-session"),
-        );
-        return sessionJson
-          ? (JSON.parse(sessionJson) as { state?: { noteFilePath?: string } })
-          : null;
+        const settings = await readJson<{ pinnedFiles?: string[] }>(glyph.sandbox.settingsPath);
+        return settings?.pinnedFiles ?? [];
       })
-      .toMatchObject({
-        state: {
-          noteFilePath: sandbox.nestedNotePath,
-        },
-      });
+      .toContain(nestedNotePath);
 
-    await firstLaunch.stop(testInfo);
-    firstLaunch = null;
-
-    secondLaunch = await launchGlyph(sandbox);
-    await expectAppShell(secondLaunch.window);
-    await expect(secondLaunch.window.getByRole("heading", { name: "Nested Note" })).toBeVisible();
-    await expect(secondLaunch.window.getByText("Nested note body.")).toBeVisible();
+    await selectPaletteItem(glyph.window, "unpin current note", /unpin current note/i);
+    await expect
+      .poll(async () => {
+        const settings = await readJson<{ pinnedFiles?: string[] }>(glyph.sandbox.settingsPath);
+        return settings?.pinnedFiles ?? [];
+      })
+      .not.toContain(nestedNotePath);
   } finally {
-    if (firstLaunch) {
-      await firstLaunch.stop(testInfo);
-    }
-
-    if (secondLaunch) {
-      await secondLaunch.stop(testInfo);
-    }
-
-    await sandbox.cleanup();
+    await glyph.stop(testInfo);
   }
 });

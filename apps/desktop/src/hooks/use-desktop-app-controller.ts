@@ -624,6 +624,7 @@ export const useDesktopAppController = (
       return;
     }
 
+    setIsPaletteOpen(false);
     const file = await glyph.createFile(baseDir, `Untitled-${Date.now()}.md`);
     setActiveFile(file);
     setIsWorkspaceMode(true);
@@ -631,7 +632,6 @@ export const useDesktopAppController = (
     const nextSettings = await glyph.getSettings();
     setSettings(nextSettings);
     pushHistory(file.path);
-    setIsPaletteOpen(false);
     requestEditorFocus("start");
   }, [
     glyph,

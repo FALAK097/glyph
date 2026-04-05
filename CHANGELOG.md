@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.4.0](https://github.com/FALAK097/glyph/compare/v0.3.0...v0.4.0) (2026-04-05)
+
+
+### Features
+
+* **desktop:** add editable skills library ([9f8c8cc](https://github.com/FALAK097/glyph/commit/9f8c8cc8375cb082ed931b59596c3b947b409ce7))
+* **desktop:** expand skills catalog and pane UX ([fc7f78f](https://github.com/FALAK097/glyph/commit/fc7f78fbd379bde0bfbd4f7e348f45d9082e366f))
+* **desktop:** improve skills search and metadata parsing ([620ea87](https://github.com/FALAK097/glyph/commit/620ea87f5abeaa0d65ccd986f6551d5a14b251bd))
+* **desktop:** improve skills search and session restore ([2866c68](https://github.com/FALAK097/glyph/commit/2866c68f3ed1a2837259aea1fc8ad6719906a03f))
+* **desktop:** persist note and skill sessions ([65a2da6](https://github.com/FALAK097/glyph/commit/65a2da6623628d6dcaa90fb13c87e7b21215b101))
+
+
+### Bug Fixes
+
+* **desktop:** align palette label and remove header breadcrumbs ([a912f13](https://github.com/FALAK097/glyph/commit/a912f13491c168ab112b3fce63352e404e67aa66))
+* **desktop:** duplication of base commands ([c1191b5](https://github.com/FALAK097/glyph/commit/c1191b5d06c79c8a6e6c9ada2eeec7cfd805f420))
+* **desktop:** focus opened notes at the end without scrolling ([db34107](https://github.com/FALAK097/glyph/commit/db341077e912320ac2aef066a420a46a607d4e78))
+* **desktop:** handle skill errors and source cleanup ([1dc8f34](https://github.com/FALAK097/glyph/commit/1dc8f3477aa460b231a2dd4b42c447b341ee45f2))
+* **desktop:** keep editor mounted during draft activation ([77da9cc](https://github.com/FALAK097/glyph/commit/77da9cc261f6c097446df84a9312a030f9a91426))
+* **desktop:** keep skill search results stable while typing ([5ad3108](https://github.com/FALAK097/glyph/commit/5ad31089f081c0cb2a6133c8ed41134f8fc6dc07))
+* **desktop:** materialize committed draft notes ([c3780c2](https://github.com/FALAK097/glyph/commit/c3780c2424cba0990d92477e21dcea1095c13ac8))
+* **desktop:** polish palette navigation and skill state ([256772b](https://github.com/FALAK097/glyph/commit/256772bbe1ee0b792e559a747f6a80e4e6310a96))
+* **desktop:** polish skills browser interactions ([d2861fd](https://github.com/FALAK097/glyph/commit/d2861fdd8745cf472e5557d5c1311097ad63b327))
+* **desktop:** polish skills browsing ([1163c13](https://github.com/FALAK097/glyph/commit/1163c13aa4046379303e13b6617016b55448e5e5))
+* **desktop:** polish skills search and metadata ([26cde4b](https://github.com/FALAK097/glyph/commit/26cde4b4f8c77c57cd7280bb63ddafae5a7f951b))
+* **desktop:** preserve cursor while activating draft notes ([abd8551](https://github.com/FALAK097/glyph/commit/abd85515411485c844727733f018af91a76d45a1))
+* **desktop:** refine session restore behavior ([d0eae25](https://github.com/FALAK097/glyph/commit/d0eae255196b0903f1fbc47a45098850cd4a8ebc))
+* **desktop:** refresh scroll seeds on remount ([d72bc29](https://github.com/FALAK097/glyph/commit/d72bc2946d4d71df01bf19b244a5124913f8aa70))
+* **desktop:** remove command palette fallback actions ([364874e](https://github.com/FALAK097/glyph/commit/364874ebc343514961dfec1497f7d6d522335aaf))
+* **desktop:** restore note cursor position per file ([3731c11](https://github.com/FALAK097/glyph/commit/3731c112ebca230683a0b4158b77a846601403fd))
+* **desktop:** simplify skills collections ([cd57af8](https://github.com/FALAK097/glyph/commit/cd57af840c57dbf04af39fd225f945776ef42fb8))
+* **desktop:** simplify skills compatibility labels ([f6054a8](https://github.com/FALAK097/glyph/commit/f6054a89ab841853fa952febd67b725f7c2a18af))
+* **desktop:** smooth command palette search updates ([c11973b](https://github.com/FALAK097/glyph/commit/c11973be8f3200d1afa53e30c3db92a2e1c74b3c))
+* **desktop:** stabilize note creation focus and palette fallbacks ([dd2a3ad](https://github.com/FALAK097/glyph/commit/dd2a3adde3508da98503742bb750bfe7f920e601))
+* **desktop:** stabilize session restore flow ([7095114](https://github.com/FALAK097/glyph/commit/7095114179929e555c90c37946a8c8603bf9cde5))
+* **desktop:** tighten skills review follow-ups ([f785bd3](https://github.com/FALAK097/glyph/commit/f785bd3ac99809c64b8a28aa5e0080084eb2a10c))
+* **desktop:** title ([a7a6aa1](https://github.com/FALAK097/glyph/commit/a7a6aa128e8cc54a49cf9a096950bf89614007fc))
+* **desktop:** update command palette placeholder and header breadcrumb ([9eaa3c5](https://github.com/FALAK097/glyph/commit/9eaa3c55ceac269d7a4c11b3f2aa6b5178c508af))
+* **desktop:** update command palette placeholder and header breadcrumb ([21549f0](https://github.com/FALAK097/glyph/commit/21549f0ff00d605acfc15d219d777843b5ae595f))
+* **web:** improve mobile header and brew command layout ([35248cf](https://github.com/FALAK097/glyph/commit/35248cff506e3269f3b84698b566c7876209144b))
+* **web:** keep brew copy action top-right on desktop ([84ae6fe](https://github.com/FALAK097/glyph/commit/84ae6fe833ed7a107db7ce5558e9c9e91edd3ca9))
+* **web:** refine mobile nav and brew command actions ([6c815c6](https://github.com/FALAK097/glyph/commit/6c815c6afe01fc94b0745385e7891c59980b5783))
+* **web:** update canonical domain to glyph.falakgala.dev ([e0ea065](https://github.com/FALAK097/glyph/commit/e0ea0651bcb3bb1acc4243702782af21a4eb1f7e))
+
 ## [0.3.0](https://github.com/FALAK097/glyph/compare/v0.2.5...v0.3.0) (2026-03-22)
 
 

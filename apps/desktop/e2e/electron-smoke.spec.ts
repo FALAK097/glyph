@@ -1,3 +1,5 @@
+/* eslint-disable no-empty-pattern */
+
 import fs from "node:fs/promises";
 import { createRequire } from "node:module";
 import os from "node:os";
@@ -14,29 +16,57 @@ const isMac = process.platform === "darwin";
 const keepSandbox = process.env.GLYPH_E2E_KEEP_SANDBOX === "1";
 const modKey = isMac ? "Meta" : "Control";
 
-type GlyphHarness = {
-  app: ElectronApplication;
-  stop: (testInfo: TestInfo) => Promise<void>;
-  window: Page;
+type GlyphSandbox = {
+  cleanup: () => Promise<void>;
+  nestedNotePath: string;
+  sandboxRoot: string;
+  settingsPath: string;
+  userDataRoot: string;
+  welcomeNotePath: string;
   workspaceRoot: string;
 };
 
-async function launchGlyph(): Promise<GlyphHarness> {
+type GlyphHarness = {
+  app: ElectronApplication;
+  sandbox: GlyphSandbox;
+  stop: (testInfo: TestInfo) => Promise<void>;
+  window: Page;
+};
+
+async function createGlyphSandbox(): Promise<GlyphSandbox> {
   const sandboxRoot = await fs.mkdtemp(path.join(os.tmpdir(), "glyph-e2e-"));
   const workspaceRoot = path.join(sandboxRoot, "workspace");
   const userDataRoot = path.join(sandboxRoot, "user-data");
+  const welcomeNotePath = path.join(workspaceRoot, "welcome.md");
+  const nestedNotePath = path.join(workspaceRoot, "notes", "nested-note.md");
 
   await fs.mkdir(path.join(workspaceRoot, "notes"), { recursive: true });
   await fs.mkdir(userDataRoot, { recursive: true });
 
   await fs.writeFile(
-    path.join(workspaceRoot, "welcome.md"),
+    welcomeNotePath,
     ["# Welcome to Glyph", "", "Smoke test note content."].join("\n"),
   );
-  await fs.writeFile(
-    path.join(workspaceRoot, "notes", "nested-note.md"),
-    ["# Nested Note", "", "Nested note body."].join("\n"),
-  );
+  await fs.writeFile(nestedNotePath, ["# Nested Note", "", "Nested note body."].join("\n"));
+
+  return {
+    cleanup: async () => {
+      if (!keepSandbox) {
+        await fs.rm(sandboxRoot, { force: true, recursive: true });
+      }
+    },
+    nestedNotePath,
+    sandboxRoot,
+    settingsPath: path.join(userDataRoot, "settings.json"),
+    userDataRoot,
+    welcomeNotePath,
+    workspaceRoot,
+  };
+}
+
+async function launchGlyph(existingSandbox?: GlyphSandbox): Promise<GlyphHarness> {
+  const sandbox = existingSandbox ?? (await createGlyphSandbox());
+  const ownsSandbox = !existingSandbox;
 
   const app = await electron.launch({
     executablePath: electronBinary,
@@ -45,8 +75,8 @@ async function launchGlyph(): Promise<GlyphHarness> {
     env: {
       ...process.env,
       GLYPH_E2E_DIST: "1",
-      GLYPH_E2E_USER_DATA: userDataRoot,
-      GLYPH_E2E_WORKSPACE: workspaceRoot,
+      GLYPH_E2E_USER_DATA: sandbox.userDataRoot,
+      GLYPH_E2E_WORKSPACE: sandbox.workspaceRoot,
     },
     timeout: 60_000,
   });
@@ -93,23 +123,39 @@ async function launchGlyph(): Promise<GlyphHarness> {
     } finally {
       await app.close();
 
-      if (!keepSandbox) {
-        await fs.rm(sandboxRoot, { force: true, recursive: true });
+      if (ownsSandbox) {
+        await sandbox.cleanup();
       }
     }
   };
 
   return {
     app,
+    sandbox,
     stop,
     window,
-    workspaceRoot,
   };
 }
 
 async function expectAppShell(window: Page) {
   await window.waitForLoadState("domcontentloaded");
   await expect(window.locator('[aria-label="Glyph"]')).toBeVisible();
+}
+
+async function openCommandPalette(window: Page) {
+  await window.keyboard.press(`${modKey}+P`);
+
+  const paletteInput = window.getByLabel("Search notes, skills, and commands…");
+  await expect(paletteInput).toBeVisible();
+  return paletteInput;
+}
+
+async function selectPaletteItem(window: Page, query: string, name: RegExp) {
+  const paletteInput = await openCommandPalette(window);
+  await paletteInput.fill(query);
+  const option = window.getByRole("option", { name }).first();
+  await expect(option).toBeVisible();
+  await option.click();
 }
 
 async function openWorkspace(window: Page, workspaceRoot: string) {
@@ -132,21 +178,23 @@ async function openWorkspace(window: Page, workspaceRoot: string) {
   expect(workspace?.rootPath).toBe(workspaceRoot);
 }
 
-// eslint-disable-next-line no-empty-pattern
+async function readJson<T>(targetPath: string): Promise<T | null> {
+  try {
+    const raw = await fs.readFile(targetPath, "utf8");
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
 test("launches Glyph and opens settings from the command palette", async ({}, testInfo) => {
   const glyph = await launchGlyph();
 
   try {
     await expectAppShell(glyph.window);
-    await openWorkspace(glyph.window, glyph.workspaceRoot);
+    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
 
-    await glyph.window.keyboard.press(`${modKey}+P`);
-
-    const paletteInput = glyph.window.getByLabel("Search notes, skills, and commands…");
-    await expect(paletteInput).toBeVisible();
-
-    await paletteInput.fill("settings");
-    await glyph.window.getByRole("option", { name: /settings/i }).click();
+    await selectPaletteItem(glyph.window, "settings", /settings/i);
 
     await expect(glyph.window.getByText("Glyph Desktop")).toBeVisible();
   } finally {
@@ -154,24 +202,126 @@ test("launches Glyph and opens settings from the command palette", async ({}, te
   }
 });
 
-// eslint-disable-next-line no-empty-pattern
 test("opens a seeded markdown note from the workspace", async ({}, testInfo) => {
   const glyph = await launchGlyph();
 
   try {
     await expectAppShell(glyph.window);
-    await openWorkspace(glyph.window, glyph.workspaceRoot);
-
-    await glyph.window.keyboard.press(`${modKey}+P`);
-    const paletteInput = glyph.window.getByLabel("Search notes, skills, and commands…");
-    await expect(paletteInput).toBeVisible();
-    await paletteInput.fill("welcome");
-    await expect(glyph.window.getByRole("option", { name: /welcome\.md/i })).toBeVisible();
-    await glyph.window.keyboard.press("Enter");
+    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
+    await selectPaletteItem(glyph.window, "welcome", /welcome\.md/i);
 
     await expect(glyph.window.getByText("Smoke test note content.")).toBeVisible();
     await expect(glyph.window.getByRole("heading", { name: "Welcome to Glyph" })).toBeVisible();
   } finally {
     await glyph.stop(testInfo);
+  }
+});
+
+test("creates a note, derives its filename from the heading, and saves it to disk", async ({}, testInfo) => {
+  const glyph = await launchGlyph();
+
+  try {
+    await expectAppShell(glyph.window);
+    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
+    await selectPaletteItem(glyph.window, "new note", /new note/i);
+
+    const editor = glyph.window.locator('[data-glyph-editor="true"]');
+    await expect(editor).toBeVisible();
+    await editor.click();
+    await glyph.window.keyboard.type("# Release Smoke\n\nCreated by Playwright.");
+
+    await expect(glyph.window.getByText("Unsaved")).toBeVisible();
+
+    const renamedPath = path.join(glyph.sandbox.workspaceRoot, "Release Smoke.md");
+
+    await expect
+      .poll(async () => {
+        try {
+          return await fs.readFile(renamedPath, "utf8");
+        } catch {
+          return null;
+        }
+      })
+      .toContain("Created by Playwright.");
+
+    await expect(glyph.window.getByRole("heading", { name: "Release Smoke" })).toBeVisible();
+    await expect(glyph.window.getByText(/Saved \d{1,2}:\d{2}/)).toBeVisible();
+  } finally {
+    await glyph.stop(testInfo);
+  }
+});
+
+test("persists theme mode changes from settings", async ({}, testInfo) => {
+  const glyph = await launchGlyph();
+
+  try {
+    await expectAppShell(glyph.window);
+    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
+    await selectPaletteItem(glyph.window, "settings", /settings/i);
+    await glyph.window.getByLabel("Theme mode").click();
+    await glyph.window.getByRole("option", { name: "Dark" }).click();
+
+    await expect
+      .poll(async () =>
+        glyph.window.evaluate(() => document.documentElement.classList.contains("dark")),
+      )
+      .toBe(true);
+
+    await expect
+      .poll(async () => {
+        const settings = await readJson<{ themeMode?: string }>(glyph.sandbox.settingsPath);
+        return settings?.themeMode ?? null;
+      })
+      .toBe("dark");
+  } finally {
+    await glyph.stop(testInfo);
+  }
+});
+
+test("restores the last opened note after relaunch", async ({}, testInfo) => {
+  const sandbox = await createGlyphSandbox();
+  let firstLaunch: GlyphHarness | null = null;
+  let secondLaunch: GlyphHarness | null = null;
+
+  try {
+    firstLaunch = await launchGlyph(sandbox);
+    await expectAppShell(firstLaunch.window);
+    await openWorkspace(firstLaunch.window, sandbox.workspaceRoot);
+    await selectPaletteItem(firstLaunch.window, "nested", /nested-note\.md/i);
+
+    await expect(firstLaunch.window.getByText("Nested note body.")).toBeVisible();
+
+    await expect
+      .poll(async () => {
+        const sessionJson = await firstLaunch?.window.evaluate(() =>
+          window.localStorage.getItem("glyph.editor-session"),
+        );
+        return sessionJson
+          ? (JSON.parse(sessionJson) as { state?: { noteFilePath?: string } })
+          : null;
+      })
+      .toMatchObject({
+        state: {
+          noteFilePath: sandbox.nestedNotePath,
+        },
+      });
+
+    await firstLaunch.stop(testInfo);
+    firstLaunch = null;
+
+    secondLaunch = await launchGlyph(sandbox);
+    await expectAppShell(secondLaunch.window);
+    await expect(secondLaunch.window.getByRole("heading", { name: "Nested Note" })).toBeVisible();
+    await expect(secondLaunch.window.getByText("Nested note body.")).toBeVisible();
+  } finally {
+    if (firstLaunch) {
+      await firstLaunch.stop(testInfo);
+    }
+
+    if (secondLaunch) {
+      await secondLaunch.stop(testInfo);
+    }
+
+    await sandbox.cleanup();
   }
 });

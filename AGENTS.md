@@ -175,12 +175,10 @@ Desktop Playwright smoke tests are available:
 pnpm test:e2e:desktop
 pnpm test:e2e:desktop:headed
 pnpm test:e2e:desktop:debug
-pnpm test:e2e:desktop:run -- --grep "settings"
 ```
 
 These run from the repo root and build `apps/desktop` before launching Electron for a smoke test.
 Run `pnpm test:e2e:desktop` after meaningful desktop UI, Electron, or command-palette changes when you want a fast launch-and-interaction sanity check.
-For targeted iteration, run `pnpm build:desktop` once and then use `pnpm test:e2e:desktop:run -- ...` to execute only the relevant Playwright spec or `--grep` match.
 Keep local Electron runs headed so the real app window can be observed while debugging; CI stays virtualized.
 
 ---

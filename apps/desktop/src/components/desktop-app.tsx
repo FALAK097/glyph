@@ -1,4 +1,12 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { getDisplayFileName, isSamePath } from "@/lib/paths";
 import { countGroupedSkills, groupSkillsForBrowse } from "@/lib/skill-groups";
@@ -262,21 +270,21 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     [setDocumentScroll],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setNoteInitialScrollTop(
       controller.activeFile
         ? useSessionStore.getState().getDocumentScroll(controller.activeFile.path)
         : 0,
     );
-  }, [controller.activeFile?.path]);
+  }, [controller.activeFile?.path, viewerMode]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setSkillInitialScrollTop(
       skillsController.activeDocument
         ? useSessionStore.getState().getDocumentScroll(skillsController.activeDocument.path)
         : 0,
     );
-  }, [skillsController.activeDocument?.path]);
+  }, [skillsController.activeDocument?.path, viewerMode]);
 
   const visibleSkills = useMemo(() => {
     if (!activeSkillCollection) {

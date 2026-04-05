@@ -901,6 +901,33 @@ export const MarkdownEditor = ({
   }, [flushScrollPosition, scrollRestorationKey]);
 
   useEffect(() => {
+    const flushPendingScrollPosition = () => {
+      if (scrollPositionTimeoutRef.current) {
+        window.clearTimeout(scrollPositionTimeoutRef.current);
+        scrollPositionTimeoutRef.current = null;
+      }
+
+      flushScrollPosition();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        flushPendingScrollPosition();
+      }
+    };
+
+    window.addEventListener("pagehide", flushPendingScrollPosition);
+    window.addEventListener("beforeunload", flushPendingScrollPosition);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("pagehide", flushPendingScrollPosition);
+      window.removeEventListener("beforeunload", flushPendingScrollPosition);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [flushScrollPosition]);
+
+  useEffect(() => {
     if (!editor) {
       return;
     }

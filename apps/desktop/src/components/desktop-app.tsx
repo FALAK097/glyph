@@ -149,6 +149,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const [noteInitialScrollTop, setNoteInitialScrollTop] = useState(0);
   const [skillInitialScrollTop, setSkillInitialScrollTop] = useState(0);
   const [pendingSkillRestorePath, setPendingSkillRestorePath] = useState<string | null>(null);
+  const [isInitialSkillRestorePending, setIsInitialSkillRestorePending] = useState(false);
   const noteRenameInputRef = useRef<HTMLInputElement | null>(null);
   const confirmCancelRef = useRef<HTMLButtonElement | null>(null);
   const paletteSkillSearchNonceRef = useRef(0);
@@ -276,7 +277,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         ? useSessionStore.getState().getDocumentScroll(controller.activeFile.path)
         : 0,
     );
-  }, [controller.activeFile?.path, viewerMode]);
+  }, [controller.activeFile, viewerMode]);
 
   useLayoutEffect(() => {
     setSkillInitialScrollTop(
@@ -284,7 +285,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         ? useSessionStore.getState().getDocumentScroll(skillsController.activeDocument.path)
         : 0,
     );
-  }, [skillsController.activeDocument?.path, viewerMode]);
+  }, [skillsController.activeDocument, viewerMode]);
 
   const visibleSkills = useMemo(() => {
     if (!activeSkillCollection) {
@@ -365,7 +366,16 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   );
 
   useEffect(() => {
+    if (!sessionHasHydrated) {
+      return;
+    }
+
+    setIsInitialSkillRestorePending(initialSkillSessionRef.current.viewerMode === "skill");
+  }, [sessionHasHydrated]);
+
+  useEffect(() => {
     if (
+      !isInitialSkillRestorePending ||
       !sessionHasHydrated ||
       !controller.hasBooted ||
       !skillsController.hasLoadedOnce ||
@@ -387,6 +397,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     const persistedDocumentPath = initialSkillSessionRef.current.documentPath;
     if (!persistedDocumentPath) {
       initialSkillSessionRef.current.viewerMode = "note";
+      setIsInitialSkillRestorePending(false);
       return;
     }
 
@@ -399,16 +410,18 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       setPendingSkillRestorePath(null);
       setSelectedSkillCollectionId(nextCollectionId);
       initialSkillSessionRef.current.viewerMode = "note";
+      setIsInitialSkillRestorePending(false);
     });
   }, [
     controller.hasBooted,
+    isInitialSkillRestorePending,
     sessionHasHydrated,
     setSelectedSkillCollectionId,
     setSkillsExpanded,
     setViewerMode,
     skillCollections,
-    skillsController,
     skillsController.hasLoadedOnce,
+    skillsController.openSkillByPath,
   ]);
 
   useEffect(() => {
@@ -422,21 +435,29 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     ) {
       setPendingSkillRestorePath(null);
       initialSkillSessionRef.current.viewerMode = "note";
+      setIsInitialSkillRestorePending(false);
       return;
     }
 
     if (!skillsController.activeDocument) {
       setPendingSkillRestorePath(null);
       initialSkillSessionRef.current.viewerMode = "note";
+      setIsInitialSkillRestorePending(false);
     }
   }, [
+    isInitialSkillRestorePending,
     pendingSkillRestorePath,
     skillsController.activeDocument,
     skillsController.isDocumentLoading,
   ]);
 
   useEffect(() => {
-    if (!selectedSkillCollectionId || viewerMode !== "skill" || pendingSkillRestorePath) {
+    if (
+      !selectedSkillCollectionId ||
+      viewerMode !== "skill" ||
+      pendingSkillRestorePath ||
+      isInitialSkillRestorePending
+    ) {
       return;
     }
 
@@ -471,6 +492,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     skillsController.activeSkill,
     skillsController.clearActiveSelection,
     viewerMode,
+    isInitialSkillRestorePending,
     pendingSkillRestorePath,
     visibleSkillItems,
     visibleSkills,
@@ -673,6 +695,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const isSkillSurfaceLoading =
     isSkillSurfaceVisible &&
     (isAppBootstrapping ||
+      isInitialSkillRestorePending ||
       !skillsController.hasLoadedOnce ||
       skillsController.isLoading ||
       Boolean(pendingSkillRestorePath) ||

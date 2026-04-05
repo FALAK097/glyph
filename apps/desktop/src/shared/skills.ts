@@ -244,12 +244,16 @@ function parseFrontmatter(frontmatterText: string) {
   }
 }
 
+function splitTagString(value: string): string[] {
+  return value
+    .split(/[,\n]+/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
 function toStringArray(value: SkillMetadataValue | undefined): string[] {
   if (typeof value === "string") {
-    return value
-      .split(",")
-      .map((entry) => entry.trim())
-      .filter(Boolean);
+    return splitTagString(value);
   }
 
   if (!Array.isArray(value)) {
@@ -258,8 +262,7 @@ function toStringArray(value: SkillMetadataValue | undefined): string[] {
 
   return value.flatMap((entry) => {
     if (typeof entry === "string") {
-      const trimmed = entry.trim();
-      return trimmed ? [trimmed] : [];
+      return splitTagString(entry);
     }
 
     return [];
@@ -267,19 +270,15 @@ function toStringArray(value: SkillMetadataValue | undefined): string[] {
 }
 
 function normalizeTags(frontmatter: Record<string, SkillMetadataValue>) {
-  const topLevelTags = getSkillMetadataValue(frontmatter, ["tags"], ["keywords"]);
-  const nestedTags = getSkillMetadataValue(
-    frontmatter,
-    ["metadata", "tags"],
-    ["metadata", "keywords"],
-  );
+  const tagSources = [
+    getSkillMetadataValue(frontmatter, ["tags"]),
+    getSkillMetadataValue(frontmatter, ["keywords"]),
+    getSkillMetadataValue(frontmatter, ["metadata", "tags"]),
+    getSkillMetadataValue(frontmatter, ["metadata", "keywords"]),
+  ];
 
   return Array.from(
-    new Set(
-      [...toStringArray(topLevelTags), ...toStringArray(nestedTags)].map((tag) =>
-        tag.toLowerCase(),
-      ),
-    ),
+    new Set(tagSources.flatMap((value) => toStringArray(value)).map((tag) => tag.toLowerCase())),
   );
 }
 

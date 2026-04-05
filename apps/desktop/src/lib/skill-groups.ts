@@ -84,7 +84,20 @@ function sortKinds(kinds: SkillSourceKind[]) {
 }
 
 function getDisplayKinds(entries: SkillEntry[]): SkillSourceKind[] {
-  return sortKinds(Array.from(new Set(entries.map((entry) => entry.sourceKind))));
+  const kinds = new Set<SkillSourceKind>();
+
+  for (const entry of entries) {
+    if (entry.compatibleToolKinds.length > 0) {
+      entry.compatibleToolKinds.forEach((kind) => {
+        kinds.add(kind);
+      });
+      continue;
+    }
+
+    kinds.add(entry.sourceKind);
+  }
+
+  return sortKinds(Array.from(kinds));
 }
 
 export function groupSkillsForBrowse(skills: SkillEntry[]): SkillBrowserItem[] {

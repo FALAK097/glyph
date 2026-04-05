@@ -58,6 +58,7 @@ export function useSkillLibraryController(
   const [selectedDocumentKind, setSelectedDocumentKind] = useState<SkillDocumentKind>("skill");
   const [activeDocument, setActiveDocument] = useState<SkillDocument | null>(null);
   const [searchResultIds, setSearchResultIds] = useState<string[] | null>(null);
+  const [searchResultQuery, setSearchResultQuery] = useState<string | null>(null);
   const [draftContent, setDraftContent] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
@@ -108,9 +109,9 @@ export function useSkillLibraryController(
     () => snapshot?.skills.find((skill) => skill.id === activeSkillId) ?? null,
     [activeSkillId, snapshot?.skills],
   );
-  const searchResultIdSet = useMemo(
-    () => (searchResultIds ? new Set(searchResultIds) : null),
-    [searchResultIds],
+  const skillsById = useMemo(
+    () => new Map((snapshot?.skills ?? []).map((skill) => [skill.id, skill])),
+    [snapshot?.skills],
   );
 
   const filteredSkills = useMemo(() => {
@@ -121,12 +122,15 @@ export function useSkillLibraryController(
       return skills;
     }
 
-    if (!searchResultIdSet) {
+    if (!searchResultIds || searchResultQuery !== query) {
       return skills.filter((skill) => matchesSkillFallbackQuery(query, skill));
     }
 
-    return skills.filter((skill) => searchResultIdSet.has(skill.id));
-  }, [deferredSearchQuery, searchResultIdSet, snapshot?.skills]);
+    return searchResultIds.flatMap((skillId) => {
+      const skill = skillsById.get(skillId);
+      return skill ? [skill] : [];
+    });
+  }, [deferredSearchQuery, searchResultIds, searchResultQuery, skillsById, snapshot?.skills]);
 
   const activeDocumentPath = useMemo(() => {
     if (!activeSkill) {
@@ -468,17 +472,22 @@ export function useSkillLibraryController(
 
   useEffect(() => {
     if (!enabled) {
+      searchRequestNonceRef.current += 1;
       setSearchResultIds(null);
+      setSearchResultQuery(null);
       return;
     }
 
-    const query = deferredSearchQuery.trim();
+    const query = deferredSearchQuery.trim().toLowerCase();
     if (!query) {
+      searchRequestNonceRef.current += 1;
       setSearchResultIds(null);
+      setSearchResultQuery(null);
       return;
     }
 
     setSearchResultIds(null);
+    setSearchResultQuery(null);
 
     searchRequestNonceRef.current += 1;
     const requestNonce = searchRequestNonceRef.current;
@@ -490,6 +499,7 @@ export function useSkillLibraryController(
         }
 
         setSearchResultIds(nextResultIds);
+        setSearchResultQuery(query);
       })
       .catch((nextError) => {
         if (requestNonce !== searchRequestNonceRef.current) {
@@ -497,6 +507,7 @@ export function useSkillLibraryController(
         }
 
         setSearchResultIds([]);
+        setSearchResultQuery(query);
         setError(getErrorMessage(nextError));
       });
   }, [deferredSearchQuery, enabled, searchSkillIds]);

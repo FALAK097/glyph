@@ -9,6 +9,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { SUPPORTED_LANGUAGES } from "@/types/code-block-node-view";
 
@@ -84,26 +85,33 @@ export const CodeBlockNodeView = (props: ReactNodeViewProps) => {
       data-testid="code-block"
     >
       <div className="code-block-toolbar absolute top-2 right-2 left-2 z-20 flex items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={handleCopy}
-          onMouseDown={(e) => e.stopPropagation()}
-          className={cn(
-            "code-block-copy-button inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-border/70 bg-background/92 px-2 text-muted-foreground shadow-sm transition-[background-color,border-color,color,transform] duration-100 ease-out outline-none hover:border-border hover:bg-background hover:text-foreground focus-visible:border-primary focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-primary/20 active:translate-y-px",
-            copied && "border-primary/50 bg-primary/10 text-primary",
-          )}
-          aria-label={copied ? "Code copied" : "Copy code"}
-          title={copied ? "Copied" : "Copy code"}
-        >
-          {copied ? (
-            <span className="relative flex h-4 w-5 items-center justify-center" aria-hidden="true">
-              <TickIcon size={12} className="absolute left-0 top-1/2 -translate-y-1/2" />
-              <TickIcon size={12} className="absolute right-0 top-1/2 -translate-y-1/2" />
-            </span>
-          ) : (
-            <CopyIcon size={15} />
-          )}
-        </button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={handleCopy}
+              onMouseDown={(e) => e.stopPropagation()}
+              className={cn(
+                "code-block-copy-button inline-flex h-8 min-w-8 items-center justify-center rounded-md border border-border/70 bg-background/92 px-2 text-muted-foreground shadow-sm transition-[background-color,border-color,color,transform] duration-100 ease-out outline-none hover:border-border hover:bg-background hover:text-foreground focus-visible:border-primary focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-primary/20 active:translate-y-px",
+                copied && "border-primary/50 bg-primary/10 text-primary",
+              )}
+              aria-label={copied ? "Code copied" : "Copy code"}
+            >
+              {copied ? (
+                <span
+                  className="relative flex h-4 w-5 items-center justify-center"
+                  aria-hidden="true"
+                >
+                  <TickIcon size={12} className="absolute left-0 top-1/2 -translate-y-1/2" />
+                  <TickIcon size={12} className="absolute right-0 top-1/2 -translate-y-1/2" />
+                </span>
+              ) : (
+                <CopyIcon size={15} />
+              )}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{copied ? "Copied" : "Copy code"}</TooltipContent>
+        </Tooltip>
         <div className="min-w-0">
           {isEditing ? (
             <DropdownMenu

@@ -86,6 +86,7 @@ export function SkillView({
         onToggleSidebar={onToggleSidebar}
         title="Loading skills"
         titleLabel={activeSkillCollection?.label ?? "Skills"}
+        toggleSidebarShortcut={toggleSidebarShortcut}
       />
     );
   }
@@ -130,6 +131,7 @@ export function SkillView({
       onToggleSidebar={onToggleSidebar}
       title={skillEmptyState.title}
       titleLabel={activeSkillCollection?.label ?? "Skills"}
+      toggleSidebarShortcut={toggleSidebarShortcut}
     />
   );
 }

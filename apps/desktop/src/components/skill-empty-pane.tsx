@@ -12,6 +12,7 @@ type SkillEmptyPaneProps = {
   onToggleSidebar?: () => void;
   titleLabel?: string;
   title: string;
+  toggleSidebarShortcut?: string;
 };
 
 export function SkillEmptyPane({
@@ -23,6 +24,7 @@ export function SkillEmptyPane({
   onToggleSidebar,
   title,
   titleLabel = "Skills",
+  toggleSidebarShortcut,
 }: SkillEmptyPaneProps) {
   const isMacLike = navigator.platform.includes("Mac");
   const headerPaddingClass = isSidebarCollapsed && isMacLike ? "pl-20 pr-4" : "px-4";
@@ -41,13 +43,16 @@ export function SkillEmptyPane({
                   size="icon-sm"
                   className="flex-shrink-0 text-muted-foreground hover:bg-muted hover:text-foreground"
                   onClick={onToggleSidebar}
+                  aria-label={isSidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
                   type="button"
                 >
                   {isSidebarCollapsed ? <PanelRightIcon size={16} /> : <PanelLeftIcon size={16} />}
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                {isSidebarCollapsed ? "Show Sidebar" : "Hide Sidebar"}
+                {isSidebarCollapsed
+                  ? `Show Sidebar${toggleSidebarShortcut ? ` (${toggleSidebarShortcut})` : ""}`
+                  : `Hide Sidebar${toggleSidebarShortcut ? ` (${toggleSidebarShortcut})` : ""}`}
               </TooltipContent>
             </Tooltip>
           ) : null}
@@ -87,6 +92,7 @@ export function SkillEmptyPane({
                   size="icon-sm"
                   className="text-muted-foreground hover:bg-muted hover:text-foreground"
                   onClick={onOpenSettings}
+                  aria-label="Settings"
                   type="button"
                 >
                   <GearIcon size={16} />

@@ -1,6 +1,12 @@
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import {
   ArrowLeftIcon,
@@ -103,31 +109,24 @@ export function EditorToolbar({
   onTogglePinnedFile,
   isActiveFilePinned,
 }: EditorToolbarProps) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-
   const handleCopy = useCallback(async () => {
     await onCopy();
-    setIsMenuOpen(false);
   }, [onCopy]);
 
   const handleCopyPath = useCallback(async () => {
     await onCopyPath();
-    setIsMenuOpen(false);
   }, [onCopyPath]);
 
   const handleOpenExternal = useCallback(async () => {
     await onOpenExternal();
-    setIsMenuOpen(false);
   }, [onOpenExternal]);
 
   const handleExportPDF = useCallback(async () => {
     await onExportPDF();
-    setIsMenuOpen(false);
   }, [onExportPDF]);
 
   const handleTogglePinnedFile = useCallback(() => {
     onTogglePinnedFile?.();
-    setIsMenuOpen(false);
   }, [onTogglePinnedFile]);
 
   const backTooltipLabel = `Back (${navigateBackShortcut ?? "⌘["})`;
@@ -146,6 +145,7 @@ export function EditorToolbar({
                 size="icon-sm"
                 className="text-muted-foreground hover:text-foreground hover:bg-muted flex-shrink-0"
                 onClick={onToggleSidebar}
+                aria-label={isSidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
                 type="button"
               >
                 {isSidebarCollapsed ? <PanelRightIcon size={16} /> : <PanelLeftIcon size={16} />}
@@ -167,6 +167,7 @@ export function EditorToolbar({
                 disabled={!canGoBack}
                 onClick={onNavigateBack}
                 className="flex-shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted disabled:text-muted-foreground/40 disabled:opacity-40"
+                aria-label="Navigate back"
                 type="button"
               >
                 <ArrowLeftIcon size={14} />
@@ -184,6 +185,7 @@ export function EditorToolbar({
                 disabled={!canGoForward}
                 onClick={onNavigateForward}
                 className="flex-shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted disabled:text-muted-foreground/40 disabled:opacity-40"
+                aria-label="Navigate forward"
                 type="button"
               >
                 <ArrowRightIcon size={14} />
@@ -200,6 +202,7 @@ export function EditorToolbar({
                 size="icon-sm"
                 className="text-muted-foreground hover:text-foreground hover:bg-muted flex-shrink-0"
                 onClick={onCreateNote}
+                aria-label="New note"
                 type="button"
               >
                 <PlusIcon size={16} />
@@ -209,12 +212,14 @@ export function EditorToolbar({
           </Tooltip>
         ) : null}
         {fileName ? (
-          <span
-            className="max-w-[220px] truncate pl-1 text-sm font-medium text-foreground"
-            title={fileName}
-          >
-            {fileName.replace(MARKDOWN_FILE_SUFFIX_PATTERN, "")}
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="max-w-[220px] truncate pl-1 text-sm font-medium text-foreground">
+                {fileName.replace(MARKDOWN_FILE_SUFFIX_PATTERN, "")}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{fileName}</TooltipContent>
+          </Tooltip>
         ) : null}
       </div>
 
@@ -253,6 +258,7 @@ export function EditorToolbar({
                   }`}
                   onClick={onToggleFocusMode}
                   aria-pressed={isFocusMode}
+                  aria-label={isFocusMode ? "Exit focus mode" : "Enter focus mode"}
                   type="button"
                 >
                   <FocusIcon size={16} />
@@ -283,20 +289,56 @@ export function EditorToolbar({
           </Tooltip>
         ) : null}
         {headerAccessory ? <div className="mr-1 flex items-center">{headerAccessory}</div> : null}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="text-muted-foreground hover:text-foreground hover:bg-muted"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              type="button"
+        <DropdownMenu>
+          <Tooltip>
+            <DropdownMenuTrigger
+              render={
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="text-muted-foreground hover:text-foreground hover:bg-muted"
+                      aria-label="More options"
+                      type="button"
+                    />
+                  }
+                />
+              }
             >
               <DotsHorizontalIcon size={16} />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">More options</TooltipContent>
-        </Tooltip>
+            </DropdownMenuTrigger>
+            <TooltipContent side="bottom">More options</TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent align="end" side="bottom" sideOffset={4} className="w-48">
+            <DropdownMenuItem disabled={!content} onClick={handleCopy}>
+              <LinkIcon size={14} className="opacity-70" />
+              Copy as Markdown
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleCopyPath}>
+              <LinkIcon size={14} className="opacity-70" />
+              {`Copy ${documentLabel} path`}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleOpenExternal}>
+              <FileManagerLogo label={revealInFolderLabel} size={14} className="opacity-70" />
+              {revealInFolderLabel}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleExportPDF}>
+              <FileDownIcon size={14} className="opacity-70" />
+              Export as PDF
+            </DropdownMenuItem>
+            {onTogglePinnedFile ? (
+              <DropdownMenuItem onClick={handleTogglePinnedFile}>
+                {isActiveFilePinned ? (
+                  <PinOffIcon size={14} className="opacity-70" />
+                ) : (
+                  <PinIcon size={14} className="opacity-70" />
+                )}
+                {isActiveFilePinned ? "Unpin note" : "Pin note"}
+              </DropdownMenuItem>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
         {onOpenSettings && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -305,6 +347,7 @@ export function EditorToolbar({
                 size="icon-sm"
                 className="text-muted-foreground hover:text-foreground hover:bg-muted"
                 onClick={onOpenSettings}
+                aria-label="Settings"
                 type="button"
               >
                 <GearIcon size={16} />
@@ -312,76 +355,6 @@ export function EditorToolbar({
             </TooltipTrigger>
             <TooltipContent side="bottom">Settings</TooltipContent>
           </Tooltip>
-        )}
-
-        {isMenuOpen && (
-          <>
-            <button
-              aria-label="Close menu"
-              className="fixed inset-0 z-40 cursor-default bg-transparent outline-none"
-              onClick={() => setIsMenuOpen(false)}
-              type="button"
-            />
-            <div className="absolute right-0 top-full mt-1 w-48 bg-card border border-border rounded-md shadow-lg z-50 py-1 overflow-hidden">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-auto w-full justify-start gap-2 rounded-none px-3 py-1.5 text-sm"
-                onClick={handleCopy}
-                disabled={!content}
-                type="button"
-              >
-                <LinkIcon size={14} className="opacity-70" />
-                Copy as Markdown
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-auto w-full justify-start gap-2 rounded-none px-3 py-1.5 text-sm"
-                onClick={handleCopyPath}
-                type="button"
-              >
-                <LinkIcon size={14} className="opacity-70" />
-                {`Copy ${documentLabel} path`}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-auto w-full justify-start gap-2 rounded-none px-3 py-1.5 text-sm"
-                onClick={handleOpenExternal}
-                type="button"
-              >
-                <FileManagerLogo label={revealInFolderLabel} size={14} className="opacity-70" />
-                {revealInFolderLabel}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-auto w-full justify-start gap-2 rounded-none px-3 py-1.5 text-sm"
-                onClick={handleExportPDF}
-                type="button"
-              >
-                <FileDownIcon size={14} className="opacity-70" />
-                Export as PDF
-              </Button>
-              {onTogglePinnedFile ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-auto w-full justify-start gap-2 rounded-none px-3 py-1.5 text-sm"
-                  onClick={handleTogglePinnedFile}
-                  type="button"
-                >
-                  {isActiveFilePinned ? (
-                    <PinOffIcon size={14} className="opacity-70" />
-                  ) : (
-                    <PinIcon size={14} className="opacity-70" />
-                  )}
-                  {isActiveFilePinned ? "Unpin note" : "Pin note"}
-                </Button>
-              ) : null}
-            </div>
-          </>
         )}
       </div>
     </div>

@@ -265,3 +265,35 @@ test("toggles the current note pin action from the command palette", async ({}, 
     await glyph.stop(testInfo);
   }
 });
+
+test("shows tooltips on toolbar button hover", async ({}, testInfo) => {
+  const glyph = await launchGlyph();
+  try {
+    await expectAppShell(glyph.window);
+    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
+    await selectPaletteItem(glyph.window, "welcome", /welcome\.md/i);
+    await expect(glyph.window.getByText("Smoke test note content.")).toBeVisible();
+
+    const tooltipContent = glyph.window.locator('[data-slot="tooltip-content"]');
+
+    // Hover the Settings gear button — tooltip should appear
+    const settingsButton = glyph.window.getByRole("button", { name: "Settings" });
+    await settingsButton.hover();
+    await expect(tooltipContent.filter({ hasText: "Settings" })).toBeVisible();
+
+    // Move mouse away — tooltip should disappear
+    await glyph.window.mouse.move(0, 0);
+    await expect(tooltipContent.filter({ hasText: "Settings" })).toBeHidden();
+
+    // Hover the New Note button — tooltip should show text with keyboard shortcut
+    const newNoteButton = glyph.window.getByRole("button", { name: "New note" });
+    await newNoteButton.hover();
+    await expect(tooltipContent.filter({ hasText: /New Note/ })).toBeVisible();
+
+    // Move mouse away — tooltip should disappear
+    await glyph.window.mouse.move(0, 0);
+    await expect(tooltipContent.filter({ hasText: /New Note/ })).toBeHidden();
+  } finally {
+    await glyph.stop(testInfo);
+  }
+});

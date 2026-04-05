@@ -1054,7 +1054,7 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
           try {
             const stats = await fs.stat(item.path);
             if (
-              (item.kind === "file" && stats.isFile()) ||
+              (item.kind === "file" && stats.isFile() && isMarkdownFile(item.path)) ||
               (item.kind === "directory" && stats.isDirectory())
             ) {
               return item;

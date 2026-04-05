@@ -1030,8 +1030,13 @@ export const useDesktopAppController = (
           setIsWorkspaceMode(true);
         }
       } else {
-        const file = await glyph.readFile(target.path);
-        await syncOpenedFile(file, { recordHistory: true });
+        try {
+          const file = await glyph.readFile(target.path);
+          await syncOpenedFile(file, { recordHistory: true });
+        } catch {
+          // File may no longer exist or be inaccessible — silently ignore
+          // so the app continues in its current state.
+        }
       }
     });
   }, [syncOpenedFile, syncWorkspace, glyph]);

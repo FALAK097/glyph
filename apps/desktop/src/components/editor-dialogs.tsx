@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Editor } from "@tiptap/core";
 
@@ -81,8 +81,30 @@ export function EditorDialogs({
     src: "",
   });
 
+  // Nonce tracks each dialog open so late picker results from a previous
+  // session are ignored (e.g. user opens dialog, picks file, closes dialog,
+  // re-opens — the stale pick must not overwrite the fresh form).
+  const imageDialogNonceRef = useRef(0);
+  const imageFormStateNonceRef = useRef(0);
+
   useEffect(() => {
-    if (imageFormState && activeDialog === "insert-image") {
+    if (activeDialog === "insert-image") {
+      imageDialogNonceRef.current += 1;
+    }
+  }, [activeDialog]);
+
+  useEffect(() => {
+    if (imageFormState) {
+      imageFormStateNonceRef.current = imageDialogNonceRef.current;
+    }
+  }, [imageFormState]);
+
+  useEffect(() => {
+    if (
+      imageFormState &&
+      activeDialog === "insert-image" &&
+      imageFormStateNonceRef.current === imageDialogNonceRef.current
+    ) {
       setImageForm(imageFormState);
     }
   }, [imageFormState, activeDialog]);

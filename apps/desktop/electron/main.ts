@@ -325,21 +325,29 @@ async function hydratePersistedUpdateState() {
   const loadedState = await loadPersistedUpdateState();
   const currentVersion = app.getVersion();
   let nextPersistedUpdateState = loadedState;
+  const stagedVersionComparison = loadedState.stagedVersion
+    ? compareVersions(loadedState.stagedVersion, currentVersion)
+    : null;
 
-  if (loadedState.stagedVersion === currentVersion) {
+  if (stagedVersionComparison !== null && stagedVersionComparison <= 0) {
     nextPersistedUpdateState = {
-      ...loadedState,
+      ...nextPersistedUpdateState,
       stagedVersion: null,
       stagedReleaseName: null,
       stagedReleaseNotes: null,
-      recentlyInstalledVersion: currentVersion,
+      recentlyInstalledVersion:
+        stagedVersionComparison === 0
+          ? currentVersion
+          : nextPersistedUpdateState.recentlyInstalledVersion,
     };
-  } else if (
-    loadedState.recentlyInstalledVersion &&
-    loadedState.recentlyInstalledVersion !== currentVersion
+  }
+
+  if (
+    nextPersistedUpdateState.recentlyInstalledVersion &&
+    nextPersistedUpdateState.recentlyInstalledVersion !== currentVersion
   ) {
     nextPersistedUpdateState = {
-      ...loadedState,
+      ...nextPersistedUpdateState,
       recentlyInstalledVersion: null,
     };
   }
@@ -352,7 +360,7 @@ async function hydratePersistedUpdateState() {
 
   if (
     nextPersistedUpdateState.stagedVersion &&
-    nextPersistedUpdateState.stagedVersion !== currentVersion
+    compareVersions(nextPersistedUpdateState.stagedVersion, currentVersion) > 0
   ) {
     setUpdateState({
       status: "downloaded",
@@ -884,8 +892,7 @@ function buildApplicationMenu(shortcuts: AppSettings["shortcuts"]) {
   const checkForUpdatesItem: Electron.MenuItemConstructorOptions = {
     label: "Check for Updates",
     accelerator: getAccelerator("check-updates"),
-    click: () =>
-      mainWindow?.webContents.send("app:command", "check-updates" satisfies AppCommand),
+    click: () => mainWindow?.webContents.send("app:command", "check-updates" satisfies AppCommand),
   };
   const focusModeItem: Electron.MenuItemConstructorOptions = {
     label: "Toggle Focus Mode",

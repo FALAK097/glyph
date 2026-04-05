@@ -471,8 +471,7 @@ export const MarkdownEditor = ({
     effectiveUpdateState?.status === "downloading" ||
     effectiveUpdateState?.status === "downloaded";
   const shouldShowChangelogButton =
-    (effectiveUpdateState?.status === "idle" ||
-      effectiveUpdateState?.status === "not-available") &&
+    (effectiveUpdateState?.status === "idle" || effectiveUpdateState?.status === "not-available") &&
     Boolean(effectiveUpdateState?.recentlyInstalledVersion);
   const shouldShowUpdateActionButton = shouldShowUpdateButton || shouldShowChangelogButton;
   const isManualReleaseButton =

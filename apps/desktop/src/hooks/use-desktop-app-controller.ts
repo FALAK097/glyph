@@ -885,7 +885,11 @@ export const useDesktopAppController = (
         return;
       }
 
-      if (updateState.status === "idle" || updateState.status === "not-available" || updateState.status === "error") {
+      if (
+        updateState.status === "idle" ||
+        updateState.status === "not-available" ||
+        updateState.status === "error"
+      ) {
         await glyph.checkForUpdates();
       }
 

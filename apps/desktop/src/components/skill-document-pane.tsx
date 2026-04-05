@@ -17,6 +17,7 @@ type SkillDocumentPaneProps = {
   documentTabs: Array<{ kind: SkillDocumentKind; label: string; path: string }>;
   fileLabel: string;
   folderRevealLabel?: string;
+  initialScrollTop?: number;
   pendingExternalChange?: {
     name: string;
     path: string;
@@ -31,8 +32,10 @@ type SkillDocumentPaneProps = {
   onOpenCommandPalette?: () => void;
   onOpenSettings?: () => void;
   onReloadAfterExternalChange?: () => void;
+  onScrollPositionChange?: (scrollTop: number) => void;
   onSelectDocumentTab: (kind: SkillDocumentKind) => void;
   onToggleSidebar?: () => void;
+  scrollRestorationKey?: string | null;
   showOutline?: boolean;
   toggleSidebarShortcut?: string;
 };
@@ -43,6 +46,7 @@ export function SkillDocumentPane({
   documentTabs,
   fileLabel,
   folderRevealLabel,
+  initialScrollTop = 0,
   pendingExternalChange,
   isSidebarCollapsed,
   isSwitchingDocuments = false,
@@ -54,8 +58,10 @@ export function SkillDocumentPane({
   onOpenCommandPalette,
   onOpenSettings,
   onReloadAfterExternalChange,
+  onScrollPositionChange,
   onSelectDocumentTab,
   onToggleSidebar,
+  scrollRestorationKey = null,
   showOutline = true,
   toggleSidebarShortcut,
 }: SkillDocumentPaneProps) {
@@ -203,8 +209,11 @@ export function SkillDocumentPane({
         commandPaletteLabel="Search notes and skills"
         commandPaletteShortcut={commandPaletteShortcut}
         onOpenSettings={onOpenSettings}
+        onScrollPositionChange={onScrollPositionChange}
         onToggleSidebar={onToggleSidebar}
         isSidebarCollapsed={isSidebarCollapsed}
+        initialScrollTop={initialScrollTop}
+        scrollRestorationKey={scrollRestorationKey}
         toggleSidebarShortcut={toggleSidebarShortcut}
         folderRevealLabel={folderRevealLabel}
         onOpenLinkedFile={onOpenLinkedFile}

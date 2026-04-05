@@ -8,6 +8,7 @@ import {
   type SkillDocumentKind,
   type SkillLibrarySnapshot,
 } from "@/shared/skills";
+import { useSessionStore } from "@/store/session";
 
 export const ALL_SKILL_SOURCES_ID = "all-skills";
 
@@ -40,6 +41,8 @@ export function useSkillLibraryController(
   glyph: NonNullable<Window["glyph"]>,
   { enabled = true }: UseSkillLibraryControllerOptions = {},
 ) {
+  const clearSkillSession = useSessionStore((state) => state.clearSkillSession);
+  const setSkillSession = useSessionStore((state) => state.setSkillSession);
   const [snapshot, setSnapshot] = useState<SkillLibrarySnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -561,6 +564,19 @@ export function useSkillLibraryController(
 
     void loadActiveDocument(activeDocumentPath);
   }, [activeDocumentPath, enabled, loadActiveDocument]);
+
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    if (!activeDocumentPath) {
+      clearSkillSession();
+      return;
+    }
+
+    setSkillSession(activeDocumentPath, selectedDocumentKind);
+  }, [activeDocumentPath, clearSkillSession, enabled, selectedDocumentKind, setSkillSession]);
 
   useEffect(() => {
     if (!enabled || pendingExternalChange || !activeDocument?.isEditable || !isDirty) {

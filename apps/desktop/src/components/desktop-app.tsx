@@ -6,6 +6,7 @@ import { formatByteSize } from "@/lib/format-byte-size";
 import { getShortcutDisplay } from "@/shared/shortcuts";
 import { SKILL_AGENT_CATALOG } from "@/shared/skill-agent-catalog";
 import type { SkillEntry, SkillSourceKind, SkillToolKind } from "@/shared/skills";
+import { useSessionStore } from "@/store/session";
 import type { ThemeMode } from "@/shared/workspace";
 import type { DesktopAppProps } from "@/types/app";
 import type { CommandPaletteItem } from "@/types/command-palette";
@@ -75,18 +76,67 @@ function matchesSkillPaletteFallback(query: string, skill: SkillEntry) {
 }
 
 export const DesktopApp = ({ glyph }: DesktopAppProps) => {
-  const controller = useDesktopAppController(glyph);
+  const sessionHasHydrated = useSessionStore((state) => state.hasHydrated);
+  const viewerMode = useSessionStore((state) => state.viewerMode);
+  const isNotesExpanded = useSessionStore((state) => state.isNotesExpanded);
+  const isSkillsExpanded = useSessionStore((state) => state.isSkillsExpanded);
+  const selectedSkillCollectionId = useSessionStore((state) => state.selectedSkillCollectionId);
+  const noteWorkspacePath = useSessionStore((state) => state.noteWorkspacePath);
+  const noteFilePath = useSessionStore((state) => state.noteFilePath);
+  const skillDocumentPath = useSessionStore((state) => state.skillDocumentPath);
+  const setViewerMode = useSessionStore((state) => state.setViewerMode);
+  const setNotesExpanded = useSessionStore((state) => state.setNotesExpanded);
+  const setSkillsExpanded = useSessionStore((state) => state.setSkillsExpanded);
+  const setSelectedSkillCollectionId = useSessionStore(
+    (state) => state.setSelectedSkillCollectionId,
+  );
+  const setDocumentScroll = useSessionStore((state) => state.setDocumentScroll);
+
+  const hasCapturedInitialSessionRef = useRef(false);
+  const initialNoteSessionRef = useRef<{
+    filePath: string | null;
+    workspacePath: string | null;
+  }>({
+    filePath: null,
+    workspacePath: null,
+  });
+  const initialSkillSessionRef = useRef<{
+    collectionId: string | null;
+    documentPath: string | null;
+    viewerMode: "note" | "skill";
+  }>({
+    collectionId: null,
+    documentPath: null,
+    viewerMode: "note",
+  });
+
+  if (sessionHasHydrated && !hasCapturedInitialSessionRef.current) {
+    initialNoteSessionRef.current = {
+      filePath: noteFilePath,
+      workspacePath: noteWorkspacePath,
+    };
+    initialSkillSessionRef.current = {
+      collectionId: selectedSkillCollectionId,
+      documentPath: skillDocumentPath,
+      viewerMode,
+    };
+    hasCapturedInitialSessionRef.current = true;
+  }
+
+  const controller = useDesktopAppController(glyph, {
+    initialFilePath: initialNoteSessionRef.current.filePath,
+    initialWorkspacePath: initialNoteSessionRef.current.workspacePath,
+    sessionReady: sessionHasHydrated,
+  });
   const skillsController = useSkillLibraryController(glyph, {
     enabled: true,
   });
-  const [isNotesExpanded, setIsNotesExpanded] = useState(true);
-  const [isSkillsExpanded, setIsSkillsExpanded] = useState(false);
-  const [selectedSkillCollectionId, setSelectedSkillCollectionId] = useState<string | null>(null);
-  const [viewerMode, setViewerMode] = useState<"note" | "skill">("note");
   const [pendingNoteRename, setPendingNoteRename] = useState<PendingNoteRename | null>(null);
   const [pendingNoteConfirm, setPendingNoteConfirm] = useState<PendingNoteConfirm | null>(null);
   const [paletteSkillResultIds, setPaletteSkillResultIds] = useState<string[] | null>(null);
   const [resolvedPaletteSkillQuery, setResolvedPaletteSkillQuery] = useState("");
+  const [noteInitialScrollTop, setNoteInitialScrollTop] = useState(0);
+  const [skillInitialScrollTop, setSkillInitialScrollTop] = useState(0);
   const noteRenameInputRef = useRef<HTMLInputElement | null>(null);
   const confirmCancelRef = useRef<HTMLButtonElement | null>(null);
   const paletteSkillSearchNonceRef = useRef(0);
@@ -195,6 +245,34 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     () => (controller.activeFile ? getDisplayFileName(controller.activeFile.name) : ""),
     [controller.activeFile],
   );
+  const handleNoteScrollPositionChange = useCallback(
+    (scrollTop: number) => {
+      setDocumentScroll(controller.activeFile?.path ?? null, scrollTop);
+    },
+    [controller.activeFile?.path, setDocumentScroll],
+  );
+  const handleSkillScrollPositionChange = useCallback(
+    (scrollTop: number) => {
+      setDocumentScroll(skillsController.activeDocument?.path ?? null, scrollTop);
+    },
+    [setDocumentScroll, skillsController.activeDocument?.path],
+  );
+
+  useEffect(() => {
+    setNoteInitialScrollTop(
+      controller.activeFile
+        ? useSessionStore.getState().getDocumentScroll(controller.activeFile.path)
+        : 0,
+    );
+  }, [controller.activeFile?.path]);
+
+  useEffect(() => {
+    setSkillInitialScrollTop(
+      skillsController.activeDocument
+        ? useSessionStore.getState().getDocumentScroll(skillsController.activeDocument.path)
+        : 0,
+    );
+  }, [skillsController.activeDocument?.path]);
 
   const visibleSkills = useMemo(() => {
     if (!activeSkillCollection) {
@@ -209,23 +287,26 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
 
   const handleToggleSkillsSection = useCallback(() => {
     const nextValue = !isSkillsExpanded;
-    setIsSkillsExpanded(nextValue);
+    setSkillsExpanded(nextValue);
 
     if (!nextValue) {
       setSelectedSkillCollectionId(null);
       setViewerMode("note");
     }
-  }, [isSkillsExpanded]);
+  }, [isSkillsExpanded, setSelectedSkillCollectionId, setSkillsExpanded, setViewerMode]);
 
   const handleToggleNotesSection = useCallback(() => {
-    setIsNotesExpanded((value) => !value);
-  }, []);
+    setNotesExpanded(!isNotesExpanded);
+  }, [isNotesExpanded, setNotesExpanded]);
 
-  const activateSkillCollection = useCallback((collectionId: string) => {
-    setIsSkillsExpanded(true);
-    setSelectedSkillCollectionId(collectionId);
-    setViewerMode("skill");
-  }, []);
+  const activateSkillCollection = useCallback(
+    (collectionId: string) => {
+      setSkillsExpanded(true);
+      setSelectedSkillCollectionId(collectionId);
+      setViewerMode("skill");
+    },
+    [setSelectedSkillCollectionId, setSkillsExpanded, setViewerMode],
+  );
 
   const openSkillInCollection = useCallback(
     async (skillId: string) => {
@@ -243,12 +324,12 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
 
       setViewerMode("skill");
     },
-    [allSkills, skillsController],
+    [allSkills, setViewerMode, skillsController],
   );
 
   const handleSelectSkillCollection = useCallback(
     (collectionId: string) => {
-      setIsSkillsExpanded(true);
+      setSkillsExpanded(true);
       const isSameCollection = selectedSkillCollectionId === collectionId;
       setSelectedSkillCollectionId(isSameCollection ? null : collectionId);
       setViewerMode(isSameCollection ? "note" : "skill");
@@ -257,7 +338,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         return;
       }
     },
-    [selectedSkillCollectionId],
+    [selectedSkillCollectionId, setSelectedSkillCollectionId, setSkillsExpanded, setViewerMode],
   );
 
   const handleSelectSkill = useCallback(
@@ -266,6 +347,52 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     },
     [openSkillInCollection],
   );
+
+  useEffect(() => {
+    if (
+      !sessionHasHydrated ||
+      !controller.hasBooted ||
+      !skillsController.hasLoadedOnce ||
+      initialSkillSessionRef.current.viewerMode !== "skill"
+    ) {
+      return;
+    }
+
+    const persistedCollectionId = initialSkillSessionRef.current.collectionId ?? "all-skills";
+    const hasMatchingCollection = skillCollections.some(
+      (collection) => collection.id === persistedCollectionId,
+    );
+    const nextCollectionId = hasMatchingCollection ? persistedCollectionId : "all-skills";
+
+    setSkillsExpanded(true);
+    setSelectedSkillCollectionId(nextCollectionId);
+    setViewerMode("skill");
+
+    const persistedDocumentPath = initialSkillSessionRef.current.documentPath;
+    if (!persistedDocumentPath) {
+      initialSkillSessionRef.current.viewerMode = "note";
+      return;
+    }
+
+    void skillsController.openSkillByPath(persistedDocumentPath).then((opened) => {
+      if (opened) {
+        initialSkillSessionRef.current.viewerMode = "note";
+        return;
+      }
+
+      setSelectedSkillCollectionId(nextCollectionId);
+      initialSkillSessionRef.current.viewerMode = "note";
+    });
+  }, [
+    controller.hasBooted,
+    sessionHasHydrated,
+    setSelectedSkillCollectionId,
+    setSkillsExpanded,
+    setViewerMode,
+    skillCollections,
+    skillsController,
+    skillsController.hasLoadedOnce,
+  ]);
 
   useEffect(() => {
     if (!selectedSkillCollectionId || viewerMode !== "skill") {
@@ -298,6 +425,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     activeSkillCollection,
     openSkillInCollection,
     selectedSkillCollectionId,
+    setSelectedSkillCollectionId,
+    setViewerMode,
     skillsController.activeSkill,
     skillsController.clearActiveSelection,
     viewerMode,
@@ -311,7 +440,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       setViewerMode("note");
       await controller.openFile(filePath);
     },
-    [controller],
+    [controller, setSelectedSkillCollectionId, setViewerMode],
   );
 
   const handleOpenSkillLink = useCallback(
@@ -990,6 +1119,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                     commandPaletteShortcut={
                       getShortcutDisplay(controller.shortcuts, "command-palette") ?? "⌘P"
                     }
+                    initialScrollTop={skillInitialScrollTop}
                     isSidebarCollapsed={controller.isSidebarCollapsed}
                     isSwitchingDocuments={
                       skillsController.isDocumentLoading || skillsController.isSaving
@@ -1008,10 +1138,12 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                     onOpenLinkedFile={(targetPath) => void handleOpenSkillLink(targetPath)}
                     onOpenSettings={() => controller.setIsSettingsOpen(true)}
                     onReloadAfterExternalChange={skillsController.reloadAfterExternalChange}
+                    onScrollPositionChange={handleSkillScrollPositionChange}
                     onSelectDocumentTab={(kind) => void skillsController.openDocumentTab(kind)}
                     onToggleSidebar={() =>
                       controller.setIsSidebarCollapsed(!controller.isSidebarCollapsed)
                     }
+                    scrollRestorationKey={skillsController.activeDocument.path}
                   />
                 ) : (
                   <SkillEmptyPane
@@ -1035,6 +1167,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                   fileName={controller.activeFile?.name ?? null}
                   filePath={controller.activeFile?.path ?? null}
                   editorFocusRequest={controller.editorFocusRequest}
+                  initialScrollTop={noteInitialScrollTop}
                   saveStateLabel={controller.saveStateLabel}
                   footerMetaLabel={noteFileSizeLabel}
                   wordCount={controller.wordCount}
@@ -1054,6 +1187,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                   commandPaletteShortcut={
                     getShortcutDisplay(controller.shortcuts, "command-palette") ?? "⌘P"
                   }
+                  onScrollPositionChange={handleNoteScrollPositionChange}
                   onNavigateBack={() => void controller.navigateBack()}
                   onNavigateForward={() => void controller.navigateForward()}
                   navigateBackShortcut={getShortcutDisplay(controller.shortcuts, "navigate-back")}
@@ -1087,6 +1221,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                   }
                   outlineItems={controller.outlineItems}
                   outlineJumpRequest={controller.outlineJumpRequest}
+                  scrollRestorationKey={controller.activeFile?.path ?? null}
                   showOutline={controller.showOutline}
                   updateState={controller.updateState}
                   onUpdateAction={() => void controller.triggerUpdateAction()}

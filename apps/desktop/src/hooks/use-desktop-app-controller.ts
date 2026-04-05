@@ -42,6 +42,7 @@ const EMPTY_NOTE_NAME = "Untitled";
 const NOTE_NAME_SAFE_CHAR_PATTERN = /[^a-zA-Z0-9-_\s]/g;
 const TITLE_PREFIX_PATTERN = /^#+\s*/;
 const NOTE_NAME_MAX_LENGTH = 50;
+const APP_CHANGELOG_URL = "https://github.com/FALAK097/glyph/blob/main/CHANGELOG.md";
 
 const getDraftTitleLine = (content: string) =>
   content.split(/\r?\n/, 1)[0]?.replace(TITLE_PREFIX_PATTERN, "").trim() ?? "";
@@ -861,10 +862,138 @@ export const useDesktopAppController = (
     [],
   );
 
+  const triggerUpdateAction = useCallback(async () => {
+    if (!updateState) {
+      return;
+    }
+
+    const shouldOpenChangelog =
+      Boolean(updateState.recentlyInstalledVersion) &&
+      (updateState.status === "idle" || updateState.status === "not-available");
+    if (shouldOpenChangelog) {
+      await glyph.openExternal(APP_CHANGELOG_URL);
+      return;
+    }
+
+    if (!appInfo?.updatesEnabled || appInfo.updatesMode === "none") {
+      return;
+    }
+
+    if (appInfo.updatesMode === "manual") {
+      if (updateState.status === "available" && updateState.releasePageUrl) {
+        await glyph.openExternal(updateState.releasePageUrl);
+        return;
+      }
+
+      if (updateState.status === "idle" || updateState.status === "not-available" || updateState.status === "error") {
+        await glyph.checkForUpdates();
+      }
+
+      return;
+    }
+
+    if (updateState.status === "downloaded") {
+      await glyph.installUpdate();
+      return;
+    }
+
+    if (updateState.status === "available") {
+      await glyph.downloadUpdate();
+      return;
+    }
+
+    if (
+      updateState.status === "idle" ||
+      updateState.status === "not-available" ||
+      updateState.status === "error"
+    ) {
+      await glyph.checkForUpdates();
+    }
+  }, [appInfo?.updatesEnabled, appInfo?.updatesMode, glyph, updateState]);
+
   const shortcuts = useMemo(
     () => mergeShortcutSettings(settings?.shortcuts),
     [settings?.shortcuts],
   );
+
+  const updateActionConfig = useMemo(() => {
+    if (!appInfo?.updatesEnabled || !updateState) {
+      return null;
+    }
+
+    const shouldOpenChangelog =
+      Boolean(updateState.recentlyInstalledVersion) &&
+      (updateState.status === "idle" || updateState.status === "not-available");
+    if (shouldOpenChangelog) {
+      return {
+        title: "View Changelog",
+        subtitle: `See what's new in Glyph ${updateState.recentlyInstalledVersion ?? ""}`.trim(),
+        isDisabled: false,
+      };
+    }
+
+    const isManualReleaseAction =
+      appInfo.updatesMode === "manual" &&
+      updateState.status === "available" &&
+      Boolean(updateState.releasePageUrl);
+    if (isManualReleaseAction) {
+      return {
+        title: "Download Latest Release",
+        subtitle: "Open GitHub Releases to download and install manually",
+        isDisabled: false,
+      };
+    }
+
+    if (updateState.status === "downloaded") {
+      return {
+        title: "Restart to Update",
+        subtitle: updateState.errorMessage
+          ? `Restart Glyph to retry the update. ${updateState.errorMessage}`
+          : "Restart Glyph to install the downloaded release",
+        isDisabled: false,
+      };
+    }
+
+    if (updateState.status === "downloading") {
+      return {
+        title: `Downloading ${Math.round(updateState.progressPercent ?? 0)}%`,
+        subtitle: "Glyph is downloading the latest release in the background",
+        isDisabled: true,
+      };
+    }
+
+    if (updateState.status === "checking") {
+      return {
+        title: "Checking for Updates",
+        subtitle: "Glyph is checking whether a newer release is available",
+        isDisabled: true,
+      };
+    }
+
+    if (updateState.status === "available") {
+      return {
+        title: updateState.errorMessage ? "Retry Update" : "Update Available",
+        subtitle: updateState.errorMessage
+          ? `Glyph hit an update error. ${updateState.errorMessage}`
+          : "Download the available Glyph update",
+        isDisabled: false,
+      };
+    }
+
+    if (updateState.status === "error") {
+      return {
+        title: "Retry Update",
+        subtitle: updateState.errorMessage ?? "Retry checking for updates",
+        isDisabled: false,
+      };
+    }
+
+    return {
+      title: "Check for Updates",
+      subtitle: "Check whether a new Glyph release is available",
+      isDisabled: false,
+    };
+  }, [appInfo?.updatesEnabled, appInfo?.updatesMode, updateState]);
 
   // Stable commands list — only rebuilds when actions/shortcuts change, never on query change
   const baseCommands = useMemo<CommandPaletteItem[]>(
@@ -907,6 +1036,24 @@ export const useDesktopAppController = (
           setIsPaletteOpen(false);
         },
       },
+      ...(updateActionConfig
+        ? [
+            {
+              id: "check-updates",
+              title: updateActionConfig.title,
+              subtitle: updateActionConfig.subtitle,
+              shortcut: getShortcutDisplay(shortcuts, "check-updates"),
+              section: "Actions",
+              kind: "command" as const,
+              onSelect: () => {
+                if (!updateActionConfig.isDisabled) {
+                  void triggerUpdateAction();
+                }
+                setIsPaletteOpen(false);
+              },
+            },
+          ]
+        : []),
       {
         id: "settings",
         title: "Settings",
@@ -1025,15 +1172,16 @@ export const useDesktopAppController = (
       isFocusMode,
       navigateBack,
       navigateForward,
-      toggleFocusMode,
       saveSettings,
       shortcuts,
       showOutline,
+      triggerUpdateAction,
       syncOpenedFile,
       syncWorkspace,
       toggleFocusMode,
       toggleOutline,
       togglePinnedFile,
+      updateActionConfig,
     ],
   );
 
@@ -1236,6 +1384,7 @@ export const useDesktopAppController = (
         "navigate-back",
         "navigate-forward",
         "focus-mode",
+        "check-updates",
       ]);
       const globalShortcut = shortcuts.find(
         (entry) => globalShortcutIds.has(entry.id) && matchShortcut(event, entry.keys),
@@ -1260,6 +1409,9 @@ export const useDesktopAppController = (
             break;
           case "focus-mode":
             void toggleFocusMode();
+            break;
+          case "check-updates":
+            void triggerUpdateAction();
             break;
         }
         return;
@@ -1327,6 +1479,7 @@ export const useDesktopAppController = (
     syncWorkspace,
     navigateBack,
     navigateForward,
+    triggerUpdateAction,
   ]);
 
   useEffect(() => {
@@ -1343,6 +1496,11 @@ export const useDesktopAppController = (
 
       if (command === "focus-mode") {
         void toggleFocusMode();
+        return;
+      }
+
+      if (command === "check-updates") {
+        await triggerUpdateAction();
         return;
       }
 
@@ -1392,6 +1550,7 @@ export const useDesktopAppController = (
     syncWorkspace,
     glyph,
     toggleFocusMode,
+    triggerUpdateAction,
   ]);
 
   const saveStateLabel = isSaving
@@ -1431,30 +1590,6 @@ export const useDesktopAppController = (
     },
     [saveSettings],
   );
-
-  const triggerUpdateAction = useCallback(async () => {
-    if (!appInfo?.updatesEnabled || !updateState) {
-      return;
-    }
-
-    if (updateState.status === "downloaded") {
-      await glyph.installUpdate();
-      return;
-    }
-
-    if (updateState.status === "available") {
-      await glyph.downloadUpdate();
-      return;
-    }
-
-    if (
-      updateState.status === "idle" ||
-      updateState.status === "not-available" ||
-      updateState.status === "error"
-    ) {
-      await glyph.checkForUpdates();
-    }
-  }, [appInfo?.updatesEnabled, glyph, updateState]);
 
   return {
     activeFile,

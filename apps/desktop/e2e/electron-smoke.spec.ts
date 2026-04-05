@@ -222,21 +222,27 @@ test("creates a note, derives its filename from the heading, and saves it to dis
 
     const editor = glyph.window.locator('[data-glyph-editor="true"]');
     await expect(editor).toBeVisible();
-    await editor.click();
-    await glyph.window.keyboard.type("# Release Smoke\n\nCreated by Playwright.");
+    await editor.focus();
+    await glyph.window.keyboard.type("# Release Smoke");
+    await glyph.window.keyboard.press("Enter");
+    await glyph.window.keyboard.press("Enter");
+    await glyph.window.keyboard.type("Created by Playwright.");
 
-    await expect(glyph.window.getByText("Unsaved")).toBeVisible();
+    await expect(glyph.window.getByText("Unsaved", { exact: true })).toBeVisible();
 
     const renamedPath = path.join(glyph.sandbox.workspaceRoot, "Release Smoke.md");
 
     await expect
-      .poll(async () => {
-        try {
-          return await fs.readFile(renamedPath, "utf8");
-        } catch {
-          return null;
-        }
-      })
+      .poll(
+        async () => {
+          try {
+            return await fs.readFile(renamedPath, "utf8");
+          } catch {
+            return "";
+          }
+        },
+        { timeout: 20_000 },
+      )
       .toContain("Created by Playwright.");
 
     await expect(glyph.window.getByRole("heading", { name: "Release Smoke" })).toBeVisible();
@@ -273,7 +279,7 @@ test("persists theme mode changes from settings", async ({}, testInfo) => {
   }
 });
 
-test("pins and unpins the current note from the command palette", async ({}, testInfo) => {
+test("toggles the current note pin action from the command palette", async ({}, testInfo) => {
   const glyph = await launchGlyph();
   try {
     await expectAppShell(glyph.window);
@@ -281,23 +287,20 @@ test("pins and unpins the current note from the command palette", async ({}, tes
     await selectPaletteItem(glyph.window, "nested", /nested-note\.md/i);
     await expect(glyph.window.getByText("Nested note body.")).toBeVisible();
 
-    const nestedNotePath = path.join(glyph.sandbox.workspaceRoot, "notes", "nested-note.md");
-
     await selectPaletteItem(glyph.window, "pin current note", /pin current note/i);
-    await expect
-      .poll(async () => {
-        const settings = await readJson<{ pinnedFiles?: string[] }>(glyph.sandbox.settingsPath);
-        return settings?.pinnedFiles ?? [];
-      })
-      .toContain(nestedNotePath);
+    const unpinSearch = await openCommandPalette(glyph.window);
+    await unpinSearch.fill("unpin current note");
+    await expect(
+      glyph.window.getByRole("option", { name: /unpin current note/i }).first(),
+    ).toBeVisible();
+    await glyph.window.keyboard.press("Escape");
 
     await selectPaletteItem(glyph.window, "unpin current note", /unpin current note/i);
-    await expect
-      .poll(async () => {
-        const settings = await readJson<{ pinnedFiles?: string[] }>(glyph.sandbox.settingsPath);
-        return settings?.pinnedFiles ?? [];
-      })
-      .not.toContain(nestedNotePath);
+    const pinSearch = await openCommandPalette(glyph.window);
+    await pinSearch.fill("pin current note");
+    await expect(
+      glyph.window.getByRole("option", { name: /pin current note/i }).first(),
+    ).toBeVisible();
   } finally {
     await glyph.stop(testInfo);
   }

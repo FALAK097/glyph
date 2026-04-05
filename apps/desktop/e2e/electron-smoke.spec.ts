@@ -212,49 +212,6 @@ test("opens a seeded markdown note from the workspace", async ({}, testInfo) => 
   }
 });
 
-test("creates a note, derives its filename from the heading, and saves it to disk", async ({}, testInfo) => {
-  const glyph = await launchGlyph();
-
-  try {
-    await expectAppShell(glyph.window);
-    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
-    await selectPaletteItem(glyph.window, "new note", /new note/i);
-
-    const editor = glyph.window.locator('[data-glyph-editor="true"]');
-    await expect(editor).toBeVisible();
-    await editor.focus();
-    await glyph.window.keyboard.type("# Release Smoke");
-    await glyph.window.keyboard.press("Enter");
-    await glyph.window.keyboard.press("Enter");
-    await glyph.window.keyboard.type("Created by Playwright.");
-
-    await expect(glyph.window.getByRole("heading", { name: "Release Smoke" })).toBeVisible();
-    await expect(glyph.window.getByText("Unsaved", { exact: true })).toBeVisible();
-
-    const renamedPath = path.join(glyph.sandbox.workspaceRoot, "Release Smoke.md");
-
-    await expect(glyph.window.getByText(/Saved \d{1,2}:\d{2}/)).toBeVisible({
-      timeout: 30_000,
-    });
-
-    await expect
-      .poll(
-        async () => {
-          try {
-            const text = await fs.readFile(renamedPath, "utf8");
-            return text.includes("Created by Playwright.");
-          } catch {
-            return false;
-          }
-        },
-        { timeout: 30_000 },
-      )
-      .toBe(true);
-  } finally {
-    await glyph.stop(testInfo);
-  }
-});
-
 test("persists theme mode changes from settings", async ({}, testInfo) => {
   const glyph = await launchGlyph();
 

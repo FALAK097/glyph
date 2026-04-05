@@ -40,7 +40,8 @@ const { autoUpdater } = electronUpdater;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const isDev = !app.isPackaged || process.env.GLYPH_DEV_APP === "1";
+const isE2EDistMode = process.env.GLYPH_E2E_DIST === "1";
+const isDev = (!app.isPackaged || process.env.GLYPH_DEV_APP === "1") && !isE2EDistMode;
 const devServerUrl = "http://127.0.0.1:5173";
 const localAssetProtocol = "glyph-local";
 const APP_NAME = "Glyph";

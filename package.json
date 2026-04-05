@@ -10,21 +10,26 @@
     "build:web": "pnpm --filter @glyph/web build",
     "dist:desktop": "pnpm --filter @glyph/desktop dist",
     "release:desktop": "pnpm --filter @glyph/desktop release",
+    "test:e2e:desktop": "pnpm --filter @glyph/desktop test:e2e",
+    "test:e2e:desktop:headed": "pnpm --filter @glyph/desktop test:e2e:headed",
+    "test:e2e:desktop:debug": "pnpm --filter @glyph/desktop test:e2e:debug",
     "cask:generate": "node scripts/generate-homebrew-cask.mjs",
-    "lint": "oxlint . --ignore-pattern 'apps/**/dist/**' --ignore-pattern 'apps/**/dist-electron/**' --ignore-pattern 'apps/**/release/**'",
-    "lint:fix": "oxlint . --fix --ignore-pattern 'apps/**/dist/**' --ignore-pattern 'apps/**/dist-electron/**' --ignore-pattern 'apps/**/release/**'",
-    "lint:desktop": "oxlint apps/desktop --ignore-pattern 'dist/**' --ignore-pattern 'dist-electron/**' --ignore-pattern 'release/**'",
+    "lint": "oxlint . --ignore-pattern 'apps/**/dist/**' --ignore-pattern 'apps/**/dist-electron/**' --ignore-pattern 'apps/**/release/**' --ignore-pattern 'apps/**/playwright-report/**' --ignore-pattern 'apps/**/test-results/**'",
+    "lint:fix": "oxlint . --fix --ignore-pattern 'apps/**/dist/**' --ignore-pattern 'apps/**/dist-electron/**' --ignore-pattern 'apps/**/release/**' --ignore-pattern 'apps/**/playwright-report/**' --ignore-pattern 'apps/**/test-results/**'",
+    "lint:desktop": "oxlint apps/desktop --ignore-pattern 'dist/**' --ignore-pattern 'dist-electron/**' --ignore-pattern 'release/**' --ignore-pattern 'playwright-report/**' --ignore-pattern 'test-results/**'",
     "lint:web": "oxlint apps/web --ignore-pattern 'dist/**'",
-    "fmt": "oxfmt apps scripts package.json .release-please-config.json .release-please-manifest.json .oxlintrc.json .oxfmtrc.json '!apps/**/dist/**' '!apps/**/dist-electron/**' '!apps/**/release/**'",
-    "fmt:check": "oxfmt apps scripts package.json .release-please-config.json .release-please-manifest.json .oxlintrc.json .oxfmtrc.json '!apps/**/dist/**' '!apps/**/dist-electron/**' '!apps/**/release/**' --check",
+    "fmt": "oxfmt apps scripts package.json .release-please-config.json .release-please-manifest.json .oxlintrc.json .oxfmtrc.json '!apps/**/dist/**' '!apps/**/dist-electron/**' '!apps/**/release/**' '!apps/**/playwright-report/**' '!apps/**/test-results/**'",
+    "fmt:check": "oxfmt apps scripts package.json .release-please-config.json .release-please-manifest.json .oxlintrc.json .oxfmtrc.json '!apps/**/dist/**' '!apps/**/dist-electron/**' '!apps/**/release/**' '!apps/**/playwright-report/**' '!apps/**/test-results/**' --check",
     "typecheck": "pnpm -r typecheck",
     "typecheck:desktop": "pnpm --filter @glyph/desktop typecheck",
     "typecheck:web": "pnpm --filter @glyph/web typecheck",
     "hooks:install": "git config core.hooksPath .githooks"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.0",
     "oxfmt": "0.41.0",
-    "oxlint": "1.56.0"
+    "oxlint": "1.56.0",
+    "playwright": "^1.59.0"
   },
   "packageManager": "pnpm@10.26.0"
 }

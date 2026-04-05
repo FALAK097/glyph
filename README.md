@@ -93,8 +93,25 @@ pnpm dist:desktop
 pnpm typecheck
 pnpm lint
 pnpm fmt:check
+pnpm test:e2e:desktop
+pnpm test:e2e:desktop:headed
 pnpm cask:generate --version <version> --artifact-path apps/desktop/release/Glyph-<version>-mac.dmg
 ```
+
+## Desktop E2E Testing
+
+Glyph now includes a Playwright-based Electron smoke test.
+
+From the repo root:
+
+```bash
+pnpm test:e2e:desktop
+pnpm test:e2e:desktop:headed
+pnpm test:e2e:desktop:debug
+```
+
+These commands build the desktop app, launch Electron against the built renderer, and run a small smoke test around startup, the command palette, and settings.
+For desktop UI or Electron changes, `pnpm test:e2e:desktop` is the default sanity check to run before merge.
 
 ## Pre-commit checks
 

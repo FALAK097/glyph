@@ -40,3 +40,6 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Desktop smoke test
+        run: xvfb-run -a pnpm test:e2e:desktop

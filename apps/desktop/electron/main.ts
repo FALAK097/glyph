@@ -86,6 +86,7 @@ let searchableFilesCache: string[] = [];
 let settingsUpdatePromise: Promise<AppSettings> | null = null;
 let pendingExternalPath: string | null = null;
 let updateCheckInterval: NodeJS.Timeout | null = null;
+let watcherDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 const MARKDOWN_EXTENSIONS = [".md", ".mdx", ".markdown"] as const;
 const UPDATE_CHECK_INTERVAL_MS = 1000 * 60 * 60 * 6;
 const skillsService = createSkillsService({
@@ -1401,6 +1402,11 @@ async function openWorkspace(dirPath: string): Promise<WorkspaceSnapshot> {
   const activeFilePath = getPreferredWorkspaceFilePath(searchableFilesCache);
   const activeFile = activeFilePath ? await readMarkdownFile(activeFilePath) : null;
 
+  if (watcherDebounceTimer) {
+    clearTimeout(watcherDebounceTimer);
+    watcherDebounceTimer = null;
+  }
+
   if (activeWatcher) {
     await activeWatcher.close();
   }
@@ -1416,8 +1422,6 @@ async function openWorkspace(dirPath: string): Promise<WorkspaceSnapshot> {
   // Debounce rapid filesystem changes (e.g. git checkout) to avoid
   // redundant directory tree rebuilds. Coalesce into a single rebuild
   // after 100ms of quiet.
-  let watcherDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-
   activeWatcher.on("all", (_eventName, changedPath) => {
     if (!mainWindow || !isMarkdownFile(changedPath)) {
       return;
@@ -1431,6 +1435,12 @@ async function openWorkspace(dirPath: string): Promise<WorkspaceSnapshot> {
       watcherDebounceTimer = null;
 
       if (!mainWindow || mainWindow.isDestroyed()) {
+        return;
+      }
+
+      // Verify that the captured dirPath still matches the active workspace root
+      // to avoid broadcasting outdated tree data after workspace switch.
+      if (dirPath !== activeWorkspaceRoot) {
         return;
       }
 
@@ -2008,6 +2018,11 @@ app.on("window-all-closed", async () => {
   if (updateCheckInterval) {
     clearInterval(updateCheckInterval);
     updateCheckInterval = null;
+  }
+
+  if (watcherDebounceTimer) {
+    clearTimeout(watcherDebounceTimer);
+    watcherDebounceTimer = null;
   }
 
   if (activeWatcher) {

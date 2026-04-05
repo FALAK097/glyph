@@ -100,29 +100,6 @@ pnpm test:e2e:desktop:ui
 pnpm cask:generate --version <version> --artifact-path apps/desktop/release/Glyph-<version>-mac.dmg
 ```
 
-## Desktop E2E Testing
-
-Glyph now includes a Playwright-based Electron smoke test.
-
-From the repo root:
-
-```bash
-pnpm test:e2e:desktop
-pnpm test:e2e:desktop:headed
-pnpm test:e2e:desktop:debug
-pnpm test:e2e:desktop:run -- --grep "settings"
-pnpm test:e2e:desktop:run -- e2e/electron-smoke.spec.ts
-pnpm test:e2e:desktop:ui
-pnpm test:e2e:desktop:report
-```
-
-These commands build the desktop app, launch Electron against the built renderer, and run a smoke suite around startup, the command palette, settings, and opening a seeded markdown note from a disposable workspace.
-`pnpm test:e2e:desktop` opens a real Electron window locally. In CI, the same test runs under `xvfb`, so it stays virtual to the runner while exercising the same app flow.
-For desktop UI or Electron changes, `pnpm test:e2e:desktop` is the default sanity check to run before merge.
-For faster iteration on a specific change, build once with `pnpm build:desktop`, then run only the relevant Playwright test or title with `pnpm test:e2e:desktop:run -- ...`.
-Local Electron runs stay visible by design so the real app can be observed while debugging. CI remains virtualized under `xvfb`.
-Use `pnpm test:e2e:desktop:ui` for Playwright's interactive runner, and `pnpm test:e2e:desktop:report` to inspect the latest HTML report after a failure.
-
 ## Pre-commit checks
 
 Enable the repository pre-commit hook after install:
@@ -132,22 +109,3 @@ pnpm hooks:install
 ```
 
 The hook runs `pnpm fmt:check`, `pnpm lint`, and `pnpm typecheck` before a commit is created.
-
-## Release flow
-
-`Release Please` runs on every push to `main` and opens or updates the release PR branch when it finds releasable Conventional Commits.
-
-- If you squash merge PRs, the PR title becomes the commit title on `main`, so the PR title must use Conventional Commit format.
-- Good PR titles: `fix(desktop): keep the sidebar scrollable` and `feat(web): improve the download experience`.
-- Titles like `[codex] Fix desktop sidebar scroll and editor controls` or `Update release downloads and improve web install UX` will merge, but `release-please` will skip them.
-- If the title is still being refined, add a `Release-Please: fix(desktop): keep the sidebar scrollable` line to the PR body so the workflow can suggest the exact rename to use before merge.
-- The `release-please--branches--main--components--glyph` branch is only refreshed when a release PR is created or updated, so it can lag behind `main` between releases.
-- If a non-conventional squash-merge title already landed on `main`, edit the merged PR body and add a commit override block with a Conventional Commit message, then rerun the `Release Please` workflow manually:
-
-```text
-BEGIN_COMMIT_OVERRIDE
-fix(desktop): keep the sidebar scrollable
-END_COMMIT_OVERRIDE
-```
-
-- If you truly need to force a specific version number, use the upstream `Release-As: x.y.z` commit-body flow on a commit to `main`; do not rely on the action's `release-as` input in manifest mode.

@@ -41,6 +41,12 @@ const { autoUpdater } = electronUpdater;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const isE2EDistMode = process.env.GLYPH_E2E_DIST === "1";
+const e2eWorkspacePath = process.env.GLYPH_E2E_WORKSPACE
+  ? path.resolve(process.env.GLYPH_E2E_WORKSPACE)
+  : null;
+const e2eUserDataPath = process.env.GLYPH_E2E_USER_DATA
+  ? path.resolve(process.env.GLYPH_E2E_USER_DATA)
+  : null;
 const isDev = (!app.isPackaged || process.env.GLYPH_DEV_APP === "1") && !isE2EDistMode;
 const devServerUrl = "http://127.0.0.1:5173";
 const localAssetProtocol = "glyph-local";
@@ -51,6 +57,10 @@ const STARTUP_DARK_BACKGROUND = "#1f1b26";
 // Set app name early
 app.setName(APP_NAME);
 app.setAppUserModelId("com.glyph.app");
+
+if (e2eUserDataPath) {
+  app.setPath("userData", e2eUserDataPath);
+}
 
 const iconFileName =
   process.platform === "win32"
@@ -315,7 +325,7 @@ function getSettingsPath() {
 }
 
 function getDefaultWorkspacePath() {
-  return path.join(app.getPath("documents"), "Glyph");
+  return e2eWorkspacePath ?? path.join(app.getPath("documents"), "Glyph");
 }
 
 function buildLocalAssetUrl(targetPath: string) {

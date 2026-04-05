@@ -13,6 +13,8 @@
     "test:e2e:desktop": "pnpm --filter @glyph/desktop test:e2e",
     "test:e2e:desktop:headed": "pnpm --filter @glyph/desktop test:e2e:headed",
     "test:e2e:desktop:debug": "pnpm --filter @glyph/desktop test:e2e:debug",
+    "test:e2e:desktop:ui": "pnpm --filter @glyph/desktop test:e2e:ui",
+    "test:e2e:desktop:report": "pnpm --filter @glyph/desktop test:e2e:report",
     "cask:generate": "node scripts/generate-homebrew-cask.mjs",
     "lint": "oxlint . --ignore-pattern 'apps/**/dist/**' --ignore-pattern 'apps/**/dist-electron/**' --ignore-pattern 'apps/**/release/**' --ignore-pattern 'apps/**/playwright-report/**' --ignore-pattern 'apps/**/test-results/**'",
     "lint:fix": "oxlint . --fix --ignore-pattern 'apps/**/dist/**' --ignore-pattern 'apps/**/dist-electron/**' --ignore-pattern 'apps/**/release/**' --ignore-pattern 'apps/**/playwright-report/**' --ignore-pattern 'apps/**/test-results/**'",

@@ -24,10 +24,17 @@
     "build": "tsc -p electron/tsconfig.json && vite build",
     "dist": "pnpm run build && electron-builder --publish never",
     "release": "pnpm run build && electron-builder --publish always",
+    "test:e2e": "pnpm run build && playwright test -c playwright.config.ts",
+    "test:e2e:headed": "pnpm run build && playwright test -c playwright.config.ts --headed",
+    "test:e2e:debug": "pnpm run build && playwright test -c playwright.config.ts --debug",
+    "test:e2e:run": "playwright test -c playwright.config.ts",
+    "test:e2e:run:headed": "playwright test -c playwright.config.ts --headed",
+    "test:e2e:ui": "pnpm run build && playwright test -c playwright.config.ts --ui",
+    "test:e2e:report": "playwright show-report playwright-report",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",
-    "lint": "oxlint . --ignore-pattern 'dist/**' --ignore-pattern 'dist-electron/**' --ignore-pattern 'release/**'",
-    "fmt": "oxfmt . '!dist/**' '!dist-electron/**' '!release/**'",
-    "fmt:check": "oxfmt . '!dist/**' '!dist-electron/**' '!release/**' --check"
+    "lint": "oxlint . --ignore-pattern 'dist/**' --ignore-pattern 'dist-electron/**' --ignore-pattern 'release/**' --ignore-pattern 'playwright-report/**' --ignore-pattern 'test-results/**'",
+    "fmt": "oxfmt . '!dist/**' '!dist-electron/**' '!release/**' '!playwright-report/**' '!test-results/**'",
+    "fmt:check": "oxfmt . '!dist/**' '!dist-electron/**' '!release/**' '!playwright-report/**' '!test-results/**' --check"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",

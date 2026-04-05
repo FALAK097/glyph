@@ -15,14 +15,14 @@ Package manager: **pnpm 10.26.0** (always use `pnpm`, never `npm` or `yarn`).
 
 This repo ships local skills for various domains. **Load them before working on related tasks.**
 
-| Skill | Path | When to load |
-| --- | --- | --- |
-| `electron` | `.agents/skills/electron/SKILL.md` | IPC, BrowserWindow, menus, tray, packaging, security, cross-platform Electron APIs |
-| `frontend-design` | `.agents/skills/frontend-design/SKILL.md` | When building frontend components/interfaces to ensure distinctive, production-grade design |
-| `github-project-workflow` | `.agents/skills/github-project-workflow/SKILL.md` | When working on GitHub issues, PRs, roadmap execution, or project board status updates |
-| `remotion-best-practices` | `.agents/skills/remotion-best-practices/SKILL.md` | Best practices for Remotion - Video creation in React |
-| `vercel-react-best-practices` | `.agents/skills/vercel-react-best-practices/SKILL.md` | Performance and optimization guidelines for React/Next.js |
-| `web-design-guidelines` | `.agents/skills/web-design-guidelines/SKILL.md` | When reviewing UI, checking accessibility, UX audits, or verifying best practices |
+| Skill                         | Path                                                  | When to load                                                                                |
+| ----------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `electron`                    | `.agents/skills/electron/SKILL.md`                    | IPC, BrowserWindow, menus, tray, packaging, security, cross-platform Electron APIs          |
+| `frontend-design`             | `.agents/skills/frontend-design/SKILL.md`             | When building frontend components/interfaces to ensure distinctive, production-grade design |
+| `github-project-workflow`     | `.agents/skills/github-project-workflow/SKILL.md`     | When working on GitHub issues, PRs, roadmap execution, or project board status updates      |
+| `remotion-best-practices`     | `.agents/skills/remotion-best-practices/SKILL.md`     | Best practices for Remotion - Video creation in React                                       |
+| `vercel-react-best-practices` | `.agents/skills/vercel-react-best-practices/SKILL.md` | Performance and optimization guidelines for React/Next.js                                   |
+| `web-design-guidelines`       | `.agents/skills/web-design-guidelines/SKILL.md`       | When reviewing UI, checking accessibility, UX audits, or verifying best practices           |
 
 ---
 
@@ -73,7 +73,7 @@ This repo ships local skills for various domains. **Load them before working on 
   ```ts
   // Good — only re-renders when activeFileId changes
   const activeFileId = useWorkspaceStore((s) => s.activeFileId);
-  
+
   // Bad — re-renders on any store update
   const store = useWorkspaceStore();
   ```
@@ -169,7 +169,17 @@ pnpm --filter @glyph/desktop lint   # runs: eslint . --ext ts,tsx
 
 ### Tests
 
-There is currently **no test framework** set up. Update this section when tests are added.
+Desktop Playwright smoke tests are available:
+
+```bash
+pnpm test:e2e:desktop
+pnpm test:e2e:desktop:headed
+pnpm test:e2e:desktop:debug
+```
+
+These run from the repo root and build `apps/desktop` before launching Electron for a smoke test.
+Run `pnpm test:e2e:desktop` after meaningful desktop UI, Electron, or command-palette changes when you want a fast launch-and-interaction sanity check.
+Keep local Electron runs headed so the real app window can be observed while debugging; CI stays virtualized.
 
 ---
 
@@ -223,14 +233,14 @@ glyph/
 
 ### Naming Conventions
 
-| Entity | Convention | Example |
-| --- | --- | --- |
-| React components | PascalCase | `MarkdownEditor`, `CommandPalette` |
-| Functions / hooks | camelCase | `flattenFiles`, `useWorkspace` |
-| Types / interfaces | PascalCase | `AppSettings`, `DirectoryNode` |
-| Constants | SCREAMING_SNAKE_CASE | `DEFAULT_SHORTCUTS`, `MODIFIER_TOKENS` |
-| CSS class names | kebab-case | `editor-canvas`, `sidebar-file` |
-| IPC channel names | `domain:action` | `workspace:open`, `settings:save` |
+| Entity             | Convention           | Example                                |
+| ------------------ | -------------------- | -------------------------------------- |
+| React components   | PascalCase           | `MarkdownEditor`, `CommandPalette`     |
+| Functions / hooks  | camelCase            | `flattenFiles`, `useWorkspace`         |
+| Types / interfaces | PascalCase           | `AppSettings`, `DirectoryNode`         |
+| Constants          | SCREAMING_SNAKE_CASE | `DEFAULT_SHORTCUTS`, `MODIFIER_TOKENS` |
+| CSS class names    | kebab-case           | `editor-canvas`, `sidebar-file`        |
+| IPC channel names  | `domain:action`      | `workspace:open`, `settings:save`      |
 
 ### Exports
 

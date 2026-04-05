@@ -21,6 +21,12 @@ import type {
   SkillLibrarySnapshot,
 } from "../src/shared/skills.js";
 
+/**
+ * Retries an IPC invoke when the main process handler is not yet registered.
+ * Only use for startup-critical calls that may fire before `app.whenReady()`
+ * finishes wiring IPC handlers. User-initiated calls should use plain
+ * `ipcRenderer.invoke` since handlers are guaranteed to exist by then.
+ */
 async function invokeWithRetry<T>(channel: string, ...args: unknown[]) {
   for (let attempt = 0; attempt < 8; attempt += 1) {
     try {
@@ -41,17 +47,17 @@ async function invokeWithRetry<T>(channel: string, ...args: unknown[]) {
 
 const api = {
   openDialog(kind: DialogKind) {
-    return invokeWithRetry<FileOpenResult | null>("dialog:open", kind);
+    return ipcRenderer.invoke("dialog:open", kind) as Promise<FileOpenResult | null>;
   },
   pickAsset(kind: "image" | "any-file") {
-    return invokeWithRetry<AssetSelection | null>("asset:pick", kind);
+    return ipcRenderer.invoke("asset:pick", kind) as Promise<AssetSelection | null>;
   },
   resolveLinkTarget(currentFilePath: string | null, href: string) {
-    return invokeWithRetry<ResolvedLinkTarget | null>(
+    return ipcRenderer.invoke(
       "app:resolveLinkTarget",
       currentFilePath,
       href,
-    );
+    ) as Promise<ResolvedLinkTarget | null>;
   },
   openFolder(dirPath?: string) {
     return invokeWithRetry<WorkspaceSnapshot | null>("workspace:openFolder", dirPath);
@@ -60,19 +66,19 @@ const api = {
     return invokeWithRetry<WorkspaceSnapshot | null>("workspace:openDefault");
   },
   openDocument() {
-    return invokeWithRetry<FileDocument | null>("workspace:openDocument");
+    return ipcRenderer.invoke("workspace:openDocument") as Promise<FileDocument | null>;
   },
   readFile(filePath: string) {
-    return invokeWithRetry<FileDocument>("workspace:openFile", filePath);
+    return ipcRenderer.invoke("workspace:openFile", filePath) as Promise<FileDocument>;
   },
   getSkillLibrary() {
     return invokeWithRetry<SkillLibrarySnapshot>("skills:getLibrary");
   },
   refreshSkillLibrary(changedPaths?: string[]) {
-    return invokeWithRetry<SkillLibrarySnapshot>("skills:refresh", changedPaths);
+    return ipcRenderer.invoke("skills:refresh", changedPaths) as Promise<SkillLibrarySnapshot>;
   },
   searchSkillLibrary(query: string) {
-    return invokeWithRetry<string[]>("skills:search", query);
+    return ipcRenderer.invoke("skills:search", query) as Promise<string[]>;
   },
   readSkillDocument(filePath: string) {
     return ipcRenderer.invoke("skills:readDocument", filePath) as Promise<SkillDocument>;
@@ -81,39 +87,35 @@ const api = {
     return ipcRenderer.invoke("skills:saveDocument", filePath, content) as Promise<SkillDocument>;
   },
   saveFile(filePath: string, content: string) {
-    return invokeWithRetry<FileDocument>("workspace:saveFile", filePath, content);
+    return ipcRenderer.invoke("workspace:saveFile", filePath, content) as Promise<FileDocument>;
   },
   createFile(parentDir: string, fileName: string) {
-    return invokeWithRetry<FileDocument>("workspace:createFile", parentDir, fileName);
+    return ipcRenderer.invoke("workspace:createFile", parentDir, fileName) as Promise<FileDocument>;
   },
   renameFile(oldPath: string, newName: string) {
-    return invokeWithRetry<FileDocument>("workspace:renameFile", oldPath, newName);
+    return ipcRenderer.invoke("workspace:renameFile", oldPath, newName) as Promise<FileDocument>;
   },
   deleteFile(targetPath: string) {
-    return invokeWithRetry<string>("workspace:deleteFile", targetPath);
+    return ipcRenderer.invoke("workspace:deleteFile", targetPath) as Promise<string>;
   },
   createFolder(parentDir: string, folderName: string) {
-    return invokeWithRetry<WorkspaceSnapshot["tree"]>(
-      "workspace:createFolder",
-      parentDir,
-      folderName,
-    );
+    return ipcRenderer.invoke("workspace:createFolder", parentDir, folderName) as Promise<
+      WorkspaceSnapshot["tree"]
+    >;
   },
   searchWorkspace(query: string) {
-    return invokeWithRetry<SearchResult[]>("workspace:search", query);
+    return ipcRenderer.invoke("workspace:search", query) as Promise<SearchResult[]>;
   },
   getSidebarNode(kind: "file" | "directory", targetPath: string) {
-    return invokeWithRetry<WorkspaceSnapshot["tree"][number] | null>(
-      "sidebar:getNode",
-      kind,
-      targetPath,
-    );
+    return ipcRenderer.invoke("sidebar:getNode", kind, targetPath) as Promise<
+      WorkspaceSnapshot["tree"][number] | null
+    >;
   },
   getSettings() {
     return invokeWithRetry<AppSettings>("settings:get");
   },
   updateSettings(patch: Partial<AppSettings>) {
-    return invokeWithRetry<AppSettings>("settings:update", patch);
+    return ipcRenderer.invoke("settings:update", patch) as Promise<AppSettings>;
   },
   getAppInfo() {
     return invokeWithRetry<AppInfo>("app:getInfo");
@@ -167,7 +169,7 @@ const api = {
     return invokeWithRetry<ExternalFileTarget | null>("app:getPendingExternalPath");
   },
   revealInFinder(targetPath: string) {
-    return invokeWithRetry<boolean>("app:revealInFinder", targetPath);
+    return ipcRenderer.invoke("app:revealInFinder", targetPath) as Promise<boolean>;
   },
   onExternalFile(listener: (target: ExternalFileTarget) => void) {
     const wrapped = (_event: Electron.IpcRendererEvent, target: ExternalFileTarget) => {
@@ -198,7 +200,7 @@ const api = {
     return ipcRenderer.invoke("app:saveBlob", filePath, base64Data);
   },
   exportMarkdownToPDF(markdown: string, filename: string) {
-    return invokeWithRetry<string>("app:exportPDF", markdown, filename);
+    return ipcRenderer.invoke("app:exportPDF", markdown, filename) as Promise<string>;
   },
 };
 

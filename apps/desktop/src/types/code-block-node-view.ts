@@ -1,5 +1,3 @@
-export type CodeBlockNodeViewProps = Record<string, unknown>;
-
 export const SUPPORTED_LANGUAGES = [
   "javascript",
   "typescript",

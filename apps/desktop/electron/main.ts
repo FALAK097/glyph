@@ -84,7 +84,6 @@ let activeWatcher: ReturnType<typeof watch> | null = null;
 let activeWorkspaceRoot: string | null = null;
 let searchableFilesCache: string[] = [];
 let settingsUpdatePromise: Promise<AppSettings> | null = null;
-let cachedSettings: AppSettings | null = null;
 let pendingExternalPath: string | null = null;
 let updateCheckInterval: NodeJS.Timeout | null = null;
 const MARKDOWN_EXTENSIONS = [".md", ".mdx", ".markdown"] as const;
@@ -1022,62 +1021,67 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
   }
 
   const candidate = input as Partial<AppSettings>;
-  const validPinnedFiles: string[] = [];
-  const validHiddenFiles: string[] = [];
-  const persistedFileGroups = [
-    [normalizePersistedFileList(candidate.hiddenFiles), validHiddenFiles],
-    [normalizePersistedFileList(candidate.pinnedFiles), validPinnedFiles],
-  ] as const;
-
-  for (const [inputPaths, target] of persistedFileGroups) {
-    const validated = await Promise.all(
-      inputPaths.map(async (filePath) => {
-        try {
-          await fs.access(filePath);
-          return filePath;
-        } catch {
-          return null;
-        }
-      }),
-    );
-    for (const filePath of validated) {
-      if (filePath) target.push(filePath);
-    }
-  }
-
+  const hiddenFilePaths = normalizePersistedFileList(candidate.hiddenFiles);
+  const pinnedFilePaths = normalizePersistedFileList(candidate.pinnedFiles);
   const validSidebar = normalizeSidebarState(candidate.sidebar);
 
-  const validSidebarItems = (
-    await Promise.all(
-      validSidebar.items.map(async (item) => {
-        try {
-          const stats = await fs.stat(item.path);
-          if (
-            (item.kind === "file" && stats.isFile()) ||
-            (item.kind === "directory" && stats.isDirectory())
-          ) {
-            return item;
+  // Run all filesystem validations in parallel — each group is independent.
+  const [validatedHidden, validatedPinned, validatedSidebarItems, validatedExpandedFolders] =
+    await Promise.all([
+      Promise.all(
+        hiddenFilePaths.map(async (filePath) => {
+          try {
+            await fs.access(filePath);
+            return filePath;
+          } catch {
+            return null;
           }
-        } catch {
-          // Skip sidebar entries that no longer exist.
-        }
-        return null;
-      }),
-    )
-  ).filter((item): item is NonNullable<typeof item> => item !== null);
-
-  const validExpandedFolders = (
-    await Promise.all(
-      validSidebar.expandedFolders.map(async (folderPath) => {
-        try {
-          const stats = await fs.stat(folderPath);
-          return stats.isDirectory() ? folderPath : null;
-        } catch {
+        }),
+      ),
+      Promise.all(
+        pinnedFilePaths.map(async (filePath) => {
+          try {
+            await fs.access(filePath);
+            return filePath;
+          } catch {
+            return null;
+          }
+        }),
+      ),
+      Promise.all(
+        validSidebar.items.map(async (item) => {
+          try {
+            const stats = await fs.stat(item.path);
+            if (
+              (item.kind === "file" && stats.isFile()) ||
+              (item.kind === "directory" && stats.isDirectory())
+            ) {
+              return item;
+            }
+          } catch {
+            // Skip sidebar entries that no longer exist.
+          }
           return null;
-        }
-      }),
-    )
-  ).filter((p): p is string => p !== null);
+        }),
+      ),
+      Promise.all(
+        validSidebar.expandedFolders.map(async (folderPath) => {
+          try {
+            const stats = await fs.stat(folderPath);
+            return stats.isDirectory() ? folderPath : null;
+          } catch {
+            return null;
+          }
+        }),
+      ),
+    ]);
+
+  const validHiddenFiles = validatedHidden.filter((p): p is string => p !== null);
+  const validPinnedFiles = validatedPinned.filter((p): p is string => p !== null);
+  const validSidebarItems = validatedSidebarItems.filter(
+    (item): item is NonNullable<typeof item> => item !== null,
+  );
+  const validExpandedFolders = validatedExpandedFolders.filter((p): p is string => p !== null);
 
   return {
     defaultWorkspacePath:
@@ -1269,9 +1273,9 @@ async function ensureWorkspace(dirPath: string) {
 }
 
 async function readMarkdownFile(filePath: string) {
+  let raw: string;
   try {
-    // Check if file exists first
-    await fs.access(filePath);
+    raw = await fs.readFile(filePath, "utf8");
   } catch (err) {
     const code =
       typeof err === "object" && err && "code" in err
@@ -1283,12 +1287,10 @@ async function readMarkdownFile(filePath: string) {
     throw err;
   }
 
-  const content = (await fs.readFile(filePath, "utf8")).replace(/\r\n?/g, "\n");
-
   return {
     path: filePath,
     name: path.basename(filePath),
-    content,
+    content: raw.replace(/\r\n?/g, "\n"),
   };
 }
 
@@ -1411,18 +1413,35 @@ async function openWorkspace(dirPath: string): Promise<WorkspaceSnapshot> {
     },
   });
 
-  activeWatcher.on("all", async (_eventName, changedPath) => {
+  // Debounce rapid filesystem changes (e.g. git checkout) to avoid
+  // redundant directory tree rebuilds. Coalesce into a single rebuild
+  // after 100ms of quiet.
+  let watcherDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  activeWatcher.on("all", (_eventName, changedPath) => {
     if (!mainWindow || !isMarkdownFile(changedPath)) {
       return;
     }
 
-    const nextTree = await buildDirectoryTree(dirPath);
-    searchableFilesCache = await collectMarkdownFiles(nextTree);
-    mainWindow.webContents.send("workspace:changed", {
-      rootPath: dirPath,
-      tree: nextTree,
-      changedPath,
-    });
+    if (watcherDebounceTimer) {
+      clearTimeout(watcherDebounceTimer);
+    }
+
+    watcherDebounceTimer = setTimeout(async () => {
+      watcherDebounceTimer = null;
+
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        return;
+      }
+
+      const nextTree = await buildDirectoryTree(dirPath);
+      searchableFilesCache = await collectMarkdownFiles(nextTree);
+      mainWindow.webContents.send("workspace:changed", {
+        rootPath: dirPath,
+        tree: nextTree,
+        changedPath,
+      });
+    }, 100);
   });
 
   return {
@@ -1532,6 +1551,7 @@ async function createWindow() {
     height: 920,
     minWidth: 980,
     minHeight: 700,
+    show: false,
     icon: iconPath,
     titleBarStyle: "hiddenInset",
     backgroundColor: nativeTheme.shouldUseDarkColors
@@ -1543,6 +1563,10 @@ async function createWindow() {
       devTools: isDev,
       sandbox: true,
     },
+  });
+
+  mainWindow.once("ready-to-show", () => {
+    mainWindow?.show();
   });
 
   mainWindow.webContents.on("did-fail-load", (_event, code, description, validatedUrl) => {
@@ -1636,7 +1660,14 @@ ipcMain.handle("workspace:saveFile", async (_event, filePath: string, content: s
   }
 
   await fs.writeFile(filePath, nextContent, "utf8");
-  return readMarkdownFile(filePath);
+
+  // Return in-memory result instead of re-reading from disk — the content is
+  // already known since we just wrote it.
+  return {
+    path: filePath,
+    name: path.basename(filePath),
+    content: content.replace(/\r\n?/g, "\n"),
+  };
 });
 
 ipcMain.handle("workspace:createFile", async (_event, parentDir: string, fileName: string) => {
@@ -1930,7 +1961,10 @@ app
     wireAutoUpdater();
 
     if (getUpdatesMode() === "automatic") {
-      await hydratePersistedUpdateState();
+      // Run hydration concurrently with window creation — the renderer is not
+      // loaded yet so broadcastUpdateState inside hydrate is a no-op anyway.
+      // We re-broadcast after createWindow finishes.
+      void hydratePersistedUpdateState();
     }
 
     if (process.platform === "darwin" && app.dock) {

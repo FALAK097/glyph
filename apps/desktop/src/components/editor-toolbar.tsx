@@ -19,6 +19,8 @@ import {
 } from "@/components/icons";
 import { FileManagerLogo } from "./file-manager-logo";
 
+const MARKDOWN_FILE_SUFFIX_PATTERN = /\.(md|mdx|markdown)$/i;
+
 type EditorToolbarProps = {
   _isMacLike: boolean;
   isSidebarCollapsed: boolean | undefined;
@@ -131,7 +133,6 @@ export function EditorToolbar({
   const backTooltipLabel = `Back (${navigateBackShortcut ?? "⌘["})`;
   const forwardTooltipLabel = `Forward (${navigateForwardShortcut ?? "⌘]"})`;
   const searchButtonLabel = commandPaletteLabel ?? "Search notes";
-  const MARKDOWN_FILE_SUFFIX_PATTERN = /\.(md|mdx|markdown)$/i;
 
   return (
     <div className={`flex items-center py-2 border-b border-border/40 gap-2 ${headerPaddingClass}`}>

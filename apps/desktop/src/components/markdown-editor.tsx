@@ -102,6 +102,8 @@ const getDevPreviewUpdateState = (): UpdateState | null => {
       currentVersion: "0.1.0",
       availableVersion: "0.2.0",
       downloadedVersion: null,
+      recentlyInstalledVersion: null,
+      releasePageUrl: null,
       releaseName: "Glyph 0.2.0",
       releaseNotes: null,
       progressPercent: null,
@@ -116,6 +118,8 @@ const getDevPreviewUpdateState = (): UpdateState | null => {
       currentVersion: "0.1.0",
       availableVersion: "0.2.0",
       downloadedVersion: null,
+      recentlyInstalledVersion: null,
+      releasePageUrl: null,
       releaseName: "Glyph 0.2.0",
       releaseNotes: null,
       progressPercent: 68,
@@ -130,9 +134,27 @@ const getDevPreviewUpdateState = (): UpdateState | null => {
       currentVersion: "0.1.0",
       availableVersion: "0.2.0",
       downloadedVersion: "0.2.0",
+      recentlyInstalledVersion: null,
+      releasePageUrl: null,
       releaseName: "Glyph 0.2.0",
       releaseNotes: null,
       progressPercent: 100,
+      checkedAt: null,
+      errorMessage: null,
+    };
+  }
+
+  if (previewStatus === "installed") {
+    return {
+      status: "not-available",
+      currentVersion: "0.2.0",
+      availableVersion: null,
+      downloadedVersion: null,
+      recentlyInstalledVersion: "0.2.0",
+      releasePageUrl: null,
+      releaseName: null,
+      releaseNotes: null,
+      progressPercent: null,
       checkedAt: null,
       errorMessage: null,
     };
@@ -444,18 +466,44 @@ export const MarkdownEditor = ({
   const effectiveUpdateState = devPreviewUpdateState ?? updateState;
 
   const shouldShowUpdateButton =
+    effectiveUpdateState?.status === "error" ||
     effectiveUpdateState?.status === "available" ||
     effectiveUpdateState?.status === "downloading" ||
     effectiveUpdateState?.status === "downloaded";
+  const shouldShowChangelogButton =
+    (effectiveUpdateState?.status === "idle" || effectiveUpdateState?.status === "not-available") &&
+    Boolean(effectiveUpdateState?.recentlyInstalledVersion);
+  const shouldShowUpdateActionButton = shouldShowUpdateButton || shouldShowChangelogButton;
+  const isManualReleaseButton =
+    effectiveUpdateState?.status === "available" && Boolean(effectiveUpdateState?.releasePageUrl);
 
-  const updateButtonLabel =
-    effectiveUpdateState?.status === "downloaded"
-      ? "Install update"
-      : effectiveUpdateState?.status === "downloading"
-        ? `Downloading ${Math.round(effectiveUpdateState.progressPercent ?? 0)}%`
-        : "Update available";
-
+  const updateButtonLabel = shouldShowChangelogButton
+    ? "View changelog"
+    : isManualReleaseButton
+      ? "Download latest release"
+      : effectiveUpdateState?.status === "downloaded"
+        ? "Restart to Update"
+        : effectiveUpdateState?.status === "downloading"
+          ? `Downloading ${Math.round(effectiveUpdateState.progressPercent ?? 0)}%`
+          : effectiveUpdateState?.errorMessage
+            ? "Retry update"
+            : "Update available";
+  const updateButtonTooltip = shouldShowChangelogButton
+    ? `See what's new in Glyph ${effectiveUpdateState?.recentlyInstalledVersion ?? ""}`.trim()
+    : isManualReleaseButton
+      ? "A newer Glyph release is available on GitHub. Download and install it manually."
+      : effectiveUpdateState?.status === "downloaded"
+        ? effectiveUpdateState.errorMessage
+          ? `Restart Glyph to retry the update. ${effectiveUpdateState.errorMessage}`
+          : "Restart Glyph to install the downloaded release"
+        : effectiveUpdateState?.status === "downloading"
+          ? "Glyph is downloading the latest release in the background"
+          : effectiveUpdateState?.errorMessage
+            ? `Glyph hit an update error. ${effectiveUpdateState.errorMessage}`
+            : "Glyph is downloading the latest release in the background";
   const isUpdateButtonDisabled = effectiveUpdateState?.status === "downloading";
+  const updateButtonVariant =
+    shouldShowChangelogButton || isManualReleaseButton ? "outline" : "default";
   const isFocusLayout = Boolean(isFocusMode);
   const revealInFolderLabel = folderRevealLabel ?? getFolderRevealLabel(navigator.platform);
   const editorSurfaceClassName = [
@@ -1345,11 +1393,11 @@ export const MarkdownEditor = ({
               ) : null}
             </div>
           ) : null}
-          {shouldShowUpdateButton && onUpdateAction ? (
+          {shouldShowUpdateActionButton && onUpdateAction ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant="default"
+                  variant={updateButtonVariant}
                   size="sm"
                   className="h-8 shrink-0 rounded-full px-3 text-xs font-semibold shadow-sm"
                   onClick={onUpdateAction}
@@ -1359,11 +1407,7 @@ export const MarkdownEditor = ({
                   {updateButtonLabel}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="bottom">
-                {effectiveUpdateState?.status === "downloaded"
-                  ? "Restart to install the latest Glyph release"
-                  : "Download the latest Glyph release"}
-              </TooltipContent>
+              <TooltipContent side="bottom">{updateButtonTooltip}</TooltipContent>
             </Tooltip>
           ) : null}
           {headerAccessory ? <div className="mr-1 flex items-center">{headerAccessory}</div> : null}

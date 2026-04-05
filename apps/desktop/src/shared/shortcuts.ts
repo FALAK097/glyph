@@ -5,6 +5,7 @@ export type ShortcutId =
   | "new-note"
   | "open-file"
   | "open-folder"
+  | "check-updates"
   | "save"
   | "settings"
   | "toggle-sidebar"
@@ -39,6 +40,7 @@ export const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
   { id: "new-note", label: "New Note", keys: "⌘ N" },
   { id: "open-file", label: "Open File", keys: "⌘ O" },
   { id: "open-folder", label: "Open Folder", keys: "⇧ ⌘ O" },
+  { id: "check-updates", label: "Update Action", keys: "⇧ ⌘ U" },
   { id: "save", label: "Save", keys: "⌘ S" },
   { id: "settings", label: "Settings", keys: "⌘ ," },
   { id: "toggle-sidebar", label: "Toggle Sidebar", keys: "⌘ \\" },

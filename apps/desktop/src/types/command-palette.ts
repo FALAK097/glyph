@@ -14,10 +14,6 @@ export type CommandPaletteProps = {
   isOpen: boolean;
   query: string;
   items: CommandPaletteItem[];
-  selectedIndex: number;
   onChangeQuery: (value: string) => void;
   onClose: () => void;
-  onHoverItem: (index: number) => void;
-  onMove: (direction: 1 | -1) => void;
-  onSelect: () => void;
 };

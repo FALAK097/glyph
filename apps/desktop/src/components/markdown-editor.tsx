@@ -420,16 +420,15 @@ export const MarkdownEditor = ({
   const effectiveUpdateState = devPreviewUpdateState ?? updateState;
 
   const shouldShowUpdateButton =
+    effectiveUpdateState?.status === "error" ||
     effectiveUpdateState?.status === "available" ||
     effectiveUpdateState?.status === "downloading" ||
     effectiveUpdateState?.status === "downloaded";
 
   const updateButtonLabel =
-    effectiveUpdateState?.status === "downloaded"
-      ? "Install update"
-      : effectiveUpdateState?.status === "downloading"
-        ? `Downloading ${Math.round(effectiveUpdateState.progressPercent ?? 0)}%`
-        : "Update available";
+    effectiveUpdateState?.status === "error"
+      ? "Retry update check"
+      : "Download latest";
 
   const isUpdateButtonDisabled = effectiveUpdateState?.status === "downloading";
   const isFocusLayout = Boolean(isFocusMode);
@@ -1265,9 +1264,9 @@ export const MarkdownEditor = ({
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                {effectiveUpdateState?.status === "downloaded"
-                  ? "Restart to install the latest Glyph release"
-                  : "Download the latest Glyph release"}
+                {effectiveUpdateState?.status === "error"
+                  ? effectiveUpdateState.errorMessage ?? "Retry checking for updates"
+                  : "Open GitHub Releases to download and install the latest Glyph release"}
               </TooltipContent>
             </Tooltip>
           ) : null}

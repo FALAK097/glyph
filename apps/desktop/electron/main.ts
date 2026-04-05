@@ -44,6 +44,7 @@ const isDev = !app.isPackaged || process.env.GLYPH_DEV_APP === "1";
 const devServerUrl = "http://127.0.0.1:5173";
 const localAssetProtocol = "glyph-local";
 const APP_NAME = "Glyph";
+const RELEASE_PAGE_URL = "https://github.com/FALAK097/glyph/releases/latest";
 const STARTUP_LIGHT_BACKGROUND = "#f8f7fb";
 const STARTUP_DARK_BACKGROUND = "#1f1b26";
 
@@ -110,6 +111,7 @@ function getAppInfo(): AppInfo {
     isPackaged: app.isPackaged && !isDev,
     platform: process.platform,
     updatesEnabled: app.isPackaged && !isDev,
+    releasePageUrl: RELEASE_PAGE_URL,
   };
 }
 
@@ -594,6 +596,12 @@ function buildApplicationMenu(shortcuts: AppSettings["shortcuts"]) {
           accelerator: getAccelerator("open-folder"),
           click: () =>
             mainWindow?.webContents.send("app:command", "open-folder" satisfies AppCommand),
+        },
+        {
+          label: "Check for Updates",
+          accelerator: getAccelerator("check-updates"),
+          click: () =>
+            mainWindow?.webContents.send("app:command", "check-updates" satisfies AppCommand),
         },
         { type: "separator" },
         {
@@ -1377,7 +1385,20 @@ ipcMain.handle("app:installUpdate", async () => {
   }
 
   setImmediate(() => {
-    autoUpdater.quitAndInstall();
+    try {
+      autoUpdater.quitAndInstall();
+      setTimeout(() => {
+        setUpdateState({
+          status: "error",
+          errorMessage: "Installation did not start. Please try downloading the update again.",
+        });
+      }, 5000);
+    } catch (error) {
+      setUpdateState({
+        status: "error",
+        errorMessage: error instanceof Error ? error.message : "Failed to install the update.",
+      });
+    }
   });
 });
 

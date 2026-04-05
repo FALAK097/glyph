@@ -770,6 +770,30 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     [],
   );
 
+  const triggerUpdateAction = useCallback(async () => {
+    if (!appInfo?.updatesEnabled || !updateState) {
+      return;
+    }
+
+    if (
+      updateState.status === "available" ||
+      updateState.status === "downloading" ||
+      updateState.status === "downloaded"
+    ) {
+      await glyph.openExternal(appInfo.releasePageUrl);
+      return;
+    }
+
+    if (
+      updateState.status === "idle" ||
+      updateState.status === "checking" ||
+      updateState.status === "not-available" ||
+      updateState.status === "error"
+    ) {
+      await glyph.checkForUpdates();
+    }
+  }, [appInfo?.releasePageUrl, appInfo?.updatesEnabled, glyph, updateState]);
+
   const shortcuts = useMemo(
     () => mergeShortcutSettings(settings?.shortcuts),
     [settings?.shortcuts],
@@ -816,6 +840,36 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
           setIsPaletteOpen(false);
         },
       },
+      ...(appInfo?.updatesEnabled && updateState
+        ? [
+            {
+              id: "check-updates",
+              title:
+                updateState.status === "available" ||
+                updateState.status === "downloading" ||
+                updateState.status === "downloaded"
+                  ? "Download Latest Release"
+                  : updateState.status === "error"
+                    ? "Retry Update Check"
+                    : "Check for Updates",
+              subtitle:
+                updateState.status === "available" ||
+                updateState.status === "downloading" ||
+                updateState.status === "downloaded"
+                  ? "Open GitHub Releases to download and install manually"
+                  : updateState.status === "error"
+                  ? updateState.errorMessage ?? "Try checking for updates again"
+                  : "Check whether a new Glyph release is available",
+              shortcut: getShortcutDisplay(shortcuts, "check-updates"),
+              section: "Actions",
+              kind: "command" as const,
+              onSelect: () => {
+                void triggerUpdateAction();
+                setIsPaletteOpen(false);
+              },
+            },
+          ]
+        : []),
       {
         id: "settings",
         title: "Settings",
@@ -938,11 +992,14 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
       saveSettings,
       shortcuts,
       showOutline,
+      appInfo?.updatesEnabled,
       syncOpenedFile,
       syncWorkspace,
       toggleFocusMode,
       toggleOutline,
       togglePinnedFile,
+      triggerUpdateAction,
+      updateState,
     ],
   );
 
@@ -1145,6 +1202,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
         "navigate-back",
         "navigate-forward",
         "focus-mode",
+        "check-updates",
       ]);
       const globalShortcut = shortcuts.find(
         (entry) => globalShortcutIds.has(entry.id) && matchShortcut(event, entry.keys),
@@ -1169,6 +1227,9 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
             break;
           case "focus-mode":
             void toggleFocusMode();
+            break;
+          case "check-updates":
+            void triggerUpdateAction();
             break;
         }
         return;
@@ -1236,6 +1297,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     syncWorkspace,
     navigateBack,
     navigateForward,
+    triggerUpdateAction,
   ]);
 
   useEffect(() => {
@@ -1252,6 +1314,11 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
 
       if (command === "focus-mode") {
         void toggleFocusMode();
+        return;
+      }
+
+      if (command === "check-updates") {
+        await triggerUpdateAction();
         return;
       }
 
@@ -1301,6 +1368,7 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     syncWorkspace,
     glyph,
     toggleFocusMode,
+    triggerUpdateAction,
   ]);
 
   const saveStateLabel = isSaving
@@ -1340,30 +1408,6 @@ export const useDesktopAppController = (glyph: NonNullable<Window["glyph"]>) => 
     },
     [saveSettings],
   );
-
-  const triggerUpdateAction = useCallback(async () => {
-    if (!appInfo?.updatesEnabled || !updateState) {
-      return;
-    }
-
-    if (updateState.status === "downloaded") {
-      await glyph.installUpdate();
-      return;
-    }
-
-    if (updateState.status === "available") {
-      await glyph.downloadUpdate();
-      return;
-    }
-
-    if (
-      updateState.status === "idle" ||
-      updateState.status === "not-available" ||
-      updateState.status === "error"
-    ) {
-      await glyph.checkForUpdates();
-    }
-  }, [appInfo?.updatesEnabled, glyph, updateState]);
 
   return {
     activeFile,

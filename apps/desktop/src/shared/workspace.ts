@@ -96,6 +96,7 @@ export type AppInfo = {
   isPackaged: boolean;
   platform: string;
   updatesEnabled: boolean;
+  releasePageUrl: string;
 };
 
 export type UpdateStatus =
@@ -122,6 +123,7 @@ export type UpdateState = {
 export type AppCommand =
   | "open-file"
   | "open-folder"
+  | "check-updates"
   | "save"
   | "new-file"
   | "new-folder"

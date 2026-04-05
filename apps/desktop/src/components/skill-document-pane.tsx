@@ -32,7 +32,7 @@ type SkillDocumentPaneProps = {
   onOpenCommandPalette?: () => void;
   onOpenSettings?: () => void;
   onReloadAfterExternalChange?: () => void;
-  onScrollPositionChange?: (scrollTop: number) => void;
+  onScrollPositionChange?: (targetPath: string | null, scrollTop: number) => void;
   onSelectDocumentTab: (kind: SkillDocumentKind) => void;
   onToggleSidebar?: () => void;
   scrollRestorationKey?: string | null;

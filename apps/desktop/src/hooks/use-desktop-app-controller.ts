@@ -418,6 +418,7 @@ export const useDesktopAppController = (
     async (file: FileDocument, options?: { recordHistory?: boolean }) => {
       await ensureFileVisible(file.path);
       const currentRootPath = useWorkspaceStore.getState().rootPath;
+      const shouldPreserveFocus = useSessionStore.getState().hasDocumentScroll(file.path);
       setActiveFile(file);
       setIsWorkspaceMode(isFileInsideWorkspace(file.path, currentRootPath));
       setSidebarNodes((prev) => upsertSidebarFile(prev, file));
@@ -427,7 +428,7 @@ export const useDesktopAppController = (
       if (options?.recordHistory) {
         pushHistory(file.path);
       }
-      requestEditorFocus("end");
+      requestEditorFocus(shouldPreserveFocus ? "preserve" : "end");
     },
     [ensureFileVisible, glyph, pushHistory, requestEditorFocus, setActiveFile],
   );

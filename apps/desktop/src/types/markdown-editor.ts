@@ -54,7 +54,7 @@ export type MarkdownEditorProps = {
   onOpenNewWindow?: () => void;
   onDeleteNote?: () => void;
   onTogglePinnedFile?: () => void;
-  onScrollPositionChange?: (scrollTop: number) => void;
+  onScrollPositionChange?: (targetPath: string | null, scrollTop: number) => void;
   folderRevealLabel?: string;
   documentLabel?: string;
   outlineItems?: OutlineItem[];

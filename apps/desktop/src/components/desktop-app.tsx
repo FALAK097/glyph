@@ -84,6 +84,9 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const noteWorkspacePath = useSessionStore((state) => state.noteWorkspacePath);
   const noteFilePath = useSessionStore((state) => state.noteFilePath);
   const skillDocumentPath = useSessionStore((state) => state.skillDocumentPath);
+  const getPreferredSkillDocumentKind = useSessionStore(
+    (state) => state.getPreferredSkillDocumentKind,
+  );
   const setViewerMode = useSessionStore((state) => state.setViewerMode);
   const setNotesExpanded = useSessionStore((state) => state.setNotesExpanded);
   const setSkillsExpanded = useSessionStore((state) => state.setSkillsExpanded);
@@ -137,6 +140,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const [resolvedPaletteSkillQuery, setResolvedPaletteSkillQuery] = useState("");
   const [noteInitialScrollTop, setNoteInitialScrollTop] = useState(0);
   const [skillInitialScrollTop, setSkillInitialScrollTop] = useState(0);
+  const [pendingSkillRestorePath, setPendingSkillRestorePath] = useState<string | null>(null);
   const noteRenameInputRef = useRef<HTMLInputElement | null>(null);
   const confirmCancelRef = useRef<HTMLButtonElement | null>(null);
   const paletteSkillSearchNonceRef = useRef(0);
@@ -246,16 +250,16 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     [controller.activeFile],
   );
   const handleNoteScrollPositionChange = useCallback(
-    (scrollTop: number) => {
-      setDocumentScroll(controller.activeFile?.path ?? null, scrollTop);
+    (targetPath: string | null, scrollTop: number) => {
+      setDocumentScroll(targetPath, scrollTop);
     },
-    [controller.activeFile?.path, setDocumentScroll],
+    [setDocumentScroll],
   );
   const handleSkillScrollPositionChange = useCallback(
-    (scrollTop: number) => {
-      setDocumentScroll(skillsController.activeDocument?.path ?? null, scrollTop);
+    (targetPath: string | null, scrollTop: number) => {
+      setDocumentScroll(targetPath, scrollTop);
     },
-    [setDocumentScroll, skillsController.activeDocument?.path],
+    [setDocumentScroll],
   );
 
   useEffect(() => {
@@ -315,7 +319,11 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         return;
       }
 
-      const targetPath = matchingSkill.skillFilePath;
+      const preferredDocumentKind = getPreferredSkillDocumentKind(skillId);
+      const targetPath =
+        preferredDocumentKind === "agents" && matchingSkill.agentsFilePath
+          ? matchingSkill.agentsFilePath
+          : matchingSkill.skillFilePath;
 
       const opened = await skillsController.openSkillByPath(targetPath);
       if (!opened) {
@@ -324,7 +332,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
 
       setViewerMode("skill");
     },
-    [allSkills, setViewerMode, skillsController],
+    [allSkills, getPreferredSkillDocumentKind, setViewerMode, skillsController],
   );
 
   const handleSelectSkillCollection = useCallback(
@@ -374,12 +382,13 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       return;
     }
 
+    setPendingSkillRestorePath(persistedDocumentPath);
     void skillsController.openSkillByPath(persistedDocumentPath).then((opened) => {
       if (opened) {
-        initialSkillSessionRef.current.viewerMode = "note";
         return;
       }
 
+      setPendingSkillRestorePath(null);
       setSelectedSkillCollectionId(nextCollectionId);
       initialSkillSessionRef.current.viewerMode = "note";
     });
@@ -395,7 +404,31 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   ]);
 
   useEffect(() => {
-    if (!selectedSkillCollectionId || viewerMode !== "skill") {
+    if (!pendingSkillRestorePath || skillsController.isDocumentLoading) {
+      return;
+    }
+
+    if (
+      skillsController.activeDocument &&
+      isSamePath(skillsController.activeDocument.path, pendingSkillRestorePath)
+    ) {
+      setPendingSkillRestorePath(null);
+      initialSkillSessionRef.current.viewerMode = "note";
+      return;
+    }
+
+    if (!skillsController.activeDocument) {
+      setPendingSkillRestorePath(null);
+      initialSkillSessionRef.current.viewerMode = "note";
+    }
+  }, [
+    pendingSkillRestorePath,
+    skillsController.activeDocument,
+    skillsController.isDocumentLoading,
+  ]);
+
+  useEffect(() => {
+    if (!selectedSkillCollectionId || viewerMode !== "skill" || pendingSkillRestorePath) {
       return;
     }
 
@@ -430,6 +463,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     skillsController.activeSkill,
     skillsController.clearActiveSelection,
     viewerMode,
+    pendingSkillRestorePath,
     visibleSkillItems,
     visibleSkills,
   ]);
@@ -627,6 +661,14 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   ]);
 
   const isSkillSurfaceVisible = viewerMode === "skill";
+  const isAppBootstrapping = !sessionHasHydrated || !controller.hasBooted;
+  const isSkillSurfaceLoading =
+    isSkillSurfaceVisible &&
+    (isAppBootstrapping ||
+      !skillsController.hasLoadedOnce ||
+      skillsController.isLoading ||
+      Boolean(pendingSkillRestorePath) ||
+      (skillsController.isDocumentLoading && !skillsController.activeDocument));
   const isActiveSkillVisible =
     !selectedSkillCollectionId ||
     (skillsController.activeSkill
@@ -1098,6 +1140,11 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                 activeSkillId={
                   viewerMode === "skill" ? (skillsController.activeSkill?.id ?? null) : null
                 }
+                isLoading={
+                  !skillsController.hasLoadedOnce ||
+                  skillsController.isLoading ||
+                  Boolean(pendingSkillRestorePath)
+                }
                 items={visibleSkillItems}
                 searchQuery={skillsController.searchQuery}
                 onSelectSkill={(skillId) => void handleSelectSkill(skillId)}
@@ -1107,8 +1154,44 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
             ) : null}
 
             <div className="min-h-0 min-w-0">
-              {isSkillSurfaceVisible ? (
-                skillsController.activeDocument && isActiveSkillVisible ? (
+              {isAppBootstrapping ? (
+                <div className="flex h-full min-h-0 flex-col bg-background">
+                  <div
+                    className={`flex items-center gap-2 border-b border-border/40 py-2 ${
+                      controller.isSidebarCollapsed && navigator.platform.includes("Mac")
+                        ? "pl-20 pr-4"
+                        : "px-4"
+                    }`}
+                  >
+                    <div className="h-8 w-8 rounded-md bg-muted/70 motion-safe:animate-pulse" />
+                    <div className="mx-auto h-8 w-full max-w-sm rounded-full bg-muted/60 motion-safe:animate-pulse" />
+                    <div className="h-8 w-8 rounded-md bg-muted/70 motion-safe:animate-pulse" />
+                  </div>
+                  <div className="flex min-h-0 flex-1 flex-col gap-4 px-8 py-8">
+                    <div className="h-6 w-40 rounded-md bg-muted/60 motion-safe:animate-pulse" />
+                    <div className="h-4 w-72 rounded-md bg-muted/40 motion-safe:animate-pulse" />
+                    <div className="mt-6 h-40 rounded-2xl bg-muted/35 motion-safe:animate-pulse" />
+                    <div className="h-4 w-4/5 rounded-md bg-muted/30 motion-safe:animate-pulse" />
+                    <div className="h-4 w-3/5 rounded-md bg-muted/30 motion-safe:animate-pulse" />
+                  </div>
+                </div>
+              ) : isSkillSurfaceVisible ? (
+                isSkillSurfaceLoading ? (
+                  <SkillEmptyPane
+                    commandPaletteShortcut={
+                      getShortcutDisplay(controller.shortcuts, "command-palette") ?? "⌘P"
+                    }
+                    description="Restoring your last skill session and loading the current document."
+                    isSidebarCollapsed={controller.isSidebarCollapsed}
+                    onOpenCommandPalette={() => controller.setIsPaletteOpen(true)}
+                    onOpenSettings={() => controller.setIsSettingsOpen(true)}
+                    onToggleSidebar={() =>
+                      controller.setIsSidebarCollapsed(!controller.isSidebarCollapsed)
+                    }
+                    title="Loading skills"
+                    titleLabel={activeSkillCollection?.label ?? "Skills"}
+                  />
+                ) : skillsController.activeDocument && isActiveSkillVisible ? (
                   <SkillDocumentPane
                     activeDocument={skillsController.activeDocument}
                     draftContent={skillsController.draftContent}

@@ -42,6 +42,9 @@ export function useSkillLibraryController(
   { enabled = true }: UseSkillLibraryControllerOptions = {},
 ) {
   const clearSkillSession = useSessionStore((state) => state.clearSkillSession);
+  const setPreferredSkillDocumentKind = useSessionStore(
+    (state) => state.setPreferredSkillDocumentKind,
+  );
   const setSkillSession = useSessionStore((state) => state.setSkillSession);
   const [snapshot, setSnapshot] = useState<SkillLibrarySnapshot | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -576,7 +579,16 @@ export function useSkillLibraryController(
     }
 
     setSkillSession(activeDocumentPath, selectedDocumentKind);
-  }, [activeDocumentPath, clearSkillSession, enabled, selectedDocumentKind, setSkillSession]);
+    setPreferredSkillDocumentKind(activeSkillId, selectedDocumentKind);
+  }, [
+    activeDocumentPath,
+    activeSkillId,
+    clearSkillSession,
+    enabled,
+    selectedDocumentKind,
+    setPreferredSkillDocumentKind,
+    setSkillSession,
+  ]);
 
   useEffect(() => {
     if (!enabled || pendingExternalChange || !activeDocument?.isEditable || !isDirty) {

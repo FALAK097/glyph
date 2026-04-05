@@ -24,6 +24,7 @@ type SessionState = {
   noteFilePath: string | null;
   skillDocumentPath: string | null;
   skillDocumentKind: SkillDocumentKind;
+  skillDocumentKindsById: Record<string, SkillDocumentKind>;
   scrollPositions: Record<string, ScrollEntry>;
   setHasHydrated: (value: boolean) => void;
   setViewerMode: (mode: ViewerMode) => void;
@@ -32,9 +33,12 @@ type SessionState = {
   setSelectedSkillCollectionId: (value: string | null) => void;
   setNoteSession: (workspacePath: string | null, filePath: string | null) => void;
   setSkillSession: (documentPath: string | null, documentKind: SkillDocumentKind) => void;
+  setPreferredSkillDocumentKind: (skillId: string | null, documentKind: SkillDocumentKind) => void;
+  getPreferredSkillDocumentKind: (skillId: string | null | undefined) => SkillDocumentKind | null;
   clearSkillSession: () => void;
   setDocumentScroll: (targetPath: string | null, top: number) => void;
   getDocumentScroll: (targetPath: string | null | undefined) => number;
+  hasDocumentScroll: (targetPath: string | null | undefined) => boolean;
 };
 
 const toScrollKey = (targetPath: string) => normalizePath(targetPath).toLowerCase();
@@ -64,6 +68,7 @@ export const useSessionStore = create<SessionState>()(
       noteFilePath: null,
       skillDocumentPath: null,
       skillDocumentKind: "skill",
+      skillDocumentKindsById: {},
       scrollPositions: {},
       setHasHydrated: (value) => {
         set({ hasHydrated: value });
@@ -91,6 +96,25 @@ export const useSessionStore = create<SessionState>()(
           skillDocumentPath: skillDocumentPath ? normalizePath(skillDocumentPath) : null,
           skillDocumentKind,
         });
+      },
+      setPreferredSkillDocumentKind: (skillId, documentKind) => {
+        if (!skillId) {
+          return;
+        }
+
+        set((state) => ({
+          skillDocumentKindsById: {
+            ...state.skillDocumentKindsById,
+            [skillId]: documentKind,
+          },
+        }));
+      },
+      getPreferredSkillDocumentKind: (skillId) => {
+        if (!skillId) {
+          return null;
+        }
+
+        return get().skillDocumentKindsById[skillId] ?? null;
       },
       clearSkillSession: () => {
         set({
@@ -123,6 +147,13 @@ export const useSessionStore = create<SessionState>()(
 
         return get().scrollPositions[toScrollKey(targetPath)]?.top ?? 0;
       },
+      hasDocumentScroll: (targetPath) => {
+        if (!targetPath) {
+          return false;
+        }
+
+        return Object.hasOwn(get().scrollPositions, toScrollKey(targetPath));
+      },
     }),
     {
       name: SESSION_STORAGE_KEY,
@@ -136,6 +167,7 @@ export const useSessionStore = create<SessionState>()(
         noteFilePath: state.noteFilePath,
         skillDocumentPath: state.skillDocumentPath,
         skillDocumentKind: state.skillDocumentKind,
+        skillDocumentKindsById: state.skillDocumentKindsById,
         scrollPositions: state.scrollPositions,
       }),
       onRehydrateStorage: () => (state) => {

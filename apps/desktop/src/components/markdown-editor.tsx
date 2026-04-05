@@ -410,8 +410,8 @@ export const MarkdownEditor = ({
       return;
     }
 
-    onScrollPositionChangeRef.current(scrollContainerRef.current.scrollTop);
-  }, []);
+    onScrollPositionChangeRef.current(scrollRestorationKey, scrollContainerRef.current.scrollTop);
+  }, [scrollRestorationKey]);
 
   const focusEditorWithoutScroll = useCallback(
     (selection: { from: number; to: number }, resetScrollTop: boolean) => {

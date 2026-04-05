@@ -27,6 +27,8 @@
     "test:e2e": "pnpm run build && playwright test -c playwright.config.ts",
     "test:e2e:headed": "pnpm run build && playwright test -c playwright.config.ts --headed",
     "test:e2e:debug": "pnpm run build && playwright test -c playwright.config.ts --debug",
+    "test:e2e:run": "playwright test -c playwright.config.ts",
+    "test:e2e:run:headed": "playwright test -c playwright.config.ts --headed",
     "test:e2e:ui": "pnpm run build && playwright test -c playwright.config.ts --ui",
     "test:e2e:report": "playwright show-report playwright-report",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p electron/tsconfig.json",

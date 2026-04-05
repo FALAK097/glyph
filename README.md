@@ -95,6 +95,7 @@ pnpm lint
 pnpm fmt:check
 pnpm test:e2e:desktop
 pnpm test:e2e:desktop:headed
+pnpm test:e2e:desktop:run -- --grep "settings"
 pnpm test:e2e:desktop:ui
 pnpm cask:generate --version <version> --artifact-path apps/desktop/release/Glyph-<version>-mac.dmg
 ```
@@ -109,13 +110,18 @@ From the repo root:
 pnpm test:e2e:desktop
 pnpm test:e2e:desktop:headed
 pnpm test:e2e:desktop:debug
+pnpm test:e2e:desktop:run -- --grep "settings"
+pnpm test:e2e:desktop:run -- e2e/electron-smoke.spec.ts
 pnpm test:e2e:desktop:ui
 pnpm test:e2e:desktop:report
 ```
 
 These commands build the desktop app, launch Electron against the built renderer, and run a smoke suite around startup, the command palette, settings, and opening a seeded markdown note from a disposable workspace.
 `pnpm test:e2e:desktop` opens a real Electron window locally. In CI, the same test runs under `xvfb`, so it stays virtual to the runner while exercising the same app flow.
-For desktop UI or Electron changes, `pnpm test:e2e:desktop` is the default sanity check to run before merge. Use `pnpm test:e2e:desktop:ui` for Playwright's interactive runner, and `pnpm test:e2e:desktop:report` to inspect the latest HTML report after a failure.
+For desktop UI or Electron changes, `pnpm test:e2e:desktop` is the default sanity check to run before merge.
+For faster iteration on a specific change, build once with `pnpm build:desktop`, then run only the relevant Playwright test or title with `pnpm test:e2e:desktop:run -- ...`.
+Local Electron runs stay visible by design so the real app can be observed while debugging. CI remains virtualized under `xvfb`.
+Use `pnpm test:e2e:desktop:ui` for Playwright's interactive runner, and `pnpm test:e2e:desktop:report` to inspect the latest HTML report after a failure.
 
 ## Pre-commit checks
 

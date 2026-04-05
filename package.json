@@ -13,6 +13,8 @@
     "test:e2e:desktop": "pnpm --filter @glyph/desktop test:e2e",
     "test:e2e:desktop:headed": "pnpm --filter @glyph/desktop test:e2e:headed",
     "test:e2e:desktop:debug": "pnpm --filter @glyph/desktop test:e2e:debug",
+    "test:e2e:desktop:run": "node scripts/run-desktop-playwright.mjs",
+    "test:e2e:desktop:run:headed": "node scripts/run-desktop-playwright.mjs --headed",
     "test:e2e:desktop:ui": "pnpm --filter @glyph/desktop test:e2e:ui",
     "test:e2e:desktop:report": "pnpm --filter @glyph/desktop test:e2e:report",
     "cask:generate": "node scripts/generate-homebrew-cask.mjs",

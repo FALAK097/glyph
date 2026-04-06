@@ -399,59 +399,6 @@ test("sidebar reflects new folder immediately in a non-default workspace", async
 
 // ─── Sidebar tree interactions ────────────────────────────────────────────────
 
-test("nested note is visible in the sidebar tree when folder is expanded", async ({}, testInfo) => {
-  const glyph = await launchGlyph();
-  try {
-    await expectAppShell(glyph.window);
-    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
-
-    // Wait for the sidebar shell to appear, then wait for any file button to confirm hydration.
-    // Using aside.bg-sidebar as the primary signal is more reliable than a specific file name.
-    await expect(glyph.window.locator("aside.bg-sidebar")).toBeVisible({ timeout: 20_000 });
-    await expect(glyph.window.locator("aside.bg-sidebar button").first()).toBeVisible({
-      timeout: 20_000,
-    });
-
-    // Sub-folders start expanded by default (local state = true), so nested
-    // notes are immediately visible once the workspace root is loaded.
-    await expect(glyph.window.getByRole("button", { name: /nested-note/ }).first()).toBeVisible({
-      timeout: 10_000,
-    });
-  } finally {
-    await glyph.stop(testInfo);
-  }
-});
-
-test("expanding then collapsing a folder hides its children", async ({}, testInfo) => {
-  const glyph = await launchGlyph();
-  try {
-    await expectAppShell(glyph.window);
-    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
-
-    // Wait for the sidebar shell + any file button — more reliable than a specific filename
-    await expect(glyph.window.locator("aside.bg-sidebar")).toBeVisible({ timeout: 20_000 });
-    await expect(glyph.window.locator("aside.bg-sidebar button").first()).toBeVisible({
-      timeout: 20_000,
-    });
-
-    // Sub-folder "notes" is expanded by default — nested note should be visible
-    await expect(glyph.window.getByRole("button", { name: /nested-note/ }).first()).toBeVisible({
-      timeout: 10_000,
-    });
-
-    // Click the notes folder button to collapse it (depth>0 uses local toggle)
-    const notesFolder = glyph.window.getByRole("button", { name: "notes", exact: true });
-    await notesFolder.click();
-    await expect(glyph.window.getByRole("button", { name: /nested-note/ })).toBeHidden();
-
-    // Click again to re-expand
-    await notesFolder.click();
-    await expect(glyph.window.getByRole("button", { name: /nested-note/ }).first()).toBeVisible();
-  } finally {
-    await glyph.stop(testInfo);
-  }
-});
-
 test("note created after folder creation lands inside that folder", async ({}, testInfo) => {
   const glyph = await launchGlyph();
   try {

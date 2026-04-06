@@ -167,3 +167,66 @@ export function renameSidebarFile(
     };
   });
 }
+
+/**
+ * Remaps a single path's prefix from oldBase to newBase (case-insensitive).
+ */
+function remapPathPrefix(p: string, oldBase: string, newBase: string): string {
+  const norm = normalizePath(p);
+  const normalizedOld = normalizePath(oldBase).replace(/\/+$/, "");
+  const normalizedNew = normalizePath(newBase).replace(/\/+$/, "");
+
+  if (norm.toLowerCase() === normalizedOld.toLowerCase()) {
+    return normalizedNew;
+  }
+
+  if (norm.toLowerCase().startsWith(`${normalizedOld.toLowerCase()}/`)) {
+    return normalizedNew + norm.slice(normalizedOld.length);
+  }
+
+  return norm;
+}
+
+/**
+ * Recursively remaps all paths inside a DirectoryNode subtree from oldBase to newBase.
+ */
+function remapNodePaths(node: DirectoryNode, oldBase: string, newBase: string): DirectoryNode {
+  const newPath = remapPathPrefix(node.path, oldBase, newBase);
+
+  if (node.type === "file") {
+    return { ...node, path: newPath };
+  }
+
+  return {
+    ...node,
+    path: newPath,
+    children: node.children.map((child) => remapNodePaths(child, oldBase, newBase)),
+  };
+}
+
+/**
+ * Renames a folder node in the sidebar tree and remaps all descendant paths.
+ */
+export function renameSidebarFolder(
+  nodes: DirectoryNode[],
+  oldPath: string,
+  newPath: string,
+  newName: string,
+): DirectoryNode[] {
+  return nodes.map((node) => {
+    if (node.type === "file") {
+      return node;
+    }
+
+    if (isSamePath(node.path, oldPath)) {
+      return {
+        ...node,
+        path: newPath,
+        name: newName,
+        children: node.children.map((child) => remapNodePaths(child, oldPath, newPath)),
+      };
+    }
+
+    return { ...node, children: renameSidebarFolder(node.children, oldPath, newPath, newName) };
+  });
+}

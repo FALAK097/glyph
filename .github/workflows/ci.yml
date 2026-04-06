@@ -9,7 +9,7 @@ on:
 jobs:
   desktop-and-web:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Check out repository
@@ -41,8 +41,17 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Verify Electron binary
+        run: |
+          ELECTRON_BIN=$(node -e "process.stdout.write(require('electron'))")
+          echo "Electron binary: $ELECTRON_BIN"
+          test -f "$ELECTRON_BIN" && echo "Binary exists" || (echo "Binary MISSING — re-running postinstall" && node node_modules/.pnpm/electron@*/node_modules/electron/install.js)
+        working-directory: apps/desktop
+
       - name: Desktop smoke test
-        run: xvfb-run -a pnpm test:e2e:desktop
+        run: |
+          ulimit -n 65536 || true
+          xvfb-run -a pnpm test:e2e:desktop
         env:
           CI: true
           PLAYWRIGHT_JUNIT_OUTPUT: test-results/junit.xml

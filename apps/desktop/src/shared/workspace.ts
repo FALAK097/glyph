@@ -28,7 +28,7 @@ export type WorkspaceSnapshot = {
 export type WorkspaceChangeEvent = {
   rootPath: string;
   tree: DirectoryNode[];
-  changedPath: string;
+  changedPaths: string[];
 };
 
 export type FileOpenResult = {

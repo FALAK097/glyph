@@ -36,13 +36,17 @@ export type SidebarProps = {
   onOpenCommandPalette?: () => void;
   onOpenFile: (filePath: string) => void;
   onDeleteFile: (filePath: string) => void;
+  onDeleteFolder?: (folderPath: string) => void;
   onRemoveFileFromGlyph?: (filePath: string) => void;
   onRemoveFolder: (folderPath: string) => void;
   onRenameFile: (filePath: string, newName: string) => void;
+  onRenameFolder?: (folderPath: string, newName: string) => void;
   onRevealInFinder: (targetPath: string) => void;
   onTogglePinnedFile?: (filePath: string) => void;
   onToggleFolder: (folderPath: string) => void;
   onReorderNodes: (sourcePath: string, targetPath: string, position: DragPosition) => void;
+  onCreateNote?: () => void;
+  onCreateFolder?: () => void;
 };
 
 export type SidebarTreeNodeMenuCoords = {
@@ -69,11 +73,13 @@ export type SidebarTreeNodeProps = {
   pinnedPaths?: string[];
   onOpenFile: (filePath: string) => void;
   onRequestRemoveFolder: (folder: SidebarRemoveTarget) => void;
+  onRequestDeleteFolder?: (folder: SidebarDeleteTarget) => void;
   onRequestRemoveFile?: (file: SidebarRemoveTarget) => void;
   onRevealInFinder: (targetPath: string) => void;
   onTogglePinnedFile?: (filePath: string) => void;
   onRequestDelete: (node: SidebarDeleteTarget) => void;
   onRenameFile: (filePath: string, newName: string) => void;
+  onRenameFolder?: (folderPath: string, newName: string) => void;
   onToggleFolder: (folderPath: string) => void;
   draggable?: boolean;
   onDragStartTopLevel?: (sourcePath: string) => void;

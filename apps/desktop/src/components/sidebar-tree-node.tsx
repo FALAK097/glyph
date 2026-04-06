@@ -34,11 +34,13 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
   pinnedPaths,
   onOpenFile,
   onRequestRemoveFolder,
+  onRequestDeleteFolder,
   onRequestRemoveFile,
   onRevealInFinder,
   onTogglePinnedFile,
   onRequestDelete,
   onRenameFile,
+  onRenameFolder,
   onToggleFolder,
   draggable,
   onDragStartTopLevel,
@@ -96,7 +98,11 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
     const baseName = node.type === "file" ? getDisplayFileName(currentName) : currentName;
 
     if (trimmed !== currentName && trimmed !== baseName) {
-      onRenameFile(node.path, trimmed);
+      if (node.type === "directory" && onRenameFolder) {
+        onRenameFolder(node.path, trimmed);
+      } else {
+        onRenameFile(node.path, trimmed);
+      }
     }
 
     setIsRenaming(false);
@@ -189,6 +195,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
           <Button
             variant="ghost"
             size="sm"
+            aria-label={node.name}
             className={`h-auto min-w-0 flex-1 cursor-pointer justify-start gap-2 rounded-md bg-transparent px-0 py-1 text-left hover:!bg-transparent ${
               draggable ? "cursor-grab active:cursor-grabbing" : ""
             }`}
@@ -243,6 +250,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
                     ref={menuButtonRef}
                     variant="ghost"
                     size="icon-xs"
+                    aria-label="Folder actions"
                     className="pointer-events-none rounded bg-transparent text-muted-foreground opacity-0 transition-opacity group-hover/folder-row:pointer-events-auto group-hover/folder-row:opacity-100 hover:text-foreground hover:!bg-transparent focus-visible:opacity-100 focus-visible:!bg-transparent"
                     onClick={handleMenuToggle}
                     type="button"
@@ -266,6 +274,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
                 depth={depth + 1}
                 onOpenFile={onOpenFile}
                 onRequestRemoveFolder={onRequestRemoveFolder}
+                onRequestDeleteFolder={onRequestDeleteFolder}
                 onRequestRemoveFile={onRequestRemoveFile}
                 onRevealInFinder={onRevealInFinder}
                 folderRevealLabel={folderRevealLabel}
@@ -273,6 +282,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
                 onTogglePinnedFile={onTogglePinnedFile}
                 onRequestDelete={onRequestDelete}
                 onRenameFile={onRenameFile}
+                onRenameFolder={onRenameFolder}
                 onToggleFolder={onToggleFolder}
               />
             ))}
@@ -284,7 +294,22 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
             <Button
               variant="ghost"
               size="sm"
-              className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
+              className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-white/10 dark:hover:bg-white/10"
+              onClick={(event) => {
+                event.stopPropagation();
+                setRenameValue(node.name);
+                setIsRenaming(true);
+                setShowMenu(false);
+              }}
+              type="button"
+            >
+              <PencilIcon size={14} className="opacity-70" />
+              Rename
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-white/10 dark:hover:bg-white/10"
               onClick={(event) => {
                 event.stopPropagation();
                 onRevealInFinder(node.path);
@@ -299,7 +324,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
             <Button
               variant="ghost"
               size="sm"
-              className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
+              className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-white/10 dark:hover:bg-white/10"
               onClick={(event) => {
                 event.stopPropagation();
                 const folder: SidebarRemoveTarget = {
@@ -314,6 +339,22 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
               <XIcon size={14} className="opacity-70" />
               Remove
             </Button>
+            {onRequestDeleteFolder ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-destructive/10 hover:text-destructive"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onRequestDeleteFolder({ path: node.path, name: node.name });
+                  setShowMenu(false);
+                }}
+                type="button"
+              >
+                <TrashIcon size={14} className="opacity-70" />
+                Delete
+              </Button>
+            ) : null}
           </>,
           "Close folder menu",
         )}
@@ -404,6 +445,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
                   ref={menuButtonRef}
                   variant="ghost"
                   size="icon-xs"
+                  aria-label="Note actions"
                   className="pointer-events-none rounded bg-transparent text-muted-foreground opacity-0 transition-opacity group-hover/file-row:pointer-events-auto group-hover/file-row:opacity-100 hover:text-foreground hover:!bg-transparent focus-visible:opacity-100 focus-visible:!bg-transparent"
                   onClick={handleMenuToggle}
                   type="button"
@@ -422,7 +464,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
           <Button
             variant="ghost"
             size="sm"
-            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
+            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-white/10 dark:hover:bg-white/10"
             onClick={(event) => {
               event.stopPropagation();
               setRenameValue(displayFileName);
@@ -437,7 +479,22 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
           <Button
             variant="ghost"
             size="sm"
-            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
+            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-white/10 dark:hover:bg-white/10"
+            onClick={(event) => {
+              event.stopPropagation();
+              onRevealInFinder(node.path);
+              setShowMenu(false);
+              focusMenuButton();
+            }}
+            type="button"
+          >
+            <FileManagerLogo label={revealLabel} size={14} className="opacity-70" />
+            {revealLabel}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-white/10 dark:hover:bg-white/10"
             onClick={(event) => {
               event.stopPropagation();
               onRequestRemoveFile?.({ path: node.path, name: node.name });

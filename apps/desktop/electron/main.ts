@@ -86,6 +86,8 @@ let searchableFilesCache: string[] = [];
 let settingsUpdatePromise: Promise<AppSettings> | null = null;
 let pendingExternalPath: string | null = null;
 let updateCheckInterval: NodeJS.Timeout | null = null;
+let watcherDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let changedPathsBatch = new Set<string>();
 const MARKDOWN_EXTENSIONS = [".md", ".mdx", ".markdown"] as const;
 const UPDATE_CHECK_INTERVAL_MS = 1000 * 60 * 60 * 6;
 const skillsService = createSkillsService({
@@ -1021,52 +1023,67 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
   }
 
   const candidate = input as Partial<AppSettings>;
-  const validPinnedFiles: string[] = [];
-  const validHiddenFiles: string[] = [];
-  const persistedFileGroups = [
-    [normalizePersistedFileList(candidate.hiddenFiles), validHiddenFiles],
-    [normalizePersistedFileList(candidate.pinnedFiles), validPinnedFiles],
-  ] as const;
-
-  for (const [inputPaths, target] of persistedFileGroups) {
-    for (const filePath of inputPaths) {
-      try {
-        await fs.access(filePath);
-        target.push(filePath);
-      } catch {
-        // Skip files that don't exist or can't be accessed.
-      }
-    }
-  }
-
+  const hiddenFilePaths = normalizePersistedFileList(candidate.hiddenFiles);
+  const pinnedFilePaths = normalizePersistedFileList(candidate.pinnedFiles);
   const validSidebar = normalizeSidebarState(candidate.sidebar);
-  const validSidebarItems: AppSettings["sidebar"]["items"] = [];
 
-  for (const item of validSidebar.items) {
-    try {
-      const stats = await fs.stat(item.path);
-      if (
-        (item.kind === "file" && stats.isFile()) ||
-        (item.kind === "directory" && stats.isDirectory())
-      ) {
-        validSidebarItems.push(item);
-      }
-    } catch {
-      // Skip sidebar entries that no longer exist.
-    }
-  }
+  // Run all filesystem validations in parallel — each group is independent.
+  const [validatedHidden, validatedPinned, validatedSidebarItems, validatedExpandedFolders] =
+    await Promise.all([
+      Promise.all(
+        hiddenFilePaths.map(async (filePath) => {
+          try {
+            await fs.access(filePath);
+            return filePath;
+          } catch {
+            return null;
+          }
+        }),
+      ),
+      Promise.all(
+        pinnedFilePaths.map(async (filePath) => {
+          try {
+            await fs.access(filePath);
+            return filePath;
+          } catch {
+            return null;
+          }
+        }),
+      ),
+      Promise.all(
+        validSidebar.items.map(async (item) => {
+          try {
+            const stats = await fs.stat(item.path);
+            if (
+              (item.kind === "file" && stats.isFile() && isMarkdownFile(item.path)) ||
+              (item.kind === "directory" && stats.isDirectory())
+            ) {
+              return item;
+            }
+          } catch {
+            // Skip sidebar entries that no longer exist.
+          }
+          return null;
+        }),
+      ),
+      Promise.all(
+        validSidebar.expandedFolders.map(async (folderPath) => {
+          try {
+            const stats = await fs.stat(folderPath);
+            return stats.isDirectory() ? folderPath : null;
+          } catch {
+            return null;
+          }
+        }),
+      ),
+    ]);
 
-  const validExpandedFolders: string[] = [];
-  for (const folderPath of validSidebar.expandedFolders) {
-    try {
-      const stats = await fs.stat(folderPath);
-      if (stats.isDirectory()) {
-        validExpandedFolders.push(folderPath);
-      }
-    } catch {
-      // Skip folders that no longer exist.
-    }
-  }
+  const validHiddenFiles = validatedHidden.filter((p): p is string => p !== null);
+  const validPinnedFiles = validatedPinned.filter((p): p is string => p !== null);
+  const validSidebarItems = validatedSidebarItems.filter(
+    (item): item is NonNullable<typeof item> => item !== null,
+  );
+  const validExpandedFolders = validatedExpandedFolders.filter((p): p is string => p !== null);
 
   return {
     defaultWorkspacePath:
@@ -1258,9 +1275,9 @@ async function ensureWorkspace(dirPath: string) {
 }
 
 async function readMarkdownFile(filePath: string) {
+  let raw: string;
   try {
-    // Check if file exists first
-    await fs.access(filePath);
+    raw = await fs.readFile(filePath, "utf8");
   } catch (err) {
     const code =
       typeof err === "object" && err && "code" in err
@@ -1272,12 +1289,10 @@ async function readMarkdownFile(filePath: string) {
     throw err;
   }
 
-  const content = (await fs.readFile(filePath, "utf8")).replace(/\r\n?/g, "\n");
-
   return {
     path: filePath,
     name: path.basename(filePath),
-    content,
+    content: raw.replace(/\r\n?/g, "\n"),
   };
 }
 
@@ -1388,6 +1403,12 @@ async function openWorkspace(dirPath: string): Promise<WorkspaceSnapshot> {
   const activeFilePath = getPreferredWorkspaceFilePath(searchableFilesCache);
   const activeFile = activeFilePath ? await readMarkdownFile(activeFilePath) : null;
 
+  if (watcherDebounceTimer) {
+    clearTimeout(watcherDebounceTimer);
+    watcherDebounceTimer = null;
+  }
+  changedPathsBatch.clear();
+
   if (activeWatcher) {
     await activeWatcher.close();
   }
@@ -1400,18 +1421,44 @@ async function openWorkspace(dirPath: string): Promise<WorkspaceSnapshot> {
     },
   });
 
-  activeWatcher.on("all", async (_eventName, changedPath) => {
+  // Debounce rapid filesystem changes (e.g. git checkout) to avoid
+  // redundant directory tree rebuilds. Coalesce into a single rebuild
+  // after 100ms of quiet.
+  activeWatcher.on("all", (_eventName, changedPath) => {
     if (!mainWindow || !isMarkdownFile(changedPath)) {
       return;
     }
 
-    const nextTree = await buildDirectoryTree(dirPath);
-    searchableFilesCache = await collectMarkdownFiles(nextTree);
-    mainWindow.webContents.send("workspace:changed", {
-      rootPath: dirPath,
-      tree: nextTree,
-      changedPath,
-    });
+    changedPathsBatch.add(changedPath);
+
+    if (watcherDebounceTimer) {
+      clearTimeout(watcherDebounceTimer);
+    }
+
+    watcherDebounceTimer = setTimeout(async () => {
+      watcherDebounceTimer = null;
+
+      const changedPaths = Array.from(changedPathsBatch);
+      changedPathsBatch.clear();
+
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        return;
+      }
+
+      // Verify that the captured dirPath still matches the active workspace root
+      // to avoid broadcasting outdated tree data after workspace switch.
+      if (dirPath !== activeWorkspaceRoot) {
+        return;
+      }
+
+      const nextTree = await buildDirectoryTree(dirPath);
+      searchableFilesCache = await collectMarkdownFiles(nextTree);
+      mainWindow.webContents.send("workspace:changed", {
+        rootPath: dirPath,
+        tree: nextTree,
+        changedPaths,
+      });
+    }, 100);
   });
 
   return {
@@ -1521,6 +1568,7 @@ async function createWindow() {
     height: 920,
     minWidth: 980,
     minHeight: 700,
+    show: false,
     icon: iconPath,
     titleBarStyle: "hiddenInset",
     backgroundColor: nativeTheme.shouldUseDarkColors
@@ -1532,6 +1580,10 @@ async function createWindow() {
       devTools: isDev,
       sandbox: true,
     },
+  });
+
+  mainWindow.once("ready-to-show", () => {
+    mainWindow?.show();
   });
 
   mainWindow.webContents.on("did-fail-load", (_event, code, description, validatedUrl) => {
@@ -1594,17 +1646,9 @@ function assertBasename(name: string) {
   }
 }
 
-function assertWithinWorkspace(targetPath: string) {
-  if (!activeWorkspaceRoot) {
-    throw new Error("No workspace is open.");
-  }
-
-  const root = path.resolve(activeWorkspaceRoot);
-  const resolved = path.resolve(targetPath);
-  const relative = path.relative(root, resolved);
-
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
-    throw new Error("Path is outside the active workspace.");
+function assertSafePath(targetPath: string) {
+  if (!path.isAbsolute(targetPath)) {
+    throw new Error("Path must be absolute.");
   }
 }
 
@@ -1625,11 +1669,18 @@ ipcMain.handle("workspace:saveFile", async (_event, filePath: string, content: s
   }
 
   await fs.writeFile(filePath, nextContent, "utf8");
-  return readMarkdownFile(filePath);
+
+  // Return in-memory result instead of re-reading from disk — the content is
+  // already known since we just wrote it.
+  return {
+    path: filePath,
+    name: path.basename(filePath),
+    content: content.replace(/\r\n?/g, "\n"),
+  };
 });
 
 ipcMain.handle("workspace:createFile", async (_event, parentDir: string, fileName: string) => {
-  assertWithinWorkspace(parentDir);
+  assertSafePath(parentDir);
   assertBasename(fileName);
   const normalizedFileName = getMarkdownExtension(fileName) !== null ? fileName : `${fileName}.md`;
   const targetPath = path.join(parentDir, normalizedFileName);
@@ -1638,7 +1689,7 @@ ipcMain.handle("workspace:createFile", async (_event, parentDir: string, fileNam
 });
 
 ipcMain.handle("workspace:renameFile", async (_event, oldPath: string, newName: string) => {
-  assertWithinWorkspace(oldPath);
+  assertSafePath(oldPath);
   assertBasename(newName);
   const currentExtension = getMarkdownExtension(oldPath) ?? ".md";
   const normalizedFileName =
@@ -1648,19 +1699,40 @@ ipcMain.handle("workspace:renameFile", async (_event, oldPath: string, newName: 
   return readMarkdownFile(newPath);
 });
 
+ipcMain.handle("workspace:renameFolder", async (_event, oldPath: string, newName: string) => {
+  assertSafePath(oldPath);
+  assertBasename(newName);
+  const newPath = path.join(path.dirname(oldPath), newName);
+  await fs.rename(oldPath, newPath);
+  return { oldPath, newPath };
+});
+
 ipcMain.handle("workspace:deleteFile", async (_event, targetPath: string) => {
-  assertWithinWorkspace(targetPath);
+  assertSafePath(targetPath);
   await fs.unlink(targetPath);
   return targetPath;
 });
 
+ipcMain.handle("workspace:deleteFolder", async (_event, targetPath: string) => {
+  assertSafePath(targetPath);
+  await fs.rm(targetPath, { recursive: true, force: false });
+  return targetPath;
+});
+
 ipcMain.handle("workspace:createFolder", async (_event, parentDir: string, folderName: string) => {
-  assertWithinWorkspace(parentDir);
+  assertSafePath(parentDir);
   assertBasename(folderName);
   await fs.mkdir(path.join(parentDir, folderName), { recursive: false });
 
   if (!activeWorkspaceRoot) {
-    return [];
+    return null;
+  }
+
+  const root = path.resolve(activeWorkspaceRoot);
+  const resolved = path.resolve(parentDir);
+  const relative = path.relative(root, resolved);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    return null;
   }
 
   return buildDirectoryTree(activeWorkspaceRoot);
@@ -1919,7 +1991,10 @@ app
     wireAutoUpdater();
 
     if (getUpdatesMode() === "automatic") {
-      await hydratePersistedUpdateState();
+      // Run hydration concurrently with window creation — the renderer is not
+      // loaded yet so broadcastUpdateState inside hydrate is a no-op anyway.
+      // We re-broadcast after createWindow finishes.
+      void hydratePersistedUpdateState();
     }
 
     if (process.platform === "darwin" && app.dock) {
@@ -1964,6 +2039,12 @@ app.on("window-all-closed", async () => {
     clearInterval(updateCheckInterval);
     updateCheckInterval = null;
   }
+
+  if (watcherDebounceTimer) {
+    clearTimeout(watcherDebounceTimer);
+    watcherDebounceTimer = null;
+  }
+  changedPathsBatch.clear();
 
   if (activeWatcher) {
     await activeWatcher.close();

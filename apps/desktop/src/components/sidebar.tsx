@@ -25,7 +25,16 @@ import type {
 
 import { LogoComponent } from "./logo-component";
 import { SkillSourceLogo } from "./skill-source-logo";
-import { ChevronRightIcon, MoreVerticalIcon, PencilIcon, PinIcon, TrashIcon, XIcon } from "./icons";
+import {
+  ChevronRightIcon,
+  MoreVerticalIcon,
+  PencilIcon,
+  PinIcon,
+  PlusIcon,
+  TrashIcon,
+  XIcon,
+  FolderPlusIcon,
+} from "./icons";
 import { SidebarTreeNode } from "./sidebar-tree-node";
 
 const normalizePathKey = (path: string) => normalizePath(path).toLowerCase();
@@ -134,7 +143,7 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
           tabIndex={-1}
         />
         <div
-          className="fixed z-50 w-[142px] rounded-md border border-border bg-popover py-1 shadow-lg"
+          className="fixed z-50 w-[142px] rounded-md border border-border bg-white dark:bg-popover py-1 shadow-lg"
           style={{ top: menuCoords.top, left: menuCoords.left }}
         >
           <Button
@@ -331,12 +340,7 @@ function SidebarSkillCollectionRow({
       }`}
     >
       <span className="flex min-w-0 items-center gap-2">
-        <SkillSourceLogo
-          fallbackLabel={item.fallbackLabel}
-          iconKind={item.iconKind}
-          sourceKind={item.sourceKind}
-          variant="compact"
-        />
+        <SkillSourceLogo iconKind={item.iconKind} sourceKind={item.sourceKind} variant="compact" />
         <span className="truncate text-sm font-medium">{item.label}</span>
       </span>
       <span className="ml-3 rounded-full bg-background/80 px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
@@ -361,15 +365,20 @@ export const Sidebar = ({
   onSelectSkillCollection,
   onOpenFile,
   onDeleteFile,
+  onDeleteFolder,
   onRemoveFileFromGlyph,
   onTogglePinnedFile,
   onRemoveFolder,
   onRenameFile,
+  onRenameFolder,
   onRevealInFinder,
   onToggleFolder,
   onReorderNodes,
+  onCreateNote,
+  onCreateFolder,
 }: SidebarProps) => {
   const [nodeToDelete, setNodeToDelete] = useState<SidebarDeleteTarget | null>(null);
+  const [folderToDelete, setFolderToDelete] = useState<SidebarDeleteTarget | null>(null);
   const [fileToRemove, setFileToRemove] = useState<SidebarRemoveTarget | null>(null);
   const [folderToRemove, setFolderToRemove] = useState<SidebarRemoveTarget | null>(null);
   const [draggedPath, setDraggedPath] = useState<string | null>(null);
@@ -378,6 +387,9 @@ export const Sidebar = ({
   const pinnedPaths = useMemo(() => pinnedList.map((note) => note.path), [pinnedList]);
   const handleRequestRemoveFolder = useCallback((folder: SidebarRemoveTarget) => {
     setFolderToRemove(folder);
+  }, []);
+  const handleRequestDeleteFolder = useCallback((folder: SidebarDeleteTarget) => {
+    setFolderToDelete(folder);
   }, []);
   const handleRequestDelete = useCallback((node: SidebarDeleteTarget) => {
     setNodeToDelete(node);
@@ -399,6 +411,13 @@ export const Sidebar = ({
       onDeleteFile(nodeToDelete.path);
     }
     setNodeToDelete(null);
+  };
+
+  const handleConfirmDeleteFolder = () => {
+    if (folderToDelete) {
+      onDeleteFolder?.(folderToDelete.path);
+    }
+    setFolderToDelete(null);
   };
 
   const handleConfirmRemoveFile = () => {
@@ -433,21 +452,30 @@ export const Sidebar = ({
       <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-3">
         {skillCollections && skillCollections.length > 0 ? (
           <div className="mb-3">
-            <button
-              type="button"
-              onClick={onToggleSkillsSection}
-              className="flex w-full items-center justify-between px-4 py-1.5 text-left"
-            >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                SKILLS
-              </p>
-              <ChevronRightIcon
-                size={14}
-                className={`text-muted-foreground transition-transform duration-150 ${
-                  isSkillsExpanded ? "rotate-90" : ""
-                }`}
-              />
-            </button>
+            <div className="flex items-center justify-between px-4 py-1.5">
+              <button
+                type="button"
+                onClick={onToggleSkillsSection}
+                className="flex items-center text-left"
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  SKILLS
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={onToggleSkillsSection}
+                className="p-1 text-muted-foreground hover:text-foreground rounded-sm transition-colors"
+                aria-label={isSkillsExpanded ? "Collapse skills" : "Expand skills"}
+              >
+                <ChevronRightIcon
+                  size={12}
+                  className={`transition-transform duration-150 ${
+                    isSkillsExpanded ? "rotate-90" : ""
+                  }`}
+                />
+              </button>
+            </div>
             {isSkillsExpanded ? (
               <div>
                 <div className="space-y-1 px-2">
@@ -487,21 +515,58 @@ export const Sidebar = ({
         ) : null}
 
         <div>
-          <button
-            type="button"
-            onClick={onToggleNotesSection}
-            className="flex w-full items-center justify-between px-4 py-1.5 text-left"
-          >
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              NOTES
-            </p>
-            <ChevronRightIcon
-              size={14}
-              className={`text-muted-foreground transition-transform duration-150 ${
-                isNotesExpanded ? "rotate-90" : ""
-              }`}
-            />
-          </button>
+          <div className="flex items-center justify-between px-4 py-1.5">
+            <button type="button" onClick={onToggleNotesSection} className="flex items-center">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                NOTES
+              </p>
+            </button>
+            <div className="flex items-center gap-0.5">
+              {onCreateNote ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={onCreateNote}
+                      className="p-1 text-muted-foreground hover:text-foreground rounded-sm transition-colors"
+                      aria-label="New note"
+                    >
+                      <PlusIcon size={12} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">New Note (⌘N)</TooltipContent>
+                </Tooltip>
+              ) : null}
+              {onCreateFolder ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={onCreateFolder}
+                      className="p-1 text-muted-foreground hover:text-foreground rounded-sm transition-colors"
+                      aria-label="New folder"
+                    >
+                      <FolderPlusIcon size={12} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">New Folder (⇧⌘N)</TooltipContent>
+                </Tooltip>
+              ) : null}
+              <button
+                type="button"
+                onClick={onToggleNotesSection}
+                className="p-1 text-muted-foreground hover:text-foreground rounded-sm transition-colors"
+                aria-label={isNotesExpanded ? "Collapse notes" : "Expand notes"}
+              >
+                <ChevronRightIcon
+                  size={12}
+                  className={`text-muted-foreground transition-transform duration-150 ${
+                    isNotesExpanded ? "rotate-90" : ""
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
           {isNotesExpanded ? (
             <>
               {pinnedList.length > 0 ? (
@@ -539,10 +604,12 @@ export const Sidebar = ({
                         pinnedPaths={pinnedPaths}
                         onOpenFile={onOpenFile}
                         onRequestRemoveFolder={handleRequestRemoveFolder}
+                        onRequestDeleteFolder={handleRequestDeleteFolder}
                         onRequestRemoveFile={setFileToRemove}
                         onRevealInFinder={onRevealInFinder}
                         onRequestDelete={handleRequestDelete}
                         onRenameFile={onRenameFile}
+                        onRenameFolder={onRenameFolder}
                         onToggleFolder={onToggleFolder}
                         onTogglePinnedFile={onTogglePinnedFile}
                         draggable
@@ -581,6 +648,36 @@ export const Sidebar = ({
                 Cancel
               </Button>
               <Button variant="destructive" type="button" onClick={handleConfirmDelete}>
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+
+      {folderToDelete ? (
+        <Dialog
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) {
+              setFolderToDelete(null);
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-[420px]">
+            <DialogHeader>
+              <DialogTitle>Delete Folder</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to permanently delete{" "}
+                <span className="font-semibold text-foreground">"{folderToDelete.name}"</span> and
+                all its contents? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" type="button" onClick={() => setFolderToDelete(null)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" type="button" onClick={handleConfirmDeleteFolder}>
                 Delete
               </Button>
             </DialogFooter>

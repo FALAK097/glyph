@@ -41,10 +41,8 @@ export type MarkdownEditorProps = {
   canGoBack?: boolean;
   canGoForward?: boolean;
   autoOpenPDFSetting?: boolean;
-  isActiveFileFavorite?: boolean;
   isActiveFilePinned?: boolean;
   onOutlineJumpHandled?: () => void;
-  onToggleFavoriteFile?: () => void;
   updateState?: UpdateState | null;
   onUpdateAction?: () => void;
   isFocusMode?: boolean;

@@ -21,7 +21,9 @@ function formatSaveTime(timestamp: string | null) {
     return "Ready";
   }
 
-  return `Saved ${new Date(timestamp).toLocaleTimeString([], {
+  return `Saved ${new Date(timestamp).toLocaleString([], {
+    month: "short",
+    day: "numeric",
     hour: "numeric",
     minute: "2-digit",
   })}`;

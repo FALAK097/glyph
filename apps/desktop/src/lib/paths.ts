@@ -62,3 +62,12 @@ export function isFileInsideWorkspace(filePath: string, rootPath: string | null)
   const normalizedRootPath = normalizePath(rootPath).replace(/\/+$/, "");
   return normalizedFilePath.toLowerCase().startsWith(`${normalizedRootPath.toLowerCase()}/`);
 }
+
+export function getDirName(filePath: string): string {
+  const parts = filePath.split(/[\\/]/);
+  if (parts.length <= 1) {
+    return "";
+  }
+  parts.pop();
+  return parts.join("/");
+}

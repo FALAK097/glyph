@@ -3,7 +3,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { getDisplayFileName, isSamePath } from "@/lib/paths";
 import { countGroupedSkills, groupSkillsForBrowse } from "@/lib/skill-groups";
 import { formatByteSize } from "@/lib/format-byte-size";
-import { getShortcutDisplay } from "@/shared/shortcuts";
 import { SKILL_AGENT_CATALOG } from "@/shared/skill-agent-catalog";
 import type { SkillEntry, SkillSourceKind, SkillToolKind } from "@/shared/skills";
 import { useSessionStore } from "@/store/session";
@@ -14,23 +13,14 @@ import type { CommandPaletteItem } from "@/types/command-palette";
 import { useDesktopAppController } from "@/hooks/use-desktop-app-controller";
 import { useSkillLibraryController } from "@/hooks/use-skill-library-controller";
 
+import { AppLayout } from "./app-layout";
 import { CommandPalette } from "./command-palette";
-import { MarkdownEditor } from "./markdown-editor";
+import { NoteConfirmDialog } from "./note-confirm-dialog";
+import { NoteRenameDialog } from "./note-rename-dialog";
+import { NoteView } from "./note-view";
 import { SettingsPanel } from "./settings-panel";
-import { Sidebar } from "./sidebar";
-import { SkillDocumentPane } from "./skill-document-pane";
+import { SkillView } from "./skill-view";
 import { SkillsBrowserPane } from "./skills-browser-pane";
-import { SkillEmptyPane } from "./skill-empty-pane";
-import { Button } from "./ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "./ui/dialog";
-import { Input } from "./ui/input";
 import { TooltipProvider } from "./ui/tooltip";
 
 type SkillCollection = {
@@ -142,8 +132,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const [skillInitialScrollTop, setSkillInitialScrollTop] = useState(0);
   const [pendingSkillRestorePath, setPendingSkillRestorePath] = useState<string | null>(null);
   const [isInitialSkillRestorePending, setIsInitialSkillRestorePending] = useState(false);
-  const noteRenameInputRef = useRef<HTMLInputElement | null>(null);
-  const confirmCancelRef = useRef<HTMLButtonElement | null>(null);
   const paletteSkillSearchNonceRef = useRef(0);
   const paletteFilterQuery = controller.paletteQuery.trim().toLowerCase();
   const shouldCollapseSidebar =
@@ -249,13 +237,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     () => (controller.activeFile ? getDisplayFileName(controller.activeFile.name) : ""),
     [controller.activeFile],
   );
-  const handleNoteScrollPositionChange = useCallback(
-    (targetPath: string | null, scrollTop: number) => {
-      setDocumentScroll(targetPath, scrollTop);
-    },
-    [setDocumentScroll],
-  );
-  const handleSkillScrollPositionChange = useCallback(
+  const handleDocumentScrollPositionChange = useCallback(
     (targetPath: string | null, scrollTop: number) => {
       setDocumentScroll(targetPath, scrollTop);
     },
@@ -530,7 +512,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   );
   const closePalette = useCallback(() => {
     controller.setIsPaletteOpen(false);
-  }, [controller]);
+  }, [controller.setIsPaletteOpen]);
 
   const copyText = useCallback(async (value: string) => {
     await navigator.clipboard.writeText(value);
@@ -574,31 +556,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     await controller.handleRenameFile(pendingNoteRename.path, nextName);
     setPendingNoteRename(null);
   }, [controller, pendingNoteRename]);
-
-  useEffect(() => {
-    if (!pendingNoteRename) {
-      return;
-    }
-
-    const frame = window.requestAnimationFrame(() => {
-      noteRenameInputRef.current?.focus();
-      noteRenameInputRef.current?.select();
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [pendingNoteRename]);
-
-  useEffect(() => {
-    if (!pendingNoteConfirm) {
-      return;
-    }
-
-    const frame = window.requestAnimationFrame(() => {
-      confirmCancelRef.current?.focus();
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [pendingNoteConfirm]);
 
   const handleOpenCurrentNoteConfirm = useCallback(
     (kind: PendingNoteConfirm["kind"]) => {
@@ -1086,350 +1043,233 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     ];
   }, [currentNotePaletteItems, skillPaletteItems, viewerMode, visibleNotePaletteItems]);
 
+  const handleNoteRenameValueChange = useCallback(
+    (value: string) => {
+      setPendingNoteRename((current) =>
+        current
+          ? {
+              ...current,
+              value,
+            }
+          : current,
+      );
+    },
+    [setPendingNoteRename],
+  );
+
+  const handleToggleSidebar = useCallback(() => {
+    controller.setIsSidebarCollapsed(!controller.isSidebarCollapsed);
+  }, [controller.isSidebarCollapsed, controller.setIsSidebarCollapsed]);
+
+  const handleOpenCommandPalette = useCallback(() => {
+    controller.setIsPaletteOpen(true);
+  }, [controller.setIsPaletteOpen]);
+
+  const handleOpenSettings = useCallback(() => {
+    controller.setIsSettingsOpen(true);
+  }, [controller.setIsSettingsOpen]);
+
   return (
     <TooltipProvider>
-      <div
-        className={`grid h-screen min-h-0 overflow-hidden transition-[grid-template-columns] duration-200 ${
-          shouldCollapseSidebar ? "grid-cols-[0_minmax(0,1fr)]" : "grid-cols-[280px_minmax(0,1fr)]"
-        }`}
+      <AppLayout
+        shouldCollapseSidebar={shouldCollapseSidebar}
+        tree={controller.visibleSidebarNodes}
+        activePath={viewerMode === "note" ? (controller.activeFile?.path ?? null) : null}
+        isSidebarCollapsed={controller.isSidebarCollapsed}
+        isNotesExpanded={isNotesExpanded}
+        isSkillsExpanded={isSkillsExpanded}
+        openInFolderLabel={controller.folderRevealLabel}
+        pinnedNotes={controller.pinnedNotes}
+        skillCollections={sidebarSkillCollections}
+        onToggleNotesSection={handleToggleNotesSection}
+        onToggleSkillsSection={handleToggleSkillsSection}
+        onSelectSkillCollection={handleSelectSkillCollection}
+        onOpenFile={(filePath) => void handleOpenNoteFile(filePath)}
+        onOpenCommandPalette={handleOpenCommandPalette}
+        onDeleteFile={controller.handleDeleteFile}
+        onDeleteFolder={(folderPath) => void controller.handleDeleteFolder(folderPath)}
+        onRemoveFileFromGlyph={(filePath) => void controller.handleRemoveFileFromGlyph(filePath)}
+        onTogglePinnedFile={(filePath) => void controller.togglePinnedFile(filePath)}
+        onRemoveFolder={controller.handleRemoveFolder}
+        onRenameFile={controller.handleRenameFile}
+        onRenameFolder={(folderPath, newName) =>
+          void controller.handleRenameFolder(folderPath, newName)
+        }
+        onRevealInFinder={(targetPath) => void controller.revealInFinder(targetPath)}
+        onToggleFolder={controller.handleToggleFolder}
+        onReorderNodes={controller.handleReorderNodes}
+        onCreateNote={() => void controller.createNote()}
+        onCreateFolder={() => void controller.createFolder()}
       >
-        {shouldCollapseSidebar ? (
-          <div aria-hidden="true" className="w-0 min-w-0 overflow-hidden" />
-        ) : (
-          <Sidebar
-            tree={controller.visibleSidebarNodes}
-            activePath={viewerMode === "note" ? (controller.activeFile?.path ?? null) : null}
-            isCollapsed={controller.isSidebarCollapsed}
-            isNotesExpanded={isNotesExpanded}
-            isSkillsExpanded={isSkillsExpanded}
-            openInFolderLabel={controller.folderRevealLabel}
-            pinnedNotes={controller.pinnedNotes}
-            skillCollections={sidebarSkillCollections}
-            onToggleNotesSection={handleToggleNotesSection}
-            onToggleSkillsSection={handleToggleSkillsSection}
-            onSelectSkillCollection={handleSelectSkillCollection}
-            onOpenFile={(filePath) => void handleOpenNoteFile(filePath)}
-            onOpenCommandPalette={() => controller.setIsPaletteOpen(true)}
-            onDeleteFile={controller.handleDeleteFile}
-            onRemoveFileFromGlyph={(filePath) =>
-              void controller.handleRemoveFileFromGlyph(filePath)
-            }
-            onTogglePinnedFile={(filePath) => void controller.togglePinnedFile(filePath)}
-            onRemoveFolder={controller.handleRemoveFolder}
-            onRenameFile={controller.handleRenameFile}
-            onRevealInFinder={(targetPath) => void controller.revealInFinder(targetPath)}
-            onToggleFolder={controller.handleToggleFolder}
-            onReorderNodes={controller.handleReorderNodes}
-          />
-        )}
+        {(viewerMode === "note" ? controller.error : skillsController.error) ? (
+          <div className="mx-10 mt-4 mb-2 rounded-lg bg-destructive px-4 py-3 text-sm text-destructive-foreground">
+            {viewerMode === "note" ? controller.error : skillsController.error}
+          </div>
+        ) : null}
 
-        <main className="relative h-full min-h-0 overflow-hidden bg-background">
-          {(viewerMode === "note" ? controller.error : skillsController.error) ? (
-            <div className="mx-10 mt-4 mb-2 rounded-lg bg-destructive px-4 py-3 text-sm text-destructive-foreground">
-              {viewerMode === "note" ? controller.error : skillsController.error}
-            </div>
+        <div
+          className={`grid h-full min-h-0 ${
+            selectedSkillCollectionId
+              ? "grid-cols-[292px_minmax(0,1fr)]"
+              : "grid-cols-[minmax(0,1fr)]"
+          }`}
+        >
+          {selectedSkillCollectionId ? (
+            <SkillsBrowserPane
+              activeSkillId={
+                viewerMode === "skill" ? (skillsController.activeSkill?.id ?? null) : null
+              }
+              isLoading={
+                !skillsController.hasLoadedOnce ||
+                skillsController.isLoading ||
+                Boolean(pendingSkillRestorePath)
+              }
+              items={visibleSkillItems}
+              searchQuery={skillsController.searchQuery}
+              onSelectSkill={(skillId) => void handleSelectSkill(skillId)}
+              onSearchQueryChange={skillsController.setSearchQuery}
+              title={activeSkillCollection?.label ?? "Skills"}
+            />
           ) : null}
 
-          <div
-            className={`grid h-full min-h-0 ${
-              selectedSkillCollectionId
-                ? "grid-cols-[292px_minmax(0,1fr)]"
-                : "grid-cols-[minmax(0,1fr)]"
-            }`}
-          >
-            {selectedSkillCollectionId ? (
-              <SkillsBrowserPane
-                activeSkillId={
-                  viewerMode === "skill" ? (skillsController.activeSkill?.id ?? null) : null
-                }
-                isLoading={
-                  !skillsController.hasLoadedOnce ||
-                  skillsController.isLoading ||
-                  Boolean(pendingSkillRestorePath)
-                }
-                items={visibleSkillItems}
-                searchQuery={skillsController.searchQuery}
-                onSelectSkill={(skillId) => void handleSelectSkill(skillId)}
-                onSearchQueryChange={skillsController.setSearchQuery}
-                title={activeSkillCollection?.label ?? "Skills"}
-              />
-            ) : null}
-
-            <div className="min-h-0 min-w-0">
-              {isAppBootstrapping ? (
-                <div className="flex h-full min-h-0 flex-col bg-background">
-                  <div
-                    className={`flex items-center gap-2 border-b border-border/40 py-2 ${
-                      controller.isSidebarCollapsed && navigator.platform.includes("Mac")
-                        ? "pl-20 pr-4"
-                        : "px-4"
-                    }`}
-                  >
-                    <div className="h-8 w-8 rounded-md bg-muted/70 motion-safe:animate-pulse" />
-                    <div className="mx-auto h-8 w-full max-w-sm rounded-full bg-muted/60 motion-safe:animate-pulse" />
-                    <div className="h-8 w-8 rounded-md bg-muted/70 motion-safe:animate-pulse" />
-                  </div>
-                  <div className="flex min-h-0 flex-1 flex-col gap-4 px-8 py-8">
-                    <div className="h-6 w-40 rounded-md bg-muted/60 motion-safe:animate-pulse" />
-                    <div className="h-4 w-72 rounded-md bg-muted/40 motion-safe:animate-pulse" />
-                    <div className="mt-6 h-40 rounded-2xl bg-muted/35 motion-safe:animate-pulse" />
-                    <div className="h-4 w-4/5 rounded-md bg-muted/30 motion-safe:animate-pulse" />
-                    <div className="h-4 w-3/5 rounded-md bg-muted/30 motion-safe:animate-pulse" />
-                  </div>
+          <div className="min-h-0 min-w-0">
+            {isAppBootstrapping ? (
+              <div className="flex h-full min-h-0 flex-col bg-background">
+                <div
+                  className={`flex items-center gap-2 border-b border-border/40 py-2 ${
+                    controller.isSidebarCollapsed && navigator.platform.includes("Mac")
+                      ? "pl-20 pr-4"
+                      : "px-4"
+                  }`}
+                >
+                  <div className="h-8 w-8 rounded-md bg-muted/70 motion-safe:animate-pulse" />
+                  <div className="mx-auto h-8 w-full max-w-sm rounded-full bg-muted/60 motion-safe:animate-pulse" />
+                  <div className="h-8 w-8 rounded-md bg-muted/70 motion-safe:animate-pulse" />
                 </div>
-              ) : isSkillSurfaceVisible ? (
-                isSkillSurfaceLoading ? (
-                  <SkillEmptyPane
-                    commandPaletteShortcut={
-                      getShortcutDisplay(controller.shortcuts, "command-palette") ?? "⌘P"
-                    }
-                    description="Restoring your last skill session and loading the current document."
-                    isSidebarCollapsed={controller.isSidebarCollapsed}
-                    onOpenCommandPalette={() => controller.setIsPaletteOpen(true)}
-                    onOpenSettings={() => controller.setIsSettingsOpen(true)}
-                    onToggleSidebar={() =>
-                      controller.setIsSidebarCollapsed(!controller.isSidebarCollapsed)
-                    }
-                    title="Loading skills"
-                    titleLabel={activeSkillCollection?.label ?? "Skills"}
-                  />
-                ) : skillsController.activeDocument && isActiveSkillVisible ? (
-                  <SkillDocumentPane
-                    activeDocument={skillsController.activeDocument}
-                    draftContent={skillsController.draftContent}
-                    documentTabs={skillsController.documentTabs}
-                    fileLabel={
-                      skillsController.activeSkill?.name ?? skillsController.activeDocument.name
-                    }
-                    commandPaletteShortcut={
-                      getShortcutDisplay(controller.shortcuts, "command-palette") ?? "⌘P"
-                    }
-                    initialScrollTop={skillInitialScrollTop}
-                    isSidebarCollapsed={controller.isSidebarCollapsed}
-                    isSwitchingDocuments={
-                      skillsController.isDocumentLoading || skillsController.isSaving
-                    }
-                    pendingExternalChange={skillsController.pendingExternalChange}
-                    saveStateLabel={skillsController.saveStateLabel}
-                    onChange={skillsController.setDraftContent}
-                    onKeepMineAfterExternalChange={skillsController.keepMineAfterExternalChange}
-                    showOutline={controller.showOutline}
-                    toggleSidebarShortcut={getShortcutDisplay(
-                      controller.shortcuts,
-                      "toggle-sidebar",
-                    )}
-                    folderRevealLabel={controller.folderRevealLabel}
-                    onOpenCommandPalette={() => controller.setIsPaletteOpen(true)}
-                    onOpenLinkedFile={(targetPath) => void handleOpenSkillLink(targetPath)}
-                    onOpenSettings={() => controller.setIsSettingsOpen(true)}
-                    onReloadAfterExternalChange={skillsController.reloadAfterExternalChange}
-                    onScrollPositionChange={handleSkillScrollPositionChange}
-                    onSelectDocumentTab={(kind) => void skillsController.openDocumentTab(kind)}
-                    onToggleSidebar={() =>
-                      controller.setIsSidebarCollapsed(!controller.isSidebarCollapsed)
-                    }
-                    scrollRestorationKey={skillsController.activeDocument.path}
-                  />
-                ) : (
-                  <SkillEmptyPane
-                    commandPaletteShortcut={
-                      getShortcutDisplay(controller.shortcuts, "command-palette") ?? "⌘P"
-                    }
-                    description={skillEmptyState.description}
-                    isSidebarCollapsed={controller.isSidebarCollapsed}
-                    onOpenCommandPalette={() => controller.setIsPaletteOpen(true)}
-                    onOpenSettings={() => controller.setIsSettingsOpen(true)}
-                    onToggleSidebar={() =>
-                      controller.setIsSidebarCollapsed(!controller.isSidebarCollapsed)
-                    }
-                    title={skillEmptyState.title}
-                    titleLabel={activeSkillCollection?.label ?? "Skills"}
-                  />
-                )
-              ) : (
-                <MarkdownEditor
-                  content={controller.draftContent}
-                  fileName={controller.activeFile?.name ?? null}
-                  filePath={controller.activeFile?.path ?? null}
-                  editorFocusRequest={controller.editorFocusRequest}
-                  initialScrollTop={noteInitialScrollTop}
-                  saveStateLabel={controller.saveStateLabel}
-                  footerMetaLabel={noteFileSizeLabel}
-                  wordCount={controller.wordCount}
-                  readingTime={controller.readingTime}
-                  onChange={controller.updateDraftContent}
-                  onToggleSidebar={() =>
-                    controller.setIsSidebarCollapsed(!controller.isSidebarCollapsed)
-                  }
-                  isSidebarCollapsed={controller.isSidebarCollapsed}
-                  onCreateNote={() => void controller.createNote()}
-                  toggleSidebarShortcut={getShortcutDisplay(controller.shortcuts, "toggle-sidebar")}
-                  newNoteShortcut={getShortcutDisplay(controller.shortcuts, "new-note")}
-                  onOpenSettings={() => controller.setIsSettingsOpen(true)}
-                  onOpenCommandPalette={() => controller.setIsPaletteOpen(true)}
-                  commandPaletteLabel="Search notes and skills"
-                  onOpenLinkedFile={(path) => void handleOpenSkillLink(path)}
-                  commandPaletteShortcut={
-                    getShortcutDisplay(controller.shortcuts, "command-palette") ?? "⌘P"
-                  }
-                  onScrollPositionChange={handleNoteScrollPositionChange}
-                  onNavigateBack={() => void controller.navigateBack()}
-                  onNavigateForward={() => void controller.navigateForward()}
-                  navigateBackShortcut={getShortcutDisplay(controller.shortcuts, "navigate-back")}
-                  navigateForwardShortcut={getShortcutDisplay(
-                    controller.shortcuts,
-                    "navigate-forward",
-                  )}
-                  focusModeShortcut={getShortcutDisplay(controller.shortcuts, "focus-mode")}
-                  onDeleteNote={
-                    controller.activeFile
-                      ? () => void controller.handleDeleteFile(controller.activeFile!.path)
-                      : undefined
-                  }
-                  onOpenNewWindow={
-                    controller.activeFile
-                      ? () => void window.glyph?.openExternal(controller.activeFile!.path)
-                      : undefined
-                  }
-                  canGoBack={controller.canGoBack()}
-                  canGoForward={controller.canGoForward()}
-                  autoOpenPDFSetting={controller.settings?.autoOpenPDF ?? true}
-                  folderRevealLabel={controller.folderRevealLabel}
-                  isActiveFilePinned={controller.isActiveFilePinned}
-                  isFocusMode={controller.isFocusMode}
-                  onOutlineJumpHandled={controller.clearOutlineJumpRequest}
-                  onToggleFocusMode={() => void controller.toggleFocusMode()}
-                  onTogglePinnedFile={
-                    controller.activeFile
-                      ? () => void controller.togglePinnedFile(controller.activeFile!.path)
-                      : undefined
-                  }
-                  outlineItems={controller.outlineItems}
-                  outlineJumpRequest={controller.outlineJumpRequest}
-                  scrollRestorationKey={controller.activeFile?.path ?? null}
-                  showOutline={controller.showOutline}
-                  updateState={controller.updateState}
-                  onUpdateAction={() => void controller.triggerUpdateAction()}
-                />
-              )}
-            </div>
-          </div>
-        </main>
-
-        <CommandPalette
-          isOpen={controller.isPaletteOpen}
-          query={controller.paletteQuery}
-          items={paletteItems}
-          onChangeQuery={controller.setPaletteQuery}
-          onClose={() => {
-            controller.setIsPaletteOpen(false);
-          }}
-        />
-        <SettingsPanel
-          isOpen={controller.isSettingsOpen}
-          settings={controller.settings}
-          appInfo={controller.appInfo}
-          onClose={() => controller.setIsSettingsOpen(false)}
-          onChooseFolder={() => void controller.chooseFolderAndUpdateWorkspace()}
-          onChangeMode={(mode: ThemeMode) => void controller.changeThemeMode(mode)}
-          onChangeShortcuts={(shortcuts) => void controller.changeShortcuts(shortcuts)}
-          onChangeAutoOpenPDF={(enabled) => void controller.saveSettings({ autoOpenPDF: enabled })}
-        />
-        {pendingNoteRename ? (
-          <Dialog
-            open={true}
-            onOpenChange={(open) => {
-              if (!open) {
-                setPendingNoteRename(null);
-              }
-            }}
-          >
-            <DialogContent className="sm:max-w-[420px]">
-              <DialogHeader>
-                <DialogTitle>Rename Current Note</DialogTitle>
-                <DialogDescription>
-                  Update{" "}
-                  <span className="font-semibold text-foreground">
-                    "{currentNoteDisplayName || pendingNoteRename.name}"
-                  </span>{" "}
-                  without leaving the keyboard.
-                </DialogDescription>
-              </DialogHeader>
-              <Input
-                ref={noteRenameInputRef}
-                autoFocus
-                value={pendingNoteRename.value}
-                onChange={(event) =>
-                  setPendingNoteRename((current) =>
-                    current
-                      ? {
-                          ...current,
-                          value: event.target.value,
-                        }
-                      : current,
-                  )
-                }
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    void handleConfirmNoteRename();
-                  }
-                }}
+                <div className="flex min-h-0 flex-1 flex-col gap-4 px-8 py-8">
+                  <div className="h-6 w-40 rounded-md bg-muted/60 motion-safe:animate-pulse" />
+                  <div className="h-4 w-72 rounded-md bg-muted/40 motion-safe:animate-pulse" />
+                  <div className="mt-6 h-40 rounded-2xl bg-muted/35 motion-safe:animate-pulse" />
+                  <div className="h-4 w-4/5 rounded-md bg-muted/30 motion-safe:animate-pulse" />
+                  <div className="h-4 w-3/5 rounded-md bg-muted/30 motion-safe:animate-pulse" />
+                </div>
+              </div>
+            ) : isSkillSurfaceVisible ? (
+              <SkillView
+                isSkillSurfaceLoading={isSkillSurfaceLoading}
+                isActiveSkillVisible={isActiveSkillVisible}
+                activeSkillCollection={activeSkillCollection}
+                activeDocument={skillsController.activeDocument}
+                activeSkill={skillsController.activeSkill}
+                draftContent={skillsController.draftContent}
+                documentTabs={skillsController.documentTabs}
+                isDocumentLoading={skillsController.isDocumentLoading}
+                isSaving={skillsController.isSaving}
+                pendingExternalChange={skillsController.pendingExternalChange}
+                saveStateLabel={skillsController.saveStateLabel}
+                skillInitialScrollTop={skillInitialScrollTop}
+                skillEmptyState={skillEmptyState}
+                isSidebarCollapsed={controller.isSidebarCollapsed}
+                shortcuts={controller.shortcuts}
+                folderRevealLabel={controller.folderRevealLabel}
+                showOutline={controller.showOutline}
+                onSetIsPaletteOpen={controller.setIsPaletteOpen}
+                onSetIsSettingsOpen={controller.setIsSettingsOpen}
+                onToggleSidebar={handleToggleSidebar}
+                onOpenLinkedFile={handleOpenSkillLink}
+                onScrollPositionChange={handleDocumentScrollPositionChange}
+                onDraftContentChange={skillsController.setDraftContent}
+                onKeepMineAfterExternalChange={skillsController.keepMineAfterExternalChange}
+                onReloadAfterExternalChange={skillsController.reloadAfterExternalChange}
+                onSelectDocumentTab={(kind) => void skillsController.openDocumentTab(kind)}
               />
-              <DialogFooter>
-                <Button variant="outline" type="button" onClick={() => setPendingNoteRename(null)}>
-                  Cancel
-                </Button>
-                <Button type="button" onClick={() => void handleConfirmNoteRename()}>
-                  Rename
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        ) : null}
-        {pendingNoteConfirm ? (
-          <Dialog
-            open={true}
-            onOpenChange={(open) => {
-              if (!open) {
-                setPendingNoteConfirm(null);
-              }
-            }}
-          >
-            <DialogContent className="sm:max-w-[420px]">
-              <DialogHeader>
-                <DialogTitle>
-                  {pendingNoteConfirm.kind === "remove"
-                    ? "Remove Current Note From Glyph"
-                    : "Delete Current Note"}
-                </DialogTitle>
-                <DialogDescription>
-                  {pendingNoteConfirm.kind === "remove"
-                    ? `Remove "${pendingNoteConfirm.name}" from Glyph? This only hides it from the app and does not delete the file from your device.`
-                    : `Delete "${pendingNoteConfirm.name}" from your device? This action cannot be undone.`}
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button
-                  ref={confirmCancelRef}
-                  variant="outline"
-                  type="button"
-                  onClick={() => setPendingNoteConfirm(null)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant={pendingNoteConfirm.kind === "delete" ? "destructive" : "default"}
-                  type="button"
-                  onClick={() => void handleConfirmCurrentNoteAction()}
-                >
-                  {pendingNoteConfirm.kind === "remove" ? "Remove" : "Delete"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        ) : null}
-      </div>
+            ) : (
+              <NoteView
+                content={controller.draftContent}
+                fileName={controller.activeFile?.name ?? null}
+                filePath={controller.activeFile?.path ?? null}
+                editorFocusRequest={controller.editorFocusRequest}
+                initialScrollTop={noteInitialScrollTop}
+                saveStateLabel={controller.saveStateLabel}
+                footerMetaLabel={noteFileSizeLabel}
+                wordCount={controller.wordCount}
+                readingTime={controller.readingTime}
+                isSidebarCollapsed={controller.isSidebarCollapsed}
+                shortcuts={controller.shortcuts}
+                canGoBack={controller.canGoBack}
+                canGoForward={controller.canGoForward}
+                autoOpenPDFSetting={controller.settings?.autoOpenPDF ?? true}
+                folderRevealLabel={controller.folderRevealLabel}
+                isActiveFilePinned={controller.isActiveFilePinned}
+                isFocusMode={controller.isFocusMode}
+                showOutline={controller.showOutline}
+                outlineItems={controller.outlineItems}
+                outlineJumpRequest={controller.outlineJumpRequest}
+                updateState={controller.updateState}
+                onContentChange={controller.updateDraftContent}
+                onToggleSidebar={handleToggleSidebar}
+                onCreateNote={() => void controller.createNote()}
+                onOpenSettings={handleOpenSettings}
+                onOpenCommandPalette={handleOpenCommandPalette}
+                onOpenLinkedFile={(path) => void handleOpenSkillLink(path)}
+                onScrollPositionChange={handleDocumentScrollPositionChange}
+                onNavigateBack={() => void controller.navigateBack()}
+                onNavigateForward={() => void controller.navigateForward()}
+                onDeleteNote={
+                  controller.activeFile
+                    ? () => void controller.handleDeleteFile(controller.activeFile!.path)
+                    : undefined
+                }
+                onOpenNewWindow={
+                  controller.activeFile
+                    ? () => void window.glyph?.openExternal(controller.activeFile!.path)
+                    : undefined
+                }
+                onOutlineJumpHandled={controller.clearOutlineJumpRequest}
+                onToggleFocusMode={() => void controller.toggleFocusMode()}
+                onTogglePinnedFile={
+                  controller.activeFile
+                    ? () => void controller.togglePinnedFile(controller.activeFile!.path)
+                    : undefined
+                }
+                onUpdateAction={() => void controller.triggerUpdateAction()}
+              />
+            )}
+          </div>
+        </div>
+      </AppLayout>
+
+      <CommandPalette
+        isOpen={controller.isPaletteOpen}
+        query={controller.paletteQuery}
+        items={paletteItems}
+        onChangeQuery={controller.setPaletteQuery}
+        onClose={() => {
+          controller.setIsPaletteOpen(false);
+        }}
+      />
+      <SettingsPanel
+        isOpen={controller.isSettingsOpen}
+        settings={controller.settings}
+        appInfo={controller.appInfo}
+        onClose={() => controller.setIsSettingsOpen(false)}
+        onChooseFolder={() => void controller.chooseFolderAndUpdateWorkspace()}
+        onChangeMode={(mode: ThemeMode) => void controller.changeThemeMode(mode)}
+        onChangeShortcuts={(shortcuts) => void controller.changeShortcuts(shortcuts)}
+        onChangeAutoOpenPDF={(enabled) => void controller.saveSettings({ autoOpenPDF: enabled })}
+      />
+      <NoteRenameDialog
+        pending={pendingNoteRename}
+        currentDisplayName={currentNoteDisplayName}
+        onDismiss={() => setPendingNoteRename(null)}
+        onConfirm={() => void handleConfirmNoteRename()}
+        onValueChange={handleNoteRenameValueChange}
+      />
+      <NoteConfirmDialog
+        pending={pendingNoteConfirm}
+        onDismiss={() => setPendingNoteConfirm(null)}
+        onConfirm={() => void handleConfirmCurrentNoteAction()}
+      />
     </TooltipProvider>
   );
 };

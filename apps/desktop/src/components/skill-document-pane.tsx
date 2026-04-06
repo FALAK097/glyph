@@ -11,6 +11,8 @@ import {
 import { MarkdownEditor } from "./markdown-editor";
 import { Button } from "./ui/button";
 
+const OUTLINE_HEADING_PATTERN = /^#{1,4}\s+\S/;
+
 type SkillDocumentPaneProps = {
   activeDocument: SkillDocument;
   draftContent: string;
@@ -67,7 +69,8 @@ export function SkillDocumentPane({
 }: SkillDocumentPaneProps) {
   const parsed = useMemo(() => parseSkillDocument(draftContent), [draftContent]);
   const outlineHeadingCount = useMemo(
-    () => parsed.body.split("\n").filter((line) => /^#{1,4}\s+\S/.test(line.trim())).length,
+    () =>
+      parsed.body.split("\n").filter((line) => OUTLINE_HEADING_PATTERN.test(line.trim())).length,
     [parsed.body],
   );
   const fileSizeLabel = useMemo(() => {

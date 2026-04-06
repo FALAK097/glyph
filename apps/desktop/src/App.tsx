@@ -1,3 +1,4 @@
+import { ErrorBoundary } from "./components/error-boundary";
 import { DesktopApp } from "./components/desktop-app";
 
 export const App = () => {
@@ -22,5 +23,9 @@ export const App = () => {
     );
   }
 
-  return <DesktopApp glyph={glyph} />;
+  return (
+    <ErrorBoundary>
+      <DesktopApp glyph={glyph} />
+    </ErrorBoundary>
+  );
 };

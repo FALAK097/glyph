@@ -195,6 +195,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
           <Button
             variant="ghost"
             size="sm"
+            aria-label={node.name}
             className={`h-auto min-w-0 flex-1 cursor-pointer justify-start gap-2 rounded-md bg-transparent px-0 py-1 text-left hover:!bg-transparent ${
               draggable ? "cursor-grab active:cursor-grabbing" : ""
             }`}

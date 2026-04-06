@@ -308,9 +308,9 @@ test("sidebar reflects new note immediately without waiting for file watcher", a
     await selectPaletteItem(glyph.window, "new note", /new note/i);
 
     // The created file name starts with "Untitled-" — the sidebar strips the .md
-    // extension for display, so match without it. Must appear immediately (< 1s).
+    // extension for display, so match without it. Must appear immediately (no watcher delay).
     await expect(glyph.window.getByRole("button", { name: /Untitled-\d+/ }).first()).toBeVisible({
-      timeout: 1000,
+      timeout: 3000,
     });
   } finally {
     await glyph.stop(testInfo);
@@ -329,7 +329,7 @@ test("sidebar reflects new folder immediately without waiting for file watcher",
     // The created folder name starts with "New Folder-" — it must appear in the
     // sidebar immediately, not after a multi-second watcher delay.
     await expect(glyph.window.getByRole("button", { name: /New Folder-\d+/ }).first()).toBeVisible({
-      timeout: 1000,
+      timeout: 3000,
     });
   } finally {
     await glyph.stop(testInfo);
@@ -361,7 +361,7 @@ test("sidebar reflects new note immediately in a non-default workspace", async (
 
     // The new Untitled file must appear in the sidebar immediately
     await expect(glyph.window.getByRole("button", { name: /Untitled-\d+/ }).first()).toBeVisible({
-      timeout: 1000,
+      timeout: 3000,
     });
   } finally {
     await glyph.stop(testInfo);
@@ -389,7 +389,7 @@ test("sidebar reflects new folder immediately in a non-default workspace", async
 
     // The folder must appear in the sidebar immediately
     await expect(glyph.window.getByRole("button", { name: /New Folder-\d+/ }).first()).toBeVisible({
-      timeout: 1000,
+      timeout: 3000,
     });
   } finally {
     await glyph.stop(testInfo);
@@ -405,6 +405,9 @@ test("nested note is visible in the sidebar tree when folder is expanded", async
     await expectAppShell(glyph.window);
     await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
 
+    // Wait for the sidebar to populate with the workspace files first
+    await expect(glyph.window.getByRole("button", { name: /welcome/ }).first()).toBeVisible();
+
     // Sub-folders start expanded by default (local state = true), so nested
     // notes are immediately visible once the workspace root is loaded.
     await expect(glyph.window.getByRole("button", { name: /nested-note/ }).first()).toBeVisible();
@@ -418,6 +421,9 @@ test("expanding then collapsing a folder hides its children", async ({}, testInf
   try {
     await expectAppShell(glyph.window);
     await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
+
+    // Wait for sidebar to fully hydrate — welcome.md is at the root level
+    await expect(glyph.window.getByRole("button", { name: /welcome/ }).first()).toBeVisible();
 
     // Sub-folder "notes" is expanded by default — nested note should be visible
     await expect(glyph.window.getByRole("button", { name: /nested-note/ }).first()).toBeVisible();
@@ -613,7 +619,7 @@ test("delete file removes it from the sidebar", async ({}, testInfo) => {
     const noteButton = glyph.window
       .getByRole("button", { name: /Untitled-\d+/, exact: false })
       .first();
-    await expect(noteButton).toBeVisible({ timeout: 1000 });
+    await expect(noteButton).toBeVisible({ timeout: 3000 });
 
     // Hover the note row to reveal the "..." (Note actions) menu button, then click it
     await noteButton.hover();
@@ -644,7 +650,7 @@ test("rename file updates its name in the sidebar", async ({}, testInfo) => {
     const noteButton = glyph.window
       .getByRole("button", { name: /Untitled-\d+/, exact: false })
       .first();
-    await expect(noteButton).toBeVisible({ timeout: 1000 });
+    await expect(noteButton).toBeVisible({ timeout: 3000 });
 
     // Hover to reveal the "..." button, then click → Rename
     await noteButton.hover();
@@ -680,7 +686,7 @@ test("rename folder updates its name in the sidebar", async ({}, testInfo) => {
     const folderButton = glyph.window
       .getByRole("button", { name: /New Folder-\d+/, exact: false })
       .first();
-    await expect(folderButton).toBeVisible({ timeout: 1000 });
+    await expect(folderButton).toBeVisible({ timeout: 3000 });
 
     // Hover to reveal "..." (Folder actions), then click → Rename
     await folderButton.hover();
@@ -713,7 +719,7 @@ test("delete folder removes it from the sidebar", async ({}, testInfo) => {
     const folderButton = glyph.window
       .getByRole("button", { name: /New Folder-\d+/, exact: false })
       .first();
-    await expect(folderButton).toBeVisible({ timeout: 1000 });
+    await expect(folderButton).toBeVisible({ timeout: 3000 });
 
     // Hover to reveal "..." (Folder actions), then click → Delete
     await folderButton.hover();

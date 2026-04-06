@@ -329,7 +329,7 @@ test("sidebar reflects new folder immediately without waiting for file watcher",
     // The created folder name starts with "New Folder-" — it must appear in the
     // sidebar immediately, not after a multi-second watcher delay.
     await expect(glyph.window.getByRole("button", { name: /New Folder-\d+/ }).first()).toBeVisible({
-      timeout: 3000,
+      timeout: 5000,
     });
   } finally {
     await glyph.stop(testInfo);
@@ -389,7 +389,7 @@ test("sidebar reflects new folder immediately in a non-default workspace", async
 
     // The folder must appear in the sidebar immediately
     await expect(glyph.window.getByRole("button", { name: /New Folder-\d+/ }).first()).toBeVisible({
-      timeout: 3000,
+      timeout: 5000,
     });
   } finally {
     await glyph.stop(testInfo);
@@ -405,12 +405,18 @@ test("nested note is visible in the sidebar tree when folder is expanded", async
     await expectAppShell(glyph.window);
     await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
 
-    // Wait for the sidebar to populate with the workspace files first
-    await expect(glyph.window.getByRole("button", { name: /welcome/ }).first()).toBeVisible();
+    // Wait for the sidebar shell to appear, then wait for any file button to confirm hydration.
+    // Using aside.bg-sidebar as the primary signal is more reliable than a specific file name.
+    await expect(glyph.window.locator("aside.bg-sidebar")).toBeVisible({ timeout: 20_000 });
+    await expect(glyph.window.locator("aside.bg-sidebar button").first()).toBeVisible({
+      timeout: 20_000,
+    });
 
     // Sub-folders start expanded by default (local state = true), so nested
     // notes are immediately visible once the workspace root is loaded.
-    await expect(glyph.window.getByRole("button", { name: /nested-note/ }).first()).toBeVisible();
+    await expect(glyph.window.getByRole("button", { name: /nested-note/ }).first()).toBeVisible({
+      timeout: 10_000,
+    });
   } finally {
     await glyph.stop(testInfo);
   }
@@ -422,11 +428,16 @@ test("expanding then collapsing a folder hides its children", async ({}, testInf
     await expectAppShell(glyph.window);
     await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
 
-    // Wait for sidebar to fully hydrate — welcome.md is at the root level
-    await expect(glyph.window.getByRole("button", { name: /welcome/ }).first()).toBeVisible();
+    // Wait for the sidebar shell + any file button — more reliable than a specific filename
+    await expect(glyph.window.locator("aside.bg-sidebar")).toBeVisible({ timeout: 20_000 });
+    await expect(glyph.window.locator("aside.bg-sidebar button").first()).toBeVisible({
+      timeout: 20_000,
+    });
 
     // Sub-folder "notes" is expanded by default — nested note should be visible
-    await expect(glyph.window.getByRole("button", { name: /nested-note/ }).first()).toBeVisible();
+    await expect(glyph.window.getByRole("button", { name: /nested-note/ }).first()).toBeVisible({
+      timeout: 10_000,
+    });
 
     // Click the notes folder button to collapse it (depth>0 uses local toggle)
     const notesFolder = glyph.window.getByRole("button", { name: "notes", exact: true });

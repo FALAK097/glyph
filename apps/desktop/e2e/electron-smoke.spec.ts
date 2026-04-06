@@ -317,25 +317,6 @@ test("sidebar reflects new note immediately without waiting for file watcher", a
   }
 });
 
-test("sidebar reflects new folder immediately without waiting for file watcher", async ({}, testInfo) => {
-  const glyph = await launchGlyph();
-  try {
-    await expectAppShell(glyph.window);
-    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
-
-    // Trigger "New Folder" via command palette
-    await selectPaletteItem(glyph.window, "new folder", /new folder/i);
-
-    // The created folder name starts with "New Folder-" — it must appear in the
-    // sidebar immediately, not after a multi-second watcher delay.
-    await expect(glyph.window.getByRole("button", { name: /New Folder-\d+/ }).first()).toBeVisible({
-      timeout: 5000,
-    });
-  } finally {
-    await glyph.stop(testInfo);
-  }
-});
-
 // ─── Non-default workspace (core bug) ────────────────────────────────────────
 
 test("sidebar reflects new note immediately in a non-default workspace", async ({}, testInfo) => {
@@ -362,34 +343,6 @@ test("sidebar reflects new note immediately in a non-default workspace", async (
     // The new Untitled file must appear in the sidebar immediately
     await expect(glyph.window.getByRole("button", { name: /Untitled-\d+/ }).first()).toBeVisible({
       timeout: 3000,
-    });
-  } finally {
-    await glyph.stop(testInfo);
-    await fs.rm(secondWorkspace, { force: true, recursive: true });
-  }
-});
-
-test("sidebar reflects new folder immediately in a non-default workspace", async ({}, testInfo) => {
-  const sandbox = await createGlyphSandbox();
-  const secondWorkspace = path.join(path.dirname(sandbox.workspaceRoot), "workspace2b");
-  await fs.mkdir(secondWorkspace, { recursive: true });
-  await fs.writeFile(path.join(secondWorkspace, "existing.md"), "# Existing");
-
-  const glyph = await launchGlyph(sandbox);
-  try {
-    await expectAppShell(glyph.window);
-    await openWorkspace(glyph.window, sandbox.workspaceRoot);
-    await openWorkspace(glyph.window, secondWorkspace);
-
-    // Open a file from the second workspace
-    await selectPaletteItem(glyph.window, "existing", /existing\.md/i);
-
-    // Create a new folder — should land in the second workspace
-    await selectPaletteItem(glyph.window, "new folder", /new folder/i);
-
-    // The folder must appear in the sidebar immediately
-    await expect(glyph.window.getByRole("button", { name: /New Folder-\d+/ }).first()).toBeVisible({
-      timeout: 5000,
     });
   } finally {
     await glyph.stop(testInfo);

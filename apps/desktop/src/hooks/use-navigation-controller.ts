@@ -9,8 +9,11 @@ type UseNavigationControllerOptions = {
 };
 
 export function useNavigationController({ glyph, syncOpenedFile }: UseNavigationControllerOptions) {
-  const canGoBack = useWorkspaceStore((s) => s.canGoBack);
-  const canGoForward = useWorkspaceStore((s) => s.canGoForward);
+  // Subscribe to the index/history length directly so the component re-renders
+  // when navigation state changes (canGoBack/canGoForward are stable function
+  // references and do NOT trigger re-renders on their own).
+  const canGoBack = useWorkspaceStore((s) => s.navigationIndex > 0);
+  const canGoForward = useWorkspaceStore((s) => s.navigationIndex < s.navigationHistory.length - 1);
   const goBack = useWorkspaceStore((s) => s.goBack);
   const goForward = useWorkspaceStore((s) => s.goForward);
 

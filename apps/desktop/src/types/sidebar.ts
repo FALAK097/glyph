@@ -40,6 +40,7 @@ export type SidebarProps = {
   onRemoveFileFromGlyph?: (filePath: string) => void;
   onRemoveFolder: (folderPath: string) => void;
   onRenameFile: (filePath: string, newName: string) => void;
+  onRenameFolder?: (folderPath: string, newName: string) => void;
   onRevealInFinder: (targetPath: string) => void;
   onTogglePinnedFile?: (filePath: string) => void;
   onToggleFolder: (folderPath: string) => void;
@@ -78,6 +79,7 @@ export type SidebarTreeNodeProps = {
   onTogglePinnedFile?: (filePath: string) => void;
   onRequestDelete: (node: SidebarDeleteTarget) => void;
   onRenameFile: (filePath: string, newName: string) => void;
+  onRenameFolder?: (folderPath: string, newName: string) => void;
   onToggleFolder: (folderPath: string) => void;
   draggable?: boolean;
   onDragStartTopLevel?: (sourcePath: string) => void;

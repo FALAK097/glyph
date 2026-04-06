@@ -40,6 +40,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
   onTogglePinnedFile,
   onRequestDelete,
   onRenameFile,
+  onRenameFolder,
   onToggleFolder,
   draggable,
   onDragStartTopLevel,
@@ -97,7 +98,11 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
     const baseName = node.type === "file" ? getDisplayFileName(currentName) : currentName;
 
     if (trimmed !== currentName && trimmed !== baseName) {
-      onRenameFile(node.path, trimmed);
+      if (node.type === "directory" && onRenameFolder) {
+        onRenameFolder(node.path, trimmed);
+      } else {
+        onRenameFile(node.path, trimmed);
+      }
     }
 
     setIsRenaming(false);
@@ -244,6 +249,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
                     ref={menuButtonRef}
                     variant="ghost"
                     size="icon-xs"
+                    aria-label="Folder actions"
                     className="pointer-events-none rounded bg-transparent text-muted-foreground opacity-0 transition-opacity group-hover/folder-row:pointer-events-auto group-hover/folder-row:opacity-100 hover:text-foreground hover:!bg-transparent focus-visible:opacity-100 focus-visible:!bg-transparent"
                     onClick={handleMenuToggle}
                     type="button"
@@ -275,6 +281,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
                 onTogglePinnedFile={onTogglePinnedFile}
                 onRequestDelete={onRequestDelete}
                 onRenameFile={onRenameFile}
+                onRenameFolder={onRenameFolder}
                 onToggleFolder={onToggleFolder}
               />
             ))}
@@ -437,6 +444,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
                   ref={menuButtonRef}
                   variant="ghost"
                   size="icon-xs"
+                  aria-label="Note actions"
                   className="pointer-events-none rounded bg-transparent text-muted-foreground opacity-0 transition-opacity group-hover/file-row:pointer-events-auto group-hover/file-row:opacity-100 hover:text-foreground hover:!bg-transparent focus-visible:opacity-100 focus-visible:!bg-transparent"
                   onClick={handleMenuToggle}
                   type="button"
@@ -466,6 +474,21 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
           >
             <PencilIcon size={14} className="opacity-70" />
             Rename
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-white/10 dark:hover:bg-white/10"
+            onClick={(event) => {
+              event.stopPropagation();
+              onRevealInFinder(node.path);
+              setShowMenu(false);
+              focusMenuButton();
+            }}
+            type="button"
+          >
+            <FileManagerLogo label={revealLabel} size={14} className="opacity-70" />
+            {revealLabel}
           </Button>
           <Button
             variant="ghost"

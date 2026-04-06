@@ -16,6 +16,7 @@ import {
   orderSidebarNodes,
   removeSidebarPath,
   renameSidebarFile,
+  renameSidebarFolder,
   upsertSidebarFile,
   upsertSidebarFolder,
 } from "@/lib/sidebar-tree";
@@ -155,11 +156,22 @@ export const useDesktopAppController = (
     hiddenFileKeys,
     setExpandedFolderPaths,
     restoreSidebarNodes,
-    syncWorkspace,
+    syncWorkspace: _syncWorkspace,
     handleToggleFolder,
     handleReorderNodes,
     handleRemoveFolder,
   } = sidebarController;
+
+  // Wrap syncWorkspace to clear the stale lastCreatedFolderPath whenever the
+  // active workspace changes. Without this, creating a folder in workspace A
+  // then switching to workspace B would make the next note land in workspace A.
+  const syncWorkspace = useCallback(
+    (workspace: Parameters<typeof _syncWorkspace>[0]) => {
+      lastCreatedFolderPathRef.current = null;
+      _syncWorkspace(workspace);
+    },
+    [_syncWorkspace],
+  );
 
   // Derived values
   const files = useMemo(() => flattenFiles(tree, rootPath), [rootPath, tree]);
@@ -264,9 +276,10 @@ export const useDesktopAppController = (
   const createNote = useCallback(async () => {
     let baseDir: string | null = null;
 
-    // Prefer the last created folder so a new note lands inside it
+    // Prefer the last created folder so a new note lands inside it.
+    // This works regardless of workspace mode — the folder path is always valid.
     const lastFolder = lastCreatedFolderPathRef.current;
-    if (lastFolder && isWorkspaceMode && rootPath && isFileInsideWorkspace(lastFolder, rootPath)) {
+    if (lastFolder) {
       baseDir = lastFolder;
     } else if (isWorkspaceMode && rootPath) {
       const activeFileDir = activeFile ? getDirName(activeFile.path) : null;
@@ -286,7 +299,29 @@ export const useDesktopAppController = (
     const file = await glyph.createFile(baseDir, `Untitled-${Date.now()}.md`);
     setActiveFile(file);
     setIsWorkspaceMode(true);
-    setSidebarNodes((prev) => upsertSidebarFile(prev, file));
+
+    // Find which top-level workspace directory node owns the new file.
+    // Using sidebarNodes rather than rootPath correctly handles the case where
+    // multiple workspaces are open and the file lands in a non-default one.
+    const ownerNode = sidebarNodes.find(
+      (node) => node.type === "directory" && isFileInsideWorkspace(file.path, node.path),
+    );
+
+    if (ownerNode?.type === "directory") {
+      const workspaceNode = await glyph.getSidebarNode("directory", ownerNode.path);
+      if (workspaceNode?.type === "directory") {
+        setSidebarNodes((prev) =>
+          upsertSidebarFolder(prev, {
+            rootPath: ownerNode.path,
+            tree: workspaceNode.children,
+            activeFile: null,
+          }),
+        );
+      }
+    } else {
+      setSidebarNodes((prev) => upsertSidebarFile(prev, file));
+    }
+
     pushHistory(file.path);
     requestEditorFocus("start");
   }, [
@@ -300,6 +335,7 @@ export const useDesktopAppController = (
     settings?.defaultWorkspacePath,
     setIsPaletteOpen,
     setSidebarNodes,
+    sidebarNodes,
   ]);
 
   const createFolder = useCallback(async () => {
@@ -326,12 +362,34 @@ export const useDesktopAppController = (
     // Track the created folder path so the next createNote uses it as its parent
     lastCreatedFolderPathRef.current = `${baseDir}/${folderName}`.replace(/\\/g, "/");
 
-    if (rootPath) {
-      setSidebarNodes((prev) =>
-        upsertSidebarFolder(prev, { rootPath, tree: nextTree, activeFile: null }),
-      );
+    if (nextTree !== null) {
+      // Folder is inside the active workspace — use the returned tree directly.
+      if (rootPath) {
+        setSidebarNodes((prev) =>
+          upsertSidebarFolder(prev, { rootPath, tree: nextTree, activeFile: null }),
+        );
+      } else {
+        setSidebarNodes(nextTree);
+      }
     } else {
-      setSidebarNodes(nextTree);
+      // Folder is outside the active workspace — find which top-level directory
+      // node owns the new folder and refresh its subtree via IPC.
+      const ownerNode = sidebarNodes.find(
+        (node) => node.type === "directory" && isFileInsideWorkspace(baseDir, node.path),
+      );
+
+      if (ownerNode?.type === "directory") {
+        const workspaceNode = await glyph.getSidebarNode("directory", ownerNode.path);
+        if (workspaceNode?.type === "directory") {
+          setSidebarNodes((prev) =>
+            upsertSidebarFolder(prev, {
+              rootPath: ownerNode.path,
+              tree: workspaceNode.children,
+              activeFile: null,
+            }),
+          );
+        }
+      }
     }
   }, [
     activeFile,
@@ -341,6 +399,7 @@ export const useDesktopAppController = (
     settings?.defaultWorkspacePath,
     setIsPaletteOpen,
     setSidebarNodes,
+    sidebarNodes,
   ]);
 
   const ensureActiveDraftFile = useCallback(
@@ -524,6 +583,54 @@ export const useDesktopAppController = (
       }
     },
     [activeFile?.path, glyph, replaceHistoryPath, setActiveFile, setError, syncTrackedPaths],
+  );
+
+  const handleRenameFolder = useCallback(
+    async (folderPath: string, newName: string) => {
+      if (!newName.trim()) {
+        return;
+      }
+
+      try {
+        const { oldPath, newPath } = await glyph.renameFolder(folderPath, newName);
+        setSidebarNodes((prev) => renameSidebarFolder(prev, oldPath, newPath, newName));
+
+        // Remap active file path if it was inside the renamed folder
+        if (activeFile && isFileInsideWorkspace(activeFile.path, oldPath)) {
+          const newFilePath =
+            newPath + normalizePath(activeFile.path).slice(normalizePath(oldPath).length);
+          try {
+            const refreshedFile = await glyph.readFile(newFilePath);
+            setActiveFile(refreshedFile);
+            replaceHistoryPath(activeFile.path, newFilePath);
+          } catch {
+            // File may be temporarily inaccessible — clear active file
+            setActiveFile(null);
+            removeHistoryPath(activeFile.path);
+          }
+        }
+
+        // If the renamed folder was the workspace root, reopen to restart the watcher
+        if (rootPath && isSamePath(rootPath, oldPath)) {
+          const workspace = await glyph.openFolder(newPath);
+          if (workspace) {
+            syncWorkspace(workspace);
+          }
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to rename folder");
+      }
+    },
+    [
+      activeFile,
+      glyph,
+      removeHistoryPath,
+      replaceHistoryPath,
+      rootPath,
+      setActiveFile,
+      setError,
+      syncWorkspace,
+    ],
   );
 
   const togglePinnedFile = useCallback(
@@ -1375,6 +1482,7 @@ export const useDesktopAppController = (
     handleRemoveFileFromGlyph,
     handleRemoveFolder,
     handleRenameFile,
+    handleRenameFolder,
     handleReorderNodes,
     handleToggleFolder,
     isActiveFilePinned,

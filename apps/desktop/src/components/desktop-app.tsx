@@ -1092,6 +1092,9 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         onTogglePinnedFile={(filePath) => void controller.togglePinnedFile(filePath)}
         onRemoveFolder={controller.handleRemoveFolder}
         onRenameFile={controller.handleRenameFile}
+        onRenameFolder={(folderPath, newName) =>
+          void controller.handleRenameFolder(folderPath, newName)
+        }
         onRevealInFinder={(targetPath) => void controller.revealInFinder(targetPath)}
         onToggleFolder={controller.handleToggleFolder}
         onReorderNodes={controller.handleReorderNodes}
@@ -1193,8 +1196,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                 readingTime={controller.readingTime}
                 isSidebarCollapsed={controller.isSidebarCollapsed}
                 shortcuts={controller.shortcuts}
-                canGoBack={controller.canGoBack()}
-                canGoForward={controller.canGoForward()}
+                canGoBack={controller.canGoBack}
+                canGoForward={controller.canGoForward}
                 autoOpenPDFSetting={controller.settings?.autoOpenPDF ?? true}
                 folderRevealLabel={controller.folderRevealLabel}
                 isActiveFilePinned={controller.isActiveFilePinned}

@@ -95,6 +95,12 @@ const api = {
   renameFile(oldPath: string, newName: string) {
     return ipcRenderer.invoke("workspace:renameFile", oldPath, newName) as Promise<FileDocument>;
   },
+  renameFolder(oldPath: string, newName: string) {
+    return ipcRenderer.invoke("workspace:renameFolder", oldPath, newName) as Promise<{
+      oldPath: string;
+      newPath: string;
+    }>;
+  },
   deleteFile(targetPath: string) {
     return ipcRenderer.invoke("workspace:deleteFile", targetPath) as Promise<string>;
   },
@@ -103,7 +109,7 @@ const api = {
   },
   createFolder(parentDir: string, folderName: string) {
     return ipcRenderer.invoke("workspace:createFolder", parentDir, folderName) as Promise<
-      WorkspaceSnapshot["tree"]
+      WorkspaceSnapshot["tree"] | null
     >;
   },
   searchWorkspace(query: string) {

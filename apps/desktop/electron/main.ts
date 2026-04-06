@@ -1646,17 +1646,9 @@ function assertBasename(name: string) {
   }
 }
 
-function assertWithinWorkspace(targetPath: string) {
-  if (!activeWorkspaceRoot) {
-    throw new Error("No workspace is open.");
-  }
-
-  const root = path.resolve(activeWorkspaceRoot);
-  const resolved = path.resolve(targetPath);
-  const relative = path.relative(root, resolved);
-
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
-    throw new Error("Path is outside the active workspace.");
+function assertSafePath(targetPath: string) {
+  if (!path.isAbsolute(targetPath)) {
+    throw new Error("Path must be absolute.");
   }
 }
 
@@ -1688,7 +1680,7 @@ ipcMain.handle("workspace:saveFile", async (_event, filePath: string, content: s
 });
 
 ipcMain.handle("workspace:createFile", async (_event, parentDir: string, fileName: string) => {
-  assertWithinWorkspace(parentDir);
+  assertSafePath(parentDir);
   assertBasename(fileName);
   const normalizedFileName = getMarkdownExtension(fileName) !== null ? fileName : `${fileName}.md`;
   const targetPath = path.join(parentDir, normalizedFileName);
@@ -1697,7 +1689,7 @@ ipcMain.handle("workspace:createFile", async (_event, parentDir: string, fileNam
 });
 
 ipcMain.handle("workspace:renameFile", async (_event, oldPath: string, newName: string) => {
-  assertWithinWorkspace(oldPath);
+  assertSafePath(oldPath);
   assertBasename(newName);
   const currentExtension = getMarkdownExtension(oldPath) ?? ".md";
   const normalizedFileName =
@@ -1707,25 +1699,40 @@ ipcMain.handle("workspace:renameFile", async (_event, oldPath: string, newName: 
   return readMarkdownFile(newPath);
 });
 
+ipcMain.handle("workspace:renameFolder", async (_event, oldPath: string, newName: string) => {
+  assertSafePath(oldPath);
+  assertBasename(newName);
+  const newPath = path.join(path.dirname(oldPath), newName);
+  await fs.rename(oldPath, newPath);
+  return { oldPath, newPath };
+});
+
 ipcMain.handle("workspace:deleteFile", async (_event, targetPath: string) => {
-  assertWithinWorkspace(targetPath);
+  assertSafePath(targetPath);
   await fs.unlink(targetPath);
   return targetPath;
 });
 
 ipcMain.handle("workspace:deleteFolder", async (_event, targetPath: string) => {
-  assertWithinWorkspace(targetPath);
+  assertSafePath(targetPath);
   await fs.rm(targetPath, { recursive: true, force: false });
   return targetPath;
 });
 
 ipcMain.handle("workspace:createFolder", async (_event, parentDir: string, folderName: string) => {
-  assertWithinWorkspace(parentDir);
+  assertSafePath(parentDir);
   assertBasename(folderName);
   await fs.mkdir(path.join(parentDir, folderName), { recursive: false });
 
   if (!activeWorkspaceRoot) {
-    return [];
+    return null;
+  }
+
+  const root = path.resolve(activeWorkspaceRoot);
+  const resolved = path.resolve(parentDir);
+  const relative = path.relative(root, resolved);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    return null;
   }
 
   return buildDirectoryTree(activeWorkspaceRoot);

@@ -370,6 +370,7 @@ export const Sidebar = ({
   onTogglePinnedFile,
   onRemoveFolder,
   onRenameFile,
+  onRenameFolder,
   onRevealInFinder,
   onToggleFolder,
   onReorderNodes,
@@ -608,6 +609,7 @@ export const Sidebar = ({
                         onRevealInFinder={onRevealInFinder}
                         onRequestDelete={handleRequestDelete}
                         onRenameFile={onRenameFile}
+                        onRenameFolder={onRenameFolder}
                         onToggleFolder={onToggleFolder}
                         onTogglePinnedFile={onTogglePinnedFile}
                         draggable

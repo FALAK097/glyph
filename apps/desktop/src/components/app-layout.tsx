@@ -28,6 +28,7 @@ type AppLayoutProps = {
   onTogglePinnedFile: (filePath: string) => void;
   onRemoveFolder: (folderPath: string) => void;
   onRenameFile: (filePath: string, newName: string) => void;
+  onRenameFolder?: (folderPath: string, newName: string) => void;
   onRevealInFinder: (targetPath: string) => void;
   onToggleFolder: (folderPath: string) => void;
   onReorderNodes: (sourcePath: string, targetPath: string, position: DragPosition) => void;
@@ -57,6 +58,7 @@ export function AppLayout({
   onTogglePinnedFile,
   onRemoveFolder,
   onRenameFile,
+  onRenameFolder,
   onRevealInFinder,
   onToggleFolder,
   onReorderNodes,
@@ -93,6 +95,7 @@ export function AppLayout({
           onTogglePinnedFile={onTogglePinnedFile}
           onRemoveFolder={onRemoveFolder}
           onRenameFile={onRenameFile}
+          onRenameFolder={onRenameFolder}
           onRevealInFinder={onRevealInFinder}
           onToggleFolder={onToggleFolder}
           onReorderNodes={onReorderNodes}

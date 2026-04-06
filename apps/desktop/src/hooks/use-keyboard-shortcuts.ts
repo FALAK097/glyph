@@ -14,6 +14,7 @@ type UseKeyboardShortcutsOptions = {
   setError: (message: string | null) => void;
   setSaving: (isSaving: boolean) => void;
   createNote: () => Promise<void>;
+  createFolder: () => Promise<void>;
   syncOpenedFile: (file: FileDocument, options?: { recordHistory?: boolean }) => Promise<void>;
   syncWorkspace: (workspace: WorkspaceSnapshot) => void;
   setIsWorkspaceMode: React.Dispatch<React.SetStateAction<boolean>>;
@@ -37,6 +38,7 @@ export function useKeyboardShortcuts({
   setError,
   setSaving,
   createNote,
+  createFolder,
   syncOpenedFile,
   syncWorkspace,
   setIsWorkspaceMode,
@@ -147,6 +149,9 @@ export function useKeyboardShortcuts({
             case "new-note":
               void createNote();
               break;
+            case "new-folder":
+              void createFolder();
+              break;
             case "open-file": {
               const file = await glyph.openDocument();
               if (file) {
@@ -193,6 +198,7 @@ export function useKeyboardShortcuts({
     setSaving,
     glyph,
     createNote,
+    createFolder,
     syncOpenedFile,
     syncWorkspace,
     setIsWorkspaceMode,

@@ -10,7 +10,7 @@ import { applyTheme } from "@/theme/themes";
 
 import { getErrorMessage } from "@/lib/errors";
 import { buildBreadcrumbs, extractMarkdownOutline } from "@/lib/note-navigation";
-import { isFileInsideWorkspace, isSamePath, normalizePath } from "@/lib/paths";
+import { getDirName, isFileInsideWorkspace, isSamePath, normalizePath } from "@/lib/paths";
 import { getFolderRevealLabel } from "@/lib/platform";
 import {
   orderSidebarNodes,
@@ -259,7 +259,17 @@ export const useDesktopAppController = (
   );
 
   const createNote = useCallback(async () => {
-    const baseDir = isWorkspaceMode ? rootPath : (settings?.defaultWorkspacePath ?? null);
+    let baseDir: string | null = null;
+
+    if (isWorkspaceMode && rootPath) {
+      const activeFileDir = activeFile ? getDirName(activeFile.path) : null;
+      baseDir =
+        activeFileDir && isFileInsideWorkspace(activeFileDir, rootPath) ? activeFileDir : rootPath;
+    } else if (activeFile) {
+      baseDir = getDirName(activeFile.path);
+    } else if (settings?.defaultWorkspacePath) {
+      baseDir = settings.defaultWorkspacePath;
+    }
 
     if (!baseDir) {
       return;
@@ -273,6 +283,7 @@ export const useDesktopAppController = (
     pushHistory(file.path);
     requestEditorFocus("start");
   }, [
+    activeFile,
     glyph,
     isWorkspaceMode,
     pushHistory,
@@ -280,6 +291,39 @@ export const useDesktopAppController = (
     rootPath,
     setActiveFile,
     settings?.defaultWorkspacePath,
+    setIsPaletteOpen,
+    setSidebarNodes,
+  ]);
+
+  const createFolder = useCallback(async () => {
+    let baseDir: string | null = null;
+
+    if (isWorkspaceMode && rootPath) {
+      const activeFileDir = activeFile ? getDirName(activeFile.path) : null;
+      baseDir =
+        activeFileDir && isFileInsideWorkspace(activeFileDir, rootPath) ? activeFileDir : rootPath;
+    } else if (activeFile) {
+      baseDir = getDirName(activeFile.path);
+    } else if (settings?.defaultWorkspacePath) {
+      baseDir = settings.defaultWorkspacePath;
+    }
+
+    if (!baseDir) {
+      return;
+    }
+
+    setIsPaletteOpen(false);
+    const folderName = `New Folder-${Date.now()}`;
+    const tree = await glyph.createFolder(baseDir, folderName);
+    setSidebarNodes(tree);
+  }, [
+    activeFile,
+    glyph,
+    isWorkspaceMode,
+    rootPath,
+    settings?.defaultWorkspacePath,
+    setIsPaletteOpen,
+    setSidebarNodes,
   ]);
 
   const ensureActiveDraftFile = useCallback(
@@ -299,7 +343,7 @@ export const useDesktopAppController = (
 
       const createPromise = (async () => {
         const committedFileName = getCommittedDraftFileName(draftValue);
-        const draftFile = await glyph.createFile(baseDir, `Untitled-${Date.now()}.md`);
+        const draftFile = await glyph.createFile(baseDir!, `Untitled-${Date.now()}.md`);
         let file = draftFile;
 
         if (committedFileName) {
@@ -339,6 +383,8 @@ export const useDesktopAppController = (
       pushHistory,
       requestEditorFocus,
       rootPath,
+      setIsPaletteOpen,
+      setSidebarNodes,
       settings?.defaultWorkspacePath,
     ],
   );
@@ -658,6 +704,15 @@ export const useDesktopAppController = (
         onSelect: () => void createNote(),
       },
       {
+        id: "new-folder",
+        title: "New folder",
+        subtitle: "Create a new folder in the current directory",
+        shortcut: "⇧⌘N",
+        section: "Actions",
+        kind: "command",
+        onSelect: () => void createFolder(),
+      },
+      {
         id: "open-file",
         title: "Open File",
         subtitle: "Open an existing markdown file",
@@ -817,6 +872,7 @@ export const useDesktopAppController = (
     [
       activeFile,
       createNote,
+      createFolder,
       glyph,
       isActiveFilePinned,
       isFocusMode,
@@ -862,6 +918,7 @@ export const useDesktopAppController = (
     setError,
     setSaving,
     createNote,
+    createFolder,
     syncOpenedFile,
     syncWorkspace,
     setIsWorkspaceMode,
@@ -953,16 +1010,21 @@ export const useDesktopAppController = (
             nextSidebarNodes = upsertSidebarFolder(nextSidebarNodes, workspace);
             nextExpandedFolders.add(workspace.rootPath);
           }
-          const file = await glyph.readFile(target.path);
-          setActiveFile(file);
-          pushHistory(file.path);
-          const refreshedSettings = await glyph.getSettings();
-          setSettings(refreshedSettings);
-          setIsWorkspaceMode(
-            Boolean(workspace && isFileInsideWorkspace(file.path, workspace.rootPath)),
-          );
-          nextSidebarNodes = upsertSidebarFile(nextSidebarNodes, file);
-          bootFocusMode = "end";
+          try {
+            const file = await glyph.readFile(target.path);
+            setActiveFile(file);
+            pushHistory(file.path);
+            const refreshedSettings = await glyph.getSettings();
+            setSettings(refreshedSettings);
+            setIsWorkspaceMode(
+              Boolean(workspace && isFileInsideWorkspace(file.path, workspace.rootPath)),
+            );
+            nextSidebarNodes = upsertSidebarFile(nextSidebarNodes, file);
+            bootFocusMode = "end";
+          } catch {
+            // External file is stale or inaccessible — skip file-specific
+            // state updates but continue boot so hasBooted flips to true.
+          }
         }
       } else {
         const workspace = await tryOpenWorkspace(initialWorkspacePath);
@@ -1055,8 +1117,12 @@ export const useDesktopAppController = (
         );
 
         if (changedPath === activeFile?.path && !isDirty) {
-          const refreshedFile = await glyph.readFile(changedPath);
-          updateActiveFile(refreshedFile);
+          try {
+            const refreshedFile = await glyph.readFile(changedPath);
+            updateActiveFile(refreshedFile);
+          } catch {
+            // Ignore transient external FS races (file renamed/deleted).
+          }
         }
       },
     );
@@ -1153,7 +1219,7 @@ export const useDesktopAppController = (
         : isDirty
           ? "Unsaved"
           : lastSavedAt
-            ? `Saved ${new Date(lastSavedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
+            ? `Saved ${new Date(lastSavedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`
             : "Ready",
     [isSaving, isDirty, lastSavedAt],
   );
@@ -1259,6 +1325,7 @@ export const useDesktopAppController = (
     chooseFolderAndUpdateWorkspace,
     clearOutlineJumpRequest,
     createNote,
+    createFolder,
     draftContent,
     editorFocusRequest,
     error,

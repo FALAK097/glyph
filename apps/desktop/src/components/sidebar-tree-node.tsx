@@ -284,7 +284,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
             <Button
               variant="ghost"
               size="sm"
-              className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
+              className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-white/10 dark:hover:bg-white/10"
               onClick={(event) => {
                 event.stopPropagation();
                 onRevealInFinder(node.path);
@@ -299,7 +299,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
             <Button
               variant="ghost"
               size="sm"
-              className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
+              className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-white/10 dark:hover:bg-white/10"
               onClick={(event) => {
                 event.stopPropagation();
                 const folder: SidebarRemoveTarget = {
@@ -422,7 +422,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
           <Button
             variant="ghost"
             size="sm"
-            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
+            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-white/10 dark:hover:bg-white/10"
             onClick={(event) => {
               event.stopPropagation();
               setRenameValue(displayFileName);
@@ -437,7 +437,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
           <Button
             variant="ghost"
             size="sm"
-            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
+            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-white/10 dark:hover:bg-white/10"
             onClick={(event) => {
               event.stopPropagation();
               onRequestRemoveFile?.({ path: node.path, name: node.name });

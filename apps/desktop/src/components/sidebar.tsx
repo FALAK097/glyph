@@ -25,7 +25,16 @@ import type {
 
 import { LogoComponent } from "./logo-component";
 import { SkillSourceLogo } from "./skill-source-logo";
-import { ChevronRightIcon, MoreVerticalIcon, PencilIcon, PinIcon, TrashIcon, XIcon } from "./icons";
+import {
+  ChevronRightIcon,
+  MoreVerticalIcon,
+  PencilIcon,
+  PinIcon,
+  PlusIcon,
+  TrashIcon,
+  XIcon,
+  FolderPlusIcon,
+} from "./icons";
 import { SidebarTreeNode } from "./sidebar-tree-node";
 
 const normalizePathKey = (path: string) => normalizePath(path).toLowerCase();
@@ -134,7 +143,7 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
           tabIndex={-1}
         />
         <div
-          className="fixed z-50 w-[142px] rounded-md border border-border bg-popover py-1 shadow-lg"
+          className="fixed z-50 w-[142px] rounded-md border border-border bg-white dark:bg-popover py-1 shadow-lg"
           style={{ top: menuCoords.top, left: menuCoords.left }}
         >
           <Button
@@ -363,6 +372,8 @@ export const Sidebar = ({
   onRevealInFinder,
   onToggleFolder,
   onReorderNodes,
+  onCreateNote,
+  onCreateFolder,
 }: SidebarProps) => {
   const [nodeToDelete, setNodeToDelete] = useState<SidebarDeleteTarget | null>(null);
   const [fileToRemove, setFileToRemove] = useState<SidebarRemoveTarget | null>(null);
@@ -428,21 +439,30 @@ export const Sidebar = ({
       <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-3">
         {skillCollections && skillCollections.length > 0 ? (
           <div className="mb-3">
-            <button
-              type="button"
-              onClick={onToggleSkillsSection}
-              className="flex w-full items-center justify-between px-4 py-1.5 text-left"
-            >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                SKILLS
-              </p>
-              <ChevronRightIcon
-                size={14}
-                className={`text-muted-foreground transition-transform duration-150 ${
-                  isSkillsExpanded ? "rotate-90" : ""
-                }`}
-              />
-            </button>
+            <div className="flex items-center justify-between px-4 py-1.5">
+              <button
+                type="button"
+                onClick={onToggleSkillsSection}
+                className="flex items-center text-left"
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  SKILLS
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={onToggleSkillsSection}
+                className="p-1 text-muted-foreground hover:text-foreground rounded-sm transition-colors"
+                aria-label={isSkillsExpanded ? "Collapse skills" : "Expand skills"}
+              >
+                <ChevronRightIcon
+                  size={12}
+                  className={`transition-transform duration-150 ${
+                    isSkillsExpanded ? "rotate-90" : ""
+                  }`}
+                />
+              </button>
+            </div>
             {isSkillsExpanded ? (
               <div>
                 <div className="space-y-1 px-2">
@@ -482,21 +502,58 @@ export const Sidebar = ({
         ) : null}
 
         <div>
-          <button
-            type="button"
-            onClick={onToggleNotesSection}
-            className="flex w-full items-center justify-between px-4 py-1.5 text-left"
-          >
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              NOTES
-            </p>
-            <ChevronRightIcon
-              size={14}
-              className={`text-muted-foreground transition-transform duration-150 ${
-                isNotesExpanded ? "rotate-90" : ""
-              }`}
-            />
-          </button>
+          <div className="flex items-center justify-between px-4 py-1.5">
+            <button type="button" onClick={onToggleNotesSection} className="flex items-center">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                NOTES
+              </p>
+            </button>
+            <div className="flex items-center gap-0.5">
+              {onCreateNote ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={onCreateNote}
+                      className="p-1 text-muted-foreground hover:text-foreground rounded-sm transition-colors"
+                      aria-label="New note"
+                    >
+                      <PlusIcon size={12} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">New Note (⌘N)</TooltipContent>
+                </Tooltip>
+              ) : null}
+              {onCreateFolder ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={onCreateFolder}
+                      className="p-1 text-muted-foreground hover:text-foreground rounded-sm transition-colors"
+                      aria-label="New folder"
+                    >
+                      <FolderPlusIcon size={12} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">New Folder (⇧⌘N)</TooltipContent>
+                </Tooltip>
+              ) : null}
+              <button
+                type="button"
+                onClick={onToggleNotesSection}
+                className="p-1 text-muted-foreground hover:text-foreground rounded-sm transition-colors"
+                aria-label={isNotesExpanded ? "Collapse notes" : "Expand notes"}
+              >
+                <ChevronRightIcon
+                  size={12}
+                  className={`text-muted-foreground transition-transform duration-150 ${
+                    isNotesExpanded ? "rotate-90" : ""
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
           {isNotesExpanded ? (
             <>
               {pinnedList.length > 0 ? (

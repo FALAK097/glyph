@@ -30,6 +30,8 @@ type AppLayoutProps = {
   onRevealInFinder: (targetPath: string) => void;
   onToggleFolder: (folderPath: string) => void;
   onReorderNodes: (sourcePath: string, targetPath: string, position: DragPosition) => void;
+  onCreateNote?: () => void;
+  onCreateFolder?: () => void;
   children: React.ReactNode;
 };
 
@@ -56,6 +58,8 @@ export function AppLayout({
   onRevealInFinder,
   onToggleFolder,
   onReorderNodes,
+  onCreateNote,
+  onCreateFolder,
   children,
 }: AppLayoutProps) {
   return (
@@ -89,6 +93,8 @@ export function AppLayout({
           onRevealInFinder={onRevealInFinder}
           onToggleFolder={onToggleFolder}
           onReorderNodes={onReorderNodes}
+          onCreateNote={onCreateNote}
+          onCreateFolder={onCreateFolder}
         />
       )}
 

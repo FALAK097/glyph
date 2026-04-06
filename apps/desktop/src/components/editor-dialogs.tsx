@@ -26,6 +26,7 @@ type LinkFormState = {
 type ImageFormState = {
   alt: string;
   src: string;
+  _nonce?: number;
 };
 
 type EditorDialogsProps = {
@@ -34,7 +35,7 @@ type EditorDialogsProps = {
   editor: Editor | null;
   showToast: (title: string, description: string) => void;
   onPickImageFile: () => Promise<void>;
-  imageFormState?: { alt: string; src: string } | null;
+  imageFormState?: { alt: string; src: string; _nonce?: number } | null;
   onClearImageFormState?: () => void;
 };
 
@@ -84,8 +85,10 @@ export function EditorDialogs({
   // Nonce tracks each dialog open so late picker results from a previous
   // session are ignored (e.g. user opens dialog, picks file, closes dialog,
   // re-opens — the stale pick must not overwrite the fresh form).
+  // The nonce is captured by the parent when the picker is INITIATED and
+  // attached as _nonce on imageFormState; only results whose _nonce matches
+  // the current dialog session are applied.
   const imageDialogNonceRef = useRef(0);
-  const imageFormStateNonceRef = useRef(0);
 
   useEffect(() => {
     if (activeDialog === "insert-image") {
@@ -94,18 +97,12 @@ export function EditorDialogs({
   }, [activeDialog]);
 
   useEffect(() => {
-    if (imageFormState) {
-      imageFormStateNonceRef.current = imageDialogNonceRef.current;
-    }
-  }, [imageFormState]);
-
-  useEffect(() => {
     if (
       imageFormState &&
       activeDialog === "insert-image" &&
-      imageFormStateNonceRef.current === imageDialogNonceRef.current
+      imageFormState._nonce === imageDialogNonceRef.current
     ) {
-      setImageForm(imageFormState);
+      setImageForm({ alt: imageFormState.alt, src: imageFormState.src });
     }
   }, [imageFormState, activeDialog]);
 

@@ -32,20 +32,21 @@ export function NoteRenameDialog({
   onConfirm,
   onValueChange,
 }: NoteRenameDialogProps) {
-  const noteRenameInputRef = useRef<HTMLInputElement | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isOpen = pending !== null;
+  const prevOpenRef = useRef(false);
 
   useEffect(() => {
-    if (!pending) {
-      return;
+    const justOpened = isOpen && !prevOpenRef.current;
+    prevOpenRef.current = isOpen;
+    if (justOpened) {
+      const timer = setTimeout(() => {
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }, 50);
+      return () => clearTimeout(timer);
     }
-
-    const frame = window.requestAnimationFrame(() => {
-      noteRenameInputRef.current?.focus();
-      noteRenameInputRef.current?.select();
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [pending]);
+  }, [isOpen]);
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
@@ -78,7 +79,7 @@ export function NoteRenameDialog({
   }
 
   return (
-    <Dialog open={true} onOpenChange={handleOpenChange}>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[420px]">
         <DialogHeader>
           <DialogTitle>Rename Current Note</DialogTitle>
@@ -91,7 +92,7 @@ export function NoteRenameDialog({
           </DialogDescription>
         </DialogHeader>
         <Input
-          ref={noteRenameInputRef}
+          ref={inputRef}
           aria-label="New note name"
           autoFocus
           value={pending.value}

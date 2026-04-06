@@ -512,7 +512,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   );
   const closePalette = useCallback(() => {
     controller.setIsPaletteOpen(false);
-  }, [controller]);
+  }, [controller.setIsPaletteOpen]);
 
   const copyText = useCallback(async (value: string) => {
     await navigator.clipboard.writeText(value);
@@ -1043,16 +1043,19 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     ];
   }, [currentNotePaletteItems, skillPaletteItems, viewerMode, visibleNotePaletteItems]);
 
-  const handleNoteRenameValueChange = useCallback((value: string) => {
-    setPendingNoteRename((current) =>
-      current
-        ? {
-            ...current,
-            value,
-          }
-        : current,
-    );
-  }, []);
+  const handleNoteRenameValueChange = useCallback(
+    (value: string) => {
+      setPendingNoteRename((current) =>
+        current
+          ? {
+              ...current,
+              value,
+            }
+          : current,
+      );
+    },
+    [setPendingNoteRename],
+  );
 
   const handleToggleSidebar = useCallback(() => {
     controller.setIsSidebarCollapsed(!controller.isSidebarCollapsed);
@@ -1091,6 +1094,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         onRevealInFinder={(targetPath) => void controller.revealInFinder(targetPath)}
         onToggleFolder={controller.handleToggleFolder}
         onReorderNodes={controller.handleReorderNodes}
+        onCreateNote={() => void controller.createNote()}
+        onCreateFolder={() => void controller.createFolder()}
       >
         {(viewerMode === "note" ? controller.error : skillsController.error) ? (
           <div className="mx-10 mt-4 mb-2 rounded-lg bg-destructive px-4 py-3 text-sm text-destructive-foreground">

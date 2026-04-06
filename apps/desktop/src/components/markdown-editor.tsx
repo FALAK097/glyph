@@ -979,13 +979,31 @@ export const MarkdownEditor = ({
     };
   }, [editor]);
 
-  const [_imageFormState, setImageFormState] = useState<{ alt: string; src: string } | null>(null);
+  const [_imageFormState, setImageFormState] = useState<{
+    alt: string;
+    src: string;
+    _nonce: number;
+  } | null>(null);
+
+  // Tracks the dialog nonce at the moment the image picker is launched so the
+  // result can be tagged and matched against the live dialog session.
+  const imagePickNonceRef = useRef(0);
+
+  useEffect(() => {
+    if (activeDialog === "insert-image") {
+      imagePickNonceRef.current += 1;
+    }
+  }, [activeDialog]);
 
   const handlePickImageFile = async () => {
     if (!window.glyph) {
       showToast("Picker unavailable", "Glyph API not available");
       return;
     }
+
+    // Capture the nonce at the moment the picker is initiated so the result
+    // can be matched against the session that was active when picking started.
+    const pickNonce = imagePickNonceRef.current;
 
     const asset = await window.glyph.pickAsset("image");
     if (!asset) {
@@ -996,6 +1014,7 @@ export const MarkdownEditor = ({
     setImageFormState({
       alt: baseName || "Image",
       src: asset.url,
+      _nonce: pickNonce,
     });
   };
 

@@ -43,6 +43,8 @@ export type SidebarProps = {
   onTogglePinnedFile?: (filePath: string) => void;
   onToggleFolder: (folderPath: string) => void;
   onReorderNodes: (sourcePath: string, targetPath: string, position: DragPosition) => void;
+  onCreateNote?: () => void;
+  onCreateFolder?: () => void;
 };
 
 export type SidebarTreeNodeMenuCoords = {

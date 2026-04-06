@@ -129,8 +129,10 @@ export function EditorToolbar({
     onTogglePinnedFile?.();
   }, [onTogglePinnedFile]);
 
-  const backTooltipLabel = `Back (${navigateBackShortcut ?? "⌘["})`;
-  const forwardTooltipLabel = `Forward (${navigateForwardShortcut ?? "⌘]"})`;
+  const backTooltipLabel = navigateBackShortcut ? `Back (${navigateBackShortcut})` : "Back";
+  const forwardTooltipLabel = navigateForwardShortcut
+    ? `Forward (${navigateForwardShortcut})`
+    : "Forward";
   const searchButtonLabel = commandPaletteLabel ?? "Search notes";
 
   return (
@@ -153,8 +155,8 @@ export function EditorToolbar({
             </TooltipTrigger>
             <TooltipContent side="bottom">
               {isSidebarCollapsed
-                ? `Show Sidebar (${toggleSidebarShortcut ?? "⌘B"})`
-                : `Hide Sidebar (${toggleSidebarShortcut ?? "⌘B"})`}
+                ? `Show Sidebar${toggleSidebarShortcut ? ` (${toggleSidebarShortcut})` : ""}`
+                : `Hide Sidebar${toggleSidebarShortcut ? ` (${toggleSidebarShortcut})` : ""}`}
             </TooltipContent>
           </Tooltip>
         )}
@@ -208,7 +210,7 @@ export function EditorToolbar({
                 <PlusIcon size={16} />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="bottom">{`New Note (${newNoteShortcut ?? "⌘N"})`}</TooltipContent>
+            <TooltipContent side="bottom">{`New Note${newNoteShortcut ? ` (${newNoteShortcut})` : ""}`}</TooltipContent>
           </Tooltip>
         ) : null}
         {fileName ? (
@@ -238,7 +240,7 @@ export function EditorToolbar({
               <span>{searchButtonLabel}</span>
             </div>
             <span className="font-mono text-xs opacity-50 ml-4 flex-shrink-0">
-              {commandPaletteShortcut ?? "⌘P"}
+              {commandPaletteShortcut}
             </span>
           </Button>
         </div>
@@ -315,15 +317,15 @@ export function EditorToolbar({
               <LinkIcon size={14} className="opacity-70" />
               Copy as Markdown
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleCopyPath}>
+            <DropdownMenuItem disabled={!fileName} onClick={handleCopyPath}>
               <LinkIcon size={14} className="opacity-70" />
               {`Copy ${documentLabel} path`}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleOpenExternal}>
+            <DropdownMenuItem disabled={!fileName} onClick={handleOpenExternal}>
               <FileManagerLogo label={revealInFolderLabel} size={14} className="opacity-70" />
               {revealInFolderLabel}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleExportPDF}>
+            <DropdownMenuItem disabled={!fileName} onClick={handleExportPDF}>
               <FileDownIcon size={14} className="opacity-70" />
               Export as PDF
             </DropdownMenuItem>

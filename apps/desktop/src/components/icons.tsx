@@ -12,6 +12,7 @@ import {
   File01Icon as File01Svg,
   FileDownIcon as FileDownSvg,
   Folder01Icon as Folder01Svg,
+  FolderAddIcon as FolderAddSvg,
   KeyboardIcon as KeyboardSvg,
   Link01Icon as Link01Svg,
   ListViewIcon as ListViewSvg,
@@ -47,6 +48,7 @@ export const ChevronRightIcon = (props: IconProps) => (
   <HugeIcon icon={ArrowRight01Svg} {...props} />
 );
 export const FolderIcon = (props: IconProps) => <HugeIcon icon={Folder01Svg} {...props} />;
+export const FolderPlusIcon = (props: IconProps) => <HugeIcon icon={FolderAddSvg} {...props} />;
 export const FileIcon = (props: IconProps) => <HugeIcon icon={File01Svg} {...props} />;
 export const MoreVerticalIcon = (props: IconProps) => (
   <HugeIcon icon={MoreVerticalSvg} {...props} />

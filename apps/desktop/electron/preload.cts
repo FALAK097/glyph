@@ -98,6 +98,9 @@ const api = {
   deleteFile(targetPath: string) {
     return ipcRenderer.invoke("workspace:deleteFile", targetPath) as Promise<string>;
   },
+  deleteFolder(targetPath: string) {
+    return ipcRenderer.invoke("workspace:deleteFolder", targetPath) as Promise<string>;
+  },
   createFolder(parentDir: string, folderName: string) {
     return ipcRenderer.invoke("workspace:createFolder", parentDir, folderName) as Promise<
       WorkspaceSnapshot["tree"]

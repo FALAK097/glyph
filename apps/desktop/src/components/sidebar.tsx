@@ -365,6 +365,7 @@ export const Sidebar = ({
   onSelectSkillCollection,
   onOpenFile,
   onDeleteFile,
+  onDeleteFolder,
   onRemoveFileFromGlyph,
   onTogglePinnedFile,
   onRemoveFolder,
@@ -376,6 +377,7 @@ export const Sidebar = ({
   onCreateFolder,
 }: SidebarProps) => {
   const [nodeToDelete, setNodeToDelete] = useState<SidebarDeleteTarget | null>(null);
+  const [folderToDelete, setFolderToDelete] = useState<SidebarDeleteTarget | null>(null);
   const [fileToRemove, setFileToRemove] = useState<SidebarRemoveTarget | null>(null);
   const [folderToRemove, setFolderToRemove] = useState<SidebarRemoveTarget | null>(null);
   const [draggedPath, setDraggedPath] = useState<string | null>(null);
@@ -384,6 +386,9 @@ export const Sidebar = ({
   const pinnedPaths = useMemo(() => pinnedList.map((note) => note.path), [pinnedList]);
   const handleRequestRemoveFolder = useCallback((folder: SidebarRemoveTarget) => {
     setFolderToRemove(folder);
+  }, []);
+  const handleRequestDeleteFolder = useCallback((folder: SidebarDeleteTarget) => {
+    setFolderToDelete(folder);
   }, []);
   const handleRequestDelete = useCallback((node: SidebarDeleteTarget) => {
     setNodeToDelete(node);
@@ -405,6 +410,13 @@ export const Sidebar = ({
       onDeleteFile(nodeToDelete.path);
     }
     setNodeToDelete(null);
+  };
+
+  const handleConfirmDeleteFolder = () => {
+    if (folderToDelete) {
+      onDeleteFolder?.(folderToDelete.path);
+    }
+    setFolderToDelete(null);
   };
 
   const handleConfirmRemoveFile = () => {
@@ -591,6 +603,7 @@ export const Sidebar = ({
                         pinnedPaths={pinnedPaths}
                         onOpenFile={onOpenFile}
                         onRequestRemoveFolder={handleRequestRemoveFolder}
+                        onRequestDeleteFolder={handleRequestDeleteFolder}
                         onRequestRemoveFile={setFileToRemove}
                         onRevealInFinder={onRevealInFinder}
                         onRequestDelete={handleRequestDelete}
@@ -633,6 +646,36 @@ export const Sidebar = ({
                 Cancel
               </Button>
               <Button variant="destructive" type="button" onClick={handleConfirmDelete}>
+                Delete
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+
+      {folderToDelete ? (
+        <Dialog
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) {
+              setFolderToDelete(null);
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-[420px]">
+            <DialogHeader>
+              <DialogTitle>Delete Folder</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to permanently delete{" "}
+                <span className="font-semibold text-foreground">"{folderToDelete.name}"</span> and
+                all its contents? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" type="button" onClick={() => setFolderToDelete(null)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" type="button" onClick={handleConfirmDeleteFolder}>
                 Delete
               </Button>
             </DialogFooter>

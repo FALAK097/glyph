@@ -34,6 +34,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
   pinnedPaths,
   onOpenFile,
   onRequestRemoveFolder,
+  onRequestDeleteFolder,
   onRequestRemoveFile,
   onRevealInFinder,
   onTogglePinnedFile,
@@ -266,6 +267,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
                 depth={depth + 1}
                 onOpenFile={onOpenFile}
                 onRequestRemoveFolder={onRequestRemoveFolder}
+                onRequestDeleteFolder={onRequestDeleteFolder}
                 onRequestRemoveFile={onRequestRemoveFile}
                 onRevealInFinder={onRevealInFinder}
                 folderRevealLabel={folderRevealLabel}
@@ -281,6 +283,21 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
 
         {renderMenu(
           <>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-white/10 dark:hover:bg-white/10"
+              onClick={(event) => {
+                event.stopPropagation();
+                setRenameValue(node.name);
+                setIsRenaming(true);
+                setShowMenu(false);
+              }}
+              type="button"
+            >
+              <PencilIcon size={14} className="opacity-70" />
+              Rename
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -314,6 +331,22 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
               <XIcon size={14} className="opacity-70" />
               Remove
             </Button>
+            {onRequestDeleteFolder ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-destructive/10 hover:text-destructive"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onRequestDeleteFolder({ path: node.path, name: node.name });
+                  setShowMenu(false);
+                }}
+                type="button"
+              >
+                <TrashIcon size={14} className="opacity-70" />
+                Delete
+              </Button>
+            ) : null}
           </>,
           "Close folder menu",
         )}

@@ -83,6 +83,8 @@ export function useKeyboardShortcuts({
         "navigate-forward",
         "focus-mode",
         "check-updates",
+        "new-note",
+        "new-folder",
       ]);
       const globalShortcut = shortcuts.find(
         (entry) => globalShortcutIds.has(entry.id) && matchShortcut(event, entry.keys),
@@ -110,6 +112,12 @@ export function useKeyboardShortcuts({
             break;
           case "check-updates":
             void triggerUpdateAction();
+            break;
+          case "new-note":
+            void createNote();
+            break;
+          case "new-folder":
+            void createFolder();
             break;
         }
         return;

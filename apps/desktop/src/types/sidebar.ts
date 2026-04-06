@@ -36,6 +36,7 @@ export type SidebarProps = {
   onOpenCommandPalette?: () => void;
   onOpenFile: (filePath: string) => void;
   onDeleteFile: (filePath: string) => void;
+  onDeleteFolder?: (folderPath: string) => void;
   onRemoveFileFromGlyph?: (filePath: string) => void;
   onRemoveFolder: (folderPath: string) => void;
   onRenameFile: (filePath: string, newName: string) => void;
@@ -71,6 +72,7 @@ export type SidebarTreeNodeProps = {
   pinnedPaths?: string[];
   onOpenFile: (filePath: string) => void;
   onRequestRemoveFolder: (folder: SidebarRemoveTarget) => void;
+  onRequestDeleteFolder?: (folder: SidebarDeleteTarget) => void;
   onRequestRemoveFile?: (file: SidebarRemoveTarget) => void;
   onRevealInFinder: (targetPath: string) => void;
   onTogglePinnedFile?: (filePath: string) => void;

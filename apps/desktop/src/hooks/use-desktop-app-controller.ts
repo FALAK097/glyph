@@ -118,6 +118,7 @@ export const useDesktopAppController = (
   } | null>(null);
   const editorFocusNonceRef = useRef(0);
   const draftFileCreationRef = useRef<Promise<FileDocument | null> | null>(null);
+  const lastCreatedFolderPathRef = useRef<string | null>(null);
 
   // Settings controller
   const settingsController = useSettingsController({ glyph });
@@ -246,6 +247,8 @@ export const useDesktopAppController = (
       }
       requestEditorFocus(shouldPreserveFocus ? "preserve" : "end");
       setIsPaletteOpen(false);
+      // Clear the last-created folder so the next note goes next to the opened file
+      lastCreatedFolderPathRef.current = null;
     },
     [ensureFileVisible, pushHistory, requestEditorFocus, setActiveFile],
   );
@@ -261,7 +264,11 @@ export const useDesktopAppController = (
   const createNote = useCallback(async () => {
     let baseDir: string | null = null;
 
-    if (isWorkspaceMode && rootPath) {
+    // Prefer the last created folder so a new note lands inside it
+    const lastFolder = lastCreatedFolderPathRef.current;
+    if (lastFolder && isWorkspaceMode && rootPath && isFileInsideWorkspace(lastFolder, rootPath)) {
+      baseDir = lastFolder;
+    } else if (isWorkspaceMode && rootPath) {
       const activeFileDir = activeFile ? getDirName(activeFile.path) : null;
       baseDir =
         activeFileDir && isFileInsideWorkspace(activeFileDir, rootPath) ? activeFileDir : rootPath;
@@ -314,8 +321,18 @@ export const useDesktopAppController = (
 
     setIsPaletteOpen(false);
     const folderName = `New Folder-${Date.now()}`;
-    const tree = await glyph.createFolder(baseDir, folderName);
-    setSidebarNodes(tree);
+    const nextTree = await glyph.createFolder(baseDir, folderName);
+
+    // Track the created folder path so the next createNote uses it as its parent
+    lastCreatedFolderPathRef.current = `${baseDir}/${folderName}`.replace(/\\/g, "/");
+
+    if (rootPath) {
+      setSidebarNodes((prev) =>
+        upsertSidebarFolder(prev, { rootPath, tree: nextTree, activeFile: null }),
+      );
+    } else {
+      setSidebarNodes(nextTree);
+    }
   }, [
     activeFile,
     glyph,
@@ -418,6 +435,28 @@ export const useDesktopAppController = (
       }
     },
     [activeFile?.path, glyph, removeHistoryPath, setActiveFile, setError, syncTrackedPaths],
+  );
+
+  const handleDeleteFolder = useCallback(
+    async (folderPath: string) => {
+      try {
+        await glyph.deleteFolder(folderPath);
+        setSidebarNodes((prev) => removeSidebarPath(prev, folderPath));
+
+        if (activeFile && isFileInsideWorkspace(activeFile.path, folderPath)) {
+          setActiveFile(null);
+          removeHistoryPath(activeFile.path);
+        }
+
+        if (rootPath && isSamePath(rootPath, folderPath)) {
+          setWorkspace({ rootPath: "", tree: [], activeFile: null });
+          setIsWorkspaceMode(false);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to delete folder");
+      }
+    },
+    [activeFile, glyph, removeHistoryPath, rootPath, setActiveFile, setError, setWorkspace],
   );
 
   const handleRemoveFileFromGlyph = useCallback(
@@ -1106,7 +1145,7 @@ export const useDesktopAppController = (
   // Workspace change handler
   useEffect(() => {
     return glyph.onWorkspaceChanged(
-      async ({ rootPath: changedRootPath, tree: nextTree, changedPath }) => {
+      async ({ rootPath: changedRootPath, tree: nextTree, changedPaths }) => {
         setTree(nextTree);
         setSidebarNodes((prev) =>
           upsertSidebarFolder(prev, {
@@ -1116,9 +1155,9 @@ export const useDesktopAppController = (
           }),
         );
 
-        if (changedPath === activeFile?.path && !isDirty) {
+        if (activeFile && changedPaths.includes(activeFile.path) && !isDirty) {
           try {
-            const refreshedFile = await glyph.readFile(changedPath);
+            const refreshedFile = await glyph.readFile(activeFile.path);
             updateActiveFile(refreshedFile);
           } catch {
             // Ignore transient external FS races (file renamed/deleted).
@@ -1332,6 +1371,7 @@ export const useDesktopAppController = (
     files,
     folderRevealLabel,
     handleDeleteFile,
+    handleDeleteFolder,
     handleRemoveFileFromGlyph,
     handleRemoveFolder,
     handleRenameFile,

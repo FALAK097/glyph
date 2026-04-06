@@ -1087,6 +1087,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         onOpenFile={(filePath) => void handleOpenNoteFile(filePath)}
         onOpenCommandPalette={handleOpenCommandPalette}
         onDeleteFile={controller.handleDeleteFile}
+        onDeleteFolder={(folderPath) => void controller.handleDeleteFolder(folderPath)}
         onRemoveFileFromGlyph={(filePath) => void controller.handleRemoveFileFromGlyph(filePath)}
         onTogglePinnedFile={(filePath) => void controller.togglePinnedFile(filePath)}
         onRemoveFolder={controller.handleRemoveFolder}

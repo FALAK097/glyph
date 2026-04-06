@@ -87,6 +87,7 @@ let settingsUpdatePromise: Promise<AppSettings> | null = null;
 let pendingExternalPath: string | null = null;
 let updateCheckInterval: NodeJS.Timeout | null = null;
 let watcherDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let changedPathsBatch = new Set<string>();
 const MARKDOWN_EXTENSIONS = [".md", ".mdx", ".markdown"] as const;
 const UPDATE_CHECK_INTERVAL_MS = 1000 * 60 * 60 * 6;
 const skillsService = createSkillsService({
@@ -1406,6 +1407,7 @@ async function openWorkspace(dirPath: string): Promise<WorkspaceSnapshot> {
     clearTimeout(watcherDebounceTimer);
     watcherDebounceTimer = null;
   }
+  changedPathsBatch.clear();
 
   if (activeWatcher) {
     await activeWatcher.close();
@@ -1427,12 +1429,17 @@ async function openWorkspace(dirPath: string): Promise<WorkspaceSnapshot> {
       return;
     }
 
+    changedPathsBatch.add(changedPath);
+
     if (watcherDebounceTimer) {
       clearTimeout(watcherDebounceTimer);
     }
 
     watcherDebounceTimer = setTimeout(async () => {
       watcherDebounceTimer = null;
+
+      const changedPaths = Array.from(changedPathsBatch);
+      changedPathsBatch.clear();
 
       if (!mainWindow || mainWindow.isDestroyed()) {
         return;
@@ -1449,7 +1456,7 @@ async function openWorkspace(dirPath: string): Promise<WorkspaceSnapshot> {
       mainWindow.webContents.send("workspace:changed", {
         rootPath: dirPath,
         tree: nextTree,
-        changedPath,
+        changedPaths,
       });
     }, 100);
   });
@@ -1703,6 +1710,12 @@ ipcMain.handle("workspace:renameFile", async (_event, oldPath: string, newName: 
 ipcMain.handle("workspace:deleteFile", async (_event, targetPath: string) => {
   assertWithinWorkspace(targetPath);
   await fs.unlink(targetPath);
+  return targetPath;
+});
+
+ipcMain.handle("workspace:deleteFolder", async (_event, targetPath: string) => {
+  assertWithinWorkspace(targetPath);
+  await fs.rm(targetPath, { recursive: true, force: false });
   return targetPath;
 });
 
@@ -2024,6 +2037,7 @@ app.on("window-all-closed", async () => {
     clearTimeout(watcherDebounceTimer);
     watcherDebounceTimer = null;
   }
+  changedPathsBatch.clear();
 
   if (activeWatcher) {
     await activeWatcher.close();

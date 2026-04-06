@@ -39,6 +39,7 @@ declare global {
       createFile: (parentDir: string, fileName: string) => Promise<FileDocument>;
       renameFile: (oldPath: string, newName: string) => Promise<FileDocument>;
       deleteFile: (targetPath: string) => Promise<string>;
+      deleteFolder: (targetPath: string) => Promise<string>;
       createFolder: (parentDir: string, folderName: string) => Promise<WorkspaceSnapshot["tree"]>;
       searchWorkspace: (query: string) => Promise<SearchResult[]>;
       getSidebarNode: (

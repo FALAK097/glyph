@@ -23,6 +23,7 @@ type AppLayoutProps = {
   onOpenFile: (filePath: string) => void;
   onOpenCommandPalette: () => void;
   onDeleteFile: (filePath: string) => void;
+  onDeleteFolder?: (folderPath: string) => void;
   onRemoveFileFromGlyph: (filePath: string) => void;
   onTogglePinnedFile: (filePath: string) => void;
   onRemoveFolder: (folderPath: string) => void;
@@ -51,6 +52,7 @@ export function AppLayout({
   onOpenFile,
   onOpenCommandPalette,
   onDeleteFile,
+  onDeleteFolder,
   onRemoveFileFromGlyph,
   onTogglePinnedFile,
   onRemoveFolder,
@@ -86,6 +88,7 @@ export function AppLayout({
           onOpenFile={onOpenFile}
           onOpenCommandPalette={onOpenCommandPalette}
           onDeleteFile={onDeleteFile}
+          onDeleteFolder={onDeleteFolder}
           onRemoveFileFromGlyph={onRemoveFileFromGlyph}
           onTogglePinnedFile={onTogglePinnedFile}
           onRemoveFolder={onRemoveFolder}

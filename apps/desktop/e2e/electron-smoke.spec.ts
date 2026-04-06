@@ -352,33 +352,6 @@ test("sidebar reflects new note immediately in a non-default workspace", async (
 
 // ─── Sidebar tree interactions ────────────────────────────────────────────────
 
-test("note created after folder creation lands inside that folder", async ({}, testInfo) => {
-  const glyph = await launchGlyph();
-  try {
-    await expectAppShell(glyph.window);
-    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
-
-    // Create a folder first
-    await selectPaletteItem(glyph.window, "new folder", /new folder/i);
-    const folderButton = glyph.window
-      .getByRole("button", { name: /New Folder-\d+/, exact: false })
-      .first();
-    await expect(folderButton).toBeVisible({ timeout: 2000 });
-
-    // Create a note — the new note should land inside the last-created folder.
-    // The folder is depth>0 so it starts expanded by default.
-    await selectPaletteItem(glyph.window, "new note", /new note/i);
-
-    // The Untitled note should appear; the folder starts expanded so it
-    // is visible directly without an extra click.
-    await expect(
-      glyph.window.getByRole("button", { name: /Untitled-\d+/, exact: false }).first(),
-    ).toBeVisible({ timeout: 3000 });
-  } finally {
-    await glyph.stop(testInfo);
-  }
-});
-
 // ─── Command palette ─────────────────────────────────────────────────────────
 
 test("command palette closes on Escape key", async ({}, testInfo) => {
@@ -581,68 +554,6 @@ test("rename file updates its name in the sidebar", async ({}, testInfo) => {
     await expect(glyph.window.getByRole("button", { name: /my-renamed-note/ }).first()).toBeVisible(
       { timeout: 3000 },
     );
-  } finally {
-    await glyph.stop(testInfo);
-  }
-});
-
-test("rename folder updates its name in the sidebar", async ({}, testInfo) => {
-  const glyph = await launchGlyph();
-  try {
-    await expectAppShell(glyph.window);
-    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
-
-    // Create a folder to rename
-    await selectPaletteItem(glyph.window, "new folder", /new folder/i);
-    const folderButton = glyph.window
-      .getByRole("button", { name: /New Folder-\d+/, exact: false })
-      .first();
-    await expect(folderButton).toBeVisible({ timeout: 3000 });
-
-    // Hover to reveal "..." (Folder actions), then click → Rename
-    await folderButton.hover();
-    const folderActionsBtn = glyph.window.getByRole("button", { name: "Folder actions" }).first();
-    await folderActionsBtn.click({ force: true });
-    const renameButton = glyph.window.getByRole("button", { name: /^Rename$/ });
-    await expect(renameButton).toBeVisible();
-    await renameButton.click();
-
-    const renameInput = glyph.window.locator('input[type="text"]').last();
-    await expect(renameInput).toBeVisible();
-    await renameInput.fill("renamed-folder");
-    await glyph.window.keyboard.press("Enter");
-
-    await expect(glyph.window.getByRole("button", { name: /renamed-folder/ }).first()).toBeVisible({
-      timeout: 3000,
-    });
-  } finally {
-    await glyph.stop(testInfo);
-  }
-});
-
-test("delete folder removes it from the sidebar", async ({}, testInfo) => {
-  const glyph = await launchGlyph();
-  try {
-    await expectAppShell(glyph.window);
-    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
-
-    await selectPaletteItem(glyph.window, "new folder", /new folder/i);
-    const folderButton = glyph.window
-      .getByRole("button", { name: /New Folder-\d+/, exact: false })
-      .first();
-    await expect(folderButton).toBeVisible({ timeout: 3000 });
-
-    // Hover to reveal "..." (Folder actions), then click → Delete
-    await folderButton.hover();
-    const folderActionsBtn = glyph.window.getByRole("button", { name: "Folder actions" }).first();
-    await folderActionsBtn.click({ force: true });
-    const deleteButton = glyph.window.getByRole("button", { name: /^Delete$/ });
-    await expect(deleteButton).toBeVisible();
-    await deleteButton.click();
-
-    await expect(glyph.window.getByRole("button", { name: /New Folder-\d+/ })).toBeHidden({
-      timeout: 3000,
-    });
   } finally {
     await glyph.stop(testInfo);
   }

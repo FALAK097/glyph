@@ -22,6 +22,7 @@ type SessionState = {
   selectedSkillCollectionId: string | null;
   noteWorkspacePath: string | null;
   noteFilePath: string | null;
+  noteTabPaths: string[];
   skillDocumentPath: string | null;
   skillDocumentKind: SkillDocumentKind;
   skillDocumentKindsById: Record<string, SkillDocumentKind>;
@@ -31,7 +32,11 @@ type SessionState = {
   setNotesExpanded: (value: boolean) => void;
   setSkillsExpanded: (value: boolean) => void;
   setSelectedSkillCollectionId: (value: string | null) => void;
-  setNoteSession: (workspacePath: string | null, filePath: string | null) => void;
+  setNoteSession: (
+    workspacePath: string | null,
+    tabPaths: string[],
+    activeFilePath: string | null,
+  ) => void;
   setSkillSession: (documentPath: string | null, documentKind: SkillDocumentKind) => void;
   setPreferredSkillDocumentKind: (skillId: string | null, documentKind: SkillDocumentKind) => void;
   getPreferredSkillDocumentKind: (skillId: string | null | undefined) => SkillDocumentKind | null;
@@ -42,6 +47,24 @@ type SessionState = {
 };
 
 const toScrollKey = (targetPath: string) => normalizePath(targetPath).toLowerCase();
+
+const normalizeUniquePaths = (paths: string[]) => {
+  const seenKeys = new Set<string>();
+  const normalizedPaths: string[] = [];
+
+  paths.forEach((path) => {
+    const normalizedPath = normalizePath(path);
+    const key = normalizedPath.toLowerCase();
+    if (seenKeys.has(key)) {
+      return;
+    }
+
+    seenKeys.add(key);
+    normalizedPaths.push(normalizedPath);
+  });
+
+  return normalizedPaths;
+};
 
 const trimScrollPositions = (positions: Record<string, ScrollEntry>) => {
   const entries = Object.entries(positions);
@@ -66,6 +89,7 @@ export const useSessionStore = create<SessionState>()(
       selectedSkillCollectionId: null,
       noteWorkspacePath: null,
       noteFilePath: null,
+      noteTabPaths: [],
       skillDocumentPath: null,
       skillDocumentKind: "skill",
       skillDocumentKindsById: {},
@@ -85,10 +109,14 @@ export const useSessionStore = create<SessionState>()(
       setSelectedSkillCollectionId: (selectedSkillCollectionId) => {
         set({ selectedSkillCollectionId });
       },
-      setNoteSession: (noteWorkspacePath, noteFilePath) => {
+      setNoteSession: (noteWorkspacePath, tabPaths, activeFilePath) => {
+        const normalizedTabPaths = normalizeUniquePaths(tabPaths);
+        const normalizedActivePath = activeFilePath ? normalizePath(activeFilePath) : null;
+
         set({
           noteWorkspacePath: noteWorkspacePath ? normalizePath(noteWorkspacePath) : null,
-          noteFilePath: noteFilePath ? normalizePath(noteFilePath) : null,
+          noteFilePath: normalizedActivePath,
+          noteTabPaths: normalizedTabPaths,
         });
       },
       setSkillSession: (skillDocumentPath, skillDocumentKind) => {
@@ -165,6 +193,7 @@ export const useSessionStore = create<SessionState>()(
         selectedSkillCollectionId: state.selectedSkillCollectionId,
         noteWorkspacePath: state.noteWorkspacePath,
         noteFilePath: state.noteFilePath,
+        noteTabPaths: state.noteTabPaths,
         skillDocumentPath: state.skillDocumentPath,
         skillDocumentKind: state.skillDocumentKind,
         skillDocumentKindsById: state.skillDocumentKindsById,

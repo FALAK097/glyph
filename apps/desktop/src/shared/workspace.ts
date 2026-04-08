@@ -4,6 +4,15 @@ export type FileDocument = {
   content: string;
 };
 
+export type NoteTab = {
+  id: string;
+  file: FileDocument;
+  draftContent: string;
+  isDirty: boolean;
+  isSaving: boolean;
+  lastSavedAt: number | null;
+};
+
 export type FileNode = {
   type: "file";
   name: string;

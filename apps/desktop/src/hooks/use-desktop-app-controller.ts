@@ -10,7 +10,13 @@ import { applyTheme } from "@/theme/themes";
 
 import { getErrorMessage } from "@/lib/errors";
 import { buildBreadcrumbs, extractMarkdownOutline } from "@/lib/note-navigation";
-import { getDirName, isFileInsideWorkspace, isSamePath, normalizePath } from "@/lib/paths";
+import {
+  getDirName,
+  getRelativePath,
+  isFileInsideWorkspace,
+  isSamePath,
+  normalizePath,
+} from "@/lib/paths";
 import { getFolderRevealLabel } from "@/lib/platform";
 import {
   orderSidebarNodes,
@@ -36,6 +42,10 @@ const NOTE_NAME_SAFE_CHAR_PATTERN = /[^a-zA-Z0-9-_\s]/g;
 const TITLE_PREFIX_PATTERN = /^#+\s*/;
 const NOTE_NAME_MAX_LENGTH = 50;
 const APP_CHANGELOG_URL = "https://github.com/FALAK097/glyph/blob/main/CHANGELOG.md";
+const MAX_DIRECT_NOTE_TAB_SHORTCUTS = 9;
+
+const getTabSwitchShortcutLabel = (index: number) =>
+  index < MAX_DIRECT_NOTE_TAB_SHORTCUTS ? `⌘${index + 1}` : undefined;
 
 const getDraftTitleLine = (content: string) =>
   content.split(/\r?\n/, 1)[0]?.replace(TITLE_PREFIX_PATTERN, "").trim() ?? "";
@@ -67,6 +77,7 @@ const getCommittedDraftFileName = (content: string) => {
 
 type UseDesktopAppControllerOptions = {
   initialFilePath?: string | null;
+  initialTabPaths?: string[];
   initialWorkspacePath?: string | null;
   sessionReady?: boolean;
 };
@@ -75,6 +86,7 @@ export const useDesktopAppController = (
   glyph: NonNullable<Window["glyph"]>,
   {
     initialFilePath = null,
+    initialTabPaths = [],
     initialWorkspacePath = null,
     sessionReady = true,
   }: UseDesktopAppControllerOptions = {},
@@ -82,6 +94,8 @@ export const useDesktopAppController = (
   const {
     rootPath,
     tree,
+    noteTabs,
+    activeTabId,
     activeFile,
     draftContent,
     isDirty,
@@ -95,8 +109,18 @@ export const useDesktopAppController = (
     updateActiveFile,
     updateDraftContent,
     markSaved,
+    markTabSaved,
     setSaving,
+    setTabSaving,
     setError,
+    activateTab,
+    closeTab,
+    closeOtherTabs,
+    removeTabsInFolder,
+    replaceTabPath,
+    remapTabsForFolderRename,
+    getActiveTab,
+    getTabByPath,
     pushHistory,
     replaceHistoryPath,
     removeHistoryPath,
@@ -246,8 +270,99 @@ export const useDesktopAppController = (
     [saveSettings, settings?.hiddenFiles],
   );
 
+  const persistNoteDraft = useCallback(
+    async (
+      target: {
+        draftContent: string;
+        file: FileDocument;
+        isDirty: boolean;
+      },
+      options?: {
+        isActive?: boolean;
+        restoreFocus?: boolean;
+      },
+    ) => {
+      if (!target.isDirty) {
+        return target.file.path;
+      }
+
+      let currentPath = target.file.path;
+      setTabSaving(currentPath, true);
+      if (options?.isActive) {
+        setSaving(true);
+      }
+
+      try {
+        let nextFile = target.file;
+        const committedFileName = getCommittedDraftFileName(target.draftContent);
+
+        if (target.file.name.startsWith("Untitled-") && committedFileName) {
+          const previousPath = currentPath;
+          nextFile = await glyph.renameFile(currentPath, committedFileName);
+          setSidebarNodes((prev) =>
+            upsertSidebarFile(renameSidebarFile(prev, currentPath, nextFile), nextFile),
+          );
+          replaceTabPath(previousPath, nextFile);
+          replaceHistoryPath(previousPath, nextFile.path);
+          await syncTrackedPaths(previousPath, nextFile.path);
+          currentPath = nextFile.path;
+
+          if (options?.restoreFocus) {
+            requestEditorFocus("preserve");
+          }
+        }
+
+        const savedFile = await glyph.saveFile(currentPath, target.draftContent);
+        if (
+          options?.isActive &&
+          isSamePath(useWorkspaceStore.getState().activeFile?.path, currentPath)
+        ) {
+          markSaved(savedFile);
+        } else {
+          markTabSaved(currentPath, savedFile);
+        }
+
+        return currentPath;
+      } catch (saveError) {
+        setError(saveError instanceof Error ? saveError.message : "Unable to save file.");
+        return null;
+      } finally {
+        setTabSaving(currentPath, false);
+        if (options?.isActive) {
+          setSaving(false);
+        }
+      }
+    },
+    [
+      glyph,
+      markSaved,
+      markTabSaved,
+      replaceHistoryPath,
+      replaceTabPath,
+      requestEditorFocus,
+      setError,
+      setSaving,
+      setTabSaving,
+      syncTrackedPaths,
+    ],
+  );
+
   const syncOpenedFile = useCallback(
     async (file: FileDocument, options?: { recordHistory?: boolean }) => {
+      const currentActiveTab = getActiveTab();
+      if (currentActiveTab && !isSamePath(currentActiveTab.file.path, file.path)) {
+        void persistNoteDraft(
+          {
+            draftContent: currentActiveTab.draftContent,
+            file: currentActiveTab.file,
+            isDirty: currentActiveTab.isDirty,
+          },
+          {
+            isActive: true,
+          },
+        );
+      }
+
       await ensureFileVisible(file.path);
       const currentRootPath = useWorkspaceStore.getState().rootPath;
       const shouldPreserveFocus = useSessionStore.getState().hasDocumentScroll(file.path);
@@ -262,15 +377,144 @@ export const useDesktopAppController = (
       // Clear the last-created folder so the next note goes next to the opened file
       lastCreatedFolderPathRef.current = null;
     },
-    [ensureFileVisible, pushHistory, requestEditorFocus, setActiveFile],
+    [
+      ensureFileVisible,
+      getActiveTab,
+      persistNoteDraft,
+      pushHistory,
+      requestEditorFocus,
+      setActiveFile,
+    ],
+  );
+
+  const activateNoteTab = useCallback(
+    async (filePath: string, options?: { recordHistory?: boolean }) => {
+      const targetTab = getTabByPath(filePath);
+      if (!targetTab) {
+        return;
+      }
+
+      const currentActiveTab = getActiveTab();
+      if (currentActiveTab && !isSamePath(currentActiveTab.file.path, filePath)) {
+        void persistNoteDraft(
+          {
+            draftContent: currentActiveTab.draftContent,
+            file: currentActiveTab.file,
+            isDirty: currentActiveTab.isDirty,
+          },
+          {
+            isActive: true,
+          },
+        );
+      }
+
+      const currentRootPath = useWorkspaceStore.getState().rootPath;
+      const shouldPreserveFocus = useSessionStore.getState().hasDocumentScroll(filePath);
+      activateTab(filePath);
+      setIsWorkspaceMode(isFileInsideWorkspace(filePath, currentRootPath));
+      if (options?.recordHistory) {
+        pushHistory(filePath);
+      }
+      requestEditorFocus(shouldPreserveFocus ? "preserve" : "end");
+      setIsPaletteOpen(false);
+      lastCreatedFolderPathRef.current = null;
+    },
+    [activateTab, getActiveTab, getTabByPath, persistNoteDraft, pushHistory, requestEditorFocus],
+  );
+
+  const closeNoteTab = useCallback(
+    async (filePath: string) => {
+      const targetTab = getTabByPath(filePath);
+      if (!targetTab) {
+        return;
+      }
+
+      const isClosingActiveTab = isSamePath(activeFile?.path, filePath);
+      let targetPath = filePath;
+      if (targetTab.isDirty) {
+        const savedPath = await persistNoteDraft(
+          {
+            draftContent: targetTab.draftContent,
+            file: targetTab.file,
+            isDirty: targetTab.isDirty,
+          },
+          {
+            isActive: isClosingActiveTab,
+            restoreFocus: isClosingActiveTab,
+          },
+        );
+
+        if (!savedPath) {
+          return;
+        }
+
+        targetPath = savedPath;
+      }
+
+      const nextActivePath = closeTab(targetPath);
+      if (nextActivePath) {
+        const currentRootPath = useWorkspaceStore.getState().rootPath;
+        const shouldPreserveFocus = useSessionStore.getState().hasDocumentScroll(nextActivePath);
+        setIsWorkspaceMode(isFileInsideWorkspace(nextActivePath, currentRootPath));
+        requestEditorFocus(shouldPreserveFocus ? "preserve" : "end");
+      }
+    },
+    [activeFile?.path, closeTab, getTabByPath, persistNoteDraft, requestEditorFocus],
+  );
+
+  const closeOtherNoteTabs = useCallback(
+    async (filePath: string) => {
+      const otherTabs = noteTabs.filter((tab) => !isSamePath(tab.file.path, filePath));
+      for (const tab of otherTabs) {
+        if (!tab.isDirty) {
+          continue;
+        }
+
+        const savedPath = await persistNoteDraft(
+          {
+            draftContent: tab.draftContent,
+            file: tab.file,
+            isDirty: tab.isDirty,
+          },
+          {
+            isActive: isSamePath(activeFile?.path, tab.file.path),
+          },
+        );
+
+        if (!savedPath) {
+          return;
+        }
+      }
+
+      closeOtherTabs(filePath);
+    },
+    [activeFile?.path, closeOtherTabs, noteTabs, persistNoteDraft],
+  );
+
+  const activateTabByIndex = useCallback(
+    async (index: number) => {
+      const targetTab = noteTabs[index];
+      if (!targetTab) {
+        return;
+      }
+
+      await activateNoteTab(targetTab.file.path, { recordHistory: true });
+    },
+    [activateNoteTab, noteTabs],
   );
 
   const openFile = useCallback(
     async (filePath: string) => {
+      const existingTab = getTabByPath(filePath);
+      if (existingTab) {
+        await activateNoteTab(existingTab.file.path, { recordHistory: true });
+        return;
+      }
+
       const file = await glyph.readFile(filePath);
       await syncOpenedFile(file, { recordHistory: true });
     },
-    [syncOpenedFile, glyph],
+    [activateNoteTab, getTabByPath, syncOpenedFile, glyph],
   );
 
   const createNote = useCallback(async () => {
@@ -293,6 +537,20 @@ export const useDesktopAppController = (
 
     if (!baseDir) {
       return;
+    }
+
+    const currentActiveTab = getActiveTab();
+    if (currentActiveTab) {
+      void persistNoteDraft(
+        {
+          draftContent: currentActiveTab.draftContent,
+          file: currentActiveTab.file,
+          isDirty: currentActiveTab.isDirty,
+        },
+        {
+          isActive: true,
+        },
+      );
     }
 
     setIsPaletteOpen(false);
@@ -326,8 +584,10 @@ export const useDesktopAppController = (
     requestEditorFocus("start");
   }, [
     activeFile,
+    getActiveTab,
     glyph,
     isWorkspaceMode,
+    persistNoteDraft,
     pushHistory,
     requestEditorFocus,
     rootPath,
@@ -485,15 +745,19 @@ export const useDesktopAppController = (
         setSidebarNodes((prev) => removeSidebarPath(prev, filePath));
         removeHistoryPath(filePath);
         await syncTrackedPaths(filePath);
-
-        if (activeFile?.path === filePath) {
-          setActiveFile(null);
+        const nextActivePath = closeTab(filePath);
+        if (nextActivePath) {
+          const currentRootPath = useWorkspaceStore.getState().rootPath;
+          setIsWorkspaceMode(isFileInsideWorkspace(nextActivePath, currentRootPath));
+          requestEditorFocus(
+            useSessionStore.getState().hasDocumentScroll(nextActivePath) ? "preserve" : "end",
+          );
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to delete file");
       }
     },
-    [activeFile?.path, glyph, removeHistoryPath, setActiveFile, setError, syncTrackedPaths],
+    [closeTab, glyph, removeHistoryPath, requestEditorFocus, setError, syncTrackedPaths],
   );
 
   const handleDeleteFolder = useCallback(
@@ -501,11 +765,12 @@ export const useDesktopAppController = (
       try {
         await glyph.deleteFolder(folderPath);
         setSidebarNodes((prev) => removeSidebarPath(prev, folderPath));
-
-        if (activeFile && isFileInsideWorkspace(activeFile.path, folderPath)) {
-          setActiveFile(null);
-          removeHistoryPath(activeFile.path);
-        }
+        noteTabs
+          .filter((tab) => isFileInsideWorkspace(tab.file.path, folderPath))
+          .forEach((tab) => {
+            removeHistoryPath(tab.file.path);
+          });
+        removeTabsInFolder(folderPath);
 
         if (rootPath && isSamePath(rootPath, folderPath)) {
           setWorkspace({ rootPath: "", tree: [], activeFile: null });
@@ -515,33 +780,54 @@ export const useDesktopAppController = (
         setError(err instanceof Error ? err.message : "Failed to delete folder");
       }
     },
-    [activeFile, glyph, removeHistoryPath, rootPath, setActiveFile, setError, setWorkspace],
+    [glyph, noteTabs, removeHistoryPath, removeTabsInFolder, rootPath, setError, setWorkspace],
   );
 
   const handleRemoveFileFromGlyph = useCallback(
     async (filePath: string) => {
       try {
-        if (activeFile?.path && isSamePath(activeFile.path, filePath) && isDirty) {
-          const savedFile = await glyph.saveFile(filePath, draftContent);
-          markSaved(savedFile);
+        const targetTab = getTabByPath(filePath);
+        let targetPath = filePath;
+        if (targetTab?.isDirty) {
+          const savedPath = await persistNoteDraft(
+            {
+              draftContent: targetTab.draftContent,
+              file: targetTab.file,
+              isDirty: targetTab.isDirty,
+            },
+            {
+              isActive: isSamePath(activeFile?.path, filePath),
+              restoreFocus: isSamePath(activeFile?.path, filePath),
+            },
+          );
+
+          if (!savedPath) {
+            return;
+          }
+
+          targetPath = savedPath;
         }
 
         const nextHiddenFiles = [
-          filePath,
-          ...(settings?.hiddenFiles ?? []).filter((entry) => !isSamePath(entry, filePath)),
+          targetPath,
+          ...(settings?.hiddenFiles ?? []).filter((entry) => !isSamePath(entry, targetPath)),
         ];
         const nextPinnedFiles = (settings?.pinnedFiles ?? []).filter(
-          (entry) => !isSamePath(entry, filePath),
+          (entry) => !isSamePath(entry, targetPath),
         );
 
         await saveSettings({
           hiddenFiles: nextHiddenFiles,
           pinnedFiles: nextPinnedFiles,
         });
-        removeHistoryPath(filePath);
-
-        if (activeFile?.path && isSamePath(activeFile.path, filePath)) {
-          setActiveFile(null);
+        removeHistoryPath(targetPath);
+        const nextActivePath = closeTab(targetPath);
+        if (nextActivePath) {
+          const currentRootPath = useWorkspaceStore.getState().rootPath;
+          setIsWorkspaceMode(isFileInsideWorkspace(nextActivePath, currentRootPath));
+          requestEditorFocus(
+            useSessionStore.getState().hasDocumentScroll(nextActivePath) ? "preserve" : "end",
+          );
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to remove note from Glyph");
@@ -549,13 +835,12 @@ export const useDesktopAppController = (
     },
     [
       activeFile?.path,
-      draftContent,
-      glyph,
-      isDirty,
-      markSaved,
+      closeTab,
+      getTabByPath,
+      persistNoteDraft,
       removeHistoryPath,
+      requestEditorFocus,
       saveSettings,
-      setActiveFile,
       setError,
       settings?.hiddenFiles,
       settings?.pinnedFiles,
@@ -575,14 +860,14 @@ export const useDesktopAppController = (
         );
         replaceHistoryPath(filePath, renamedFile.path);
         await syncTrackedPaths(filePath, renamedFile.path);
-        if (activeFile?.path === filePath) {
-          setActiveFile(renamedFile);
+        if (getTabByPath(filePath)) {
+          replaceTabPath(filePath, renamedFile);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to rename file");
       }
     },
-    [activeFile?.path, glyph, replaceHistoryPath, setActiveFile, setError, syncTrackedPaths],
+    [getTabByPath, glyph, replaceHistoryPath, replaceTabPath, setError, syncTrackedPaths],
   );
 
   const handleRenameFolder = useCallback(
@@ -594,21 +879,15 @@ export const useDesktopAppController = (
       try {
         const { oldPath, newPath } = await glyph.renameFolder(folderPath, newName);
         setSidebarNodes((prev) => renameSidebarFolder(prev, oldPath, newPath, newName));
-
-        // Remap active file path if it was inside the renamed folder
-        if (activeFile && isFileInsideWorkspace(activeFile.path, oldPath)) {
-          const newFilePath =
-            newPath + normalizePath(activeFile.path).slice(normalizePath(oldPath).length);
-          try {
-            const refreshedFile = await glyph.readFile(newFilePath);
-            setActiveFile(refreshedFile);
-            replaceHistoryPath(activeFile.path, newFilePath);
-          } catch {
-            // File may be temporarily inaccessible — clear active file
-            setActiveFile(null);
-            removeHistoryPath(activeFile.path);
-          }
-        }
+        const remappedTabs = noteTabs.filter((tab) =>
+          isFileInsideWorkspace(tab.file.path, oldPath),
+        );
+        remappedTabs.forEach((tab) => {
+          const nextFilePath =
+            newPath + normalizePath(tab.file.path).slice(normalizePath(oldPath).length);
+          replaceHistoryPath(tab.file.path, nextFilePath);
+        });
+        remapTabsForFolderRename(oldPath, newPath);
 
         // If the renamed folder was the workspace root, reopen to restart the watcher
         if (rootPath && isSamePath(rootPath, oldPath)) {
@@ -622,12 +901,11 @@ export const useDesktopAppController = (
       }
     },
     [
-      activeFile,
       glyph,
-      removeHistoryPath,
+      noteTabs,
       replaceHistoryPath,
+      remapTabsForFolderRename,
       rootPath,
-      setActiveFile,
       setError,
       syncWorkspace,
     ],
@@ -850,6 +1128,15 @@ export const useDesktopAppController = (
         onSelect: () => void createNote(),
       },
       {
+        id: "new-tab",
+        title: "New tab",
+        subtitle: "Create a new note in its own tab",
+        shortcut: getShortcutDisplay(shortcuts, "new-tab"),
+        section: "Tabs",
+        kind: "command",
+        onSelect: () => void createNote(),
+      },
+      {
         id: "new-folder",
         title: "New folder",
         subtitle: "Create a new folder in the current directory",
@@ -941,6 +1228,37 @@ export const useDesktopAppController = (
           setIsPaletteOpen(false);
         },
       },
+      ...(activeFile
+        ? [
+            {
+              id: "close-tab",
+              title: "Close Current Tab",
+              subtitle: "Close the current note tab",
+              shortcut: getShortcutDisplay(shortcuts, "close-tab"),
+              section: "Tabs",
+              kind: "command" as const,
+              onSelect: () => {
+                void closeNoteTab(activeFile.path);
+                setIsPaletteOpen(false);
+              },
+            },
+          ]
+        : []),
+      ...(activeFile && noteTabs.length > 1
+        ? [
+            {
+              id: "close-other-tabs",
+              title: "Close Other Tabs",
+              subtitle: "Keep only the current note open",
+              section: "Tabs",
+              kind: "command" as const,
+              onSelect: () => {
+                void closeOtherNoteTabs(activeFile.path);
+                setIsPaletteOpen(false);
+              },
+            },
+          ]
+        : []),
       {
         id: "toggle-focus-mode",
         title: isFocusMode ? "Exit Focus Mode" : "Enter Focus Mode",
@@ -1014,9 +1332,25 @@ export const useDesktopAppController = (
           setIsPaletteOpen(false);
         },
       },
+      ...noteTabs.map((tab, index) => ({
+        id: `open-tab-${tab.id}`,
+        title: isSamePath(tab.file.path, activeFile?.path)
+          ? `${tab.file.name} (current)`
+          : tab.file.name,
+        subtitle: getRelativePath(tab.file.path, rootPath),
+        shortcut: getTabSwitchShortcutLabel(index),
+        section: "Open Tabs",
+        kind: "command" as const,
+        onSelect: () => {
+          void activateNoteTab(tab.file.path, { recordHistory: true });
+        },
+      })),
     ],
     [
       activeFile,
+      activateNoteTab,
+      closeNoteTab,
+      closeOtherNoteTabs,
       createNote,
       createFolder,
       glyph,
@@ -1024,6 +1358,8 @@ export const useDesktopAppController = (
       isFocusMode,
       navigateBack,
       navigateForward,
+      noteTabs,
+      rootPath,
       saveSettings,
       shortcuts,
       showOutline,
@@ -1059,12 +1395,35 @@ export const useDesktopAppController = (
     glyph,
     shortcuts,
     activeFile,
-    draftContent,
-    markSaved,
-    setError,
-    setSaving,
+    saveActiveNote: async () => {
+      const activeTab = getActiveTab();
+      if (!activeTab) {
+        return;
+      }
+
+      await persistNoteDraft(
+        {
+          draftContent: activeTab.draftContent,
+          file: activeTab.file,
+          isDirty: activeTab.isDirty,
+        },
+        {
+          isActive: true,
+          restoreFocus: true,
+        },
+      );
+    },
     createNote,
+    createTab: createNote,
     createFolder,
+    closeActiveTab: async () => {
+      if (!activeFile) {
+        return;
+      }
+
+      await closeNoteTab(activeFile.path);
+    },
+    activateTabByIndex,
     syncOpenedFile,
     syncWorkspace,
     setIsWorkspaceMode,
@@ -1134,6 +1493,17 @@ export const useDesktopAppController = (
           return null;
         }
       };
+      const restoredTabPaths = Array.from(
+        new Set(
+          (initialTabPaths.length > 0
+            ? initialTabPaths
+            : initialFilePath
+              ? [initialFilePath]
+              : []
+          ).map((path) => normalizePath(path)),
+        ),
+      );
+      const restoredActivePath = initialFilePath ? normalizePath(initialFilePath) : null;
 
       const target = await glyph.getPendingExternalPath();
       if (target) {
@@ -1152,7 +1522,11 @@ export const useDesktopAppController = (
         } else {
           const workspace = await tryOpenWorkspace(null);
           if (workspace) {
-            setWorkspace(workspace);
+            setWorkspace({
+              rootPath: workspace.rootPath,
+              tree: workspace.tree,
+              activeFile: null,
+            });
             nextSidebarNodes = upsertSidebarFolder(nextSidebarNodes, workspace);
             nextExpandedFolders.add(workspace.rootPath);
           }
@@ -1175,24 +1549,57 @@ export const useDesktopAppController = (
       } else {
         const workspace = await tryOpenWorkspace(initialWorkspacePath);
         if (workspace) {
-          setWorkspace(workspace);
+          setWorkspace({
+            rootPath: workspace.rootPath,
+            tree: workspace.tree,
+            activeFile: restoredTabPaths.length > 0 ? null : workspace.activeFile,
+          });
           setIsWorkspaceMode(true);
           nextSidebarNodes = upsertSidebarFolder(nextSidebarNodes, workspace);
-          if (workspace.activeFile) {
+          if (restoredTabPaths.length === 0 && workspace.activeFile) {
             nextSidebarNodes = upsertSidebarFile(nextSidebarNodes, workspace.activeFile);
+            pushHistory(workspace.activeFile.path);
             bootFocusMode = "end";
           }
           nextExpandedFolders.add(workspace.rootPath);
         }
 
-        const restoredFile = await tryReadPersistedFile(initialFilePath);
-        if (restoredFile) {
-          setActiveFile(restoredFile);
-          setIsWorkspaceMode(
-            Boolean(workspace && isFileInsideWorkspace(restoredFile.path, workspace.rootPath)),
-          );
-          nextSidebarNodes = upsertSidebarFile(nextSidebarNodes, restoredFile);
-          bootFocusMode = "preserve";
+        if (restoredTabPaths.length > 0) {
+          const orderedRestorePaths = restoredActivePath
+            ? [
+                restoredActivePath,
+                ...restoredTabPaths.filter((path) => !isSamePath(path, restoredActivePath)),
+              ]
+            : restoredTabPaths;
+          let restoredActiveFile: FileDocument | null = null;
+
+          for (const restorePath of orderedRestorePaths) {
+            const restoredFile = await tryReadPersistedFile(restorePath);
+            if (!restoredFile) {
+              continue;
+            }
+
+            setActiveFile(restoredFile);
+            setIsWorkspaceMode(
+              Boolean(workspace && isFileInsideWorkspace(restoredFile.path, workspace.rootPath)),
+            );
+            nextSidebarNodes = upsertSidebarFile(nextSidebarNodes, restoredFile);
+
+            if (!restoredActiveFile || isSamePath(restoredFile.path, restoredActivePath)) {
+              restoredActiveFile = restoredFile;
+            }
+          }
+
+          if (restoredActiveFile) {
+            setActiveFile(restoredActiveFile);
+            setIsWorkspaceMode(
+              Boolean(
+                workspace && isFileInsideWorkspace(restoredActiveFile.path, workspace.rootPath),
+              ),
+            );
+            pushHistory(restoredActiveFile.path);
+            bootFocusMode = "preserve";
+          }
         }
       }
 
@@ -1262,17 +1669,26 @@ export const useDesktopAppController = (
           }),
         );
 
-        if (activeFile && changedPaths.includes(activeFile.path) && !isDirty) {
-          try {
-            const refreshedFile = await glyph.readFile(activeFile.path);
-            updateActiveFile(refreshedFile);
-          } catch {
-            // Ignore transient external FS races (file renamed/deleted).
-          }
-        }
+        const changedOpenTabs = noteTabs.filter((tab) =>
+          changedPaths.some((changedPath) => isSamePath(changedPath, tab.file.path)),
+        );
+        await Promise.all(
+          changedOpenTabs.map(async (tab) => {
+            if (tab.isDirty) {
+              return;
+            }
+
+            try {
+              const refreshedFile = await glyph.readFile(tab.file.path);
+              updateActiveFile(refreshedFile);
+            } catch {
+              // Ignore transient external FS races (file renamed/deleted).
+            }
+          }),
+        );
       },
     );
-  }, [activeFile?.path, isDirty, updateActiveFile, setTree, glyph]);
+  }, [glyph, noteTabs, updateActiveFile, setTree]);
 
   // Auto-save draft content
   useEffect(() => {
@@ -1280,50 +1696,27 @@ export const useDesktopAppController = (
       return;
     }
 
+    const activeTab = getActiveTab();
+    if (!activeTab) {
+      return;
+    }
+
     const timer = window.setTimeout(async () => {
-      setSaving(true);
-      try {
-        let currentPath = activeFile.path;
-        let finalFile = activeFile;
-        const isUntitled = activeFile.name.startsWith("Untitled-");
-        const committedFileName = getCommittedDraftFileName(draftContent);
-
-        if (isUntitled && committedFileName) {
-          const previousPath = currentPath;
-          finalFile = await glyph.renameFile(currentPath, committedFileName);
-          setSidebarNodes((prev) =>
-            upsertSidebarFile(renameSidebarFile(prev, currentPath, finalFile), finalFile),
-          );
-          currentPath = finalFile.path;
-          updateActiveFile(finalFile);
-          replaceHistoryPath(previousPath, finalFile.path);
-          await syncTrackedPaths(previousPath, finalFile.path);
-          requestEditorFocus("preserve");
-        }
-
-        const savedFile = await glyph.saveFile(currentPath, draftContent);
-        markSaved(savedFile);
-      } catch (saveError) {
-        setError(saveError instanceof Error ? saveError.message : "Unable to save file.");
-      } finally {
-        setSaving(false);
-      }
+      await persistNoteDraft(
+        {
+          draftContent: activeTab.draftContent,
+          file: activeTab.file,
+          isDirty: activeTab.isDirty,
+        },
+        {
+          isActive: true,
+          restoreFocus: true,
+        },
+      );
     }, 800);
 
     return () => window.clearTimeout(timer);
-  }, [
-    activeFile?.path,
-    draftContent,
-    glyph,
-    isDirty,
-    isSaving,
-    markSaved,
-    replaceHistoryPath,
-    requestEditorFocus,
-    setError,
-    setSaving,
-    syncTrackedPaths,
-  ]);
+  }, [activeFile?.path, getActiveTab, isDirty, isSaving, persistNoteDraft]);
 
   // Session sync
   useEffect(() => {
@@ -1331,8 +1724,12 @@ export const useDesktopAppController = (
       return;
     }
 
-    setNoteSession(rootPath || null, activeFile?.path ?? null);
-  }, [activeFile?.path, hasBooted, rootPath, sessionReady, setNoteSession]);
+    setNoteSession(
+      rootPath || null,
+      noteTabs.map((tab) => tab.file.path),
+      activeFile?.path ?? null,
+    );
+  }, [activeFile?.path, hasBooted, noteTabs, rootPath, sessionReady, setNoteSession]);
 
   const requestOutlineJump = useCallback((id: string) => {
     setOutlineJumpRequest({
@@ -1432,25 +1829,31 @@ export const useDesktopAppController = (
       }
 
       if (command === "save" && activeFile) {
-        setSaving(true);
-        try {
-          const savedFile = await glyph.saveFile(activeFile.path, draftContent);
-          markSaved(savedFile);
-        } catch (saveError) {
-          console.error("Menu save failed:", saveError);
-          setError(getErrorMessage(saveError));
-        } finally {
-          setSaving(false);
+        const activeTab = getActiveTab();
+        if (!activeTab) {
+          return;
         }
+
+        await persistNoteDraft(
+          {
+            draftContent: activeTab.draftContent,
+            file: activeTab.file,
+            isDirty: activeTab.isDirty,
+          },
+          {
+            isActive: true,
+            restoreFocus: true,
+          },
+        );
       }
     });
   }, [
     activeFile,
     createNote,
     draftContent,
-    markSaved,
+    getActiveTab,
+    persistNoteDraft,
     setError,
-    setSaving,
     syncOpenedFile,
     syncWorkspace,
     glyph,
@@ -1463,6 +1866,7 @@ export const useDesktopAppController = (
   return {
     activeFile,
     appInfo,
+    activeTabId,
     breadcrumbs,
     canGoBack,
     canGoForward,
@@ -1470,6 +1874,8 @@ export const useDesktopAppController = (
     changeThemeMode,
     chooseFolderAndUpdateWorkspace,
     clearOutlineJumpRequest,
+    closeNoteTab,
+    closeOtherNoteTabs,
     createNote,
     createFolder,
     draftContent,
@@ -1492,8 +1898,11 @@ export const useDesktopAppController = (
     isSettingsOpen,
     isSidebarCollapsed,
     markSaved,
+    noteTabs,
     navigateBack,
     navigateForward,
+    activateNoteTab,
+    activateTabByIndex,
     openFile,
     outlineItems,
     outlineJumpRequest,

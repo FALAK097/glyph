@@ -1,8 +1,8 @@
 import { create } from "zustand";
 
-import { isSamePath } from "@/lib/paths";
+import { getBaseName, isPathInside, isSamePath, normalizePath } from "@/lib/paths";
 
-import type { DirectoryNode, FileDocument } from "../shared/workspace";
+import type { DirectoryNode, FileDocument, NoteTab } from "../shared/workspace";
 
 const getClosestHistoryIndex = (history: string[], currentIndex: number, filePath: string) => {
   let closestIndex = -1;
@@ -23,16 +23,73 @@ const getClosestHistoryIndex = (history: string[], currentIndex: number, filePat
   return closestIndex;
 };
 
+const toTabId = (path: string) => normalizePath(path).toLowerCase();
+
+type ActiveSurfaceSnapshot = {
+  activeFile: FileDocument | null;
+  draftContent: string;
+  isDirty: boolean;
+  isSaving: boolean;
+  lastSavedAt: number | null;
+};
+
+const EMPTY_ACTIVE_SURFACE: ActiveSurfaceSnapshot = {
+  activeFile: null,
+  draftContent: "",
+  isDirty: false,
+  isSaving: false,
+  lastSavedAt: null,
+};
+
+const createNoteTab = (
+  file: FileDocument,
+  overrides?: Partial<Omit<NoteTab, "file" | "id">>,
+): NoteTab => ({
+  id: toTabId(file.path),
+  file,
+  draftContent: overrides?.draftContent ?? file.content,
+  isDirty: overrides?.isDirty ?? false,
+  isSaving: overrides?.isSaving ?? false,
+  lastSavedAt: overrides?.lastSavedAt ?? Date.now(),
+});
+
+const getNoteTabIndex = (noteTabs: NoteTab[], filePath: string) =>
+  noteTabs.findIndex((tab) => tab.id === toTabId(filePath));
+
+const getActiveSurface = (
+  noteTabs: NoteTab[],
+  activeTabId: string | null,
+  fallback: ActiveSurfaceSnapshot,
+): ActiveSurfaceSnapshot => {
+  if (!activeTabId) {
+    return fallback;
+  }
+
+  const activeTab = noteTabs.find((tab) => tab.id === activeTabId);
+  if (!activeTab) {
+    return fallback;
+  }
+
+  return {
+    activeFile: activeTab.file,
+    draftContent: activeTab.draftContent,
+    isDirty: activeTab.isDirty,
+    isSaving: activeTab.isSaving,
+    lastSavedAt: activeTab.lastSavedAt,
+  };
+};
+
 type WorkspaceState = {
   rootPath: string | null;
   tree: DirectoryNode[];
+  noteTabs: NoteTab[];
+  activeTabId: string | null;
   activeFile: FileDocument | null;
   draftContent: string;
   isDirty: boolean;
   isSaving: boolean;
   lastSavedAt: number | null;
   error: string | null;
-  // Navigation history
   navigationHistory: string[];
   navigationIndex: number;
   setWorkspace: (payload: {
@@ -46,9 +103,19 @@ type WorkspaceState = {
   updateActiveFile: (file: FileDocument) => void;
   updateDraftContent: (content: string) => void;
   markSaved: (file: FileDocument) => void;
+  markTabSaved: (filePath: string, file: FileDocument) => void;
   setSaving: (isSaving: boolean) => void;
+  setTabSaving: (filePath: string, isSaving: boolean) => void;
   setError: (message: string | null) => void;
-  // Navigation history methods
+  activateTab: (filePath: string) => void;
+  closeTab: (filePath: string) => string | null;
+  closeOtherTabs: (filePath: string) => void;
+  removeTab: (filePath: string) => void;
+  removeTabsInFolder: (folderPath: string) => void;
+  replaceTabPath: (oldPath: string, file: FileDocument) => void;
+  remapTabsForFolderRename: (oldFolderPath: string, newFolderPath: string) => void;
+  getActiveTab: () => NoteTab | null;
+  getTabByPath: (filePath: string) => NoteTab | null;
   pushHistory: (filePath: string) => void;
   replaceHistoryPath: (oldPath: string, newPath: string) => void;
   removeHistoryPath: (targetPath: string) => void;
@@ -61,6 +128,8 @@ type WorkspaceState = {
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   rootPath: null,
   tree: [],
+  noteTabs: [],
+  activeTabId: null,
   activeFile: null,
   draftContent: "",
   isDirty: false,
@@ -70,46 +139,443 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   navigationHistory: [],
   navigationIndex: -1,
   setWorkspace: ({ rootPath, tree, activeFile }) =>
-    set({
-      rootPath,
-      tree,
-      activeFile,
-      draftContent: activeFile?.content ?? "",
-      isDirty: false,
-      lastSavedAt: activeFile ? Date.now() : null,
-      error: null,
-      navigationHistory: activeFile ? [activeFile.path] : [],
-      navigationIndex: activeFile ? 0 : -1,
+    set((state) => {
+      if (!activeFile) {
+        return {
+          rootPath,
+          tree,
+          error: null,
+        };
+      }
+
+      const existingIndex = getNoteTabIndex(state.noteTabs, activeFile.path);
+      const noteTabs =
+        existingIndex >= 0
+          ? state.noteTabs.map((tab, index) => {
+              if (index !== existingIndex) {
+                return tab;
+              }
+
+              return {
+                ...tab,
+                file: activeFile,
+                draftContent: tab.isDirty ? tab.draftContent : activeFile.content,
+              };
+            })
+          : [...state.noteTabs, createNoteTab(activeFile)];
+      const activeTabId = toTabId(activeFile.path);
+
+      return {
+        rootPath,
+        tree,
+        error: null,
+        noteTabs,
+        activeTabId,
+        ...getActiveSurface(noteTabs, activeTabId, EMPTY_ACTIVE_SURFACE),
+      };
     }),
   setTree: (tree) => set({ tree }),
   setActiveFile: (activeFile) =>
-    set({
-      activeFile,
-      draftContent: activeFile?.content ?? "",
-      isDirty: false,
-      lastSavedAt: activeFile ? Date.now() : null,
+    set((state) => {
+      if (!activeFile) {
+        return {
+          activeTabId: null,
+          ...EMPTY_ACTIVE_SURFACE,
+        };
+      }
+
+      const existingIndex = getNoteTabIndex(state.noteTabs, activeFile.path);
+      const noteTabs =
+        existingIndex >= 0
+          ? state.noteTabs.map((tab, index) => {
+              if (index !== existingIndex) {
+                return tab;
+              }
+
+              return {
+                ...tab,
+                file: activeFile,
+                draftContent: tab.isDirty ? tab.draftContent : activeFile.content,
+              };
+            })
+          : [...state.noteTabs, createNoteTab(activeFile)];
+      const activeTabId = toTabId(activeFile.path);
+
+      return {
+        noteTabs,
+        activeTabId,
+        ...getActiveSurface(noteTabs, activeTabId, EMPTY_ACTIVE_SURFACE),
+      };
     }),
   attachActiveFile: (activeFile) =>
-    set((state) => ({
-      activeFile,
-      draftContent: state.draftContent,
-      isDirty: state.isDirty,
-      lastSavedAt: state.lastSavedAt,
-    })),
-  updateActiveFile: (activeFile) => set({ activeFile }),
-  updateDraftContent: (draftContent) => set({ draftContent, isDirty: true }),
+    set((state) => {
+      const activeDraftContent = state.activeTabId ? activeFile.content : state.draftContent;
+      const activeIsDirty = state.activeTabId ? false : state.isDirty;
+      const activeIsSaving = state.activeTabId ? false : state.isSaving;
+      const activeLastSavedAt = state.activeTabId ? Date.now() : state.lastSavedAt;
+      const existingIndex = getNoteTabIndex(state.noteTabs, activeFile.path);
+      const nextTab = createNoteTab(activeFile, {
+        draftContent: activeDraftContent,
+        isDirty: activeIsDirty,
+        isSaving: activeIsSaving,
+        lastSavedAt: activeLastSavedAt,
+      });
+      const noteTabs =
+        existingIndex >= 0
+          ? state.noteTabs.map((tab, index) => (index === existingIndex ? nextTab : tab))
+          : [...state.noteTabs, nextTab];
+
+      return {
+        noteTabs,
+        activeTabId: nextTab.id,
+        activeFile,
+        draftContent: nextTab.draftContent,
+        isDirty: nextTab.isDirty,
+        isSaving: nextTab.isSaving,
+        lastSavedAt: nextTab.lastSavedAt,
+      };
+    }),
+  updateActiveFile: (activeFile) =>
+    set((state) => {
+      const tabIndex = getNoteTabIndex(state.noteTabs, activeFile.path);
+      const noteTabs =
+        tabIndex >= 0
+          ? state.noteTabs.map((tab, index) => {
+              if (index !== tabIndex) {
+                return tab;
+              }
+
+              return {
+                ...tab,
+                file: activeFile,
+                draftContent: tab.isDirty ? tab.draftContent : activeFile.content,
+              };
+            })
+          : state.noteTabs;
+      const activeTabId = state.activeTabId;
+
+      return {
+        noteTabs,
+        ...getActiveSurface(noteTabs, activeTabId, {
+          activeFile: state.activeFile,
+          draftContent: state.draftContent,
+          isDirty: state.isDirty,
+          isSaving: state.isSaving,
+          lastSavedAt: state.lastSavedAt,
+        }),
+      };
+    }),
+  updateDraftContent: (draftContent) =>
+    set((state) => {
+      if (!state.activeTabId) {
+        return { draftContent, isDirty: true };
+      }
+
+      const noteTabs = state.noteTabs.map((tab) =>
+        tab.id === state.activeTabId
+          ? {
+              ...tab,
+              draftContent,
+              isDirty: true,
+            }
+          : tab,
+      );
+
+      return {
+        noteTabs,
+        draftContent,
+        isDirty: true,
+      };
+    }),
   markSaved: (activeFile) =>
-    set((state) => ({
-      activeFile,
-      // Only update draft content if it's not currently dirty.
-      // This prevents the editor from resetting the cursor if the user is typing while it saves.
-      draftContent: state.isDirty ? state.draftContent : activeFile.content,
-      isDirty: false,
-      isSaving: false,
-      lastSavedAt: Date.now(),
-    })),
-  setSaving: (isSaving) => set({ isSaving }),
+    set((state) => {
+      const currentActiveTab = state.activeTabId
+        ? (state.noteTabs.find((tab) => tab.id === state.activeTabId) ?? null)
+        : null;
+      const shouldRemainDirty =
+        (currentActiveTab?.draftContent ?? state.draftContent) !== activeFile.content;
+
+      if (!state.activeTabId) {
+        return {
+          activeFile,
+          draftContent: shouldRemainDirty ? state.draftContent : activeFile.content,
+          isDirty: shouldRemainDirty,
+          isSaving: false,
+          lastSavedAt: Date.now(),
+        };
+      }
+
+      const noteTabs = state.noteTabs.map((tab) =>
+        tab.id === state.activeTabId
+          ? {
+              ...tab,
+              file: activeFile,
+              draftContent: shouldRemainDirty ? tab.draftContent : activeFile.content,
+              isDirty: shouldRemainDirty,
+              isSaving: false,
+              lastSavedAt: Date.now(),
+            }
+          : tab,
+      );
+
+      return {
+        noteTabs,
+        activeFile,
+        draftContent: shouldRemainDirty ? state.draftContent : activeFile.content,
+        isDirty: shouldRemainDirty,
+        isSaving: false,
+        lastSavedAt: Date.now(),
+      };
+    }),
+  markTabSaved: (filePath, file) =>
+    set((state) => {
+      const tabIndex = getNoteTabIndex(state.noteTabs, filePath);
+      if (tabIndex < 0) {
+        return state;
+      }
+
+      const noteTabs = state.noteTabs.map((tab, index) =>
+        index === tabIndex
+          ? {
+              ...tab,
+              id: toTabId(file.path),
+              file,
+              draftContent: file.content,
+              isDirty: false,
+              isSaving: false,
+              lastSavedAt: Date.now(),
+            }
+          : tab,
+      );
+      const nextActiveTabId =
+        state.activeTabId === toTabId(filePath) ? toTabId(file.path) : state.activeTabId;
+
+      return {
+        noteTabs,
+        activeTabId: nextActiveTabId,
+        ...getActiveSurface(noteTabs, nextActiveTabId, {
+          activeFile: state.activeFile,
+          draftContent: state.draftContent,
+          isDirty: state.isDirty,
+          isSaving: state.isSaving,
+          lastSavedAt: state.lastSavedAt,
+        }),
+      };
+    }),
+  setSaving: (isSaving) =>
+    set((state) => {
+      if (!state.activeTabId) {
+        return { isSaving };
+      }
+
+      return {
+        noteTabs: state.noteTabs.map((tab) =>
+          tab.id === state.activeTabId
+            ? {
+                ...tab,
+                isSaving,
+              }
+            : tab,
+        ),
+        isSaving,
+      };
+    }),
+  setTabSaving: (filePath, isSaving) =>
+    set((state) => {
+      const tabIndex = getNoteTabIndex(state.noteTabs, filePath);
+      if (tabIndex < 0) {
+        return state;
+      }
+
+      const noteTabs = state.noteTabs.map((tab, index) =>
+        index === tabIndex
+          ? {
+              ...tab,
+              isSaving,
+            }
+          : tab,
+      );
+
+      return {
+        noteTabs,
+        ...getActiveSurface(noteTabs, state.activeTabId, {
+          activeFile: state.activeFile,
+          draftContent: state.draftContent,
+          isDirty: state.isDirty,
+          isSaving: state.isSaving,
+          lastSavedAt: state.lastSavedAt,
+        }),
+      };
+    }),
   setError: (error) => set({ error }),
+  activateTab: (filePath) =>
+    set((state) => {
+      const nextActiveTabId = toTabId(filePath);
+      if (state.activeTabId === nextActiveTabId) {
+        return state;
+      }
+
+      const tab = state.noteTabs.find((entry) => entry.id === nextActiveTabId);
+      if (!tab) {
+        return state;
+      }
+
+      return {
+        activeTabId: nextActiveTabId,
+        ...getActiveSurface(state.noteTabs, nextActiveTabId, EMPTY_ACTIVE_SURFACE),
+      };
+    }),
+  closeTab: (filePath) => {
+    const state = get();
+    const tabIndex = getNoteTabIndex(state.noteTabs, filePath);
+    if (tabIndex < 0) {
+      return state.activeFile?.path ?? null;
+    }
+
+    const targetTabId = state.noteTabs[tabIndex]?.id ?? null;
+    const noteTabs = state.noteTabs.filter((tab) => tab.id !== targetTabId);
+    let nextActiveTabId = state.activeTabId;
+
+    if (targetTabId && state.activeTabId === targetTabId) {
+      const previousTab = state.noteTabs[tabIndex - 1] ?? null;
+      const nextTab = state.noteTabs[tabIndex + 1] ?? null;
+      nextActiveTabId = previousTab?.id ?? nextTab?.id ?? null;
+    }
+
+    set({
+      noteTabs,
+      activeTabId: nextActiveTabId,
+      ...getActiveSurface(noteTabs, nextActiveTabId, EMPTY_ACTIVE_SURFACE),
+    });
+
+    const nextActiveTab = noteTabs.find((tab) => tab.id === nextActiveTabId) ?? null;
+    return nextActiveTab?.file.path ?? null;
+  },
+  closeOtherTabs: (filePath) =>
+    set((state) => {
+      const tabIndex = getNoteTabIndex(state.noteTabs, filePath);
+      if (tabIndex < 0) {
+        return state;
+      }
+
+      const nextTab = state.noteTabs[tabIndex]!;
+      const noteTabs = [nextTab];
+
+      return {
+        noteTabs,
+        activeTabId: nextTab.id,
+        ...getActiveSurface(noteTabs, nextTab.id, EMPTY_ACTIVE_SURFACE),
+      };
+    }),
+  removeTab: (filePath) =>
+    set((state) => {
+      const nextTabs = state.noteTabs.filter((tab) => !isSamePath(tab.file.path, filePath));
+      const nextActiveTabId =
+        state.activeTabId && isSamePath(filePath, state.activeFile?.path)
+          ? (nextTabs.at(-1)?.id ?? null)
+          : state.activeTabId;
+
+      return {
+        noteTabs: nextTabs,
+        activeTabId: nextActiveTabId,
+        ...getActiveSurface(nextTabs, nextActiveTabId, EMPTY_ACTIVE_SURFACE),
+      };
+    }),
+  removeTabsInFolder: (folderPath) =>
+    set((state) => {
+      const nextTabs = state.noteTabs.filter((tab) => !isPathInside(tab.file.path, folderPath));
+      const nextActiveTabId =
+        state.activeTabId && isPathInside(state.activeFile?.path ?? "", folderPath)
+          ? (nextTabs.at(-1)?.id ?? null)
+          : state.activeTabId;
+
+      return {
+        noteTabs: nextTabs,
+        activeTabId: nextActiveTabId,
+        ...getActiveSurface(nextTabs, nextActiveTabId, EMPTY_ACTIVE_SURFACE),
+      };
+    }),
+  replaceTabPath: (oldPath, file) =>
+    set((state) => {
+      const tabIndex = getNoteTabIndex(state.noteTabs, oldPath);
+      if (tabIndex < 0) {
+        return state;
+      }
+
+      const previousTab = state.noteTabs[tabIndex]!;
+      const nextTab: NoteTab = {
+        ...previousTab,
+        id: toTabId(file.path),
+        file,
+      };
+      const noteTabs = state.noteTabs.map((tab, index) => (index === tabIndex ? nextTab : tab));
+      const nextActiveTabId = state.activeTabId === previousTab.id ? nextTab.id : state.activeTabId;
+
+      return {
+        noteTabs,
+        activeTabId: nextActiveTabId,
+        ...getActiveSurface(noteTabs, nextActiveTabId, {
+          activeFile: state.activeFile,
+          draftContent: state.draftContent,
+          isDirty: state.isDirty,
+          isSaving: state.isSaving,
+          lastSavedAt: state.lastSavedAt,
+        }),
+      };
+    }),
+  remapTabsForFolderRename: (oldFolderPath, newFolderPath) =>
+    set((state) => {
+      let nextActiveTabId = state.activeTabId;
+      const noteTabs = state.noteTabs.map((tab) => {
+        if (!isPathInside(tab.file.path, oldFolderPath)) {
+          return tab;
+        }
+
+        const normalizedOldFolderPath = normalizePath(oldFolderPath).replace(/\/+$/, "");
+        const normalizedNewFolderPath = normalizePath(newFolderPath).replace(/\/+$/, "");
+        const suffix = normalizePath(tab.file.path).slice(normalizedOldFolderPath.length);
+        const nextPath = `${normalizedNewFolderPath}${suffix}`;
+        const nextTab: NoteTab = {
+          ...tab,
+          id: toTabId(nextPath),
+          file: {
+            ...tab.file,
+            path: nextPath,
+            name: getBaseName(nextPath),
+          },
+        };
+
+        if (state.activeTabId === tab.id) {
+          nextActiveTabId = nextTab.id;
+        }
+
+        return nextTab;
+      });
+
+      return {
+        noteTabs,
+        activeTabId: nextActiveTabId,
+        ...getActiveSurface(noteTabs, nextActiveTabId, {
+          activeFile: state.activeFile,
+          draftContent: state.draftContent,
+          isDirty: state.isDirty,
+          isSaving: state.isSaving,
+          lastSavedAt: state.lastSavedAt,
+        }),
+      };
+    }),
+  getActiveTab: () => {
+    const state = get();
+    if (!state.activeTabId) {
+      return null;
+    }
+
+    return state.noteTabs.find((tab) => tab.id === state.activeTabId) ?? null;
+  },
+  getTabByPath: (filePath) => {
+    const state = get();
+    return state.noteTabs.find((tab) => isSamePath(tab.file.path, filePath)) ?? null;
+  },
   pushHistory: (filePath) => {
     set((state) => {
       const currentPath =
@@ -133,17 +599,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         };
       }
 
-      // If we're not at the end of history, remove forward entries
       const newHistory = state.navigationHistory.slice(0, state.navigationIndex + 1);
-
-      // Don't add duplicate consecutive entries
       if (isSamePath(newHistory[newHistory.length - 1], filePath)) {
         return state;
       }
 
       newHistory.push(filePath);
 
-      // Limit history to 50 entries
       if (newHistory.length > 50) {
         newHistory.shift();
       }

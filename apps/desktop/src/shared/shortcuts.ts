@@ -3,7 +3,9 @@ import type { ShortcutSetting } from "./workspace.js";
 export type ShortcutId =
   | "command-palette"
   | "new-note"
+  | "new-tab"
   | "new-folder"
+  | "close-tab"
   | "open-file"
   | "open-folder"
   | "check-updates"
@@ -39,7 +41,9 @@ export const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
   // App shortcuts (fire globally, even from inside the editor)
   { id: "command-palette", label: "Command Palette", keys: "⌘ P" },
   { id: "new-note", label: "New Note", keys: "⌘ N" },
+  { id: "new-tab", label: "New Tab", keys: "⌘ T" },
   { id: "new-folder", label: "New Folder", keys: "⇧ ⌘ N" },
+  { id: "close-tab", label: "Close Tab", keys: "⌘ W" },
   { id: "open-file", label: "Open File", keys: "⌘ O" },
   { id: "open-folder", label: "Open Folder", keys: "⇧ ⌘ O" },
   { id: "check-updates", label: "Update Action", keys: "⇧ ⌘ U" },

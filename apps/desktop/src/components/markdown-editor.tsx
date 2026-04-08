@@ -290,6 +290,7 @@ export const MarkdownEditor = ({
   onToggleSidebar,
   isSidebarCollapsed,
   headerAccessory,
+  subheaderContent,
   topContent,
   onCreateNote,
   toggleSidebarShortcut,
@@ -1138,6 +1139,9 @@ export const MarkdownEditor = ({
         onTogglePinnedFile={onTogglePinnedFile}
         isActiveFilePinned={isActiveFilePinned}
       />
+      {subheaderContent ? (
+        <div className="border-b border-border/30">{subheaderContent}</div>
+      ) : null}
       <div
         ref={scrollContainerRef}
         className={`flex-1 min-h-0 overflow-y-auto relative [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${

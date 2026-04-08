@@ -950,6 +950,12 @@ function buildApplicationMenu(shortcuts: AppSettings["shortcuts"]) {
           accelerator: getAccelerator("save"),
           click: () => mainWindow?.webContents.send("app:command", "save" satisfies AppCommand),
         },
+        {
+          label: "Close Tab",
+          accelerator: getAccelerator("close-tab"),
+          click: () =>
+            mainWindow?.webContents.send("app:command", "close-tab" satisfies AppCommand),
+        },
         { type: "separator" },
         {
           label: "Toggle Sidebar",

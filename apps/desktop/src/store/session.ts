@@ -66,6 +66,9 @@ const normalizeUniquePaths = (paths: string[]) => {
   return normalizedPaths;
 };
 
+const arePathArraysEqual = (left: string[], right: string[]) =>
+  left.length === right.length && left.every((entry, index) => entry === right[index]);
+
 const trimScrollPositions = (positions: Record<string, ScrollEntry>) => {
   const entries = Object.entries(positions);
   if (entries.length <= MAX_SCROLL_ENTRIES) {
@@ -110,11 +113,21 @@ export const useSessionStore = create<SessionState>()(
         set({ selectedSkillCollectionId });
       },
       setNoteSession: (noteWorkspacePath, tabPaths, activeFilePath) => {
+        const normalizedWorkspacePath = noteWorkspacePath ? normalizePath(noteWorkspacePath) : null;
         const normalizedTabPaths = normalizeUniquePaths(tabPaths);
         const normalizedActivePath = activeFilePath ? normalizePath(activeFilePath) : null;
+        const currentState = get();
+
+        if (
+          currentState.noteWorkspacePath === normalizedWorkspacePath &&
+          currentState.noteFilePath === normalizedActivePath &&
+          arePathArraysEqual(currentState.noteTabPaths, normalizedTabPaths)
+        ) {
+          return;
+        }
 
         set({
-          noteWorkspacePath: noteWorkspacePath ? normalizePath(noteWorkspacePath) : null,
+          noteWorkspacePath: normalizedWorkspacePath,
           noteFilePath: normalizedActivePath,
           noteTabPaths: normalizedTabPaths,
         });

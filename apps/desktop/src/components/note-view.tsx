@@ -1,6 +1,7 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 
-import { getShortcutDisplay } from "@/shared/shortcuts";
+import { getDisplayFileName } from "@/lib/paths";
+import { getDirectTabShortcutDisplay, getShortcutDisplay } from "@/shared/shortcuts";
 import type { NoteTab, ShortcutSetting } from "@/shared/workspace";
 import type { OutlineItem } from "@/types/navigation";
 import type { UpdateState } from "@/shared/workspace";
@@ -34,7 +35,6 @@ type NoteViewProps = {
   outlineJumpRequest: { id: string; nonce: number } | null;
   updateState: UpdateState | null;
   onContentChange: (value: string) => void;
-  onCreateTab: () => void;
   onSelectTab: (path: string) => void;
   onCloseTab: (path: string) => void;
   onToggleSidebar: () => void;
@@ -78,7 +78,6 @@ export function NoteView({
   outlineJumpRequest,
   updateState,
   onContentChange,
-  onCreateTab,
   onSelectTab,
   onCloseTab,
   onToggleSidebar,
@@ -104,6 +103,21 @@ export function NoteView({
     onOpenSettings();
   }, [onOpenSettings]);
 
+  const noteTabItems = useMemo(
+    () =>
+      noteTabs.map((tab, index) => ({
+        id: tab.id,
+        isDirty: tab.isDirty,
+        label: getDisplayFileName(tab.file.name),
+        path: tab.file.path,
+        shortcutLabel: getDirectTabShortcutDisplay(
+          index,
+          typeof navigator === "undefined" ? undefined : navigator.platform,
+        ),
+      })),
+    [noteTabs],
+  );
+
   return (
     <MarkdownEditor
       content={content}
@@ -116,15 +130,14 @@ export function NoteView({
       wordCount={wordCount}
       readingTime={readingTime}
       subheaderContent={
-        <NoteTabsBar
-          activeTabId={activeTabId}
-          tabs={noteTabs}
-          newTabShortcut={getShortcutDisplay(shortcuts, "new-tab")}
-          closeTabShortcut={getShortcutDisplay(shortcuts, "close-tab")}
-          onCreateTab={onCreateTab}
-          onSelectTab={onSelectTab}
-          onCloseTab={onCloseTab}
-        />
+        noteTabItems.length > 0 ? (
+          <NoteTabsBar
+            activeTabId={activeTabId}
+            tabs={noteTabItems}
+            onSelectTab={onSelectTab}
+            onCloseTab={onCloseTab}
+          />
+        ) : null
       }
       onChange={onContentChange}
       onToggleSidebar={onToggleSidebar}

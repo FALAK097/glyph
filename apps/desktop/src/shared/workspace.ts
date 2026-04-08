@@ -138,6 +138,7 @@ export type AppCommand =
   | "save"
   | "new-file"
   | "new-folder"
+  | "close-tab"
   | "search"
   | "quick-open"
   | "toggle-sidebar"

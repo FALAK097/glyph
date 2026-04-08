@@ -30,6 +30,12 @@ type GlyphHarness = {
   window: Page;
 };
 
+type PersistedSessionState = {
+  noteFilePath: string | null;
+  noteTabPaths: string[];
+  noteWorkspacePath: string | null;
+};
+
 async function createGlyphSandbox(): Promise<GlyphSandbox> {
   const sandboxRoot = await fs.mkdtemp(path.join(os.tmpdir(), "glyph-e2e-"));
   const workspaceRoot = path.join(sandboxRoot, "workspace");
@@ -147,8 +153,8 @@ async function openCommandPalette(window: Page) {
 async function selectPaletteItem(window: Page, query: string, name: RegExp) {
   const paletteInput = await openCommandPalette(window);
   await paletteInput.fill(query);
-  const option = window.getByRole("option", { name }).first();
-  await expect(option).toBeVisible();
+  const option = window.locator('[role="option"]').filter({ hasText: name }).first();
+  await expect(option).toBeVisible({ timeout: 15_000 });
   await option.click();
   await expect(paletteInput).toBeHidden({ timeout: 15_000 });
 }
@@ -174,22 +180,7 @@ async function openWorkspace(window: Page, workspaceRoot: string) {
 }
 
 async function triggerTabSwitchShortcut(window: Page, tabNumber: number) {
-  await window.evaluate(
-    ({ nextTabNumber, useMeta }) => {
-      window.dispatchEvent(
-        new KeyboardEvent("keydown", {
-          key: String(nextTabNumber),
-          metaKey: useMeta,
-          ctrlKey: !useMeta,
-          bubbles: true,
-        }),
-      );
-    },
-    {
-      nextTabNumber: tabNumber,
-      useMeta: isMac,
-    },
-  );
+  await window.keyboard.press(`${modKey}+${tabNumber}`);
 }
 
 async function getTabState(window: Page) {
@@ -206,6 +197,15 @@ async function getTabState(window: Page) {
       editorText: editor?.textContent ?? null,
     };
   });
+}
+
+async function expectTabSelectedByTitle(window: Page, title: string | null) {
+  await expect
+    .poll(async () => {
+      const tabState = await getTabState(window);
+      return tabState.tabs.find((tab) => tab.title === title)?.selected ?? null;
+    })
+    .toBe("true");
 }
 
 function getExpectedBodyForTabTitle(title: string | null) {
@@ -229,6 +229,21 @@ async function readJson<T>(targetPath: string): Promise<T | null> {
   }
 }
 
+async function readPersistedSession(window: Page): Promise<PersistedSessionState | null> {
+  return await window.evaluate(() => {
+    const rawSession = window.localStorage.getItem("glyph.editor-session");
+    if (!rawSession) {
+      return null;
+    }
+
+    const parsedSession = JSON.parse(rawSession) as {
+      state?: PersistedSessionState;
+    };
+
+    return parsedSession.state ?? null;
+  });
+}
+
 test("launches Glyph and opens settings from the command palette", async ({}, testInfo) => {
   const glyph = await launchGlyph();
 
@@ -250,7 +265,7 @@ test("opens a seeded markdown note from the workspace", async ({}, testInfo) => 
   try {
     await expectAppShell(glyph.window);
     await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
-    await selectPaletteItem(glyph.window, "welcome", /welcome\.md/i);
+    await selectPaletteItem(glyph.window, "welcome", /welcome/i);
 
     await expect(glyph.window.getByText("Smoke test note content.")).toBeVisible();
     await expect(glyph.window.getByRole("heading", { name: "Welcome to Glyph" })).toBeVisible();
@@ -291,7 +306,7 @@ test("toggles the current note pin action from the command palette", async ({}, 
   try {
     await expectAppShell(glyph.window);
     await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
-    await selectPaletteItem(glyph.window, "nested", /nested-note\.md/i);
+    await selectPaletteItem(glyph.window, "nested-note", /nested-note/i);
     await expect(glyph.window.getByText("Nested note body.")).toBeVisible();
 
     await selectPaletteItem(glyph.window, "pin current note", /pin current note/i);
@@ -564,17 +579,13 @@ test("opens notes in multiple tabs and switches between them with keyboard short
     await expect(
       glyph.window.getByText(getExpectedBodyForTabTitle(firstTab?.title ?? null)),
     ).toBeVisible();
-    await expect(
-      glyph.window.getByRole("tab", { name: new RegExp(firstTab?.label ?? "", "i") }),
-    ).toHaveAttribute("aria-selected", "true");
+    await expectTabSelectedByTitle(glyph.window, firstTab?.title ?? null);
 
     await triggerTabSwitchShortcut(glyph.window, 2);
     await expect(
       glyph.window.getByText(getExpectedBodyForTabTitle(secondTab?.title ?? null)),
     ).toBeVisible();
-    await expect(
-      glyph.window.getByRole("tab", { name: new RegExp(secondTab?.label ?? "", "i") }),
-    ).toHaveAttribute("aria-selected", "true");
+    await expectTabSelectedByTitle(glyph.window, secondTab?.title ?? null);
 
     await selectPaletteItem(glyph.window, "close current tab", /close current tab/i);
     await expect(
@@ -597,10 +608,10 @@ test("creates and closes tabs from shortcuts and restores tab sessions after rel
     firstRun = await launchGlyph(sandbox);
     await expectAppShell(firstRun.window);
     await openWorkspace(firstRun.window, sandbox.workspaceRoot);
-    await selectPaletteItem(firstRun.window, "welcome", /welcome\.md/i);
+    await selectPaletteItem(firstRun.window, "welcome", /welcome/i);
     await expect(firstRun.window.getByRole("tab", { name: /welcome/i })).toBeVisible();
 
-    await firstRun.window.keyboard.press(`${modKey}+T`);
+    await firstRun.window.keyboard.press(`${modKey}+N`);
     await expect(firstRun.window.getByRole("tab", { name: /Untitled-/ })).toBeVisible();
 
     const paletteInput = await openCommandPalette(firstRun.window);
@@ -613,14 +624,32 @@ test("creates and closes tabs from shortcuts and restores tab sessions after rel
     await firstRun.window.keyboard.press(`${modKey}+W`);
     await expect(firstRun.window.getByRole("tab", { name: /Untitled-/ })).toBeHidden();
 
-    await selectPaletteItem(firstRun.window, "nested", /nested-note\.md/i);
+    await selectPaletteItem(firstRun.window, "nested-note", /nested-note/i);
     await expect(firstRun.window.getByText("Nested note body.")).toBeVisible();
+    const persistedTabPaths = (await getTabState(firstRun.window)).tabs
+      .map((tab) => tab.title)
+      .filter((title): title is string => Boolean(title));
+
+    await expect
+      .poll(async () => readPersistedSession(firstRun.window), {
+        timeout: 15_000,
+      })
+      .toMatchObject({
+        noteFilePath: path.join(sandbox.workspaceRoot, "notes", "nested-note.md"),
+        noteTabPaths: persistedTabPaths,
+        noteWorkspacePath: sandbox.workspaceRoot,
+      });
 
     await firstRun.stop(testInfo);
     firstRun = null;
 
     secondRun = await launchGlyph(sandbox);
     await expectAppShell(secondRun.window);
+    await expect
+      .poll(async () => (await getTabState(secondRun.window)).tabs.map((tab) => tab.title), {
+        timeout: 15_000,
+      })
+      .toEqual(persistedTabPaths);
     await expect(secondRun.window.getByRole("tab", { name: /welcome/i })).toBeVisible();
     await expect(secondRun.window.getByRole("tab", { name: /nested-note/i })).toBeVisible();
     await expect(secondRun.window.getByText("Nested note body.")).toBeVisible();

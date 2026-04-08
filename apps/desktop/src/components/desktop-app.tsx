@@ -745,7 +745,13 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   }, [controller.isPaletteOpen, controller.paletteQuery, skillsController.searchSkillIds]);
 
   const visibleNotePaletteItems = useMemo(() => {
-    const noteOnlyCommandIds = new Set(["new-note", "pin-note", "toggle-focus-mode"]);
+    const noteOnlyCommandIds = new Set([
+      "new-note",
+      "close-tab",
+      "close-other-tabs",
+      "pin-note",
+      "toggle-focus-mode",
+    ]);
 
     const filteredItems = controller.paletteItems.filter((item) => {
       if (viewerMode === "skill") {
@@ -1214,7 +1220,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                 outlineJumpRequest={controller.outlineJumpRequest}
                 updateState={controller.updateState}
                 onContentChange={controller.updateDraftContent}
-                onCreateTab={() => void controller.createNote()}
                 onSelectTab={(path) =>
                   void controller.activateNoteTab(path, { recordHistory: true })
                 }

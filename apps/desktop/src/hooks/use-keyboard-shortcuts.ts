@@ -9,9 +9,9 @@ type UseKeyboardShortcutsOptions = {
   activeFile: FileDocument | null;
   saveActiveNote: () => Promise<void>;
   createNote: () => Promise<void>;
-  createTab: () => Promise<void>;
   createFolder: () => Promise<void>;
   closeActiveTab: () => Promise<void>;
+  closeOtherTabs: () => Promise<void>;
   activateTabByIndex: (index: number) => Promise<void>;
   syncOpenedFile: (file: FileDocument, options?: { recordHistory?: boolean }) => Promise<void>;
   syncWorkspace: (workspace: WorkspaceSnapshot) => void;
@@ -33,9 +33,9 @@ export function useKeyboardShortcuts({
   activeFile,
   saveActiveNote,
   createNote,
-  createTab,
   createFolder,
   closeActiveTab,
+  closeOtherTabs,
   activateTabByIndex,
   syncOpenedFile,
   syncWorkspace,
@@ -95,9 +95,9 @@ export function useKeyboardShortcuts({
         "focus-mode",
         "check-updates",
         "new-note",
-        "new-tab",
         "new-folder",
         "close-tab",
+        "close-other-tabs",
       ]);
       const globalShortcut = shortcuts.find(
         (entry) => globalShortcutIds.has(entry.id) && matchShortcut(event, entry.keys),
@@ -129,14 +129,14 @@ export function useKeyboardShortcuts({
           case "new-note":
             void createNote();
             break;
-          case "new-tab":
-            void createTab();
-            break;
           case "new-folder":
             void createFolder();
             break;
           case "close-tab":
             void closeActiveTab();
+            break;
+          case "close-other-tabs":
+            void closeOtherTabs();
             break;
         }
         return;
@@ -204,9 +204,9 @@ export function useKeyboardShortcuts({
     saveActiveNote,
     glyph,
     createNote,
-    createTab,
     createFolder,
     closeActiveTab,
+    closeOtherTabs,
     activateTabByIndex,
     syncOpenedFile,
     syncWorkspace,

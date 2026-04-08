@@ -3,9 +3,9 @@ import type { ShortcutSetting } from "./workspace.js";
 export type ShortcutId =
   | "command-palette"
   | "new-note"
-  | "new-tab"
   | "new-folder"
   | "close-tab"
+  | "close-other-tabs"
   | "open-file"
   | "open-folder"
   | "check-updates"
@@ -41,9 +41,9 @@ export const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
   // App shortcuts (fire globally, even from inside the editor)
   { id: "command-palette", label: "Command Palette", keys: "⌘ P" },
   { id: "new-note", label: "New Note", keys: "⌘ N" },
-  { id: "new-tab", label: "New Tab", keys: "⌘ T" },
   { id: "new-folder", label: "New Folder", keys: "⇧ ⌘ N" },
   { id: "close-tab", label: "Close Tab", keys: "⌘ W" },
+  { id: "close-other-tabs", label: "Close Other Tabs", keys: "⌥ ⌘ W" },
   { id: "open-file", label: "Open File", keys: "⌘ O" },
   { id: "open-folder", label: "Open Folder", keys: "⇧ ⌘ O" },
   { id: "check-updates", label: "Update Action", keys: "⇧ ⌘ U" },
@@ -60,6 +60,22 @@ export const MODIFIER_TOKENS = {
   alt: "⌥",
   shift: "⇧",
 } as const;
+
+export function getPrimaryShortcutPrefix(platform?: string): string {
+  const normalizedPlatform = platform?.toLowerCase() ?? "";
+
+  return normalizedPlatform.includes("mac") || normalizedPlatform === "darwin"
+    ? MODIFIER_TOKENS.cmdOrCtrl
+    : "Ctrl+";
+}
+
+export function getDirectTabShortcutDisplay(index: number, platform?: string): string | undefined {
+  if (index < 0 || index > 8) {
+    return undefined;
+  }
+
+  return `${getPrimaryShortcutPrefix(platform)}${index + 1}`;
+}
 
 const MODIFIER_TOKENS_SET = new Set(Object.values(MODIFIER_TOKENS));
 

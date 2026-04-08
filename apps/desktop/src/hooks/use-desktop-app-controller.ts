@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { BreadcrumbItem, OutlineItem } from "@/types/navigation";
 
-import { getShortcutDisplay } from "@/shared/shortcuts";
+import { getDirectTabShortcutDisplay, getShortcutDisplay } from "@/shared/shortcuts";
 import type { DirectoryNode, FileDocument } from "@/shared/workspace";
 import { useSessionStore } from "@/store/session";
 import { useWorkspaceStore } from "@/store/workspace";
@@ -42,10 +42,18 @@ const NOTE_NAME_SAFE_CHAR_PATTERN = /[^a-zA-Z0-9-_\s]/g;
 const TITLE_PREFIX_PATTERN = /^#+\s*/;
 const NOTE_NAME_MAX_LENGTH = 50;
 const APP_CHANGELOG_URL = "https://github.com/FALAK097/glyph/blob/main/CHANGELOG.md";
-const MAX_DIRECT_NOTE_TAB_SHORTCUTS = 9;
 
-const getTabSwitchShortcutLabel = (index: number) =>
-  index < MAX_DIRECT_NOTE_TAB_SHORTCUTS ? `⌘${index + 1}` : undefined;
+const getRenamedFolderFilePath = (
+  oldFolderPath: string,
+  newFolderPath: string,
+  filePath: string,
+) => {
+  const normalizedOldFolderPath = normalizePath(oldFolderPath).replace(/\/+$/, "");
+  const normalizedNewFolderPath = normalizePath(newFolderPath).replace(/\/+$/, "");
+  const suffix = normalizePath(filePath).slice(normalizedOldFolderPath.length);
+
+  return `${normalizedNewFolderPath}${suffix}`;
+};
 
 const getDraftTitleLine = (content: string) =>
   content.split(/\r?\n/, 1)[0]?.replace(TITLE_PREFIX_PATTERN, "").trim() ?? "";
@@ -113,6 +121,7 @@ export const useDesktopAppController = (
     setSaving,
     setTabSaving,
     setError,
+    navigationHistory,
     activateTab,
     closeTab,
     closeOtherTabs,
@@ -765,11 +774,11 @@ export const useDesktopAppController = (
       try {
         await glyph.deleteFolder(folderPath);
         setSidebarNodes((prev) => removeSidebarPath(prev, folderPath));
-        noteTabs
-          .filter((tab) => isFileInsideWorkspace(tab.file.path, folderPath))
-          .forEach((tab) => {
-            removeHistoryPath(tab.file.path);
-          });
+        Array.from(
+          new Set(navigationHistory.filter((entry) => isFileInsideWorkspace(entry, folderPath))),
+        ).forEach((entry) => {
+          removeHistoryPath(entry);
+        });
         removeTabsInFolder(folderPath);
 
         if (rootPath && isSamePath(rootPath, folderPath)) {
@@ -780,7 +789,15 @@ export const useDesktopAppController = (
         setError(err instanceof Error ? err.message : "Failed to delete folder");
       }
     },
-    [glyph, noteTabs, removeHistoryPath, removeTabsInFolder, rootPath, setError, setWorkspace],
+    [
+      glyph,
+      navigationHistory,
+      removeHistoryPath,
+      removeTabsInFolder,
+      rootPath,
+      setError,
+      setWorkspace,
+    ],
   );
 
   const handleRemoveFileFromGlyph = useCallback(
@@ -879,13 +896,10 @@ export const useDesktopAppController = (
       try {
         const { oldPath, newPath } = await glyph.renameFolder(folderPath, newName);
         setSidebarNodes((prev) => renameSidebarFolder(prev, oldPath, newPath, newName));
-        const remappedTabs = noteTabs.filter((tab) =>
-          isFileInsideWorkspace(tab.file.path, oldPath),
-        );
-        remappedTabs.forEach((tab) => {
-          const nextFilePath =
-            newPath + normalizePath(tab.file.path).slice(normalizePath(oldPath).length);
-          replaceHistoryPath(tab.file.path, nextFilePath);
+        Array.from(
+          new Set(navigationHistory.filter((entry) => isFileInsideWorkspace(entry, oldPath))),
+        ).forEach((entry) => {
+          replaceHistoryPath(entry, getRenamedFolderFilePath(oldPath, newPath, entry));
         });
         remapTabsForFolderRename(oldPath, newPath);
 
@@ -902,7 +916,7 @@ export const useDesktopAppController = (
     },
     [
       glyph,
-      noteTabs,
+      navigationHistory,
       replaceHistoryPath,
       remapTabsForFolderRename,
       rootPath,
@@ -1128,15 +1142,6 @@ export const useDesktopAppController = (
         onSelect: () => void createNote(),
       },
       {
-        id: "new-tab",
-        title: "New tab",
-        subtitle: "Create a new note in its own tab",
-        shortcut: getShortcutDisplay(shortcuts, "new-tab"),
-        section: "Tabs",
-        kind: "command",
-        onSelect: () => void createNote(),
-      },
-      {
         id: "new-folder",
         title: "New folder",
         subtitle: "Create a new folder in the current directory",
@@ -1250,6 +1255,7 @@ export const useDesktopAppController = (
               id: "close-other-tabs",
               title: "Close Other Tabs",
               subtitle: "Keep only the current note open",
+              shortcut: getShortcutDisplay(shortcuts, "close-other-tabs"),
               section: "Tabs",
               kind: "command" as const,
               onSelect: () => {
@@ -1338,7 +1344,7 @@ export const useDesktopAppController = (
           ? `${tab.file.name} (current)`
           : tab.file.name,
         subtitle: getRelativePath(tab.file.path, rootPath),
-        shortcut: getTabSwitchShortcutLabel(index),
+        shortcut: getDirectTabShortcutDisplay(index, appInfo?.platform),
         section: "Open Tabs",
         kind: "command" as const,
         onSelect: () => {
@@ -1349,6 +1355,7 @@ export const useDesktopAppController = (
     [
       activeFile,
       activateNoteTab,
+      appInfo?.platform,
       closeNoteTab,
       closeOtherNoteTabs,
       createNote,
@@ -1414,7 +1421,6 @@ export const useDesktopAppController = (
       );
     },
     createNote,
-    createTab: createNote,
     createFolder,
     closeActiveTab: async () => {
       if (!activeFile) {
@@ -1422,6 +1428,13 @@ export const useDesktopAppController = (
       }
 
       await closeNoteTab(activeFile.path);
+    },
+    closeOtherTabs: async () => {
+      if (!activeFile) {
+        return;
+      }
+
+      await closeOtherNoteTabs(activeFile.path);
     },
     activateTabByIndex,
     syncOpenedFile,
@@ -1565,12 +1578,8 @@ export const useDesktopAppController = (
         }
 
         if (restoredTabPaths.length > 0) {
-          const orderedRestorePaths = restoredActivePath
-            ? [
-                restoredActivePath,
-                ...restoredTabPaths.filter((path) => !isSamePath(path, restoredActivePath)),
-              ]
-            : restoredTabPaths;
+          const orderedRestorePaths = restoredTabPaths;
+          let firstRestoredFile: FileDocument | null = null;
           let restoredActiveFile: FileDocument | null = null;
 
           for (const restorePath of orderedRestorePaths) {
@@ -1579,25 +1588,30 @@ export const useDesktopAppController = (
               continue;
             }
 
+            if (!firstRestoredFile) {
+              firstRestoredFile = restoredFile;
+            }
+
             setActiveFile(restoredFile);
             setIsWorkspaceMode(
               Boolean(workspace && isFileInsideWorkspace(restoredFile.path, workspace.rootPath)),
             );
             nextSidebarNodes = upsertSidebarFile(nextSidebarNodes, restoredFile);
 
-            if (!restoredActiveFile || isSamePath(restoredFile.path, restoredActivePath)) {
+            if (restoredActivePath && isSamePath(restoredFile.path, restoredActivePath)) {
               restoredActiveFile = restoredFile;
             }
           }
 
-          if (restoredActiveFile) {
-            setActiveFile(restoredActiveFile);
+          const nextActiveRestoredFile = restoredActiveFile ?? firstRestoredFile;
+          if (nextActiveRestoredFile) {
+            setActiveFile(nextActiveRestoredFile);
             setIsWorkspaceMode(
               Boolean(
-                workspace && isFileInsideWorkspace(restoredActiveFile.path, workspace.rootPath),
+                workspace && isFileInsideWorkspace(nextActiveRestoredFile.path, workspace.rootPath),
               ),
             );
-            pushHistory(restoredActiveFile.path);
+            pushHistory(nextActiveRestoredFile.path);
             bootFocusMode = "preserve";
           }
         }
@@ -1696,12 +1710,12 @@ export const useDesktopAppController = (
       return;
     }
 
-    const activeTab = getActiveTab();
-    if (!activeTab) {
-      return;
-    }
-
     const timer = window.setTimeout(async () => {
+      const activeTab = getActiveTab();
+      if (!activeTab || !activeTab.isDirty || activeTab.isSaving) {
+        return;
+      }
+
       await persistNoteDraft(
         {
           draftContent: activeTab.draftContent,
@@ -1716,10 +1730,10 @@ export const useDesktopAppController = (
     }, 800);
 
     return () => window.clearTimeout(timer);
-  }, [activeFile?.path, getActiveTab, isDirty, isSaving, persistNoteDraft]);
+  }, [activeFile?.path, draftContent, getActiveTab, isDirty, isSaving, persistNoteDraft]);
 
   // Session sync
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!sessionReady || !hasBooted) {
       return;
     }
@@ -1811,6 +1825,11 @@ export const useDesktopAppController = (
         return;
       }
 
+      if (command === "close-tab" && activeFile) {
+        await closeNoteTab(activeFile.path);
+        return;
+      }
+
       if (command === "open-file") {
         const file = await glyph.openDocument();
         if (file) {
@@ -1849,6 +1868,7 @@ export const useDesktopAppController = (
     });
   }, [
     activeFile,
+    closeNoteTab,
     createNote,
     draftContent,
     getActiveTab,

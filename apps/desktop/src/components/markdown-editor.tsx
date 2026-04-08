@@ -134,8 +134,18 @@ type TableControlsState = {
   canDeleteTable: boolean;
 };
 
+type SelectionSnapshot = {
+  from: number;
+  to: number;
+};
+
 type EditorOutlineItem = OutlineItem & {
   pos: number;
+};
+
+const DEFAULT_SELECTION_SNAPSHOT: SelectionSnapshot = {
+  from: 1,
+  to: 1,
 };
 
 const extractLinkAttributes = (input: string) => {
@@ -325,6 +335,7 @@ export const MarkdownEditor = ({
   const onChangeRef = useRef(onChange);
   const onScrollPositionChangeRef = useRef(onScrollPositionChange);
   const filePathRef = useRef(filePath);
+  const scrollRestorationKeyRef = useRef(scrollRestorationKey);
   const onOpenLinkedFileRef = useRef(onOpenLinkedFile);
   const isAutoConvertingRef = useRef(false);
   const liveEditorRef = useRef<Editor | null>(null);
@@ -333,7 +344,8 @@ export const MarkdownEditor = ({
   const toastTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const hoveredLinkHideTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const scrollPositionTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
-  const selectionSnapshotRef = useRef({ from: 1, to: 1 });
+  const selectionSnapshotRef = useRef<SelectionSnapshot>(DEFAULT_SELECTION_SNAPSHOT);
+  const selectionSnapshotsByDocumentRef = useRef<Record<string, SelectionSnapshot>>({});
   const lastHandledFocusRequestRef = useRef<number | null>(null);
   const lastRestoredScrollStateRef = useRef<{
     key: string | null;
@@ -356,8 +368,9 @@ export const MarkdownEditor = ({
     onChangeRef.current = onChange;
     onScrollPositionChangeRef.current = onScrollPositionChange;
     filePathRef.current = filePath;
+    scrollRestorationKeyRef.current = scrollRestorationKey;
     onOpenLinkedFileRef.current = onOpenLinkedFile;
-  }, [onChange, onScrollPositionChange, filePath, onOpenLinkedFile]);
+  }, [filePath, onChange, onOpenLinkedFile, onScrollPositionChange, scrollRestorationKey]);
 
   const refreshOutline = useCallback((nextEditor: Editor) => {
     const items = collectEditorOutline(nextEditor);
@@ -373,8 +386,17 @@ export const MarkdownEditor = ({
     onScrollPositionChangeRef.current(scrollRestorationKey, scrollContainerRef.current.scrollTop);
   }, [scrollRestorationKey]);
 
+  const rememberSelectionSnapshot = useCallback((nextSelection: SelectionSnapshot) => {
+    selectionSnapshotRef.current = nextSelection;
+
+    const targetKey = scrollRestorationKeyRef.current ?? filePathRef.current;
+    if (targetKey) {
+      selectionSnapshotsByDocumentRef.current[targetKey] = nextSelection;
+    }
+  }, []);
+
   const focusEditorWithoutScroll = useCallback(
-    (selection: { from: number; to: number }, resetScrollTop: boolean) => {
+    (selection: SelectionSnapshot, resetScrollTop: boolean) => {
       const nextEditor = liveEditorRef.current;
       if (!nextEditor) {
         return;
@@ -386,7 +408,7 @@ export const MarkdownEditor = ({
         to: clamp(selection.to, 1, maxPosition),
       };
 
-      selectionSnapshotRef.current = nextSelection;
+      rememberSelectionSnapshot(nextSelection);
       nextEditor.view.dispatch(
         nextEditor.state.tr.setSelection(
           TextSelection.create(nextEditor.state.doc, nextSelection.from, nextSelection.to),
@@ -398,7 +420,7 @@ export const MarkdownEditor = ({
         scrollContainerRef.current.scrollTop = 0;
       }
     },
-    [],
+    [rememberSelectionSnapshot],
   );
 
   const effectiveUpdateState = devPreviewUpdateState ?? updateState ?? null;
@@ -779,10 +801,10 @@ export const MarkdownEditor = ({
           return;
         }
 
-        selectionSnapshotRef.current = {
+        rememberSelectionSnapshot({
           from: nextEditor.state.selection.from,
           to: nextEditor.state.selection.to,
-        };
+        });
         refreshTableControls(nextEditor);
         refreshImageControls(nextEditor);
         refreshOutline(nextEditor);
@@ -794,15 +816,15 @@ export const MarkdownEditor = ({
       },
       onSelectionUpdate: ({ editor: nextEditor }) => {
         liveEditorRef.current = nextEditor;
-        selectionSnapshotRef.current = {
+        rememberSelectionSnapshot({
           from: nextEditor.state.selection.from,
           to: nextEditor.state.selection.to,
-        };
+        });
         refreshTableControls(nextEditor);
         refreshImageControls(nextEditor);
       },
     },
-    [],
+    [rememberSelectionSnapshot],
   );
 
   useEffect(() => {
@@ -819,6 +841,14 @@ export const MarkdownEditor = ({
     refreshImageControls(editor);
     refreshOutline(editor);
   }, [content, editor, refreshOutline]);
+
+  useEffect(() => {
+    const targetKey = scrollRestorationKey ?? filePath;
+
+    selectionSnapshotRef.current = targetKey
+      ? (selectionSnapshotsByDocumentRef.current[targetKey] ?? DEFAULT_SELECTION_SNAPSHOT)
+      : DEFAULT_SELECTION_SNAPSHOT;
+  }, [filePath, scrollRestorationKey]);
 
   useEffect(() => {
     if (!editor || !scrollContainerRef.current || !scrollRestorationKey) {

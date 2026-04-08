@@ -196,23 +196,6 @@ export function EditorToolbar({
             <TooltipContent side="bottom">{forwardTooltipLabel}</TooltipContent>
           </Tooltip>
         ) : null}
-        {onCreateNote ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="text-muted-foreground hover:text-foreground hover:bg-muted flex-shrink-0"
-                onClick={onCreateNote}
-                aria-label="New note"
-                type="button"
-              >
-                <PlusIcon size={16} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">{`New Note${newNoteShortcut ? ` (${newNoteShortcut})` : ""}`}</TooltipContent>
-          </Tooltip>
-        ) : null}
         {fileName ? (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -288,6 +271,24 @@ export function EditorToolbar({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">{updateButtonTooltip}</TooltipContent>
+          </Tooltip>
+        ) : null}
+        {onCreateNote ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 shrink-0 rounded-full px-3 text-xs font-semibold shadow-sm"
+                onClick={onCreateNote}
+                aria-label="New note"
+                type="button"
+              >
+                <PlusIcon size={14} />
+                <span>New Note</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{`New Note${newNoteShortcut ? ` (${newNoteShortcut})` : ""}`}</TooltipContent>
           </Tooltip>
         ) : null}
         {headerAccessory ? <div className="mr-1 flex items-center">{headerAccessory}</div> : null}

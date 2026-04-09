@@ -192,7 +192,7 @@ async function triggerPreviousTabShortcut(window: Page) {
 }
 
 async function triggerCloseOtherTabsShortcut(window: Page) {
-  await window.keyboard.press(isMac ? "Meta+Alt+W" : "Control+Alt+W");
+  await window.keyboard.press(isMac ? "Meta+Shift+W" : "Control+Shift+W");
 }
 
 async function getTabState(window: Page, options?: { workspaceRoot?: string }) {

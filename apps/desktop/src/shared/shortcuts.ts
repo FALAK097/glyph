@@ -43,7 +43,7 @@ export const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
   { id: "new-note", label: "New Note", keys: "⌘ N" },
   { id: "new-folder", label: "New Folder", keys: "⇧ ⌘ N" },
   { id: "close-tab", label: "Close Tab", keys: "⌘ W" },
-  { id: "close-other-tabs", label: "Close Other Tabs", keys: "⌥ ⌘ W" },
+  { id: "close-other-tabs", label: "Close Other Tabs", keys: "⇧ ⌘ W" },
   { id: "open-file", label: "Open File", keys: "⌘ O" },
   { id: "open-folder", label: "Open Folder", keys: "⇧ ⌘ O" },
   { id: "check-updates", label: "Update Action", keys: "⇧ ⌘ U" },
@@ -226,6 +226,10 @@ const SHIFTED_SYMBOL_ALIASES: Record<string, string> = {
   "~": "`",
 };
 
+const LEGACY_SHORTCUT_MIGRATIONS: Partial<Record<ShortcutId, string[]>> = {
+  "close-other-tabs": ["⌥ ⌘ W"],
+};
+
 function normalizeShortcutKeyToken(token: string): string | null {
   const trimmed = token.trim();
 
@@ -308,10 +312,18 @@ export function mergeShortcutSettings(shortcuts?: ShortcutSetting[] | null): Sho
         (shortcut): shortcut is ShortcutSetting =>
           typeof shortcut?.id === "string" && typeof shortcut?.keys === "string",
       )
-      .map((shortcut) => [
-        shortcut.id,
-        canonicalizeShortcut(shortcut.keys) ?? shortcut.keys.trim(),
-      ]),
+      .map((shortcut) => {
+        const normalizedKeys = canonicalizeShortcut(shortcut.keys) ?? shortcut.keys.trim();
+        const shortcutId = shortcut.id as ShortcutId;
+        const legacyKeys = LEGACY_SHORTCUT_MIGRATIONS[shortcutId];
+
+        if (legacyKeys?.some((legacyKey) => canonicalizeShortcut(legacyKey) === normalizedKeys)) {
+          const migratedDefault = DEFAULT_SHORTCUTS.find((entry) => entry.id === shortcutId)?.keys;
+          return [shortcut.id, migratedDefault ?? normalizedKeys];
+        }
+
+        return [shortcut.id, normalizedKeys];
+      }),
   );
 
   return DEFAULT_SHORTCUTS.map((shortcut) => ({

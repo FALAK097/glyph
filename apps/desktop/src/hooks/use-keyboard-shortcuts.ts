@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { matchAdjacentTabShortcut, matchShortcut } from "@/shared/shortcuts";
+import { matchShortcut } from "@/shared/shortcuts";
 import type { FileDocument, ShortcutSetting, WorkspaceSnapshot } from "@/shared/workspace";
 
 type UseKeyboardShortcutsOptions = {
@@ -94,22 +94,34 @@ export function useKeyboardShortcuts({
         return;
       }
 
-      const currentPlatform = typeof navigator === "undefined" ? undefined : navigator.platform;
-      if (
+      const isPreviousBracketShortcut =
+        primaryPressed && !event.altKey && matchShortcut(event, "⇧ ⌘ [");
+      const isNextBracketShortcut =
+        primaryPressed && !event.altKey && matchShortcut(event, "⇧ ⌘ ]");
+      const isPreviousCtrlTabShortcut =
         !hasConfiguredShortcutMatch &&
+        event.ctrlKey &&
+        !event.metaKey &&
         !event.altKey &&
-        matchAdjacentTabShortcut(event, "previous", currentPlatform)
-      ) {
+        event.shiftKey &&
+        !event.repeat &&
+        event.key === "Tab";
+      const isNextCtrlTabShortcut =
+        !hasConfiguredShortcutMatch &&
+        event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        !event.shiftKey &&
+        !event.repeat &&
+        event.key === "Tab";
+
+      if (!hasConfiguredShortcutMatch && (isPreviousBracketShortcut || isPreviousCtrlTabShortcut)) {
         event.preventDefault();
         void activatePreviousTab();
         return;
       }
 
-      if (
-        !hasConfiguredShortcutMatch &&
-        !event.altKey &&
-        matchAdjacentTabShortcut(event, "next", currentPlatform)
-      ) {
+      if (!hasConfiguredShortcutMatch && (isNextBracketShortcut || isNextCtrlTabShortcut)) {
         event.preventDefault();
         void activateNextTab();
         return;

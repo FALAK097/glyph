@@ -902,6 +902,9 @@ function buildApplicationMenu(shortcuts: AppSettings["shortcuts"]) {
     const keys = resolvedShortcuts.find((shortcut) => shortcut.id === id)?.keys;
     return keys ? toElectronAccelerator(keys) : undefined;
   };
+  const previousTabAccelerator =
+    process.platform === "darwin" ? "Command+Shift+[" : "Ctrl+Shift+Tab";
+  const nextTabAccelerator = process.platform === "darwin" ? "Command+Shift+]" : "Ctrl+Tab";
   const checkForUpdatesItem: Electron.MenuItemConstructorOptions = {
     label: "Check for Updates",
     accelerator: getAccelerator("check-updates"),
@@ -949,6 +952,23 @@ function buildApplicationMenu(shortcuts: AppSettings["shortcuts"]) {
           label: "Save",
           accelerator: getAccelerator("save"),
           click: () => mainWindow?.webContents.send("app:command", "save" satisfies AppCommand),
+        },
+        {
+          label: "Close Tab",
+          accelerator: getAccelerator("close-tab"),
+          click: () =>
+            mainWindow?.webContents.send("app:command", "close-tab" satisfies AppCommand),
+        },
+        {
+          label: "Previous Tab",
+          accelerator: previousTabAccelerator,
+          click: () =>
+            mainWindow?.webContents.send("app:command", "previous-tab" satisfies AppCommand),
+        },
+        {
+          label: "Next Tab",
+          accelerator: nextTabAccelerator,
+          click: () => mainWindow?.webContents.send("app:command", "next-tab" satisfies AppCommand),
         },
         { type: "separator" },
         {
@@ -2011,7 +2031,7 @@ app
       return net.fetch(pathToFileURL(normalizedTarget).toString());
     });
 
-    if (process.platform !== "darwin") {
+    if (process.platform !== "darwin" && !isE2EDistMode) {
       const args = process.argv.slice(1);
       const target = args.find(
         (arg) => arg !== "." && !arg.startsWith("-") && !arg.includes("node_modules"),

@@ -1,12 +1,14 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 
-import { getShortcutDisplay } from "@/shared/shortcuts";
-import type { ShortcutSetting } from "@/shared/workspace";
+import { getDisplayFileName } from "@/lib/paths";
+import { getDirectTabShortcutDisplay, getShortcutDisplay } from "@/shared/shortcuts";
+import type { NoteTab, ShortcutSetting, TabMovePosition } from "@/shared/workspace";
 import type { OutlineItem } from "@/types/navigation";
 import type { UpdateState } from "@/shared/workspace";
 import type { EditorFocusRequest } from "@/types/markdown-editor";
 
 import { MarkdownEditor } from "./markdown-editor";
+import { NoteTabsBar } from "./note-tabs-bar";
 
 type NoteViewProps = {
   content: string;
@@ -19,6 +21,8 @@ type NoteViewProps = {
   wordCount: number;
   readingTime: number;
   isSidebarCollapsed: boolean;
+  activeTabId: string | null;
+  noteTabs: NoteTab[];
   shortcuts: ShortcutSetting[];
   canGoBack: boolean;
   canGoForward: boolean;
@@ -31,6 +35,9 @@ type NoteViewProps = {
   outlineJumpRequest: { id: string; nonce: number } | null;
   updateState: UpdateState | null;
   onContentChange: (value: string) => void;
+  onSelectTab: (path: string) => void;
+  onCloseTab: (path: string) => void;
+  onMoveTab: (sourcePath: string, targetPath: string, position: TabMovePosition) => void;
   onToggleSidebar: () => void;
   onCreateNote: () => void;
   onOpenSettings: () => void;
@@ -58,6 +65,8 @@ export function NoteView({
   wordCount,
   readingTime,
   isSidebarCollapsed,
+  activeTabId,
+  noteTabs,
   shortcuts,
   canGoBack,
   canGoForward,
@@ -70,6 +79,9 @@ export function NoteView({
   outlineJumpRequest,
   updateState,
   onContentChange,
+  onSelectTab,
+  onCloseTab,
+  onMoveTab,
   onToggleSidebar,
   onCreateNote,
   onOpenSettings,
@@ -93,6 +105,21 @@ export function NoteView({
     onOpenSettings();
   }, [onOpenSettings]);
 
+  const noteTabItems = useMemo(
+    () =>
+      noteTabs.map((tab, index) => ({
+        id: tab.id,
+        label: getDisplayFileName(tab.file.name),
+        path: tab.file.path,
+        shortcutLabel: getDirectTabShortcutDisplay(
+          index,
+          noteTabs.length,
+          typeof navigator === "undefined" ? undefined : navigator.platform,
+        ),
+      })),
+    [noteTabs],
+  );
+
   return (
     <MarkdownEditor
       content={content}
@@ -104,6 +131,17 @@ export function NoteView({
       footerMetaLabel={footerMetaLabel}
       wordCount={wordCount}
       readingTime={readingTime}
+      subheaderContent={
+        noteTabItems.length > 0 ? (
+          <NoteTabsBar
+            activeTabId={activeTabId}
+            tabs={noteTabItems}
+            onSelectTab={onSelectTab}
+            onCloseTab={onCloseTab}
+            onMoveTab={onMoveTab}
+          />
+        ) : null
+      }
       onChange={onContentChange}
       onToggleSidebar={onToggleSidebar}
       isSidebarCollapsed={isSidebarCollapsed}

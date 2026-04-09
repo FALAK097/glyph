@@ -3,18 +3,18 @@ import { useEffect } from "react";
 import { matchShortcut } from "@/shared/shortcuts";
 import type { FileDocument, ShortcutSetting, WorkspaceSnapshot } from "@/shared/workspace";
 
-import { getErrorMessage } from "@/lib/errors";
-
 type UseKeyboardShortcutsOptions = {
   glyph: NonNullable<Window["glyph"]>;
   shortcuts: ShortcutSetting[];
   activeFile: FileDocument | null;
-  draftContent: string;
-  markSaved: (file: FileDocument) => void;
-  setError: (message: string | null) => void;
-  setSaving: (isSaving: boolean) => void;
+  saveActiveNote: () => Promise<void>;
   createNote: () => Promise<void>;
   createFolder: () => Promise<void>;
+  closeActiveTab: () => Promise<void>;
+  closeOtherTabs: () => Promise<void>;
+  activateTabByIndex: (index: number) => Promise<void>;
+  activateNextTab: () => Promise<void>;
+  activatePreviousTab: () => Promise<void>;
   syncOpenedFile: (file: FileDocument, options?: { recordHistory?: boolean }) => Promise<void>;
   syncWorkspace: (workspace: WorkspaceSnapshot) => void;
   setIsWorkspaceMode: React.Dispatch<React.SetStateAction<boolean>>;
@@ -33,12 +33,14 @@ export function useKeyboardShortcuts({
   glyph,
   shortcuts,
   activeFile,
-  draftContent,
-  markSaved,
-  setError,
-  setSaving,
+  saveActiveNote,
   createNote,
   createFolder,
+  closeActiveTab,
+  closeOtherTabs,
+  activateTabByIndex,
+  activateNextTab,
+  activatePreviousTab,
   syncOpenedFile,
   syncWorkspace,
   setIsWorkspaceMode,
@@ -75,6 +77,56 @@ export function useKeyboardShortcuts({
         }
       }
 
+      const hasConfiguredShortcutMatch = shortcuts.some((entry) =>
+        matchShortcut(event, entry.keys),
+      );
+      const primaryPressed = event.metaKey !== event.ctrlKey && (event.metaKey || event.ctrlKey);
+      if (
+        !hasConfiguredShortcutMatch &&
+        primaryPressed &&
+        !event.altKey &&
+        !event.shiftKey &&
+        !event.repeat &&
+        /^[1-9]$/.test(event.key)
+      ) {
+        event.preventDefault();
+        void activateTabByIndex(Number(event.key) - 1);
+        return;
+      }
+
+      const isPreviousBracketShortcut =
+        primaryPressed && !event.altKey && matchShortcut(event, "⇧ ⌘ [");
+      const isNextBracketShortcut =
+        primaryPressed && !event.altKey && matchShortcut(event, "⇧ ⌘ ]");
+      const isPreviousCtrlTabShortcut =
+        !hasConfiguredShortcutMatch &&
+        event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        event.shiftKey &&
+        !event.repeat &&
+        event.key === "Tab";
+      const isNextCtrlTabShortcut =
+        !hasConfiguredShortcutMatch &&
+        event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        !event.shiftKey &&
+        !event.repeat &&
+        event.key === "Tab";
+
+      if (!hasConfiguredShortcutMatch && (isPreviousBracketShortcut || isPreviousCtrlTabShortcut)) {
+        event.preventDefault();
+        void activatePreviousTab();
+        return;
+      }
+
+      if (!hasConfiguredShortcutMatch && (isNextBracketShortcut || isNextCtrlTabShortcut)) {
+        event.preventDefault();
+        void activateNextTab();
+        return;
+      }
+
       const globalShortcutIds = new Set([
         "toggle-sidebar",
         "command-palette",
@@ -85,6 +137,8 @@ export function useKeyboardShortcuts({
         "check-updates",
         "new-note",
         "new-folder",
+        "close-tab",
+        "close-other-tabs",
       ]);
       const globalShortcut = shortcuts.find(
         (entry) => globalShortcutIds.has(entry.id) && matchShortcut(event, entry.keys),
@@ -119,6 +173,12 @@ export function useKeyboardShortcuts({
           case "new-folder":
             void createFolder();
             break;
+          case "close-tab":
+            void closeActiveTab();
+            break;
+          case "close-other-tabs":
+            void closeOtherTabs();
+            break;
         }
         return;
       }
@@ -131,16 +191,7 @@ export function useKeyboardShortcuts({
 
         if (saveShortcut && activeFile) {
           event.preventDefault();
-          setSaving(true);
-          try {
-            const savedFile = await glyph.saveFile(activeFile.path, draftContent);
-            markSaved(savedFile);
-          } catch (saveError) {
-            console.error("Manual save failed:", saveError);
-            setError(getErrorMessage(saveError));
-          } finally {
-            setSaving(false);
-          }
+          await saveActiveNote();
           return;
         }
       }
@@ -177,16 +228,7 @@ export function useKeyboardShortcuts({
             }
             case "save":
               if (activeFile) {
-                setSaving(true);
-                try {
-                  const savedFile = await glyph.saveFile(activeFile.path, draftContent);
-                  markSaved(savedFile);
-                } catch (saveError) {
-                  console.error("Manual save failed:", saveError);
-                  setError(getErrorMessage(saveError));
-                } finally {
-                  setSaving(false);
-                }
+                await saveActiveNote();
               }
               break;
           }
@@ -200,13 +242,15 @@ export function useKeyboardShortcuts({
   }, [
     shortcuts,
     activeFile,
-    draftContent,
-    markSaved,
-    setError,
-    setSaving,
+    saveActiveNote,
     glyph,
     createNote,
     createFolder,
+    closeActiveTab,
+    closeOtherTabs,
+    activateTabByIndex,
+    activateNextTab,
+    activatePreviousTab,
     syncOpenedFile,
     syncWorkspace,
     setIsWorkspaceMode,

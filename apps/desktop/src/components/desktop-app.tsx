@@ -73,6 +73,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const selectedSkillCollectionId = useSessionStore((state) => state.selectedSkillCollectionId);
   const noteWorkspacePath = useSessionStore((state) => state.noteWorkspacePath);
   const noteFilePath = useSessionStore((state) => state.noteFilePath);
+  const noteTabPaths = useSessionStore((state) => state.noteTabPaths);
   const skillDocumentPath = useSessionStore((state) => state.skillDocumentPath);
   const getPreferredSkillDocumentKind = useSessionStore(
     (state) => state.getPreferredSkillDocumentKind,
@@ -88,9 +89,11 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const hasCapturedInitialSessionRef = useRef(false);
   const initialNoteSessionRef = useRef<{
     filePath: string | null;
+    tabPaths: string[];
     workspacePath: string | null;
   }>({
     filePath: null,
+    tabPaths: [],
     workspacePath: null,
   });
   const initialSkillSessionRef = useRef<{
@@ -106,6 +109,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   if (sessionHasHydrated && !hasCapturedInitialSessionRef.current) {
     initialNoteSessionRef.current = {
       filePath: noteFilePath,
+      tabPaths: noteTabPaths.length > 0 ? noteTabPaths : noteFilePath ? [noteFilePath] : [],
       workspacePath: noteWorkspacePath,
     };
     initialSkillSessionRef.current = {
@@ -118,6 +122,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
 
   const controller = useDesktopAppController(glyph, {
     initialFilePath: initialNoteSessionRef.current.filePath,
+    initialTabPaths: initialNoteSessionRef.current.tabPaths,
     initialWorkspacePath: initialNoteSessionRef.current.workspacePath,
     sessionReady: sessionHasHydrated,
   });
@@ -740,7 +745,15 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   }, [controller.isPaletteOpen, controller.paletteQuery, skillsController.searchSkillIds]);
 
   const visibleNotePaletteItems = useMemo(() => {
-    const noteOnlyCommandIds = new Set(["new-note", "pin-note", "toggle-focus-mode"]);
+    const noteOnlyCommandIds = new Set([
+      "new-note",
+      "close-tab",
+      "close-other-tabs",
+      "previous-tab",
+      "next-tab",
+      "pin-note",
+      "toggle-focus-mode",
+    ]);
 
     const filteredItems = controller.paletteItems.filter((item) => {
       if (viewerMode === "skill") {
@@ -1195,6 +1208,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                 wordCount={controller.wordCount}
                 readingTime={controller.readingTime}
                 isSidebarCollapsed={controller.isSidebarCollapsed}
+                activeTabId={controller.activeTabId}
+                noteTabs={controller.noteTabs}
                 shortcuts={controller.shortcuts}
                 canGoBack={controller.canGoBack}
                 canGoForward={controller.canGoForward}
@@ -1207,6 +1222,13 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                 outlineJumpRequest={controller.outlineJumpRequest}
                 updateState={controller.updateState}
                 onContentChange={controller.updateDraftContent}
+                onSelectTab={(path) =>
+                  void controller.activateNoteTab(path, { recordHistory: true })
+                }
+                onCloseTab={(path) => void controller.closeNoteTab(path)}
+                onMoveTab={(sourcePath, targetPath, position) =>
+                  controller.moveNoteTab(sourcePath, targetPath, position)
+                }
                 onToggleSidebar={handleToggleSidebar}
                 onCreateNote={() => void controller.createNote()}
                 onOpenSettings={handleOpenSettings}

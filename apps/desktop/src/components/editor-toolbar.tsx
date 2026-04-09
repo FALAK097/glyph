@@ -25,8 +25,6 @@ import {
 } from "@/components/icons";
 import { FileManagerLogo } from "./file-manager-logo";
 
-const MARKDOWN_FILE_SUFFIX_PATTERN = /\.(md|mdx|markdown)$/i;
-
 type EditorToolbarProps = {
   _isMacLike: boolean;
   isSidebarCollapsed: boolean | undefined;
@@ -211,16 +209,6 @@ export function EditorToolbar({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">{`New Note${newNoteShortcut ? ` (${newNoteShortcut})` : ""}`}</TooltipContent>
-          </Tooltip>
-        ) : null}
-        {fileName ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="max-w-[220px] truncate pl-1 text-sm font-medium text-foreground">
-                {fileName.replace(MARKDOWN_FILE_SUFFIX_PATTERN, "")}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">{fileName}</TooltipContent>
           </Tooltip>
         ) : null}
       </div>

@@ -25,6 +25,7 @@ export type MarkdownEditorProps = {
   onToggleSidebar?: () => void;
   isSidebarCollapsed?: boolean;
   headerAccessory?: ReactNode;
+  subheaderContent?: ReactNode;
   topContent?: ReactNode;
   onCreateNote?: () => void;
   toggleSidebarShortcut?: string;

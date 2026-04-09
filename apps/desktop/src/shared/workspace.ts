@@ -4,6 +4,17 @@ export type FileDocument = {
   content: string;
 };
 
+export type NoteTab = {
+  id: string;
+  file: FileDocument;
+  draftContent: string;
+  isDirty: boolean;
+  isSaving: boolean;
+  lastSavedAt: number | null;
+};
+
+export type TabMovePosition = "before" | "after";
+
 export type FileNode = {
   type: "file";
   name: string;
@@ -129,6 +140,9 @@ export type AppCommand =
   | "save"
   | "new-file"
   | "new-folder"
+  | "close-tab"
+  | "next-tab"
+  | "previous-tab"
   | "search"
   | "quick-open"
   | "toggle-sidebar"

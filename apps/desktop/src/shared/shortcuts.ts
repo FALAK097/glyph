@@ -4,6 +4,8 @@ export type ShortcutId =
   | "command-palette"
   | "new-note"
   | "new-folder"
+  | "close-tab"
+  | "close-other-tabs"
   | "open-file"
   | "open-folder"
   | "check-updates"
@@ -40,6 +42,8 @@ export const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
   { id: "command-palette", label: "Command Palette", keys: "⌘ P" },
   { id: "new-note", label: "New Note", keys: "⌘ N" },
   { id: "new-folder", label: "New Folder", keys: "⇧ ⌘ N" },
+  { id: "close-tab", label: "Close Tab", keys: "⌘ W" },
+  { id: "close-other-tabs", label: "Close Other Tabs", keys: "⇧ ⌘ W" },
   { id: "open-file", label: "Open File", keys: "⌘ O" },
   { id: "open-folder", label: "Open Folder", keys: "⇧ ⌘ O" },
   { id: "check-updates", label: "Update Action", keys: "⇧ ⌘ U" },
@@ -53,9 +57,94 @@ export const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
 
 export const MODIFIER_TOKENS = {
   cmdOrCtrl: "⌘",
+  ctrl: "Ctrl+",
   alt: "⌥",
   shift: "⇧",
 } as const;
+
+export function getPrimaryShortcutPrefix(platform?: string): string {
+  const normalizedPlatform = platform?.toLowerCase() ?? "";
+
+  return normalizedPlatform.includes("mac") || normalizedPlatform === "darwin"
+    ? MODIFIER_TOKENS.cmdOrCtrl
+    : MODIFIER_TOKENS.ctrl;
+}
+
+export const MAX_DIRECT_NOTE_TAB_SHORTCUTS = 9;
+
+export function getDirectTabShortcutDisplay(
+  index: number,
+  totalTabs: number,
+  platform?: string,
+): string | undefined {
+  if (index < 0 || totalTabs <= 0) {
+    return undefined;
+  }
+
+  if (totalTabs <= MAX_DIRECT_NOTE_TAB_SHORTCUTS) {
+    if (index >= totalTabs) {
+      return undefined;
+    }
+
+    return `${getPrimaryShortcutPrefix(platform)}${index + 1}`;
+  }
+
+  if (index < MAX_DIRECT_NOTE_TAB_SHORTCUTS - 1) {
+    return `${getPrimaryShortcutPrefix(platform)}${index + 1}`;
+  }
+
+  if (index === totalTabs - 1) {
+    return `${getPrimaryShortcutPrefix(platform)}${MAX_DIRECT_NOTE_TAB_SHORTCUTS}`;
+  }
+
+  return undefined;
+}
+
+export function getDirectTabTargetIndex(requestedIndex: number, totalTabs: number): number | null {
+  if (requestedIndex < 0 || totalTabs <= 0) {
+    return null;
+  }
+
+  if (totalTabs <= MAX_DIRECT_NOTE_TAB_SHORTCUTS) {
+    return requestedIndex < totalTabs ? requestedIndex : null;
+  }
+
+  if (requestedIndex < MAX_DIRECT_NOTE_TAB_SHORTCUTS - 1) {
+    return requestedIndex;
+  }
+
+  return requestedIndex === MAX_DIRECT_NOTE_TAB_SHORTCUTS - 1 ? totalTabs - 1 : null;
+}
+
+export function getAdjacentTabShortcutDisplay(
+  direction: "next" | "previous",
+  platform?: string,
+): string {
+  const normalizedPlatform = platform?.toLowerCase() ?? "";
+  const isMacPlatform = normalizedPlatform.includes("mac") || normalizedPlatform === "darwin";
+
+  if (isMacPlatform) {
+    return direction === "next" ? "⇧⌘]" : "⇧⌘[";
+  }
+
+  return direction === "next" ? "Ctrl+Tab" : "Ctrl+Shift+Tab";
+}
+
+export function matchAdjacentTabShortcut(
+  event: ShortcutEventLike,
+  direction: "next" | "previous",
+  platform?: string,
+): boolean {
+  const normalizedPlatform = platform?.toLowerCase() ?? "";
+  const isMacPlatform = normalizedPlatform.includes("mac") || normalizedPlatform === "darwin";
+
+  return matchShortcut(
+    event,
+    isMacPlatform
+      ? `⇧ ⌘ ${direction === "next" ? "]" : "["}`
+      : `${direction === "next" ? "⌘ Tab" : "⇧ ⌘ Tab"}`,
+  );
+}
 
 const MODIFIER_TOKENS_SET = new Set(Object.values(MODIFIER_TOKENS));
 
@@ -135,6 +224,10 @@ const SHIFTED_SYMBOL_ALIASES: Record<string, string> = {
   ">": ".",
   "?": "/",
   "~": "`",
+};
+
+const LEGACY_SHORTCUT_MIGRATIONS: Partial<Record<ShortcutId, string[]>> = {
+  "close-other-tabs": ["⌥ ⌘ W"],
 };
 
 function normalizeShortcutKeyToken(token: string): string | null {
@@ -219,10 +312,18 @@ export function mergeShortcutSettings(shortcuts?: ShortcutSetting[] | null): Sho
         (shortcut): shortcut is ShortcutSetting =>
           typeof shortcut?.id === "string" && typeof shortcut?.keys === "string",
       )
-      .map((shortcut) => [
-        shortcut.id,
-        canonicalizeShortcut(shortcut.keys) ?? shortcut.keys.trim(),
-      ]),
+      .map((shortcut) => {
+        const normalizedKeys = canonicalizeShortcut(shortcut.keys) ?? shortcut.keys.trim();
+        const shortcutId = shortcut.id as ShortcutId;
+        const legacyKeys = LEGACY_SHORTCUT_MIGRATIONS[shortcutId];
+
+        if (legacyKeys?.some((legacyKey) => canonicalizeShortcut(legacyKey) === normalizedKeys)) {
+          const migratedDefault = DEFAULT_SHORTCUTS.find((entry) => entry.id === shortcutId)?.keys;
+          return [shortcut.id, migratedDefault ?? normalizedKeys];
+        }
+
+        return [shortcut.id, normalizedKeys];
+      }),
   );
 
   return DEFAULT_SHORTCUTS.map((shortcut) => ({

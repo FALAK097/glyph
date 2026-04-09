@@ -1224,6 +1224,9 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                   void controller.activateNoteTab(path, { recordHistory: true })
                 }
                 onCloseTab={(path) => void controller.closeNoteTab(path)}
+                onMoveTab={(sourcePath, targetPath, position) =>
+                  controller.moveNoteTab(sourcePath, targetPath, position)
+                }
                 onToggleSidebar={handleToggleSidebar}
                 onCreateNote={() => void controller.createNote()}
                 onOpenSettings={handleOpenSettings}

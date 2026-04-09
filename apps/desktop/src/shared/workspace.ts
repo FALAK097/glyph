@@ -13,6 +13,8 @@ export type NoteTab = {
   lastSavedAt: number | null;
 };
 
+export type TabMovePosition = "before" | "after";
+
 export type FileNode = {
   type: "file";
   name: string;

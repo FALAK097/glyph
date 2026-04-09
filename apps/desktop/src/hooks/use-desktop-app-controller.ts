@@ -3,7 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { BreadcrumbItem, OutlineItem } from "@/types/navigation";
 
 import { getDirectTabShortcutDisplay, getShortcutDisplay } from "@/shared/shortcuts";
-import type { DirectoryNode, FileDocument } from "@/shared/workspace";
+import type { DirectoryNode, FileDocument, TabMovePosition } from "@/shared/workspace";
 import { useSessionStore } from "@/store/session";
 import { useWorkspaceStore } from "@/store/workspace";
 import { applyTheme } from "@/theme/themes";
@@ -125,6 +125,7 @@ export const useDesktopAppController = (
     activateTab,
     closeTab,
     closeOtherTabs,
+    moveTab,
     removeTabsInFolder,
     replaceTabPath,
     remapTabsForFolderRename,
@@ -473,7 +474,9 @@ export const useDesktopAppController = (
 
   const closeOtherNoteTabs = useCallback(
     async (filePath: string) => {
-      const otherTabs = noteTabs.filter((tab) => !isSamePath(tab.file.path, filePath));
+      const otherTabs = useWorkspaceStore
+        .getState()
+        .noteTabs.filter((tab) => !isSamePath(tab.file.path, filePath));
       for (const tab of otherTabs) {
         if (!tab.isDirty) {
           continue;
@@ -494,10 +497,16 @@ export const useDesktopAppController = (
           return;
         }
       }
-
       closeOtherTabs(filePath);
     },
-    [activeFile?.path, closeOtherTabs, noteTabs, persistNoteDraft],
+    [activeFile?.path, closeOtherTabs, persistNoteDraft],
+  );
+
+  const moveNoteTab = useCallback(
+    (sourcePath: string, targetPath: string, position: TabMovePosition) => {
+      moveTab(sourcePath, targetPath, position);
+    },
+    [moveTab],
   );
 
   const activateTabByIndex = useCallback(
@@ -1243,7 +1252,10 @@ export const useDesktopAppController = (
               section: "Tabs",
               kind: "command" as const,
               onSelect: () => {
-                void closeNoteTab(activeFile.path);
+                const currentActiveTab = useWorkspaceStore.getState().getActiveTab();
+                if (currentActiveTab) {
+                  void closeNoteTab(currentActiveTab.file.path);
+                }
                 setIsPaletteOpen(false);
               },
             },
@@ -1259,7 +1271,10 @@ export const useDesktopAppController = (
               section: "Tabs",
               kind: "command" as const,
               onSelect: () => {
-                void closeOtherNoteTabs(activeFile.path);
+                const currentActiveTab = useWorkspaceStore.getState().getActiveTab();
+                if (currentActiveTab) {
+                  void closeOtherNoteTabs(currentActiveTab.file.path);
+                }
                 setIsPaletteOpen(false);
               },
             },
@@ -1423,18 +1438,20 @@ export const useDesktopAppController = (
     createNote,
     createFolder,
     closeActiveTab: async () => {
-      if (!activeFile) {
+      const currentActiveTab = useWorkspaceStore.getState().getActiveTab();
+      if (!currentActiveTab) {
         return;
       }
 
-      await closeNoteTab(activeFile.path);
+      await closeNoteTab(currentActiveTab.file.path);
     },
     closeOtherTabs: async () => {
-      if (!activeFile) {
+      const currentActiveTab = useWorkspaceStore.getState().getActiveTab();
+      if (!currentActiveTab) {
         return;
       }
 
-      await closeOtherNoteTabs(activeFile.path);
+      await closeOtherNoteTabs(currentActiveTab.file.path);
     },
     activateTabByIndex,
     syncOpenedFile,
@@ -1613,6 +1630,14 @@ export const useDesktopAppController = (
             );
             pushHistory(nextActiveRestoredFile.path);
             bootFocusMode = "preserve";
+          } else if (workspace?.activeFile) {
+            setActiveFile(workspace.activeFile);
+            setIsWorkspaceMode(
+              isFileInsideWorkspace(workspace.activeFile.path, workspace.rootPath),
+            );
+            nextSidebarNodes = upsertSidebarFile(nextSidebarNodes, workspace.activeFile);
+            pushHistory(workspace.activeFile.path);
+            bootFocusMode = "end";
           }
         }
       }
@@ -1825,8 +1850,13 @@ export const useDesktopAppController = (
         return;
       }
 
-      if (command === "close-tab" && activeFile) {
-        await closeNoteTab(activeFile.path);
+      if (command === "close-tab") {
+        const currentActiveTab = useWorkspaceStore.getState().getActiveTab();
+        if (!currentActiveTab) {
+          return;
+        }
+
+        await closeNoteTab(currentActiveTab.file.path);
         return;
       }
 
@@ -1918,6 +1948,7 @@ export const useDesktopAppController = (
     isSettingsOpen,
     isSidebarCollapsed,
     markSaved,
+    moveNoteTab,
     noteTabs,
     navigateBack,
     navigateForward,

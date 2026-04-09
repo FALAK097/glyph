@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 import { getBaseName, isPathInside, isSamePath, normalizePath } from "@/lib/paths";
 
-import type { DirectoryNode, FileDocument, NoteTab } from "../shared/workspace";
+import type { DirectoryNode, FileDocument, NoteTab, TabMovePosition } from "../shared/workspace";
 
 const getClosestHistoryIndex = (history: string[], currentIndex: number, filePath: string) => {
   let closestIndex = -1;
@@ -110,6 +110,7 @@ type WorkspaceState = {
   activateTab: (filePath: string) => void;
   closeTab: (filePath: string) => string | null;
   closeOtherTabs: (filePath: string) => void;
+  moveTab: (sourcePath: string, targetPath: string, position: TabMovePosition) => void;
   removeTab: (filePath: string) => void;
   removeTabsInFolder: (folderPath: string) => void;
   replaceTabPath: (oldPath: string, file: FileDocument) => void;
@@ -465,6 +466,45 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         noteTabs,
         activeTabId: nextTab.id,
         ...getActiveSurface(noteTabs, nextTab.id, EMPTY_ACTIVE_SURFACE),
+      };
+    }),
+  moveTab: (sourcePath, targetPath, position) =>
+    set((state) => {
+      const sourceIndex = getNoteTabIndex(state.noteTabs, sourcePath);
+      const targetIndex = getNoteTabIndex(state.noteTabs, targetPath);
+
+      if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) {
+        return state;
+      }
+
+      const sourceTab = state.noteTabs[sourceIndex];
+      const targetTab = state.noteTabs[targetIndex];
+      if (!sourceTab || !targetTab) {
+        return state;
+      }
+
+      const remainingTabs = state.noteTabs.filter((tab) => tab.id !== sourceTab.id);
+      const nextTargetIndex = remainingTabs.findIndex((tab) => tab.id === targetTab.id);
+      if (nextTargetIndex < 0) {
+        return state;
+      }
+
+      const insertionIndex = position === "before" ? nextTargetIndex : nextTargetIndex + 1;
+      const noteTabs = [
+        ...remainingTabs.slice(0, insertionIndex),
+        sourceTab,
+        ...remainingTabs.slice(insertionIndex),
+      ];
+
+      return {
+        noteTabs,
+        ...getActiveSurface(noteTabs, state.activeTabId, {
+          activeFile: state.activeFile,
+          draftContent: state.draftContent,
+          isDirty: state.isDirty,
+          isSaving: state.isSaving,
+          lastSavedAt: state.lastSavedAt,
+        }),
       };
     }),
   removeTab: (filePath) =>

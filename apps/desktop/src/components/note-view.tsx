@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 
 import { getDisplayFileName } from "@/lib/paths";
 import { getDirectTabShortcutDisplay, getShortcutDisplay } from "@/shared/shortcuts";
-import type { NoteTab, ShortcutSetting } from "@/shared/workspace";
+import type { NoteTab, ShortcutSetting, TabMovePosition } from "@/shared/workspace";
 import type { OutlineItem } from "@/types/navigation";
 import type { UpdateState } from "@/shared/workspace";
 import type { EditorFocusRequest } from "@/types/markdown-editor";
@@ -37,6 +37,7 @@ type NoteViewProps = {
   onContentChange: (value: string) => void;
   onSelectTab: (path: string) => void;
   onCloseTab: (path: string) => void;
+  onMoveTab: (sourcePath: string, targetPath: string, position: TabMovePosition) => void;
   onToggleSidebar: () => void;
   onCreateNote: () => void;
   onOpenSettings: () => void;
@@ -80,6 +81,7 @@ export function NoteView({
   onContentChange,
   onSelectTab,
   onCloseTab,
+  onMoveTab,
   onToggleSidebar,
   onCreateNote,
   onOpenSettings,
@@ -107,7 +109,6 @@ export function NoteView({
     () =>
       noteTabs.map((tab, index) => ({
         id: tab.id,
-        isDirty: tab.isDirty,
         label: getDisplayFileName(tab.file.name),
         path: tab.file.path,
         shortcutLabel: getDirectTabShortcutDisplay(
@@ -136,6 +137,7 @@ export function NoteView({
             tabs={noteTabItems}
             onSelectTab={onSelectTab}
             onCloseTab={onCloseTab}
+            onMoveTab={onMoveTab}
           />
         ) : null
       }

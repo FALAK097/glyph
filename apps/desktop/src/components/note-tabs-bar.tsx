@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { DragEvent } from "react";
 
+import { isSamePath } from "@/lib/paths";
 import { cn } from "@/lib/utils";
+import type { TabMovePosition } from "@/shared/workspace";
 
 import { XIcon } from "./icons";
 
 export type NoteTabRailItem = {
   id: string;
-  isDirty: boolean;
   label: string;
   path: string;
   shortcutLabel?: string;
@@ -15,15 +17,29 @@ export type NoteTabRailItem = {
 type NoteTabsBarProps = {
   activeTabId: string | null;
   onCloseTab: (path: string) => void;
+  onMoveTab: (sourcePath: string, targetPath: string, position: TabMovePosition) => void;
   onSelectTab: (path: string) => void;
   tabs: NoteTabRailItem[];
 };
 
-export function NoteTabsBar({ activeTabId, onCloseTab, onSelectTab, tabs }: NoteTabsBarProps) {
+export function NoteTabsBar({
+  activeTabId,
+  onCloseTab,
+  onMoveTab,
+  onSelectTab,
+  tabs,
+}: NoteTabsBarProps) {
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const draggedTabPathRef = useRef<string | null>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [draggedTabPath, setDraggedTabPath] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{
+    path: string;
+    position: TabMovePosition;
+  } | null>(null);
+  const tabOrderKey = useMemo(() => tabs.map((tab) => tab.id).join("|"), [tabs]);
 
   const updateScrollState = useCallback(() => {
     const scrollContainer = scrollContainerRef.current;
@@ -54,7 +70,7 @@ export function NoteTabsBar({ activeTabId, onCloseTab, onSelectTab, tabs }: Note
       scrollContainer.removeEventListener("scroll", updateScrollState);
       window.removeEventListener("resize", updateScrollState);
     };
-  }, [tabs.length, updateScrollState]);
+  }, [tabOrderKey, updateScrollState]);
 
   useEffect(() => {
     if (!activeTabId) {
@@ -65,7 +81,76 @@ export function NoteTabsBar({ activeTabId, onCloseTab, onSelectTab, tabs }: Note
       block: "nearest",
       inline: "nearest",
     });
-  }, [activeTabId]);
+  }, [activeTabId, tabOrderKey]);
+
+  const clearDragState = useCallback(() => {
+    draggedTabPathRef.current = null;
+    setDraggedTabPath(null);
+    setDropTarget(null);
+  }, []);
+
+  const handleTabDragOver = useCallback((event: DragEvent<HTMLElement>, tabPath: string) => {
+    const currentDraggedTabPath = draggedTabPathRef.current;
+    if (!currentDraggedTabPath || isSamePath(currentDraggedTabPath, tabPath)) {
+      return;
+    }
+
+    event.preventDefault();
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const position: TabMovePosition =
+      event.clientX < bounds.left + bounds.width / 2 ? "before" : "after";
+    setDropTarget((current) =>
+      current?.path === tabPath && current.position === position
+        ? current
+        : { path: tabPath, position },
+    );
+  }, []);
+
+  const handleContainerDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
+    if (!draggedTabPathRef.current) {
+      return;
+    }
+
+    event.preventDefault();
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) {
+      return;
+    }
+
+    const bounds = scrollContainer.getBoundingClientRect();
+    const edgeThreshold = 56;
+    if (event.clientX <= bounds.left + edgeThreshold) {
+      scrollContainer.scrollBy({ left: -18 });
+    } else if (event.clientX >= bounds.right - edgeThreshold) {
+      scrollContainer.scrollBy({ left: 18 });
+    }
+  }, []);
+
+  const handleContainerDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      const currentDraggedTabPath = draggedTabPathRef.current;
+      if (!currentDraggedTabPath) {
+        return;
+      }
+
+      const dropElement =
+        event.target instanceof HTMLElement
+          ? event.target.closest<HTMLElement>("[data-note-tab-path]")
+          : null;
+      if (dropElement) {
+        return;
+      }
+
+      const lastTab = tabs.at(-1);
+      if (lastTab && !isSamePath(lastTab.path, currentDraggedTabPath)) {
+        event.preventDefault();
+        onMoveTab(currentDraggedTabPath, lastTab.path, "after");
+      }
+
+      clearDragState();
+    },
+    [clearDragState, onMoveTab, tabs],
+  );
 
   return (
     <div className="relative flex h-11 items-center bg-background px-2">
@@ -82,27 +167,78 @@ export function NoteTabsBar({ activeTabId, onCloseTab, onSelectTab, tabs }: Note
           role="tablist"
           aria-label="Open note tabs"
           className="scrollbar-hide flex min-w-0 items-center gap-1 overflow-x-auto py-1"
+          onDragOver={handleContainerDragOver}
+          onDrop={handleContainerDrop}
         >
           {tabs.map((tab) => {
             const isActive = tab.id === activeTabId;
             const label = tab.label;
+            const showDropIndicator = dropTarget?.path === tab.path;
 
             return (
-              <div key={tab.id} className="group relative shrink-0">
+              <div
+                key={tab.id}
+                data-note-tab-path={tab.path}
+                className="group/tab relative shrink-0"
+              >
+                {showDropIndicator ? (
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "pointer-events-none absolute inset-y-1 z-20 w-0.5 rounded-full bg-primary/75",
+                      dropTarget.position === "before" ? "-left-0.5" : "-right-0.5",
+                    )}
+                  />
+                ) : null}
+
                 <button
                   ref={(element) => {
                     tabRefs.current[tab.id] = element;
                   }}
                   type="button"
                   role="tab"
+                  draggable={tabs.length > 1}
                   aria-selected={isActive}
                   title={tab.path}
+                  onDragEnd={clearDragState}
+                  onDragLeave={(event) => {
+                    if (
+                      event.currentTarget.contains(event.relatedTarget as Node | null) ||
+                      !dropTarget ||
+                      dropTarget.path !== tab.path
+                    ) {
+                      return;
+                    }
+
+                    setDropTarget(null);
+                  }}
+                  onDragStart={(event) => {
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData("text/plain", tab.path);
+                    draggedTabPathRef.current = tab.path;
+                    setDraggedTabPath(tab.path);
+                  }}
+                  onDragOver={(event) => handleTabDragOver(event, tab.path)}
+                  onDrop={(event) => {
+                    const currentDraggedTabPath = draggedTabPathRef.current;
+                    if (!currentDraggedTabPath || isSamePath(currentDraggedTabPath, tab.path)) {
+                      clearDragState();
+                      return;
+                    }
+
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const position = dropTarget?.path === tab.path ? dropTarget.position : "after";
+                    onMoveTab(currentDraggedTabPath, tab.path, position);
+                    clearDragState();
+                  }}
                   onClick={() => onSelectTab(tab.path)}
                   className={cn(
-                    "flex h-8 min-w-[152px] max-w-[224px] items-center gap-2 rounded-lg border px-3 pr-9 text-left outline-none",
+                    "flex h-8 min-w-[152px] max-w-[224px] cursor-grab items-center gap-2 rounded-lg border px-3 pr-9 text-left outline-none transition-[border-color,background-color,color,box-shadow] duration-150 ease-out active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                     isActive
                       ? "border-border bg-card text-foreground shadow-sm"
                       : "border-transparent text-muted-foreground hover:border-border/60 hover:bg-muted/60 hover:text-foreground",
+                    draggedTabPath && isSamePath(draggedTabPath, tab.path) ? "opacity-70" : "",
                   )}
                 >
                   {tab.shortcutLabel ? (
@@ -111,12 +247,6 @@ export function NoteTabsBar({ activeTabId, onCloseTab, onSelectTab, tabs }: Note
                     </span>
                   ) : null}
                   <span className="truncate text-sm font-medium">{label}</span>
-                  {tab.isDirty ? (
-                    <span
-                      aria-label="Unsaved changes"
-                      className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary/75"
-                    />
-                  ) : null}
                 </button>
 
                 <button
@@ -128,10 +258,10 @@ export function NoteTabsBar({ activeTabId, onCloseTab, onSelectTab, tabs }: Note
                     onCloseTab(tab.path);
                   }}
                   className={cn(
-                    "absolute top-1/2 right-1.5 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground outline-none",
+                    "absolute top-1/2 right-1.5 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground outline-none transition-[background-color,color,opacity,box-shadow] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                     isActive
                       ? "pointer-events-auto opacity-100 hover:bg-muted hover:text-foreground"
-                      : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-focus-within:pointer-events-auto group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-muted hover:text-foreground",
+                      : "pointer-events-none opacity-0 group-hover/tab:pointer-events-auto group-focus-within/tab:pointer-events-auto group-hover/tab:opacity-100 group-focus-within/tab:opacity-100 hover:bg-muted hover:text-foreground",
                   )}
                 >
                   <XIcon size={12} />

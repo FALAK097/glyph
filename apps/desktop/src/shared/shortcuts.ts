@@ -57,6 +57,7 @@ export const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
 
 export const MODIFIER_TOKENS = {
   cmdOrCtrl: "⌘",
+  ctrl: "Ctrl+",
   alt: "⌥",
   shift: "⇧",
 } as const;
@@ -66,7 +67,7 @@ export function getPrimaryShortcutPrefix(platform?: string): string {
 
   return normalizedPlatform.includes("mac") || normalizedPlatform === "darwin"
     ? MODIFIER_TOKENS.cmdOrCtrl
-    : "Ctrl+";
+    : MODIFIER_TOKENS.ctrl;
 }
 
 export function getDirectTabShortcutDisplay(index: number, platform?: string): string | undefined {

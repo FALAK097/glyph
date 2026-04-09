@@ -73,8 +73,12 @@ export function useKeyboardShortcuts({
         }
       }
 
+      const hasConfiguredShortcutMatch = shortcuts.some((entry) =>
+        matchShortcut(event, entry.keys),
+      );
       const primaryPressed = event.metaKey !== event.ctrlKey && (event.metaKey || event.ctrlKey);
       if (
+        !hasConfiguredShortcutMatch &&
         primaryPressed &&
         !event.altKey &&
         !event.shiftKey &&

@@ -183,24 +183,37 @@ async function triggerTabSwitchShortcut(window: Page, tabNumber: number) {
   await window.keyboard.press(`${modKey}+${tabNumber}`);
 }
 
+async function triggerNextTabShortcut(window: Page) {
+  await window.keyboard.press(isMac ? "Meta+Shift+]" : "Control+Tab");
+}
+
+async function triggerPreviousTabShortcut(window: Page) {
+  await window.keyboard.press(isMac ? "Meta+Shift+[" : "Control+Shift+Tab");
+}
+
 async function triggerCloseOtherTabsShortcut(window: Page) {
   await window.keyboard.press(isMac ? "Meta+Alt+W" : "Control+Alt+W");
 }
 
-async function getTabState(window: Page) {
-  return await window.evaluate(() => {
-    const tabs = Array.from(document.querySelectorAll('[role="tab"]')).map((tab) => ({
-      label: tab.textContent?.trim() ?? null,
-      selected: tab.getAttribute("aria-selected"),
-      title: tab.getAttribute("title"),
-    }));
-    const editor = document.querySelector('[data-glyph-editor="true"]');
+async function getTabState(window: Page, options?: { workspaceRoot?: string }) {
+  return await window.evaluate(
+    ({ workspaceRoot }) => {
+      const tabs = Array.from(document.querySelectorAll('[role="tab"]'))
+        .map((tab) => ({
+          label: tab.textContent?.trim() ?? null,
+          selected: tab.getAttribute("aria-selected"),
+          title: tab.getAttribute("title"),
+        }))
+        .filter((tab) => !workspaceRoot || tab.title?.startsWith(workspaceRoot));
+      const editor = document.querySelector('[data-glyph-editor="true"]');
 
-    return {
-      tabs,
-      editorText: editor?.textContent ?? null,
-    };
-  });
+      return {
+        tabs,
+        editorText: editor?.textContent ?? null,
+      };
+    },
+    { workspaceRoot: options?.workspaceRoot ?? null },
+  );
 }
 
 async function dragTabBefore(window: Page, sourceIndex: number, targetIndex: number) {
@@ -241,6 +254,11 @@ function getExpectedBodyForTabTitle(title: string | null) {
 
   if (title?.endsWith("nested-note.md")) {
     return "Nested note body.";
+  }
+
+  const generatedTabMatch = title?.match(/tab-(\d+)\.md$/i);
+  if (generatedTabMatch) {
+    return `Body ${generatedTabMatch[1]}.`;
   }
 
   throw new Error(`Unexpected tab title: ${title ?? "null"}`);
@@ -332,7 +350,7 @@ test("toggles the current note pin action from the command palette", async ({}, 
   try {
     await expectAppShell(glyph.window);
     await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
-    await selectPaletteItem(glyph.window, "nested-note", /nested-note/i);
+    await selectPaletteItem(glyph.window, "nested", /nested-note/i);
     await expect(glyph.window.getByText("Nested note body.")).toBeVisible();
 
     await selectPaletteItem(glyph.window, "pin current note", /pin current note/i);
@@ -595,7 +613,9 @@ test("opens notes in multiple tabs and switches between them with keyboard short
     await expect(glyph.window.getByRole("tab", { name: /welcome/i })).toBeVisible();
     await expect(glyph.window.getByRole("tab", { name: /nested-note/i })).toBeVisible();
 
-    const tabState = await getTabState(glyph.window);
+    const tabState = await getTabState(glyph.window, {
+      workspaceRoot: glyph.sandbox.workspaceRoot,
+    });
     expect(tabState.tabs).toHaveLength(2);
     const [firstTab, secondTab] = tabState.tabs;
     expect(firstTab).toBeDefined();
@@ -620,9 +640,17 @@ test("opens notes in multiple tabs and switches between them with keyboard short
 
     await triggerCloseOtherTabsShortcut(glyph.window);
     await expect
-      .poll(async () => (await getTabState(glyph.window)).tabs.map((tab) => tab.title), {
-        timeout: 15_000,
-      })
+      .poll(
+        async () =>
+          (
+            await getTabState(glyph.window, {
+              workspaceRoot: glyph.sandbox.workspaceRoot,
+            })
+          ).tabs.map((tab) => tab.title),
+        {
+          timeout: 15_000,
+        },
+      )
       .toEqual(secondTab?.title ? [secondTab.title] : []);
     await expect(
       glyph.window.getByText(getExpectedBodyForTabTitle(secondTab?.title ?? null)),
@@ -638,9 +666,17 @@ test("opens notes in multiple tabs and switches between them with keyboard short
       new RegExp(escapeRegExp(reopenedTabFileName!), "i"),
     );
     await expect
-      .poll(async () => (await getTabState(glyph.window)).tabs.map((tab) => tab.title), {
-        timeout: 15_000,
-      })
+      .poll(
+        async () =>
+          (
+            await getTabState(glyph.window, {
+              workspaceRoot: glyph.sandbox.workspaceRoot,
+            })
+          ).tabs.map((tab) => tab.title),
+        {
+          timeout: 15_000,
+        },
+      )
       .toEqual(
         [secondTab?.title ?? null, firstTab?.title ?? null].filter((title): title is string =>
           Boolean(title),
@@ -649,15 +685,92 @@ test("opens notes in multiple tabs and switches between them with keyboard short
 
     await selectPaletteItem(glyph.window, "close current tab", /close current tab/i);
     await expect
-      .poll(async () => (await getTabState(glyph.window)).tabs.map((tab) => tab.title), {
-        timeout: 15_000,
-      })
+      .poll(
+        async () =>
+          (
+            await getTabState(glyph.window, {
+              workspaceRoot: glyph.sandbox.workspaceRoot,
+            })
+          ).tabs.map((tab) => tab.title),
+        {
+          timeout: 15_000,
+        },
+      )
       .toEqual(secondTab?.title ? [secondTab.title] : []);
     await expect(
       glyph.window.getByText(getExpectedBodyForTabTitle(secondTab?.title ?? null)),
     ).toBeVisible();
   } finally {
     await glyph.stop(testInfo);
+  }
+});
+
+test("supports last-tab and adjacent tab keyboard shortcuts across long tab rails", async ({}, testInfo) => {
+  const sandbox = await createGlyphSandbox();
+  const generatedTabs = Array.from({ length: 8 }, (_, index) => {
+    const label = String(index + 1).padStart(2, "0");
+    return {
+      label,
+      fileName: `tab-${label}.md`,
+      query: `body ${label}`,
+      titlePattern: new RegExp(`tab-${label}\\.md`, "i"),
+    };
+  });
+
+  await Promise.all(
+    generatedTabs.map((tab) =>
+      fs.writeFile(
+        path.join(sandbox.workspaceRoot, tab.fileName),
+        [`# Tab ${tab.label}`, "", `Body ${tab.label}.`].join("\n"),
+      ),
+    ),
+  );
+
+  const glyph = await launchGlyph(sandbox);
+
+  try {
+    await expectAppShell(glyph.window);
+    await openWorkspace(glyph.window, sandbox.workspaceRoot);
+
+    await selectPaletteItem(glyph.window, "welcome", /welcome\.md/i);
+    await selectPaletteItem(glyph.window, "nested", /nested-note\.md/i);
+
+    for (const tab of generatedTabs) {
+      await selectPaletteItem(glyph.window, tab.query, tab.titlePattern);
+    }
+
+    const tabState = await getTabState(glyph.window, {
+      workspaceRoot: sandbox.workspaceRoot,
+    });
+    expect(tabState.tabs).toHaveLength(10);
+
+    const firstTabTitle = tabState.tabs[0]?.title ?? null;
+    const lastTabTitle = tabState.tabs.at(-1)?.title ?? null;
+    const previousToLastTabTitle = tabState.tabs.at(-2)?.title ?? null;
+    expect(firstTabTitle).toBeTruthy();
+    expect(lastTabTitle).toBeTruthy();
+    expect(previousToLastTabTitle).toBeTruthy();
+
+    await triggerTabSwitchShortcut(glyph.window, 9);
+    await expect(glyph.window.getByText(getExpectedBodyForTabTitle(lastTabTitle))).toBeVisible();
+    await expectTabSelectedByTitle(glyph.window, lastTabTitle);
+
+    await triggerNextTabShortcut(glyph.window);
+    await expect(glyph.window.getByText(getExpectedBodyForTabTitle(firstTabTitle))).toBeVisible();
+    await expectTabSelectedByTitle(glyph.window, firstTabTitle);
+
+    await triggerPreviousTabShortcut(glyph.window);
+    await expect(glyph.window.getByText(getExpectedBodyForTabTitle(lastTabTitle))).toBeVisible();
+    await expectTabSelectedByTitle(glyph.window, lastTabTitle);
+
+    await triggerPreviousTabShortcut(glyph.window);
+    await expect(
+      glyph.window.getByText(getExpectedBodyForTabTitle(previousToLastTabTitle)),
+    ).toBeVisible();
+    await expectTabSelectedByTitle(glyph.window, previousToLastTabTitle);
+  } finally {
+    await glyph.stop(testInfo);
+    await sandbox.cleanup();
   }
 });
 
@@ -686,9 +799,11 @@ test("creates and closes tabs from shortcuts and restores tab sessions after rel
     await firstRun.window.keyboard.press(`${modKey}+W`);
     await expect(firstRun.window.getByRole("tab", { name: /Untitled-/ })).toBeHidden();
 
-    await selectPaletteItem(firstRun.window, "nested-note", /nested-note/i);
+    await selectPaletteItem(firstRun.window, "nested", /nested-note/i);
     await expect(firstRun.window.getByText("Nested note body.")).toBeVisible();
-    const tabStateBeforeReorder = await getTabState(firstRun.window);
+    const tabStateBeforeReorder = await getTabState(firstRun.window, {
+      workspaceRoot: sandbox.workspaceRoot,
+    });
     const tabTitlesBeforeReorder = tabStateBeforeReorder.tabs
       .map((tab) => tab.title)
       .filter((title): title is string => Boolean(title));
@@ -702,9 +817,17 @@ test("creates and closes tabs from shortcuts and restores tab sessions after rel
     expect(activeRestoredTitle).toBeTruthy();
 
     await expect
-      .poll(async () => (await getTabState(firstRun.window)).tabs.map((tab) => tab.title), {
-        timeout: 15_000,
-      })
+      .poll(
+        async () =>
+          (
+            await getTabState(firstRun.window, {
+              workspaceRoot: sandbox.workspaceRoot,
+            })
+          ).tabs.map((tab) => tab.title),
+        {
+          timeout: 15_000,
+        },
+      )
       .toEqual(reorderedTabTitles);
 
     await expect
@@ -719,7 +842,11 @@ test("creates and closes tabs from shortcuts and restores tab sessions after rel
     ).toBeVisible();
     const activeTitleAfterShortcut = reorderedTabTitles[0] ?? null;
 
-    const persistedTabPaths = (await getTabState(firstRun.window)).tabs
+    const persistedTabPaths = (
+      await getTabState(firstRun.window, {
+        workspaceRoot: sandbox.workspaceRoot,
+      })
+    ).tabs
       .map((tab) => tab.title)
       .filter((title): title is string => Boolean(title));
 
@@ -739,9 +866,17 @@ test("creates and closes tabs from shortcuts and restores tab sessions after rel
     secondRun = await launchGlyph(sandbox);
     await expectAppShell(secondRun.window);
     await expect
-      .poll(async () => (await getTabState(secondRun.window)).tabs.map((tab) => tab.title), {
-        timeout: 15_000,
-      })
+      .poll(
+        async () =>
+          (
+            await getTabState(secondRun.window, {
+              workspaceRoot: sandbox.workspaceRoot,
+            })
+          ).tabs.map((tab) => tab.title),
+        {
+          timeout: 15_000,
+        },
+      )
       .toEqual(persistedTabPaths);
     await expect(secondRun.window.getByRole("tab", { name: /welcome/i })).toBeVisible();
     await expect(secondRun.window.getByRole("tab", { name: /nested-note/i })).toBeVisible();

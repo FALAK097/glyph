@@ -70,12 +70,80 @@ export function getPrimaryShortcutPrefix(platform?: string): string {
     : MODIFIER_TOKENS.ctrl;
 }
 
-export function getDirectTabShortcutDisplay(index: number, platform?: string): string | undefined {
-  if (index < 0 || index > 8) {
+export const MAX_DIRECT_NOTE_TAB_SHORTCUTS = 9;
+
+export function getDirectTabShortcutDisplay(
+  index: number,
+  totalTabs: number,
+  platform?: string,
+): string | undefined {
+  if (index < 0 || totalTabs <= 0) {
     return undefined;
   }
 
-  return `${getPrimaryShortcutPrefix(platform)}${index + 1}`;
+  if (totalTabs <= MAX_DIRECT_NOTE_TAB_SHORTCUTS) {
+    if (index >= totalTabs) {
+      return undefined;
+    }
+
+    return `${getPrimaryShortcutPrefix(platform)}${index + 1}`;
+  }
+
+  if (index < MAX_DIRECT_NOTE_TAB_SHORTCUTS - 1) {
+    return `${getPrimaryShortcutPrefix(platform)}${index + 1}`;
+  }
+
+  if (index === totalTabs - 1) {
+    return `${getPrimaryShortcutPrefix(platform)}${MAX_DIRECT_NOTE_TAB_SHORTCUTS}`;
+  }
+
+  return undefined;
+}
+
+export function getDirectTabTargetIndex(requestedIndex: number, totalTabs: number): number | null {
+  if (requestedIndex < 0 || totalTabs <= 0) {
+    return null;
+  }
+
+  if (totalTabs <= MAX_DIRECT_NOTE_TAB_SHORTCUTS) {
+    return requestedIndex < totalTabs ? requestedIndex : null;
+  }
+
+  if (requestedIndex < MAX_DIRECT_NOTE_TAB_SHORTCUTS - 1) {
+    return requestedIndex;
+  }
+
+  return requestedIndex === MAX_DIRECT_NOTE_TAB_SHORTCUTS - 1 ? totalTabs - 1 : null;
+}
+
+export function getAdjacentTabShortcutDisplay(
+  direction: "next" | "previous",
+  platform?: string,
+): string {
+  const normalizedPlatform = platform?.toLowerCase() ?? "";
+  const isMacPlatform = normalizedPlatform.includes("mac") || normalizedPlatform === "darwin";
+
+  if (isMacPlatform) {
+    return direction === "next" ? "⇧⌘]" : "⇧⌘[";
+  }
+
+  return direction === "next" ? "Ctrl+Tab" : "Ctrl+Shift+Tab";
+}
+
+export function matchAdjacentTabShortcut(
+  event: ShortcutEventLike,
+  direction: "next" | "previous",
+  platform?: string,
+): boolean {
+  const normalizedPlatform = platform?.toLowerCase() ?? "";
+  const isMacPlatform = normalizedPlatform.includes("mac") || normalizedPlatform === "darwin";
+
+  return matchShortcut(
+    event,
+    isMacPlatform
+      ? `⇧ ⌘ ${direction === "next" ? "]" : "["}`
+      : `${direction === "next" ? "⌘ Tab" : "⇧ ⌘ Tab"}`,
+  );
 }
 
 const MODIFIER_TOKENS_SET = new Set(Object.values(MODIFIER_TOKENS));

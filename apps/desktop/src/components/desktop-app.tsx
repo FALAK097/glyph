@@ -749,6 +749,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       "new-note",
       "close-tab",
       "close-other-tabs",
+      "previous-tab",
+      "next-tab",
       "pin-note",
       "toggle-focus-mode",
     ]);

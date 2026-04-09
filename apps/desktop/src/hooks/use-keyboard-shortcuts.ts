@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { matchShortcut } from "@/shared/shortcuts";
+import { matchAdjacentTabShortcut, matchShortcut } from "@/shared/shortcuts";
 import type { FileDocument, ShortcutSetting, WorkspaceSnapshot } from "@/shared/workspace";
 
 type UseKeyboardShortcutsOptions = {
@@ -13,6 +13,8 @@ type UseKeyboardShortcutsOptions = {
   closeActiveTab: () => Promise<void>;
   closeOtherTabs: () => Promise<void>;
   activateTabByIndex: (index: number) => Promise<void>;
+  activateNextTab: () => Promise<void>;
+  activatePreviousTab: () => Promise<void>;
   syncOpenedFile: (file: FileDocument, options?: { recordHistory?: boolean }) => Promise<void>;
   syncWorkspace: (workspace: WorkspaceSnapshot) => void;
   setIsWorkspaceMode: React.Dispatch<React.SetStateAction<boolean>>;
@@ -37,6 +39,8 @@ export function useKeyboardShortcuts({
   closeActiveTab,
   closeOtherTabs,
   activateTabByIndex,
+  activateNextTab,
+  activatePreviousTab,
   syncOpenedFile,
   syncWorkspace,
   setIsWorkspaceMode,
@@ -87,6 +91,27 @@ export function useKeyboardShortcuts({
       ) {
         event.preventDefault();
         void activateTabByIndex(Number(event.key) - 1);
+        return;
+      }
+
+      const currentPlatform = typeof navigator === "undefined" ? undefined : navigator.platform;
+      if (
+        !hasConfiguredShortcutMatch &&
+        !event.altKey &&
+        matchAdjacentTabShortcut(event, "previous", currentPlatform)
+      ) {
+        event.preventDefault();
+        void activatePreviousTab();
+        return;
+      }
+
+      if (
+        !hasConfiguredShortcutMatch &&
+        !event.altKey &&
+        matchAdjacentTabShortcut(event, "next", currentPlatform)
+      ) {
+        event.preventDefault();
+        void activateNextTab();
         return;
       }
 
@@ -212,6 +237,8 @@ export function useKeyboardShortcuts({
     closeActiveTab,
     closeOtherTabs,
     activateTabByIndex,
+    activateNextTab,
+    activatePreviousTab,
     syncOpenedFile,
     syncWorkspace,
     setIsWorkspaceMode,

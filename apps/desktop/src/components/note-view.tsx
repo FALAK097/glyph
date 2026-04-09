@@ -113,6 +113,7 @@ export function NoteView({
         path: tab.file.path,
         shortcutLabel: getDirectTabShortcutDisplay(
           index,
+          noteTabs.length,
           typeof navigator === "undefined" ? undefined : navigator.platform,
         ),
       })),

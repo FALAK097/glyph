@@ -2,7 +2,12 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import type { BreadcrumbItem, OutlineItem } from "@/types/navigation";
 
-import { getDirectTabShortcutDisplay, getShortcutDisplay } from "@/shared/shortcuts";
+import {
+  getAdjacentTabShortcutDisplay,
+  getDirectTabShortcutDisplay,
+  getDirectTabTargetIndex,
+  getShortcutDisplay,
+} from "@/shared/shortcuts";
 import type { DirectoryNode, FileDocument, TabMovePosition } from "@/shared/workspace";
 import { useSessionStore } from "@/store/session";
 import { useWorkspaceStore } from "@/store/workspace";
@@ -511,7 +516,12 @@ export const useDesktopAppController = (
 
   const activateTabByIndex = useCallback(
     async (index: number) => {
-      const targetTab = noteTabs[index];
+      const targetIndex = getDirectTabTargetIndex(index, noteTabs.length);
+      if (targetIndex === null) {
+        return;
+      }
+
+      const targetTab = noteTabs[targetIndex];
       if (!targetTab) {
         return;
       }
@@ -519,6 +529,28 @@ export const useDesktopAppController = (
       await activateNoteTab(targetTab.file.path, { recordHistory: true });
     },
     [activateNoteTab, noteTabs],
+  );
+
+  const activateAdjacentNoteTab = useCallback(
+    async (direction: -1 | 1) => {
+      if (noteTabs.length <= 1 || !activeTabId) {
+        return;
+      }
+
+      const currentIndex = noteTabs.findIndex((tab) => tab.id === activeTabId);
+      if (currentIndex < 0) {
+        return;
+      }
+
+      const targetIndex = (currentIndex + direction + noteTabs.length) % noteTabs.length;
+      const targetTab = noteTabs[targetIndex];
+      if (!targetTab) {
+        return;
+      }
+
+      await activateNoteTab(targetTab.file.path, { recordHistory: true });
+    },
+    [activateNoteTab, activeTabId, noteTabs],
   );
 
   const openFile = useCallback(
@@ -1242,6 +1274,34 @@ export const useDesktopAppController = (
           setIsPaletteOpen(false);
         },
       },
+      ...(noteTabs.length > 1
+        ? [
+            {
+              id: "previous-tab",
+              title: "Previous Tab",
+              subtitle: "Move to the previous open note tab",
+              shortcut: getAdjacentTabShortcutDisplay("previous", appInfo?.platform),
+              section: "Tabs",
+              kind: "command" as const,
+              onSelect: () => {
+                void activateAdjacentNoteTab(-1);
+                setIsPaletteOpen(false);
+              },
+            },
+            {
+              id: "next-tab",
+              title: "Next Tab",
+              subtitle: "Move to the next open note tab",
+              shortcut: getAdjacentTabShortcutDisplay("next", appInfo?.platform),
+              section: "Tabs",
+              kind: "command" as const,
+              onSelect: () => {
+                void activateAdjacentNoteTab(1);
+                setIsPaletteOpen(false);
+              },
+            },
+          ]
+        : []),
       ...(activeFile
         ? [
             {
@@ -1359,7 +1419,7 @@ export const useDesktopAppController = (
           ? `${tab.file.name} (current)`
           : tab.file.name,
         subtitle: getRelativePath(tab.file.path, rootPath),
-        shortcut: getDirectTabShortcutDisplay(index, appInfo?.platform),
+        shortcut: getDirectTabShortcutDisplay(index, noteTabs.length, appInfo?.platform),
         section: "Open Tabs",
         kind: "command" as const,
         onSelect: () => {
@@ -1369,6 +1429,7 @@ export const useDesktopAppController = (
     ],
     [
       activeFile,
+      activateAdjacentNoteTab,
       activateNoteTab,
       appInfo?.platform,
       closeNoteTab,
@@ -1454,6 +1515,12 @@ export const useDesktopAppController = (
       await closeOtherNoteTabs(currentActiveTab.file.path);
     },
     activateTabByIndex,
+    activateNextTab: async () => {
+      await activateAdjacentNoteTab(1);
+    },
+    activatePreviousTab: async () => {
+      await activateAdjacentNoteTab(-1);
+    },
     syncOpenedFile,
     syncWorkspace,
     setIsWorkspaceMode,
@@ -1860,6 +1927,16 @@ export const useDesktopAppController = (
         return;
       }
 
+      if (command === "next-tab") {
+        await activateAdjacentNoteTab(1);
+        return;
+      }
+
+      if (command === "previous-tab") {
+        await activateAdjacentNoteTab(-1);
+        return;
+      }
+
       if (command === "open-file") {
         const file = await glyph.openDocument();
         if (file) {
@@ -1899,6 +1976,7 @@ export const useDesktopAppController = (
   }, [
     activeFile,
     closeNoteTab,
+    activateAdjacentNoteTab,
     createNote,
     draftContent,
     getActiveTab,

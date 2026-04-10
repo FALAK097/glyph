@@ -5,7 +5,7 @@ import { getDirectTabShortcutDisplay, getShortcutDisplay } from "@/shared/shortc
 import type { NoteTab, ShortcutSetting, TabMovePosition } from "@/shared/workspace";
 import type { OutlineItem } from "@/types/navigation";
 import type { UpdateState } from "@/shared/workspace";
-import type { EditorFocusRequest } from "@/types/markdown-editor";
+import type { EditorFindRequest, EditorFocusRequest } from "@/types/markdown-editor";
 
 import { MarkdownEditor } from "./markdown-editor";
 import { NoteTabsBar } from "./note-tabs-bar";
@@ -15,6 +15,7 @@ type NoteViewProps = {
   fileName: string | null;
   filePath: string | null;
   editorFocusRequest: EditorFocusRequest | null;
+  findRequest: EditorFindRequest | null;
   initialScrollTop: number;
   saveStateLabel: string;
   footerMetaLabel: string;
@@ -59,6 +60,7 @@ export function NoteView({
   fileName,
   filePath,
   editorFocusRequest,
+  findRequest,
   initialScrollTop,
   saveStateLabel,
   footerMetaLabel,
@@ -126,6 +128,7 @@ export function NoteView({
       fileName={fileName}
       filePath={filePath}
       editorFocusRequest={editorFocusRequest}
+      findRequest={findRequest}
       initialScrollTop={initialScrollTop}
       saveStateLabel={saveStateLabel}
       footerMetaLabel={footerMetaLabel}

@@ -60,6 +60,13 @@ export type ResolvedLinkTarget = {
   target: string;
 };
 
+export type NoteLinkPreview = {
+  targetPath: string;
+  title: string;
+  excerpt: string;
+  displayPath: string;
+};
+
 export type SearchResult = {
   path: string;
   name: string;
@@ -145,6 +152,7 @@ export type AppCommand =
   | "previous-tab"
   | "search"
   | "quick-open"
+  | "find-in-note"
   | "toggle-sidebar"
   | "focus-mode";
 

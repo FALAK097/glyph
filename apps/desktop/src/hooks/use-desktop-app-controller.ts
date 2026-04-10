@@ -151,6 +151,9 @@ export const useDesktopAppController = (
     mode: "start" | "end" | "preserve";
     nonce: number;
   } | null>(null);
+  const [findRequest, setFindRequest] = useState<{
+    nonce: number;
+  } | null>(null);
   const [hasBooted, setHasBooted] = useState(false);
   const [outlineJumpRequest, setOutlineJumpRequest] = useState<{
     id: string;
@@ -244,6 +247,18 @@ export const useDesktopAppController = (
       });
     });
   }, []);
+
+  const requestFindInNote = useCallback(() => {
+    if (!activeFile) {
+      return;
+    }
+
+    setIsPaletteOpen(false);
+    setIsSettingsOpen(false);
+    setFindRequest({
+      nonce: Date.now(),
+    });
+  }, [activeFile, setIsPaletteOpen, setIsSettingsOpen]);
 
   const syncTrackedPaths = useCallback(
     async (oldPath: string, nextPath?: string) => {
@@ -1526,6 +1541,7 @@ export const useDesktopAppController = (
     setIsWorkspaceMode,
     navigateBack,
     navigateForward,
+    requestFindInNote,
     triggerUpdateAction,
     isPaletteOpen,
     isSettingsOpen,
@@ -1897,6 +1913,11 @@ export const useDesktopAppController = (
         return;
       }
 
+      if (command === "find-in-note") {
+        requestFindInNote();
+        return;
+      }
+
       if (command === "toggle-sidebar") {
         setIsSidebarCollapsed((prev) => !prev);
         return;
@@ -1985,6 +2006,7 @@ export const useDesktopAppController = (
     syncOpenedFile,
     syncWorkspace,
     glyph,
+    requestFindInNote,
     toggleFocusMode,
     triggerUpdateAction,
     setIsPaletteOpen,
@@ -2008,6 +2030,7 @@ export const useDesktopAppController = (
     createFolder,
     draftContent,
     editorFocusRequest,
+    findRequest,
     error,
     files,
     folderRevealLabel,
@@ -2040,6 +2063,7 @@ export const useDesktopAppController = (
     pinnedNotes,
     readingTime,
     revealInFinder,
+    requestFindInNote,
     requestOutlineJump,
     saveSettings,
     saveStateLabel,

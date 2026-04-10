@@ -9,6 +9,7 @@ import type {
   UpdateState,
   FileDocument,
   FileOpenResult,
+  NoteLinkPreview,
   ResolvedLinkTarget,
   SearchResult,
   WorkspaceChangeEvent,
@@ -58,6 +59,13 @@ const api = {
       currentFilePath,
       href,
     ) as Promise<ResolvedLinkTarget | null>;
+  },
+  getLinkPreview(currentFilePath: string | null, href: string) {
+    return ipcRenderer.invoke(
+      "app:getLinkPreview",
+      currentFilePath,
+      href,
+    ) as Promise<NoteLinkPreview | null>;
   },
   openFolder(dirPath?: string) {
     return invokeWithRetry<WorkspaceSnapshot | null>("workspace:openFolder", dirPath);

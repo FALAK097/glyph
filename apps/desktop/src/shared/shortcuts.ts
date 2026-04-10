@@ -2,6 +2,7 @@ import type { ShortcutSetting } from "./workspace.js";
 
 export type ShortcutId =
   | "command-palette"
+  | "find-in-note"
   | "new-note"
   | "new-folder"
   | "close-tab"
@@ -37,30 +38,51 @@ export type ShortcutEventLike = {
   repeat?: boolean;
 };
 
-export const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
-  // App shortcuts (fire globally, even from inside the editor)
-  { id: "command-palette", label: "Command Palette", keys: "⌘ P" },
-  { id: "new-note", label: "New Note", keys: "⌘ N" },
-  { id: "new-folder", label: "New Folder", keys: "⇧ ⌘ N" },
-  { id: "close-tab", label: "Close Tab", keys: "⌘ W" },
-  { id: "close-other-tabs", label: "Close Other Tabs", keys: "⇧ ⌘ W" },
-  { id: "open-file", label: "Open File", keys: "⌘ O" },
-  { id: "open-folder", label: "Open Folder", keys: "⇧ ⌘ O" },
-  { id: "check-updates", label: "Update Action", keys: "⇧ ⌘ U" },
-  { id: "save", label: "Save", keys: "⌘ S" },
-  { id: "settings", label: "Settings", keys: "⌘ ," },
-  { id: "toggle-sidebar", label: "Toggle Sidebar", keys: "⌘ \\" },
-  { id: "navigate-back", label: "Navigate Back", keys: "⌘ [" },
-  { id: "navigate-forward", label: "Navigate Forward", keys: "⌘ ]" },
-  { id: "focus-mode", label: "Toggle Focus Mode", keys: "⇧ ⌘ F" },
-];
-
 export const MODIFIER_TOKENS = {
   cmdOrCtrl: "⌘",
   ctrl: "Ctrl+",
   alt: "⌥",
   shift: "⇧",
 } as const;
+
+export const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
+  // App shortcuts (fire globally, even from inside the editor)
+  { id: "command-palette", label: "Command Palette", keys: `${MODIFIER_TOKENS.cmdOrCtrl} P` },
+  { id: "find-in-note", label: "Find in Note", keys: `${MODIFIER_TOKENS.cmdOrCtrl} F` },
+  { id: "new-note", label: "New Note", keys: `${MODIFIER_TOKENS.cmdOrCtrl} N` },
+  {
+    id: "new-folder",
+    label: "New Folder",
+    keys: `${MODIFIER_TOKENS.shift} ${MODIFIER_TOKENS.cmdOrCtrl} N`,
+  },
+  { id: "close-tab", label: "Close Tab", keys: `${MODIFIER_TOKENS.cmdOrCtrl} W` },
+  {
+    id: "close-other-tabs",
+    label: "Close Other Tabs",
+    keys: `${MODIFIER_TOKENS.shift} ${MODIFIER_TOKENS.cmdOrCtrl} W`,
+  },
+  { id: "open-file", label: "Open File", keys: `${MODIFIER_TOKENS.cmdOrCtrl} O` },
+  {
+    id: "open-folder",
+    label: "Open Folder",
+    keys: `${MODIFIER_TOKENS.shift} ${MODIFIER_TOKENS.cmdOrCtrl} O`,
+  },
+  {
+    id: "check-updates",
+    label: "Update Action",
+    keys: `${MODIFIER_TOKENS.shift} ${MODIFIER_TOKENS.cmdOrCtrl} U`,
+  },
+  { id: "save", label: "Save", keys: `${MODIFIER_TOKENS.cmdOrCtrl} S` },
+  { id: "settings", label: "Settings", keys: `${MODIFIER_TOKENS.cmdOrCtrl} ,` },
+  { id: "toggle-sidebar", label: "Toggle Sidebar", keys: `${MODIFIER_TOKENS.cmdOrCtrl} \\` },
+  { id: "navigate-back", label: "Navigate Back", keys: `${MODIFIER_TOKENS.cmdOrCtrl} [` },
+  { id: "navigate-forward", label: "Navigate Forward", keys: `${MODIFIER_TOKENS.cmdOrCtrl} ]` },
+  {
+    id: "focus-mode",
+    label: "Toggle Focus Mode",
+    keys: `${MODIFIER_TOKENS.shift} ${MODIFIER_TOKENS.cmdOrCtrl} F`,
+  },
+];
 
 export function getPrimaryShortcutPrefix(platform?: string): string {
   const normalizedPlatform = platform?.toLowerCase() ?? "";

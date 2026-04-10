@@ -41,6 +41,7 @@ async function createGlyphSandbox(): Promise<GlyphSandbox> {
   const workspaceRoot = path.join(sandboxRoot, "workspace");
   const userDataRoot = path.join(sandboxRoot, "user-data");
   const welcomeNotePath = path.join(workspaceRoot, "welcome.md");
+  const findSamplePath = path.join(workspaceRoot, "find-sample.md");
   const nestedNotePath = path.join(workspaceRoot, "notes", "nested-note.md");
 
   await fs.mkdir(path.join(workspaceRoot, "notes"), { recursive: true });
@@ -48,7 +49,23 @@ async function createGlyphSandbox(): Promise<GlyphSandbox> {
 
   await fs.writeFile(
     welcomeNotePath,
-    ["# Welcome to Glyph", "", "Smoke test note content."].join("\n"),
+    [
+      "# Welcome to Glyph",
+      "",
+      "Smoke test note content.",
+      "",
+      "Preview the [Nested Note](notes/nested-note.md).",
+    ].join("\n"),
+  );
+  await fs.writeFile(
+    findSamplePath,
+    [
+      "# Find Sample",
+      "",
+      "Needle line one.",
+      "Needle line two.",
+      "Another needle appears here.",
+    ].join("\n"),
   );
   await fs.writeFile(nestedNotePath, ["# Nested Note", "", "Nested note body."].join("\n"));
 
@@ -593,6 +610,71 @@ test("new note is editable and content persists after save", async ({}, testInfo
 
     // The note should remain open and content should still be visible
     await expect(glyph.window.getByText("My Test Content")).toBeVisible();
+  } finally {
+    await glyph.stop(testInfo);
+  }
+});
+
+test("find in note highlights matches and cycles through them from the keyboard", async ({}, testInfo) => {
+  const glyph = await launchGlyph();
+  try {
+    await expectAppShell(glyph.window);
+    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
+
+    await selectPaletteItem(glyph.window, "find sample", /find-sample\.md/i);
+    await expect(glyph.window.getByText("Needle line one.")).toBeVisible();
+
+    await glyph.window.keyboard.press(`${modKey}+F`);
+    const findInput = glyph.window.getByLabel("Find in current note");
+    const findResults = glyph.window.getByLabel("Find results");
+
+    await expect(findInput).toBeVisible();
+    await findInput.fill("needle");
+
+    await expect(findResults).toHaveText("1/3");
+    await expect(glyph.window.locator(".glyph-find-match")).toHaveCount(3);
+    await expect(glyph.window.locator(".glyph-find-match-active")).toHaveCount(1);
+
+    await glyph.window.keyboard.press("Enter");
+    await expect(findResults).toHaveText("2/3");
+
+    await glyph.window.keyboard.press("Shift+Enter");
+    await expect(findResults).toHaveText("1/3");
+
+    await glyph.window.keyboard.press("Escape");
+    await expect(findInput).toBeHidden();
+    await expect
+      .poll(async () =>
+        glyph.window.evaluate(() => {
+          const activeElement = document.activeElement;
+          return Boolean(activeElement?.closest('[data-glyph-editor="true"]'));
+        }),
+      )
+      .toBe(true);
+  } finally {
+    await glyph.stop(testInfo);
+  }
+});
+
+test("hovering a markdown note link shows a local note preview", async ({}, testInfo) => {
+  const glyph = await launchGlyph();
+  try {
+    await expectAppShell(glyph.window);
+    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
+
+    await selectPaletteItem(glyph.window, "welcome", /welcome\.md/i);
+    const nestedLink = glyph.window
+      .locator('[data-glyph-editor="true"] a')
+      .filter({ hasText: "Nested Note" })
+      .first();
+    await expect(nestedLink).toBeVisible();
+
+    await nestedLink.hover();
+
+    const previewCard = glyph.window.getByLabel("Note link preview");
+    await expect(previewCard).toBeVisible();
+    await expect(previewCard.getByText("Nested Note", { exact: true })).toBeVisible();
+    await expect(previewCard.getByText("Nested note body.")).toBeVisible();
   } finally {
     await glyph.stop(testInfo);
   }

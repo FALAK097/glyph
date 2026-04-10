@@ -8,6 +8,10 @@ export type EditorFocusRequest = {
   nonce: number;
 };
 
+export type EditorFindRequest = {
+  nonce: number;
+};
+
 export type MarkdownEditorProps = {
   content: string;
   fileName: string | null;
@@ -16,6 +20,7 @@ export type MarkdownEditorProps = {
   initialScrollTop?: number | null;
   scrollRestorationKey?: string | null;
   editorFocusRequest?: EditorFocusRequest | null;
+  findRequest?: EditorFindRequest | null;
   workspaceRootPath?: string | null;
   saveStateLabel: string;
   footerMetaLabel?: string;

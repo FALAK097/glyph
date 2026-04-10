@@ -631,15 +631,15 @@ test("find in note highlights matches and cycles through them from the keyboard"
     await expect(findInput).toBeVisible();
     await findInput.fill("needle");
 
-    await expect(findResults).toHaveText("1 of 3");
+    await expect(findResults).toHaveText("1/3");
     await expect(glyph.window.locator(".glyph-find-match")).toHaveCount(3);
     await expect(glyph.window.locator(".glyph-find-match-active")).toHaveCount(1);
 
     await glyph.window.keyboard.press("Enter");
-    await expect(findResults).toHaveText("2 of 3");
+    await expect(findResults).toHaveText("2/3");
 
     await glyph.window.keyboard.press("Shift+Enter");
-    await expect(findResults).toHaveText("1 of 3");
+    await expect(findResults).toHaveText("1/3");
 
     await glyph.window.keyboard.press("Escape");
     await expect(findInput).toBeHidden();

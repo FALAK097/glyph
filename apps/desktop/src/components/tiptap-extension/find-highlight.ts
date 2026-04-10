@@ -43,26 +43,49 @@ function collectFindHighlightMatches(doc: ProseMirrorNode, query: string): FindH
 
   const matches: FindHighlightMatch[] = [];
 
+  // Walk block-level nodes that contain inline content (paragraphs, headings,
+  // etc.). For each block we flatten all child text nodes into a single
+  // lowercase string and build a parallel position map so that matches
+  // spanning adjacent text nodes (e.g. across bold/italic marks) are found.
   doc.descendants((node, pos) => {
-    if (!node.isText || !node.text) {
-      return;
+    if (!node.isBlock || !node.inlineContent) {
+      return; // keep descending into container blocks
     }
 
-    const text = node.text.toLowerCase();
+    let flatText = "";
+    const positionMap: number[] = [];
+
+    node.forEach((child, offset) => {
+      if (child.isText && child.text) {
+        const basePos = pos + 1 + offset;
+        for (let i = 0; i < child.text.length; i++) {
+          positionMap.push(basePos + i);
+        }
+        flatText += child.text.toLowerCase();
+      } else {
+        // Non-text inline node (image, hard break) — sentinel prevents
+        // false matches across non-text boundaries.
+        flatText += "\n";
+        positionMap.push(-1);
+      }
+    });
+
     let fromIndex = 0;
 
-    while (fromIndex <= text.length - normalizedQuery.length) {
-      const matchIndex = text.indexOf(normalizedQuery, fromIndex);
+    while (fromIndex <= flatText.length - normalizedQuery.length) {
+      const matchIndex = flatText.indexOf(normalizedQuery, fromIndex);
       if (matchIndex === -1) {
         break;
       }
 
-      const from = pos + matchIndex;
-      const to = from + normalizedQuery.length;
+      const from = positionMap[matchIndex];
+      const to = positionMap[matchIndex + normalizedQuery.length - 1] + 1;
 
       matches.push({ from, to });
       fromIndex = matchIndex + Math.max(normalizedQuery.length, 1);
     }
+
+    return false; // already processed inline children via node.forEach
   });
 
   return matches;

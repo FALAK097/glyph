@@ -24,6 +24,7 @@ import type {
   DialogKind,
   DirectoryNode,
   FileOpenResult,
+  NoteLinkPreview,
   ResolvedLinkTarget,
   SearchResult,
   UpdateState,
@@ -55,6 +56,8 @@ const STARTUP_LIGHT_BACKGROUND = "#f8f7fb";
 const STARTUP_DARK_BACKGROUND = "#1f1b26";
 const GITHUB_RELEASES_URL = "https://github.com/FALAK097/glyph/releases";
 const GITHUB_LATEST_RELEASE_API_URL = "https://api.github.com/repos/FALAK097/glyph/releases/latest";
+const MARKDOWN_PREVIEW_SUFFIX_PATTERN = /\.(md|mdx|markdown)$/i;
+const MARKDOWN_HEADING_PATTERN = /^#{1,6}\s+(.*)$/;
 
 type PersistedUpdateState = {
   stagedVersion: string | null;
@@ -810,6 +813,113 @@ async function resolveLinkTarget(
   };
 }
 
+function stripMarkdownPreviewSyntax(value: string) {
+  return value
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/\[\[([^[\]|]+)(?:\|([^[\]]+))?\]\]/g, (_match, target: string, label?: string) =>
+      (label ?? target).trim(),
+    )
+    .replace(/^#{1,6}\s+/, "")
+    .replace(/^\s*[-*+]\s+\[[xX ]\]\s+/, "")
+    .replace(/^\s*[-*+]\s+/, "")
+    .replace(/^\s*\d+\.\s+/, "")
+    .replace(/`{1,3}([^`]+)`{1,3}/g, "$1")
+    .trim();
+}
+
+function deriveWorkspaceRootForPath(targetPath: string): string | null {
+  // Use the active workspace root if the target is inside it.
+  if (activeWorkspaceRoot) {
+    const rel = path.relative(activeWorkspaceRoot, targetPath);
+    if (!rel.startsWith("..") && !path.isAbsolute(rel)) {
+      return activeWorkspaceRoot;
+    }
+  }
+
+  return null;
+}
+
+function buildNoteLinkPreview(
+  document: {
+    content: string;
+    name: string;
+    path: string;
+  },
+  workspaceRoot?: string | null,
+): NoteLinkPreview {
+  const lines = document.content.split("\n");
+  const fallbackTitle = document.name.replace(MARKDOWN_PREVIEW_SUFFIX_PATTERN, "");
+  let title = fallbackTitle;
+  let inCodeFence = false;
+  const excerptLines: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    if (/^(```|~~~)/.test(trimmed)) {
+      inCodeFence = !inCodeFence;
+      continue;
+    }
+
+    if (inCodeFence) {
+      continue;
+    }
+
+    const headingMatch = trimmed.match(MARKDOWN_HEADING_PATTERN);
+    if (headingMatch && title === fallbackTitle) {
+      const headingTitle = stripMarkdownPreviewSyntax(headingMatch[1] ?? "");
+      if (headingTitle) {
+        title = headingTitle;
+        continue;
+      }
+    }
+
+    const previewLine = stripMarkdownPreviewSyntax(trimmed);
+    if (!previewLine) {
+      continue;
+    }
+
+    excerptLines.push(previewLine);
+    if (excerptLines.length >= 3) {
+      break;
+    }
+  }
+
+  const effectiveRoot = workspaceRoot ?? deriveWorkspaceRootForPath(document.path);
+  const relativePath = effectiveRoot ? path.relative(effectiveRoot, document.path) : null;
+  const displayPath =
+    relativePath && !relativePath.startsWith("..") && !path.isAbsolute(relativePath)
+      ? relativePath.replace(/\\/g, "/")
+      : document.name;
+
+  return {
+    targetPath: document.path,
+    title,
+    excerpt: excerptLines.join(" ").slice(0, 220),
+    displayPath: displayPath || document.name,
+  };
+}
+
+async function getLinkPreview(
+  currentFilePath: string | null,
+  href: string,
+): Promise<NoteLinkPreview | null> {
+  const resolved = await resolveLinkTarget(currentFilePath, href);
+  if (!resolved || resolved.kind !== "markdown-file") {
+    return null;
+  }
+
+  const workspaceRoot = currentFilePath
+    ? deriveWorkspaceRootForPath(currentFilePath)
+    : activeWorkspaceRoot;
+  const document = await readMarkdownFile(resolved.target);
+  return buildNoteLinkPreview(document, workspaceRoot);
+}
+
 function getDefaultSettings(): AppSettings {
   return {
     defaultWorkspacePath: getDefaultWorkspacePath(),
@@ -996,6 +1106,13 @@ function buildApplicationMenu(shortcuts: AppSettings["shortcuts"]) {
         { role: "copy" },
         { role: "paste" },
         { role: "selectAll" },
+        { type: "separator" },
+        {
+          label: "Find in Note",
+          accelerator: getAccelerator("find-in-note"),
+          click: () =>
+            mainWindow?.webContents.send("app:command", "find-in-note" satisfies AppCommand),
+        },
       ],
     },
     {
@@ -1639,6 +1756,20 @@ ipcMain.handle(
   async (_event, currentFilePath: string | null, href: string) =>
     resolveLinkTarget(currentFilePath, href),
 );
+
+ipcMain.handle("app:getLinkPreview", async (_event, currentFilePath: unknown, href: unknown) => {
+  const normalizedFilePath =
+    typeof currentFilePath === "string" && currentFilePath.trim().length > 0
+      ? path.normalize(currentFilePath)
+      : null;
+  const normalizedHref = typeof href === "string" ? href.trim() : "";
+
+  if (!normalizedHref) {
+    return null;
+  }
+
+  return getLinkPreview(normalizedFilePath, normalizedHref);
+});
 
 ipcMain.handle("workspace:openFolder", async (_event, dirPath?: string) => {
   let resolvedPath = dirPath;

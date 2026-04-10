@@ -9,6 +9,7 @@ import type {
   UpdateState,
   FileDocument,
   FileOpenResult,
+  NoteLinkPreview,
   ResolvedLinkTarget,
   SearchResult,
   WorkspaceChangeEvent,
@@ -26,6 +27,10 @@ declare global {
         currentFilePath: string | null,
         href: string,
       ) => Promise<ResolvedLinkTarget | null>;
+      getLinkPreview: (
+        currentFilePath: string | null,
+        href: string,
+      ) => Promise<NoteLinkPreview | null>;
       openFolder: (dirPath?: string) => Promise<WorkspaceSnapshot | null>;
       openDefaultWorkspace: () => Promise<WorkspaceSnapshot | null>;
       openDocument: () => Promise<FileDocument | null>;

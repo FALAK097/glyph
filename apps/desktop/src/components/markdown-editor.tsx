@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
@@ -19,6 +19,12 @@ import { createHeadingId } from "@/lib/note-navigation";
 import { getFolderRevealLabel } from "@/lib/platform";
 
 import { CustomCodeBlockLowlight } from "./tiptap-extension/code-block-lowlight";
+import {
+  FindHighlightExtension,
+  getFindHighlightState,
+  setActiveFindHighlightMatch,
+  setFindHighlightQuery,
+} from "./tiptap-extension/find-highlight";
 import { MarkdownShortcuts } from "./tiptap-extension/markdown-shortcuts";
 
 import { Button } from "@/components/ui/button";
@@ -29,14 +35,15 @@ import { EditorDialogs } from "./editor-dialogs";
 import { useUpdateStateFlags } from "./update-notification";
 import { SlashCommand } from "./slash-command";
 import { TableOfContents } from "./table-of-contents";
-import { ArrowUpIcon, TrashIcon, OutlineIcon } from "./icons";
+import { ArrowDownIcon, ArrowUpIcon, OutlineIcon, SearchIcon, TrashIcon, XIcon } from "./icons";
 
 import type { MarkdownEditorProps, MarkdownEditorToast } from "../types/markdown-editor";
 import type { OutlineItem } from "@/types/navigation";
-import type { UpdateState } from "../shared/workspace";
+import type { NoteLinkPreview, UpdateState } from "../shared/workspace";
 
 const LINK_IMAGE_PATTERN = /(!?)\[([^\]]+)\]\(([^)]+)\)$/;
 const MARKDOWN_FILE_SUFFIX_PATTERN = /\.(md|mdx|markdown)$/i;
+const WINDOWS_DRIVE_PATH_PATTERN = /^[a-z]:[\\/]/i;
 type EditorActionType = "insert-table" | "insert-link" | "insert-image";
 
 type EditorActionDetail = {
@@ -123,6 +130,10 @@ const getDevPreviewUpdateState = (): UpdateState | null => {
 };
 
 type HoveredLinkState = {
+  href: string;
+  placement: "above" | "below";
+  preview: NoteLinkPreview | null;
+  status: "hint" | "loading" | "preview";
   tooltipLeft: number;
   tooltipTop: number;
 };
@@ -139,6 +150,11 @@ type SelectionSnapshot = {
   to: number;
 };
 
+type FindPanelState = {
+  activeIndex: number;
+  matchCount: number;
+};
+
 type EditorOutlineItem = OutlineItem & {
   pos: number;
 };
@@ -146,6 +162,11 @@ type EditorOutlineItem = OutlineItem & {
 const DEFAULT_SELECTION_SNAPSHOT: SelectionSnapshot = {
   from: 1,
   to: 1,
+};
+
+const EMPTY_FIND_PANEL_STATE: FindPanelState = {
+  activeIndex: -1,
+  matchCount: 0,
 };
 
 const extractLinkAttributes = (input: string) => {
@@ -176,6 +197,37 @@ const normalizeLinkTarget = (value: string) => {
   }
 
   return trimmed;
+};
+
+const isSafeLocalLinkTarget = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  if (trimmed.startsWith("#")) {
+    return true;
+  }
+
+  if (WINDOWS_DRIVE_PATH_PATTERN.test(trimmed)) {
+    return true;
+  }
+
+  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) {
+    return false;
+  }
+
+  const [pathPart] = trimmed.split(/[?#]/, 1);
+  if (!pathPart || pathPart.startsWith("//")) {
+    return false;
+  }
+
+  return pathPart.includes("/") || pathPart.startsWith(".");
+};
+
+const isExternalLink = (href: string) => {
+  const trimmed = href.trim();
+  return /^https?:\/\//i.test(trimmed) || /^mailto:/i.test(trimmed);
 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
@@ -216,6 +268,15 @@ function collectEditorOutline(editor: Editor): EditorOutlineItem[] {
   });
 
   return items;
+}
+
+function getSelectedEditorText(editor: Editor) {
+  const { from, to } = editor.state.selection;
+  if (from === to) {
+    return "";
+  }
+
+  return editor.state.doc.textBetween(from, to, " ", " ").trim();
 }
 
 const INACTIVE_TABLE_CONTROLS: TableControlsState = {
@@ -292,6 +353,7 @@ export const MarkdownEditor = ({
   initialScrollTop = 0,
   scrollRestorationKey = null,
   editorFocusRequest,
+  findRequest,
   saveStateLabel,
   footerMetaLabel,
   wordCount,
@@ -340,13 +402,17 @@ export const MarkdownEditor = ({
   const isAutoConvertingRef = useRef(false);
   const liveEditorRef = useRef<Editor | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const findInputRef = useRef<HTMLInputElement | null>(null);
   const tableControlsRef = useRef<TableControlsState>(INACTIVE_TABLE_CONTROLS);
   const toastTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const hoveredLinkHideTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const hoveredLinkRequestNonceRef = useRef(0);
   const scrollPositionTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const selectionSnapshotRef = useRef<SelectionSnapshot>(DEFAULT_SELECTION_SNAPSHOT);
   const selectionSnapshotsByDocumentRef = useRef<Record<string, SelectionSnapshot>>({});
   const lastHandledFocusRequestRef = useRef<number | null>(null);
+  const lastHandledFindRequestRef = useRef<number | null>(null);
+  const isFindOpenRef = useRef(false);
   const lastRestoredScrollStateRef = useRef<{
     key: string | null;
     top: number;
@@ -362,6 +428,10 @@ export const MarkdownEditor = ({
   const [devPreviewUpdateState] = useState<UpdateState | null>(() => getDevPreviewUpdateState());
   const [outlineItems, setOutlineItems] = useState<EditorOutlineItem[]>([]);
   const [activeHeadingId, setActiveHeadingId] = useState<string | null>(null);
+  const [isFindOpen, setIsFindOpen] = useState(false);
+  const [findQuery, setFindQuery] = useState("");
+  const deferredFindQuery = useDeferredValue(findQuery);
+  const [findPanelState, setFindPanelState] = useState<FindPanelState>(EMPTY_FIND_PANEL_STATE);
   const outlineItemsRef = useRef<EditorOutlineItem[]>([]);
 
   useEffect(() => {
@@ -371,6 +441,10 @@ export const MarkdownEditor = ({
     scrollRestorationKeyRef.current = scrollRestorationKey;
     onOpenLinkedFileRef.current = onOpenLinkedFile;
   }, [filePath, onChange, onOpenLinkedFile, onScrollPositionChange, scrollRestorationKey]);
+
+  useEffect(() => {
+    isFindOpenRef.current = isFindOpen;
+  }, [isFindOpen]);
 
   const refreshOutline = useCallback((nextEditor: Editor) => {
     const items = collectEditorOutline(nextEditor);
@@ -421,6 +495,106 @@ export const MarkdownEditor = ({
       }
     },
     [rememberSelectionSnapshot],
+  );
+
+  const scrollToFindMatch = useCallback(
+    (nextEditor: Editor, match: { from: number; to: number }) => {
+      const container = scrollContainerRef.current;
+      if (!container) {
+        return;
+      }
+
+      const startCoords = nextEditor.view.coordsAtPos(match.from);
+      const endCoords = nextEditor.view.coordsAtPos(Math.max(match.from, match.to - 1));
+      const containerRect = container.getBoundingClientRect();
+      const matchTop = Math.min(startCoords.top, endCoords.top);
+      const matchBottom = Math.max(startCoords.bottom, endCoords.bottom);
+      const visibleTop = containerRect.top + 92;
+      const visibleBottom = containerRect.bottom - 48;
+
+      if (matchTop >= visibleTop && matchBottom <= visibleBottom) {
+        return;
+      }
+
+      const targetScrollTop = container.scrollTop + (matchTop - containerRect.top) - 88;
+      container.scrollTo({
+        top: Math.max(0, targetScrollTop),
+        behavior: "smooth",
+      });
+    },
+    [],
+  );
+
+  const syncFindPanelState = useCallback(
+    (nextEditor: Editor, options?: { scrollToActive?: boolean }) => {
+      const nextState = getFindHighlightState(nextEditor);
+      setFindPanelState({
+        activeIndex: nextState.activeIndex,
+        matchCount: nextState.matches.length,
+      });
+
+      if (!options?.scrollToActive || nextState.activeIndex < 0) {
+        return;
+      }
+
+      const activeMatch = nextState.matches[nextState.activeIndex];
+      if (activeMatch) {
+        scrollToFindMatch(nextEditor, activeMatch);
+      }
+    },
+    [scrollToFindMatch],
+  );
+
+  const closeFindPanel = useCallback(() => {
+    setIsFindOpen(false);
+    setFindQuery("");
+    setFindPanelState(EMPTY_FIND_PANEL_STATE);
+
+    const nextEditor = liveEditorRef.current;
+    if (nextEditor) {
+      setFindHighlightQuery(nextEditor, "");
+    }
+
+    window.requestAnimationFrame(() => {
+      focusEditorWithoutScroll(selectionSnapshotRef.current, false);
+    });
+  }, [focusEditorWithoutScroll]);
+
+  const openFindPanel = useCallback((initialQuery: string) => {
+    setIsFindOpen(true);
+    setFindQuery(initialQuery);
+
+    window.requestAnimationFrame(() => {
+      const input = findInputRef.current;
+      if (!input) {
+        return;
+      }
+
+      input.focus();
+      input.select();
+    });
+  }, []);
+
+  const navigateFindMatches = useCallback(
+    (direction: 1 | -1) => {
+      const nextEditor = liveEditorRef.current;
+      if (!nextEditor) {
+        return;
+      }
+
+      const currentState = getFindHighlightState(nextEditor);
+      if (currentState.matches.length === 0) {
+        return;
+      }
+
+      const baseIndex = currentState.activeIndex >= 0 ? currentState.activeIndex : 0;
+      const nextIndex =
+        (baseIndex + direction + currentState.matches.length) % currentState.matches.length;
+
+      setActiveFindHighlightMatch(nextEditor, nextIndex);
+      syncFindPanelState(nextEditor, { scrollToActive: true });
+    },
+    [syncFindPanelState],
   );
 
   const effectiveUpdateState = devPreviewUpdateState ?? updateState ?? null;
@@ -537,6 +711,7 @@ export const MarkdownEditor = ({
   const scheduleHoveredLinkHide = () => {
     clearHoveredLinkHideTimeout();
     hoveredLinkHideTimeoutRef.current = window.setTimeout(() => {
+      hoveredLinkRequestNonceRef.current += 1;
       setHoveredLink(null);
       hoveredLinkHideTimeoutRef.current = null;
     }, 140);
@@ -690,6 +865,7 @@ export const MarkdownEditor = ({
         Link.configure({
           autolink: true,
           defaultProtocol: "https",
+          isAllowedUri: (url, ctx) => ctx.defaultValidate(url) || isSafeLocalLinkTarget(url),
           linkOnPaste: true,
           openOnClick: false,
           HTMLAttributes: {
@@ -713,6 +889,7 @@ export const MarkdownEditor = ({
         TableHeader,
         TableCell,
         SlashCommand,
+        FindHighlightExtension,
         Placeholder.configure({
           placeholder: "Start with a title, then let markdown shortcuts shape the page.",
         }),
@@ -772,10 +949,82 @@ export const MarkdownEditor = ({
 
             clearHoveredLinkHideTimeout();
             const rect = link.getBoundingClientRect();
+            const placement = rect.bottom > window.innerHeight * 0.64 ? "above" : "below";
+            const tooltipTop = placement === "above" ? rect.top - 12 : rect.bottom + 12;
+            const tooltipLeft = clamp(rect.left + rect.width / 2, 96, window.innerWidth - 96);
+
+            // For external links (http(s), mailto), show a simple hint immediately
+            // without fetching a rich preview — only note links get the full card.
+            if (isExternalLink(href)) {
+              hoveredLinkRequestNonceRef.current += 1;
+              setHoveredLink({
+                href,
+                placement,
+                preview: null,
+                status: "hint",
+                tooltipLeft,
+                tooltipTop,
+              });
+              return false;
+            }
+
+            const requestNonce = hoveredLinkRequestNonceRef.current + 1;
+            hoveredLinkRequestNonceRef.current = requestNonce;
+
             setHoveredLink({
-              tooltipLeft: clamp(rect.left + rect.width / 2, 96, window.innerWidth - 96),
-              tooltipTop: rect.bottom + 10,
+              href,
+              placement,
+              preview: null,
+              status: "loading",
+              tooltipLeft,
+              tooltipTop,
             });
+
+            if (!window.glyph) {
+              setHoveredLink((current) =>
+                current?.href === href
+                  ? {
+                      ...current,
+                      preview: null,
+                      status: "hint",
+                    }
+                  : current,
+              );
+              return false;
+            }
+
+            void window.glyph
+              .getLinkPreview(filePathRef.current, href)
+              .then((preview) => {
+                if (requestNonce !== hoveredLinkRequestNonceRef.current) {
+                  return;
+                }
+
+                setHoveredLink((current) =>
+                  current?.href === href
+                    ? {
+                        ...current,
+                        preview,
+                        status: preview ? "preview" : "hint",
+                      }
+                    : current,
+                );
+              })
+              .catch(() => {
+                if (requestNonce !== hoveredLinkRequestNonceRef.current) {
+                  return;
+                }
+
+                setHoveredLink((current) =>
+                  current?.href === href
+                    ? {
+                        ...current,
+                        preview: null,
+                        status: "hint",
+                      }
+                    : current,
+                );
+              });
             return false;
           },
           mouseout: (_view, _event) => {
@@ -789,6 +1038,7 @@ export const MarkdownEditor = ({
           },
           scroll: () => {
             setImageControls(null);
+            hoveredLinkRequestNonceRef.current += 1;
             clearHoveredLinkHideTimeout();
             setHoveredLink(null);
             return false;
@@ -808,6 +1058,9 @@ export const MarkdownEditor = ({
         refreshTableControls(nextEditor);
         refreshImageControls(nextEditor);
         refreshOutline(nextEditor);
+        if (isFindOpenRef.current) {
+          syncFindPanelState(nextEditor);
+        }
 
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any
         const nextMarkdown = (nextEditor.storage as any).markdown.getMarkdown() as string;
@@ -822,9 +1075,12 @@ export const MarkdownEditor = ({
         });
         refreshTableControls(nextEditor);
         refreshImageControls(nextEditor);
+        if (isFindOpenRef.current) {
+          syncFindPanelState(nextEditor);
+        }
       },
     },
-    [rememberSelectionSnapshot],
+    [rememberSelectionSnapshot, syncFindPanelState],
   );
 
   useEffect(() => {
@@ -840,7 +1096,10 @@ export const MarkdownEditor = ({
     refreshTableControls(editor);
     refreshImageControls(editor);
     refreshOutline(editor);
-  }, [content, editor, refreshOutline]);
+    if (isFindOpenRef.current) {
+      syncFindPanelState(editor);
+    }
+  }, [content, editor, refreshOutline, syncFindPanelState]);
 
   useEffect(() => {
     const targetKey = scrollRestorationKey ?? filePath;
@@ -925,6 +1184,39 @@ export const MarkdownEditor = ({
     liveEditorRef.current = editor;
     editor.setEditable(isEditable);
   }, [editor, isEditable]);
+
+  useEffect(() => {
+    if (!editor) {
+      return;
+    }
+
+    if (!isFindOpen) {
+      setFindHighlightQuery(editor, "");
+      setFindPanelState(EMPTY_FIND_PANEL_STATE);
+      return;
+    }
+
+    setFindHighlightQuery(editor, deferredFindQuery);
+    syncFindPanelState(editor, {
+      scrollToActive: Boolean(deferredFindQuery.trim()),
+    });
+  }, [editor, deferredFindQuery, isFindOpen, syncFindPanelState]);
+
+  useEffect(() => {
+    if (!findRequest || !editor) {
+      return;
+    }
+
+    if (lastHandledFindRequestRef.current === findRequest.nonce) {
+      return;
+    }
+
+    lastHandledFindRequestRef.current = findRequest.nonce;
+    const selectedText = getSelectedEditorText(editor).replace(/\s+/g, " ").trim();
+    const initialQuery = selectedText && selectedText.length <= 120 ? selectedText : findQuery;
+
+    openFindPanel(initialQuery);
+  }, [editor, findQuery, findRequest, openFindPanel]);
 
   useEffect(() => {
     if (!editorFocusRequest || !editor) {
@@ -1172,170 +1464,303 @@ export const MarkdownEditor = ({
       {subheaderContent ? (
         <div className="border-b border-border/30">{subheaderContent}</div>
       ) : null}
-      <div
-        ref={scrollContainerRef}
-        className={`flex-1 min-h-0 overflow-y-auto relative [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${
-          shouldShowOutlineRail ? "xl:pr-[316px]" : ""
-        }`}
-        onScroll={() => {
-          setImageControls(null);
-          clearHoveredLinkHideTimeout();
-          setHoveredLink(null);
+      <div className="relative flex-1 min-h-0">
+        {isFindOpen ? (
+          <div
+            className={`pointer-events-none absolute top-2 right-0 z-30 flex justify-end px-4 ${
+              shouldShowOutlineRail ? "xl:pr-[324px]" : ""
+            }`}
+          >
+            <div className="pointer-events-auto flex items-center gap-1 rounded-lg border border-border/50 bg-card/95 px-2 py-1.5 shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.04] supports-backdrop-filter:backdrop-blur-md">
+              <SearchIcon size={12} className="shrink-0 text-muted-foreground/70" />
+              <input
+                ref={findInputRef}
+                autoFocus
+                aria-label="Find in current note"
+                value={findQuery}
+                className="h-5 w-[160px] bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground/50"
+                onChange={(event) => {
+                  setFindQuery(event.target.value);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    navigateFindMatches(event.shiftKey ? -1 : 1);
+                    return;
+                  }
 
-          if (!editor) return;
-          const container = scrollContainerRef.current;
-          if (!container) return;
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    closeFindPanel();
+                    return;
+                  }
 
-          if (scrollPositionTimeoutRef.current) {
-            window.clearTimeout(scrollPositionTimeoutRef.current);
-          }
-          scrollPositionTimeoutRef.current = window.setTimeout(() => {
-            flushScrollPosition();
-            scrollPositionTimeoutRef.current = null;
-          }, 120);
+                  const primaryPressed =
+                    event.metaKey !== event.ctrlKey && (event.metaKey || event.ctrlKey);
+                  if (primaryPressed && event.key.toLowerCase() === "g") {
+                    event.preventDefault();
+                    navigateFindMatches(event.shiftKey ? -1 : 1);
+                  }
+                }}
+              />
+              {findQuery.trim() ? (
+                <span
+                  aria-live="polite"
+                  aria-label="Find results"
+                  className="min-w-[36px] text-right text-[11px] tabular-nums text-muted-foreground"
+                >
+                  {findPanelState.matchCount > 0
+                    ? `${findPanelState.activeIndex + 1}/${findPanelState.matchCount}`
+                    : "No matches"}
+                </span>
+              ) : null}
+              <div className="mx-0.5 h-3.5 w-px bg-border/40" />
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                disabled={findPanelState.matchCount === 0}
+                aria-label="Previous match"
+                className="h-5 w-5"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  navigateFindMatches(-1);
+                }}
+              >
+                <ArrowUpIcon size={12} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                disabled={findPanelState.matchCount === 0}
+                aria-label="Next match"
+                className="h-5 w-5"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  navigateFindMatches(1);
+                }}
+              >
+                <ArrowDownIcon size={12} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                aria-label="Close find"
+                className="h-5 w-5"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  closeFindPanel();
+                }}
+              >
+                <XIcon size={12} />
+              </Button>
+            </div>
+          </div>
+        ) : null}
+        <div
+          ref={scrollContainerRef}
+          className={`h-full overflow-y-auto relative [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${
+            shouldShowOutlineRail ? "xl:pr-[316px]" : ""
+          }`}
+          onScroll={() => {
+            setImageControls(null);
+            hoveredLinkRequestNonceRef.current += 1;
+            clearHoveredLinkHideTimeout();
+            setHoveredLink(null);
 
-          const headings = outlineItemsRef.current;
-          if (headings.length === 0) {
-            setActiveHeadingId(null);
-            return;
-          }
+            if (!editor) return;
+            const container = scrollContainerRef.current;
+            if (!container) return;
 
-          const containerRect = container.getBoundingClientRect();
-          const remainingScroll =
-            container.scrollHeight - container.scrollTop - container.clientHeight;
+            if (scrollPositionTimeoutRef.current) {
+              window.clearTimeout(scrollPositionTimeoutRef.current);
+            }
+            scrollPositionTimeoutRef.current = window.setTimeout(() => {
+              flushScrollPosition();
+              scrollPositionTimeoutRef.current = null;
+            }, 120);
 
-          let activeId = headings[0].id;
-          for (const heading of headings) {
-            const nodeDom = editor.view.nodeDOM(heading.pos - 1);
-            if (nodeDom instanceof HTMLElement) {
-              const rect = nodeDom.getBoundingClientRect();
-              // Add a bit more tolerance so if we jump to 40px, it comfortably highlights
-              if (rect.top <= containerRect.top + 120) {
-                activeId = heading.id;
-              } else {
-                break;
+            const headings = outlineItemsRef.current;
+            if (headings.length === 0) {
+              setActiveHeadingId(null);
+              return;
+            }
+
+            const containerRect = container.getBoundingClientRect();
+            const remainingScroll =
+              container.scrollHeight - container.scrollTop - container.clientHeight;
+
+            let activeId = headings[0].id;
+            for (const heading of headings) {
+              const nodeDom = editor.view.nodeDOM(heading.pos - 1);
+              if (nodeDom instanceof HTMLElement) {
+                const rect = nodeDom.getBoundingClientRect();
+                // Add a bit more tolerance so if we jump to 40px, it comfortably highlights
+                if (rect.top <= containerRect.top + 120) {
+                  activeId = heading.id;
+                } else {
+                  break;
+                }
               }
             }
-          }
 
-          // When near the bottom of the document, activate the last heading.
-          // Use a generous threshold to account for bottom padding (pb-32 = 128px),
-          // sub-pixel rounding on high-DPI displays, and floating footer overlays.
-          if (remainingScroll < 150) {
-            activeId = headings[headings.length - 1].id;
-          }
+            // When near the bottom of the document, activate the last heading.
+            // Use a generous threshold to account for bottom padding (pb-32 = 128px),
+            // sub-pixel rounding on high-DPI displays, and floating footer overlays.
+            if (remainingScroll < 150) {
+              activeId = headings[headings.length - 1].id;
+            }
 
-          setActiveHeadingId(activeId);
-        }}
-      >
-        {topContent ? <div className="mx-auto max-w-[800px] px-10 pt-5">{topContent}</div> : null}
-        {tableControls.active ? (
-          <div className="sticky top-4 z-20 h-0 overflow-visible">
-            <div
-              className={`pointer-events-none flex justify-end ${
-                shouldShowOutlineRail ? "xl:pr-[316px]" : "pr-6"
-              }`}
-            >
-              <div className="pointer-events-auto flex max-w-[min(720px,calc(100vw-2rem))] flex-wrap items-center justify-center gap-2 rounded-2xl border border-border/70 bg-card/95 px-3 py-2 shadow-lg supports-backdrop-filter:backdrop-blur-sm">
-                <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                  Table
-                </span>
-                <Button
-                  variant="outline"
-                  size="xs"
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => editor?.chain().focus().addRowAfter().run()}
-                >
-                  Add Row
-                </Button>
-                <Button
-                  variant="outline"
-                  size="xs"
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => editor?.chain().focus().addColumnAfter().run()}
-                >
-                  Add Column
-                </Button>
-                <Button
-                  variant="outline"
-                  size="xs"
-                  type="button"
-                  disabled={!tableControls.canDeleteRow}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => editor?.chain().focus().deleteRow().run()}
-                >
-                  Remove Row
-                </Button>
-                <Button
-                  variant="outline"
-                  size="xs"
-                  type="button"
-                  disabled={!tableControls.canDeleteColumn}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => editor?.chain().focus().deleteColumn().run()}
-                >
-                  Remove Column
-                </Button>
-                <Button
-                  variant="outline"
-                  size="xs"
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => editor?.chain().focus().toggleHeaderRow().run()}
-                >
-                  Toggle Header
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="xs"
-                  type="button"
-                  disabled={!tableControls.canDeleteTable}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => editor?.chain().focus().deleteTable().run()}
-                >
-                  Delete Table
-                </Button>
+            setActiveHeadingId(activeId);
+          }}
+        >
+          {topContent ? <div className="mx-auto max-w-[800px] px-10 pt-5">{topContent}</div> : null}
+          {tableControls.active ? (
+            <div className="sticky top-4 z-20 h-0 overflow-visible">
+              <div
+                className={`pointer-events-none flex justify-center pl-52 pr-6 ${
+                  shouldShowOutlineRail ? "xl:pr-[316px]" : ""
+                }`}
+              >
+                <div className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-border/70 bg-card/95 px-2.5 py-1.5 shadow-lg supports-backdrop-filter:backdrop-blur-sm">
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => editor?.chain().focus().addRowAfter().run()}
+                  >
+                    Add Row
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => editor?.chain().focus().addColumnAfter().run()}
+                  >
+                    Add Column
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    type="button"
+                    disabled={!tableControls.canDeleteRow}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => editor?.chain().focus().deleteRow().run()}
+                  >
+                    Remove Row
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    type="button"
+                    disabled={!tableControls.canDeleteColumn}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => editor?.chain().focus().deleteColumn().run()}
+                  >
+                    Remove Column
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    type="button"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => editor?.chain().focus().toggleHeaderRow().run()}
+                  >
+                    Toggle Header
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="xs"
+                    type="button"
+                    disabled={!tableControls.canDeleteTable}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => editor?.chain().focus().deleteTable().run()}
+                  >
+                    Delete Table
+                  </Button>
+                </div>
               </div>
             </div>
-          </div>
-        ) : null}
-        {hoveredLink ? (
-          <div
-            className="pointer-events-none fixed z-30"
-            style={{
-              left: hoveredLink.tooltipLeft,
-              top: hoveredLink.tooltipTop,
-              transform: "translateX(-50%)",
-            }}
-          >
-            <div className="inline-flex max-w-[220px] items-center rounded-md bg-foreground px-3 py-1.5 text-xs text-background shadow-sm">
-              {linkOpenShortcutHint}
-            </div>
-          </div>
-        ) : null}
-        {imageControls ? (
-          <div
-            className="fixed z-30"
-            style={{
-              left: imageControls.left,
-              top: imageControls.top,
-            }}
-          >
-            <Button
-              variant="destructive"
-              size="icon-xs"
-              type="button"
-              className="shadow-md"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={handleDeleteSelectedImage}
+          ) : null}
+          {hoveredLink ? (
+            <div
+              className={`fixed z-30 ${hoveredLink.status === "preview" && hoveredLink.preview ? "w-[min(320px,calc(100vw-2rem))]" : ""}`}
+              style={{
+                left: hoveredLink.tooltipLeft,
+                top: hoveredLink.tooltipTop,
+                transform:
+                  hoveredLink.placement === "above"
+                    ? "translate(-50%, calc(-100% - 4px))"
+                    : "translateX(-50%)",
+              }}
+              onMouseEnter={clearHoveredLinkHideTimeout}
+              onMouseLeave={scheduleHoveredLinkHide}
             >
-              <TrashIcon size={12} />
-            </Button>
-          </div>
-        ) : null}
-        <EditorContent editor={editor} />
+              {hoveredLink.status === "preview" && hoveredLink.preview ? (
+                <div
+                  aria-label="Note link preview"
+                  className="rounded-2xl border border-border/70 bg-card/95 p-3 shadow-lg supports-backdrop-filter:backdrop-blur-sm"
+                >
+                  <div className="space-y-2">
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-foreground">
+                        {hoveredLink.preview.title}
+                      </p>
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                        {hoveredLink.preview.displayPath}
+                      </p>
+                    </div>
+                    <p className="text-sm leading-6 text-muted-foreground">
+                      {hoveredLink.preview.excerpt || "This note does not have preview text yet."}
+                    </p>
+                    <p className="text-[11px] font-medium text-muted-foreground">
+                      {linkOpenShortcutHint}
+                    </p>
+                  </div>
+                </div>
+              ) : hoveredLink.status === "loading" ? (
+                <div
+                  aria-label="Loading preview"
+                  className="rounded-xl border border-border/60 bg-card/95 px-3 py-2 shadow-md supports-backdrop-filter:backdrop-blur-sm"
+                >
+                  <p className="text-xs text-muted-foreground">Loading&hellip;</p>
+                </div>
+              ) : (
+                <div
+                  aria-label="Link hint"
+                  className="rounded-xl border border-border/60 bg-card/95 px-3 py-1.5 shadow-md supports-backdrop-filter:backdrop-blur-sm"
+                >
+                  <p className="text-xs text-muted-foreground">{linkOpenShortcutHint}</p>
+                </div>
+              )}
+            </div>
+          ) : null}
+          {imageControls ? (
+            <div
+              className="fixed z-30"
+              style={{
+                left: imageControls.left,
+                top: imageControls.top,
+              }}
+            >
+              <Button
+                variant="destructive"
+                size="icon-xs"
+                type="button"
+                className="shadow-md"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={handleDeleteSelectedImage}
+              >
+                <TrashIcon size={12} />
+              </Button>
+            </div>
+          ) : null}
+          <EditorContent editor={editor} />
+        </div>
       </div>
       {shouldShowOutlineRail ? (
         <aside className="pointer-events-none absolute right-8 top-[88px] z-20 hidden xl:block w-[240px] animate-in fade-in slide-in-from-right-2 duration-200 ease-out">

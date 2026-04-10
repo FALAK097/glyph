@@ -20,6 +20,7 @@ type UseKeyboardShortcutsOptions = {
   setIsWorkspaceMode: React.Dispatch<React.SetStateAction<boolean>>;
   navigateBack: () => Promise<void>;
   navigateForward: () => Promise<void>;
+  requestFindInNote: () => void;
   triggerUpdateAction: () => Promise<void>;
   isPaletteOpen: boolean;
   isSettingsOpen: boolean;
@@ -46,6 +47,7 @@ export function useKeyboardShortcuts({
   setIsWorkspaceMode,
   navigateBack,
   navigateForward,
+  requestFindInNote,
   triggerUpdateAction,
   isPaletteOpen,
   isSettingsOpen,
@@ -130,6 +132,7 @@ export function useKeyboardShortcuts({
       const globalShortcutIds = new Set([
         "toggle-sidebar",
         "command-palette",
+        "find-in-note",
         "settings",
         "navigate-back",
         "navigate-forward",
@@ -151,6 +154,9 @@ export function useKeyboardShortcuts({
             break;
           case "command-palette":
             setIsPaletteOpen((value) => !value);
+            break;
+          case "find-in-note":
+            requestFindInNote();
             break;
           case "settings":
             setIsSettingsOpen((value) => !value);
@@ -256,6 +262,7 @@ export function useKeyboardShortcuts({
     setIsWorkspaceMode,
     navigateBack,
     navigateForward,
+    requestFindInNote,
     triggerUpdateAction,
     isPaletteOpen,
     isSettingsOpen,

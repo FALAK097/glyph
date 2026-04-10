@@ -797,6 +797,17 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     const query = paletteFilterQuery;
     const items: CommandPaletteItem[] = [
       {
+        id: "find-in-current-note",
+        title: "Find in Current Note",
+        subtitle: "Search the active note without leaving the editor",
+        section: "Note",
+        kind: "command",
+        onSelect: () => {
+          controller.requestFindInNote();
+          closePalette();
+        },
+      },
+      {
         id: "rename-current-note",
         title: "Rename Current Note",
         subtitle: "Change the file name from the command palette",
@@ -866,6 +877,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   }, [
     controller.activeFile,
     controller.folderRevealLabel,
+    controller.requestFindInNote,
     handleCopyCurrentNoteMarkdown,
     handleCopyCurrentNotePath,
     handleExportCurrentNote,
@@ -1202,6 +1214,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                 fileName={controller.activeFile?.name ?? null}
                 filePath={controller.activeFile?.path ?? null}
                 editorFocusRequest={controller.editorFocusRequest}
+                findRequest={controller.findRequest}
                 initialScrollTop={noteInitialScrollTop}
                 saveStateLabel={controller.saveStateLabel}
                 footerMetaLabel={noteFileSizeLabel}

@@ -382,6 +382,7 @@ export const MarkdownEditor = ({
   isActiveFilePinned,
   onOutlineJumpHandled,
   updateState,
+  updatesMode,
   onUpdateAction,
   isFocusMode,
   showOutline = true,
@@ -598,7 +599,7 @@ export const MarkdownEditor = ({
   );
 
   const effectiveUpdateState = devPreviewUpdateState ?? updateState ?? null;
-  const updateStateFlags = useUpdateStateFlags(effectiveUpdateState);
+  const updateStateFlags = useUpdateStateFlags(effectiveUpdateState, updatesMode);
   const isFocusLayout = Boolean(isFocusMode);
   const revealInFolderLabel = folderRevealLabel ?? getFolderRevealLabel(navigator.platform);
   const isMacLike = useMemo(() => navigator.platform.includes("Mac"), []);

@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 
 import { getDisplayFileName } from "@/lib/paths";
 import { getDirectTabShortcutDisplay, getShortcutDisplay } from "@/shared/shortcuts";
-import type { NoteTab, ShortcutSetting, TabMovePosition } from "@/shared/workspace";
+import type { AppInfo, NoteTab, ShortcutSetting, TabMovePosition } from "@/shared/workspace";
 import type { OutlineItem } from "@/types/navigation";
 import type { UpdateState } from "@/shared/workspace";
 import type { EditorFindRequest, EditorFocusRequest } from "@/types/markdown-editor";
@@ -35,6 +35,7 @@ type NoteViewProps = {
   outlineItems: OutlineItem[];
   outlineJumpRequest: { id: string; nonce: number } | null;
   updateState: UpdateState | null;
+  updatesMode?: AppInfo["updatesMode"];
   onContentChange: (value: string) => void;
   onSelectTab: (path: string) => void;
   onCloseTab: (path: string) => void;
@@ -80,6 +81,7 @@ export function NoteView({
   outlineItems,
   outlineJumpRequest,
   updateState,
+  updatesMode,
   onContentChange,
   onSelectTab,
   onCloseTab,
@@ -178,6 +180,7 @@ export function NoteView({
       scrollRestorationKey={filePath}
       showOutline={showOutline}
       updateState={updateState}
+      updatesMode={updatesMode}
       onUpdateAction={onUpdateAction}
     />
   );

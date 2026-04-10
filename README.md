@@ -45,7 +45,7 @@ Glyph aims to sit in the middle ground between plain-text tools and heavyweight 
 
 ### macOS with Homebrew
 
-The Homebrew cask is kept in this repo and updated from the macOS release artifact:
+Glyph ships through the public Homebrew tap at [FALAK097/homebrew-glyph](https://github.com/FALAK097/homebrew-glyph):
 
 ```bash
 brew install --cask FALAK097/glyph/glyph
@@ -56,7 +56,9 @@ brew install --cask FALAK097/glyph/glyph
 Desktop release artifacts are published through [GitHub Releases](https://github.com/FALAK097/glyph/releases):
 
 - macOS: `.dmg`
+- macOS: if macOS shows `Move to Bin`, click `Done`, then open `System Settings > Privacy & Security` and allow Glyph before opening it again
 - Windows: `.exe`
+- Windows: if SmartScreen appears, click `More info`, then `Run anyway`
 
 ## Project Layout
 
@@ -71,7 +73,6 @@ glyph/
 │   └── web/
 │       └── src/
 ├── .github/workflows/
-├── Casks/
 ├── scripts/
 ├── CHANGELOG.md
 ├── package.json

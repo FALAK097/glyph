@@ -41,6 +41,9 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Verify desktop runtime dependencies
+        run: pnpm --filter @glyph/desktop verify:runtime-deps
+
       - name: Verify Electron binary
         run: |
           ELECTRON_BIN=$(node -e "process.stdout.write(require('electron'))")

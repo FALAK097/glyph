@@ -31,6 +31,7 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+      TAP_REPO: FALAK097/homebrew-glyph
 
     steps:
       - name: Check out repository
@@ -71,15 +72,13 @@ jobs:
         # Unsigned/notarized macOS releases are intentional for now; GitHub Releases and Homebrew are the distribution path.
         run: pnpm --filter @glyph/desktop release -- --mac
 
-      - name: Generate Homebrew cask
-        run: pnpm cask:generate --version "${RELEASE_TAG#v}" --artifact-path "apps/desktop/release/${MAC_DMG_NAME}"
-
-      - name: Commit updated Homebrew cask
+      - name: Update Homebrew tap
         run: |
           git restore apps/desktop/package.json
-          git fetch origin main
-          git switch main
-          git pull --rebase --autostash origin main
+          TAP_DIR="${RUNNER_TEMP}/homebrew-glyph"
+          git clone "https://x-access-token:${{ secrets.TAP_GITHUB_TOKEN }}@github.com/${TAP_REPO}.git" "${TAP_DIR}"
+          pnpm cask:generate --version "${RELEASE_TAG#v}" --artifact-path "apps/desktop/release/${MAC_DMG_NAME}" --output-dir "${TAP_DIR}"
+          cd "${TAP_DIR}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Casks/glyph.rb

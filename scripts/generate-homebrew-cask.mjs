@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -99,9 +99,11 @@ function main() {
   const description = getArgValue("--description") ?? DEFAULT_DESCRIPTION;
   const homepage = getArgValue("--homepage") ?? DEFAULT_HOMEPAGE;
   const bundleId = getArgValue("--bundle-id") ?? DEFAULT_BUNDLE_ID;
+  const outputDirArg = getArgValue("--output-dir");
   const explicitSha256 = getArgValue("--sha256");
   const artifactPathArg = getArgValue("--artifact-path");
   const artifactPath = artifactPathArg ? path.resolve(repoRoot, artifactPathArg) : null;
+  const outputRoot = outputDirArg ? path.resolve(repoRoot, outputDirArg) : repoRoot;
 
   if (!explicitSha256 && !artifactPath) {
     throw new Error("Provide either --artifact-path or --sha256.");
@@ -126,10 +128,12 @@ function main() {
     artifactNameTemplate,
   });
 
-  const caskPath = path.join(repoRoot, "Casks", `${caskName}.rb`);
+  const caskDir = path.join(outputRoot, "Casks");
+  mkdirSync(caskDir, { recursive: true });
+  const caskPath = path.join(caskDir, `${caskName}.rb`);
   writeFileSync(caskPath, caskContents, "utf8");
 
-  process.stdout.write(`Updated ${path.relative(repoRoot, caskPath)} for ${version}\n`);
+  process.stdout.write(`Updated ${path.relative(outputRoot, caskPath)} for ${version}\n`);
 }
 
 try {

@@ -336,6 +336,18 @@ export function App() {
               </div>
             ) : null}
           </div>
+          <p className="mt-3 text-[0.8rem] text-[var(--ink-muted)]">
+            Installs from the public Homebrew tap{" "}
+            <a
+              href="https://github.com/FALAK097/homebrew-glyph"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="footer-link"
+            >
+              FALAK097/homebrew-glyph
+            </a>
+            .
+          </p>
         </div>
       </header>
 

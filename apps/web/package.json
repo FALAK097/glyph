@@ -1,6 +1,6 @@
 {
   "name": "@glyph/web",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "description": "Glyph - A minimal markdown viewer and editor for macOS and Windows landing page",
   "keywords": [

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/FALAK097/glyph/compare/v0.5.0...v0.5.1) (2026-04-10)
+
+
+### Bug Fixes
+
+* **desktop:** harden release packaging and homebrew distribution ([b42a136](https://github.com/FALAK097/glyph/commit/b42a136a83e3c740aeae1dcf34b9eca880124016))
+* **web:** tighten homebrew install layout ([d19833e](https://github.com/FALAK097/glyph/commit/d19833ee2429774daf44d95baeee000b9b2d0e0c))
+
 ## [0.5.0](https://github.com/FALAK097/glyph/compare/v0.4.0...v0.5.0) (2026-04-10)
 
 

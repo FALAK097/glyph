@@ -309,6 +309,24 @@ async function savePersistedUpdateState(next: PersistedUpdateState) {
   return next;
 }
 
+async function clearPersistedStagedUpdateState() {
+  const loadedState = await loadPersistedUpdateState();
+  const nextPersistedUpdateState = {
+    ...loadedState,
+    stagedVersion: null,
+    stagedReleaseName: null,
+    stagedReleaseNotes: null,
+  };
+
+  persistedUpdateState = nextPersistedUpdateState;
+
+  if (JSON.stringify(nextPersistedUpdateState) !== JSON.stringify(loadedState)) {
+    await queuePersistedUpdateStateWrite(nextPersistedUpdateState);
+  }
+
+  return nextPersistedUpdateState;
+}
+
 function queuePersistedUpdateStateWrite(next: PersistedUpdateState) {
   persistedUpdateState = next;
 
@@ -486,7 +504,12 @@ function wireAutoUpdater() {
   if (getUpdatesMode() !== "automatic") {
     setUpdateState({
       status: "idle",
+      availableVersion: null,
+      downloadedVersion: null,
       releasePageUrl: null,
+      releaseName: null,
+      releaseNotes: null,
+      progressPercent: null,
       checkedAt: new Date().toISOString(),
       errorMessage: null,
     });
@@ -603,7 +626,16 @@ async function checkForAppUpdates() {
 
   if (updatesMode === "manual") {
     if (updateState.status === "downloading" || updateState.status === "downloaded") {
-      return updateState;
+      void clearPersistedStagedUpdateState();
+      setUpdateState({
+        status: "idle",
+        downloadedVersion: null,
+        releasePageUrl: null,
+        releaseName: null,
+        releaseNotes: null,
+        progressPercent: null,
+        errorMessage: null,
+      });
     }
 
     return checkForManualReleaseUpdates();
@@ -2146,6 +2178,8 @@ app
       // loaded yet so broadcastUpdateState inside hydrate is a no-op anyway.
       // We re-broadcast after createWindow finishes.
       void hydratePersistedUpdateState();
+    } else if (app.isPackaged && !isDev) {
+      void clearPersistedStagedUpdateState();
     }
 
     if (process.platform === "darwin" && app.dock) {

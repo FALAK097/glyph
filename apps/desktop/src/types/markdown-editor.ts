@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import type { UpdateState } from "../shared/workspace";
+import type { AppInfo, UpdateState } from "../shared/workspace";
 import type { OutlineItem } from "@/types/navigation";
 
 export type EditorFocusRequest = {
@@ -50,6 +50,7 @@ export type MarkdownEditorProps = {
   isActiveFilePinned?: boolean;
   onOutlineJumpHandled?: () => void;
   updateState?: UpdateState | null;
+  updatesMode?: AppInfo["updatesMode"];
   onUpdateAction?: () => void;
   isFocusMode?: boolean;
   showOutline?: boolean;

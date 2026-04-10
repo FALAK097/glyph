@@ -1,16 +1,20 @@
 import { useMemo } from "react";
 
-import type { UpdateState } from "@/shared/workspace";
+import type { AppInfo, UpdateState } from "@/shared/workspace";
 
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 type UpdateNotificationProps = {
   updateState: UpdateState | null;
+  updatesMode?: AppInfo["updatesMode"];
   onUpdateAction: (() => void) | undefined;
 };
 
-export function useUpdateStateFlags(updateState: UpdateState | null) {
+export function useUpdateStateFlags(
+  updateState: UpdateState | null,
+  updatesMode?: AppInfo["updatesMode"],
+) {
   return useMemo((): {
     shouldShowUpdateActionButton: boolean;
     updateButtonLabel: string;
@@ -30,7 +34,10 @@ export function useUpdateStateFlags(updateState: UpdateState | null) {
 
     const shouldShowUpdateActionButton = shouldShowUpdateButton || shouldShowChangelogButton;
     const isManualReleaseButton =
-      updateState?.status === "available" && Boolean(updateState?.releasePageUrl);
+      updatesMode === "manual" &&
+      (updateState?.status === "available" ||
+        updateState?.status === "downloading" ||
+        updateState?.status === "downloaded");
 
     const updateButtonLabel = shouldShowChangelogButton
       ? "View changelog"
@@ -62,7 +69,9 @@ export function useUpdateStateFlags(updateState: UpdateState | null) {
                 ? `Glyph hit an update error. ${updateState.errorMessage}`
                 : "Check whether a newer Glyph release is available";
 
-    const isUpdateButtonDisabled = updateState?.status === "downloading";
+    const isUpdateButtonDisabled = isManualReleaseButton
+      ? false
+      : updateState?.status === "downloading";
     const updateButtonVariant =
       shouldShowChangelogButton || isManualReleaseButton ? "outline" : "default";
 
@@ -73,17 +82,21 @@ export function useUpdateStateFlags(updateState: UpdateState | null) {
       isUpdateButtonDisabled,
       updateButtonVariant,
     };
-  }, [updateState]);
+  }, [updateState, updatesMode]);
 }
 
-export function UpdateNotification({ updateState, onUpdateAction }: UpdateNotificationProps) {
+export function UpdateNotification({
+  updateState,
+  updatesMode,
+  onUpdateAction,
+}: UpdateNotificationProps) {
   const {
     shouldShowUpdateActionButton,
     updateButtonLabel,
     updateButtonTooltip,
     isUpdateButtonDisabled,
     updateButtonVariant,
-  } = useUpdateStateFlags(updateState);
+  } = useUpdateStateFlags(updateState, updatesMode);
 
   if (!shouldShowUpdateActionButton || !onUpdateAction) {
     return null;

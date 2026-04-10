@@ -47,6 +47,7 @@ const NOTE_NAME_SAFE_CHAR_PATTERN = /[^a-zA-Z0-9-_\s]/g;
 const TITLE_PREFIX_PATTERN = /^#+\s*/;
 const NOTE_NAME_MAX_LENGTH = 50;
 const APP_CHANGELOG_URL = "https://github.com/FALAK097/glyph/blob/main/CHANGELOG.md";
+const APP_RELEASES_URL = "https://github.com/FALAK097/glyph/releases";
 
 const getRenamedFolderFilePath = (
   oldFolderPath: string,
@@ -1029,8 +1030,12 @@ export const useDesktopAppController = (
     }
 
     if (appInfo.updatesMode === "manual") {
-      if (updateState.status === "available" && updateState.releasePageUrl) {
-        await glyph.openExternal(updateState.releasePageUrl);
+      if (
+        updateState.status === "available" ||
+        updateState.status === "downloading" ||
+        updateState.status === "downloaded"
+      ) {
+        await glyph.openExternal(updateState.releasePageUrl ?? APP_RELEASES_URL);
         return;
       }
 
@@ -1082,12 +1087,15 @@ export const useDesktopAppController = (
 
     const isManualReleaseAction =
       appInfo.updatesMode === "manual" &&
-      updateState.status === "available" &&
-      Boolean(updateState.releasePageUrl);
+      (updateState.status === "available" ||
+        updateState.status === "downloading" ||
+        updateState.status === "downloaded");
     if (isManualReleaseAction) {
       return {
         title: "Download Latest Release",
-        subtitle: "Open GitHub Releases to download and install manually",
+        subtitle: updateState.availableVersion
+          ? `Open GitHub Releases to download Glyph ${updateState.availableVersion} manually`
+          : "Open GitHub Releases to download and install manually",
         isDisabled: false,
       };
     }

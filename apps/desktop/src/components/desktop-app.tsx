@@ -1267,6 +1267,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                     ? () => void controller.togglePinnedFile(controller.activeFile!.path)
                     : undefined
                 }
+                updatesMode={controller.appInfo?.updatesMode}
                 onUpdateAction={() => void controller.triggerUpdateAction()}
               />
             )}

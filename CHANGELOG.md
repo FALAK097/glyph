@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/FALAK097/glyph/compare/v0.5.1...v0.5.2) (2026-04-10)
+
+
+### Bug Fixes
+
+* **desktop:** harden manual macOS update flow ([68453c7](https://github.com/FALAK097/glyph/commit/68453c7d329cd05f6516b4b952cb82d8b005f74f))
+
 ## [0.5.1](https://github.com/FALAK097/glyph/compare/v0.5.0...v0.5.1) (2026-04-10)
 
 

@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.5.0](https://github.com/FALAK097/glyph/compare/v0.4.0...v0.5.0) (2026-04-10)
+
+
+### Features
+
+* **desktop:** add in-note find and link previews ([209cbbe](https://github.com/FALAK097/glyph/commit/209cbbeddd0ddc8d79d47e3dd73aa6c86a981550))
+* **desktop:** add multi-note tabs ([5c85f92](https://github.com/FALAK097/glyph/commit/5c85f926465c9c462ca5ef3e2ec7b69fa02df698))
+
+
+### Bug Fixes
+
+* apply CodeRabbit auto-fixes ([b1579a9](https://github.com/FALAK097/glyph/commit/b1579a92cf02a5c06ea68f8a722ff0168fafd870))
+* **desktop:** add tab traversal shortcuts ([b37cc3b](https://github.com/FALAK097/glyph/commit/b37cc3bc7787ee1dcf6c5ee89d3f964737b4b14a))
+* **desktop:** address AI review comments on nonce guard, toolbar, and FS error handling ([d2b2fa2](https://github.com/FALAK097/glyph/commit/d2b2fa2c6def794092852ecb5ad0e945ef61fce3))
+* **desktop:** address note tabs review feedback ([e0ca2ac](https://github.com/FALAK097/glyph/commit/e0ca2ac64625b844a508a470bcd5a194da164045))
+* **desktop:** address PR review comments and fix e2e test failures ([e28a560](https://github.com/FALAK097/glyph/commit/e28a5602e1d1dca5c61d4f643ac25eedefc58eb9))
+* **desktop:** batch watcher changedPaths and resolve remaining review threads ([444f542](https://github.com/FALAK097/glyph/commit/444f54270fbb70496da8478d05ea7d40cc54dd1b))
+* **desktop:** cross-node find matching and e2e test format ([8409df9](https://github.com/FALAK097/glyph/commit/8409df9b4ee75f367ea9d3bcaff446c5d7d0e76a))
+* **desktop:** fix CI e2e failures — folder button aria-label, flaky timeouts, and CI hardening ([9e132f3](https://github.com/FALAK097/glyph/commit/9e132f3841dfe20e940ff7590e1a8feea25c7b78))
+* **desktop:** fix sidebar instant update for non-default workspace + 28 e2e tests ([84442d4](https://github.com/FALAK097/glyph/commit/84442d44333ef3f69fcf4a142603a568a2760301))
+* **desktop:** ignore stale staged update state ([7b50aaa](https://github.com/FALAK097/glyph/commit/7b50aaa2d100011044bb6cbd721949f8cbe4f7f2))
+* **desktop:** polish note tab interactions ([2b9f443](https://github.com/FALAK097/glyph/commit/2b9f443b08d2e7aac88302620724e33ea5e83fa8))
+* **desktop:** refine note tab shortcuts ([d05299b](https://github.com/FALAK097/glyph/commit/d05299b418503495cd7bf35efd2435142b7db618))
+* **desktop:** refine note toolbar actions ([c2c2d1e](https://github.com/FALAK097/glyph/commit/c2c2d1e486ef9d9268eb50a7b873ac7570ae796b))
+* **desktop:** resolve remaining PR review comments and improve accessibility ([807a41b](https://github.com/FALAK097/glyph/commit/807a41b0e0d3240e346aeb405b14259bddac9ee7))
+* **desktop:** smooth command palette updates ([ad66d08](https://github.com/FALAK097/glyph/commit/ad66d0858fc858e5efcdbfc0bfbb25e0a42e59dd))
+* **desktop:** unify updater flow across platforms ([f7515bc](https://github.com/FALAK097/glyph/commit/f7515bc65e123284f6c0701d3dd5ef2b8c0053a4))
+* **e2e:** remove all tests dependent on New Folder sidebar timing ([f50975c](https://github.com/FALAK097/glyph/commit/f50975c9d438e9d65606913b0da96e1991f785b0))
+* **e2e:** remove flaky new-folder sidebar timing tests ([71381ee](https://github.com/FALAK097/glyph/commit/71381ee3bca0d1b71760736705af744e4cf1cf1e))
+* **e2e:** remove flaky sidebar tree tests that consistently fail on CI ([db51cd4](https://github.com/FALAK097/glyph/commit/db51cd4c32e57300c71841d88b134c8ca9ebe1fb))
+* **e2e:** use reliable sidebar hydration guard and increase flaky timeouts ([60d8059](https://github.com/FALAK097/glyph/commit/60d8059bd5af9aff360213e371d4288a5bda8897))
+
+
+### Performance Improvements
+
+* **desktop:** optimize main process startup and reduce IPC overhead ([06982a4](https://github.com/FALAK097/glyph/commit/06982a4e62f8c938592fc0780ee83ce6780fd5e6))
+
 ## [0.4.0](https://github.com/FALAK097/glyph/compare/v0.3.0...v0.4.0) (2026-04-05)
 
 

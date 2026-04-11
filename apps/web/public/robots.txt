@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://glyph.falakgala.dev/sitemap.xml

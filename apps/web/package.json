@@ -19,6 +19,7 @@
   },
   "type": "module",
   "scripts": {
+    "prebuild": "node scripts/generate-rss.js",
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",

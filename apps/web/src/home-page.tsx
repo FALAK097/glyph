@@ -24,6 +24,11 @@ type FaqItem = {
   question: string;
 };
 
+type FeatureCard = {
+  body: string;
+  title: string;
+};
+
 const featureSections: FeatureSection[] = [
   {
     eyebrow: "Command Palette",
@@ -69,6 +74,33 @@ const featureSections: FeatureSection[] = [
       src: "/syntax-highlighting.png",
       alt: "Glyph editor with syntax highlighting",
     },
+  },
+];
+
+const featureCards: FeatureCard[] = [
+  {
+    title: "Multi-note tabs",
+    body: "Keep several notes open, jump between them with shortcuts, and reorder tabs without losing your place.",
+  },
+  {
+    title: "Global search",
+    body: "Search file names, paths, and note content so large folders still feel easy to navigate.",
+  },
+  {
+    title: "In-note find",
+    body: "Find and step through matches inside the current note when you are editing longer documents.",
+  },
+  {
+    title: "Outline and focus mode",
+    body: "Jump by heading when you need structure, then hide extra interface when you want a quieter writing surface.",
+  },
+  {
+    title: "Autosave and safe refresh",
+    body: "Changes stay saved as you work, and the app stays in sync when files change outside Glyph.",
+  },
+  {
+    title: "Settings and shortcuts",
+    body: "Adjust themes, default folders, PDF behavior, and keyboard shortcuts so the app fits the way you already work.",
   },
 ];
 
@@ -191,7 +223,7 @@ export function HomePage() {
       <header className="mx-auto max-w-screen-2xl px-6 pb-18 pt-14 sm:px-8 sm:pb-22 lg:px-12 lg:pb-24 lg:pt-18">
         <div className="mx-auto max-w-[82rem]">
           <div className="clean-home__copy">
-            <span className="clean-home__eyebrow">Keyboard-first markdown workspace</span>
+            <span className="clean-home__eyebrow">The Interface of Thought</span>
             <h1 id="main-content" className="clean-home__title">
               A calmer place to write in markdown.
             </h1>
@@ -314,6 +346,32 @@ export function HomePage() {
                   alt: "Glyph dark theme",
                 }}
               />
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-screen-2xl px-6 pb-12 pt-2 sm:px-8 lg:px-12 lg:pb-16">
+        <div className="mx-auto max-w-[82rem]">
+          <article className="clean-feature-grid">
+            <div className="clean-feature-grid__intro">
+              <span className="clean-section__eyebrow">More</span>
+              <h2 className="clean-section__title">
+                The rest of the workflow stays quietly useful.
+              </h2>
+              <p className="clean-section__body">
+                The larger moments already have their own place above. These smaller pieces are the
+                ones that keep everyday work moving.
+              </p>
+            </div>
+
+            <div className="clean-feature-grid__cards">
+              {featureCards.map((card) => (
+                <article key={card.title} className="clean-feature-grid__card">
+                  <h3 className="clean-feature-grid__title">{card.title}</h3>
+                  <p className="clean-feature-grid__body">{card.body}</p>
+                </article>
+              ))}
             </div>
           </article>
         </div>

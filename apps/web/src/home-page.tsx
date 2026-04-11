@@ -389,6 +389,11 @@ export function HomePage() {
                   Glyph allows you to view and manage all your agent skills, custom instructions,
                   and prompts together, keeping your workspace highly organized.
                 </p>
+                <ul className="clean-list">
+                  <li>Manage custom instructions and prompts</li>
+                  <li>View all agent capabilities at a glance</li>
+                  <li>Keep workspace context centralized</li>
+                </ul>
               </div>
 
               <div className="clean-section__media">

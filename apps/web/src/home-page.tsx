@@ -55,7 +55,7 @@ const featureSections: FeatureSection[] = [
     ],
     reverse: true,
     shot: {
-      src: "/dark-theme.png",
+      src: "/og-image.png",
       alt: "Glyph workspace with explorer and editor",
     },
   },
@@ -380,25 +380,19 @@ export function HomePage() {
         <div className="mx-auto max-w-[82rem]">
           <article className="clean-theme-panel">
             <div className="clean-theme-panel__copy">
-              <span className="clean-section__eyebrow">Themes</span>
-              <h2 className="clean-section__title">Light and dark both feel intentional.</h2>
+              <span className="clean-section__eyebrow">Skills</span>
+              <h2 className="clean-section__title">All your agents' skills in one place.</h2>
               <p className="clean-section__body">
-                Glyph keeps the same calm reading rhythm across light, dark, and system modes, so
-                the interface stays consistent through long sessions.
+                Glyph allows you to view and manage all your agent skills, custom instructions, and
+                prompts together, keeping your workspace highly organized.
               </p>
             </div>
 
-            <div className="clean-theme-panel__grid">
+            <div className="mt-10 lg:mt-12 w-full lg:w-[85%] mx-auto">
               <ShotCard
                 shot={{
                   src: "/light-theme.png",
-                  alt: "Glyph light theme",
-                }}
-              />
-              <ShotCard
-                shot={{
-                  src: "/dark-theme.png",
-                  alt: "Glyph dark theme",
+                  alt: "Glyph skills management",
                 }}
               />
             </div>

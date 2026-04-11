@@ -1267,7 +1267,9 @@ body {
 }
 
 .clean-shot__frame {
-  /* Removed unwanted backgrounds and borders so the beautiful 16:9 images shine through directly */
+  /* No background/borders, but apply a nice curve and crop the scale */
+  overflow: hidden;
+  border-radius: 1rem;
 }
 
 .clean-shot--hero .clean-shot__frame {
@@ -1280,6 +1282,8 @@ body {
   aspect-ratio: 16 / 9;
   object-fit: contain;
   object-position: center top;
+  /* Slightly scale up to bring the app window forward */
+  transform: scale(1.15);
 }
 
 .clean-shot__image--cover {
@@ -1293,7 +1297,7 @@ body {
 
 .clean-section__grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.52fr) minmax(0, 0.48fr);
+  grid-template-columns: minmax(0, 0.38fr) minmax(0, 0.62fr);
   gap: clamp(2rem, 4vw, 4rem);
   align-items: center;
 }
@@ -1308,7 +1312,7 @@ body {
 
 .clean-section__copy,
 .clean-theme-panel__copy {
-  max-width: 34rem;
+  max-width: 32rem;
 }
 
 .clean-section__title {

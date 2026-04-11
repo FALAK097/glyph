@@ -1534,7 +1534,23 @@ async function ensureWelcomeNoteForFirstRun(settings: AppSettings) {
   const workspacePath = settings.defaultWorkspacePath;
   await ensureWorkspace(workspacePath);
   await fs.rm(legacyWelcomeNoteImagePath, { force: true });
+  const workspaceEntries = await fs.readdir(workspacePath, { withFileTypes: true });
+  const hasOtherWorkspaceContent = workspaceEntries.some((entry) => {
+    if (
+      entry.name === WELCOME_NOTE_FILE_NAME ||
+      entry.name === LEGACY_WELCOME_NOTE_IMAGE_FILE_NAME
+    ) {
+      return false;
+    }
+
+    if (entry.name === ".DS_Store") {
+      return false;
+    }
+
+    return entry.isDirectory() || (entry.isFile() && isMarkdownFile(entry.name));
+  });
   let nextWelcomeNoteContent = buildWelcomeNoteContent();
+  let shouldOpenWelcomeNote = false;
   let shouldRewriteWelcomeNote = false;
   try {
     const existingWelcomeNote = await fs.readFile(welcomeNotePath, "utf8");
@@ -1550,7 +1566,21 @@ async function ensureWelcomeNoteForFirstRun(settings: AppSettings) {
         ? String((error as { code?: unknown }).code)
         : "";
     if (code === "ENOENT") {
-      shouldRewriteWelcomeNote = true;
+      if (hasOtherWorkspaceContent) {
+        const nextSettings = {
+          ...settings,
+          hasSeenWelcomeNote: true,
+          welcomeNoteVersionSeen: WELCOME_NOTE_VERSION,
+        };
+        await saveSettings(nextSettings);
+        return {
+          settings: nextSettings,
+          shouldOpenWelcomeNote: false,
+          welcomeNotePath,
+        };
+      }
+
+      shouldOpenWelcomeNote = true;
     } else {
       throw error;
     }
@@ -1559,7 +1589,7 @@ async function ensureWelcomeNoteForFirstRun(settings: AppSettings) {
   try {
     await fs.writeFile(welcomeNotePath, nextWelcomeNoteContent, {
       encoding: "utf8",
-      flag: shouldRewriteWelcomeNote ? "w" : "wx",
+      flag: shouldRewriteWelcomeNote || !shouldOpenWelcomeNote ? "w" : "wx",
     });
   } catch (error) {
     const code =
@@ -1579,7 +1609,7 @@ async function ensureWelcomeNoteForFirstRun(settings: AppSettings) {
   await saveSettings(nextSettings);
   return {
     settings: nextSettings,
-    shouldOpenWelcomeNote: true,
+    shouldOpenWelcomeNote,
     welcomeNotePath,
   };
 }

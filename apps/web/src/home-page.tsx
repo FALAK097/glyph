@@ -337,13 +337,20 @@ export function HomePage() {
 
           <div className="clean-home__stage">
             <div className="clean-home__stage-surface">
-              <ShotCard
-                shot={{
-                  src: "/dark-theme.png",
-                  alt: "Glyph workspace overview",
-                }}
-                variant="hero"
-              />
+              <div className="clean-shot clean-shot--hero">
+                <div className="clean-shot__frame">
+                  <video
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="clean-shot__image clean-shot__image--cover"
+                    poster="/dark-theme.png"
+                  >
+                    <source src="/glyph-demo.mp4" type="video/mp4" />
+                  </video>
+                </div>
+              </div>
             </div>
           </div>
         </div>

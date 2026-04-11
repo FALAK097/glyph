@@ -262,7 +262,7 @@ body {
   bottom: -0.12rem;
   left: 0;
   height: 1px;
-  background: currentColor;
+  background: currentcolor;
   opacity: 0.42;
   transform: scaleX(0.28);
   transform-origin: left center;

@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.6.0](https://github.com/FALAK097/glyph/compare/v0.5.2...v0.6.0) (2026-04-11)
+
+
+### Features
+
+* add feature bullets to Skills section on landing page ([97be38c](https://github.com/FALAK097/glyph/commit/97be38c6ad071da143d628cd7c65401e62f0715a))
+* replace hero image with auto-playing demo video ([a294852](https://github.com/FALAK097/glyph/commit/a294852075bcbb32b2e510a38f39b526d087283d))
+* **ui:** add dev overlays and feature grid ([62c333f](https://github.com/FALAK097/glyph/commit/62c333fc28ddd5cca055c3b42f31fcf7de9dc1ad))
+* **web:** add seo metadata, rss generation, sitemap and robots.txt ([456b8d2](https://github.com/FALAK097/glyph/commit/456b8d245245b53ba201eb325d9e6cb8ea680647))
+* **web:** expand landing feature grid ([473fa8f](https://github.com/FALAK097/glyph/commit/473fa8f288576e5865639e9c329b511b32d8aa34))
+* **web:** refresh landing page and polish in-site changelog ([4a61bbc](https://github.com/FALAK097/glyph/commit/4a61bbc1f071555dad347314701a966f21b19681))
+* **web:** update to new 16:9 images and remove backgrounds/borders ([ca9aa14](https://github.com/FALAK097/glyph/commit/ca9aa14128def65b26bd442740c60ffba51a0757))
+* **web:** update to new Skills section, scale images for readability, use og-image for files feature ([e942485](https://github.com/FALAK097/glyph/commit/e942485862c4b6b17c1d20c5f7cf42485835a9fb))
+
+
+### Bug Fixes
+
+* address PR review comments for home page and styles ([7ba4577](https://github.com/FALAK097/glyph/commit/7ba457789b850aec98394e16ea927ce62db7e615))
+* **web:** restore correct image aspect ratio sizing and align Skills section ([2309002](https://github.com/FALAK097/glyph/commit/2309002b6c4d762751ce619b790eb56fd2f75dd6))
+
 ## [0.5.2](https://github.com/FALAK097/glyph/compare/v0.5.1...v0.5.2) (2026-04-10)
 
 

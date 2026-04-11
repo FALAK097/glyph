@@ -1099,7 +1099,9 @@ body {
 }
 
 .clean-home__copy {
-  max-width: 40rem;
+  max-width: 56rem;
+  margin-inline: auto;
+  text-align: center;
 }
 
 .clean-home__eyebrow,
@@ -1114,33 +1116,28 @@ body {
 
 .clean-home__title {
   margin: 0.8rem 0 0;
-  max-width: 11ch;
   font-family: var(--font-sans);
   font-size: clamp(3.35rem, 6vw, 5.5rem);
   font-weight: 600;
   line-height: 0.96;
   letter-spacing: -0.07em;
+  text-wrap: balance;
   color: var(--ink-strong);
 }
 
 .clean-home__body,
 .clean-section__body {
-  max-width: 39rem;
+  max-width: 43rem;
   margin: 1rem 0 0;
   color: var(--ink-soft);
   font-size: clamp(1rem, 0.96rem + 0.22vw, 1.12rem);
   line-height: 1.82;
 }
 
-.clean-home__meta {
-  max-width: 35rem;
-  margin: 1rem 0 0;
-  color: var(--ink-muted);
-  font-size: 0.95rem;
-  line-height: 1.8;
+.clean-home__body {
+  margin-inline: auto;
 }
 
-.clean-home__actions,
 .clean-closing__actions {
   display: flex;
   flex-wrap: wrap;
@@ -1148,23 +1145,10 @@ body {
   margin-top: 2rem;
 }
 
-.clean-home__link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  align-self: center;
-  color: var(--ink-soft);
-  font-size: 0.95rem;
-  font-weight: 500;
-  text-decoration: none;
-  transition:
-    color 160ms ease,
-    transform 160ms var(--ease-out-strong);
-}
-
 .clean-home__brew {
-  max-width: 47rem;
+  max-width: 41rem;
   margin-top: 1.35rem;
+  margin-inline: auto;
   overflow: hidden;
   border: 1px solid var(--border-soft);
   border-radius: 1.25rem;
@@ -1183,14 +1167,40 @@ body {
 .clean-home__brew-command {
   display: block;
   min-width: 0;
+  overflow-x: auto;
   color: var(--ink-soft);
   font-size: 0.94rem;
   line-height: 1.8;
-  white-space: normal;
-  word-break: break-all;
+  white-space: nowrap;
+  scrollbar-width: none;
 }
 
-.clean-home__brew-button {
+.clean-home__brew-command::-webkit-scrollbar {
+  display: none;
+}
+
+.clean-home__brew-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  padding: 0.2rem;
+  color: var(--ink-muted);
+  cursor: pointer;
+  transition:
+    transform 120ms var(--ease-out-strong),
+    color 160ms ease;
+}
+
+.clean-home__brew-copy:active,
+.clean-home__brew-select:active {
+  transform: scale(0.98);
+}
+
+.clean-home__brew-select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1208,10 +1218,6 @@ body {
     background-color 160ms ease,
     border-color 160ms ease,
     color 160ms ease;
-}
-
-.clean-home__brew-button:active {
-  transform: scale(0.98);
 }
 
 .clean-home__brew-fallback {
@@ -1330,6 +1336,7 @@ body {
   font-weight: 600;
   line-height: 1.02;
   letter-spacing: -0.06em;
+  text-wrap: balance;
   color: var(--ink-strong);
 }
 
@@ -1383,7 +1390,7 @@ body {
 }
 
 .clean-faq__intro {
-  max-width: 34rem;
+  max-width: 46rem;
 }
 
 .clean-faq__list {
@@ -1465,12 +1472,11 @@ body {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .clean-home__link:hover {
+  .clean-home__brew-copy:hover {
     color: var(--surface-strong);
-    transform: translateY(-1px);
   }
 
-  .clean-home__brew-button:hover {
+  .clean-home__brew-select:hover {
     background: color-mix(in oklab, white 72%, var(--surface-paper));
     border-color: color-mix(in oklab, var(--surface-strong) 18%, var(--border-soft));
   }
@@ -1493,14 +1499,9 @@ body {
     font-size: clamp(2.65rem, 12vw, 4rem);
   }
 
-  .clean-home__actions,
   .clean-closing__actions {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .clean-home__link {
-    align-self: flex-start;
   }
 
   .clean-home__brew-row {

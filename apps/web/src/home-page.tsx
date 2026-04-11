@@ -1,4 +1,4 @@
-import { ArrowUpRight, Check, Copy } from "lucide-react";
+import { Check, Copy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { AppleIcon, BREW_INSTALL_COMMAND, DOWNLOAD_URLS, WindowsIcon } from "./site-config";
@@ -197,36 +197,8 @@ export function HomePage() {
             </h1>
             <p className="clean-home__body">
               Glyph is a local-first desktop app for plain markdown files, built around folders,
-              shortcuts, and a command palette that makes the whole workspace feel easy to move
-              through.
+              shortcuts, and a workspace that feels easy to move through.
             </p>
-            <p className="clean-home__meta">
-              Command palette, pinned notes, explorer, copy as markdown, and export all stay close
-              without turning the interface into noise.
-            </p>
-
-            <div className="clean-home__actions">
-              <a href={DOWNLOAD_URLS.mac} className="download-button cursor-pointer border-0">
-                <AppleIcon />
-                <span>Download for macOS</span>
-              </a>
-              <a
-                href={DOWNLOAD_URLS.windows}
-                className="download-button download-button--secondary cursor-pointer border-0"
-              >
-                <WindowsIcon />
-                <span>Download for Windows</span>
-              </a>
-              <a
-                href={DOWNLOAD_URLS.github}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="clean-home__link"
-              >
-                View on GitHub
-                <ArrowUpRight size={14} aria-hidden="true" />
-              </a>
-            </div>
 
             <div id="install-with-homebrew" className="clean-home__brew">
               <div className="clean-home__brew-row">
@@ -234,19 +206,13 @@ export function HomePage() {
                 <button
                   type="button"
                   aria-label={hasCopiedBrew ? "Copied command" : "Copy command"}
-                  className="clean-home__brew-button"
+                  className="clean-home__brew-copy"
                   onClick={() => void handleCopyBrewCommand()}
                 >
                   {hasCopiedBrew ? (
-                    <>
-                      <Check size={15} aria-hidden="true" />
-                      <span>Copied</span>
-                    </>
+                    <Check size={15} aria-hidden="true" />
                   ) : (
-                    <>
-                      <Copy size={15} aria-hidden="true" />
-                      <span>Copy</span>
-                    </>
+                    <Copy size={15} aria-hidden="true" />
                   )}
                 </button>
               </div>
@@ -269,7 +235,7 @@ export function HomePage() {
                     />
                     <button
                       type="button"
-                      className="clean-home__brew-button"
+                      className="clean-home__brew-select"
                       onClick={selectBrewFallbackInput}
                     >
                       Select

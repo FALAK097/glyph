@@ -108,3 +108,7 @@ pnpm hooks:install
 ```
 
 The hook runs `pnpm fmt:check`, `pnpm lint`, and `pnpm typecheck` before a commit is created.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

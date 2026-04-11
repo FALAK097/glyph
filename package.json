@@ -2,6 +2,7 @@
   "name": "glyph",
   "version": "0.5.2",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "dev:desktop": "pnpm --filter @glyph/desktop dev",
     "dev:web": "pnpm --filter @glyph/web dev",

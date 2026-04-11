@@ -138,10 +138,6 @@ const featureCards: FeatureCard[] = [
     title: "Settings and shortcuts",
     body: "Adjust themes, default folders, PDF behavior, and keyboard shortcuts so the app fits the way you already work.",
   },
-  {
-    title: "Built-in updates",
-    body: "Stay current through the app itself instead of treating updates like a separate maintenance task.",
-  },
 ];
 
 const faqItems: FaqItem[] = [
@@ -170,6 +166,25 @@ const faqItems: FaqItem[] = [
     answer:
       "Yes. You can copy notes as markdown, reveal them in Finder or Explorer, and export them as PDF when you need a cleaner handoff.",
   },
+  {
+    question: "How much does it cost?",
+    answer: "Glyph is completely free to use.",
+  },
+  {
+    question: "Can I sync my notes across devices?",
+    answer:
+      "Yes. Because your notes are local files on disk, you can use any syncing service you like, such as iCloud, Dropbox, Google Drive, or a Git repository.",
+  },
+  {
+    question: "What flavors of markdown are supported?",
+    answer:
+      "Glyph supports standard Markdown along with GitHub Flavored Markdown (GFM) features like tables, task lists, and syntax highlighting in code blocks.",
+  },
+  {
+    question: "Does Glyph have mobile apps?",
+    answer:
+      "Not currently. Glyph is a desktop-first app designed specifically for macOS and Windows, focusing on a fast, keyboard-centric workflow.",
+  },
 ];
 
 type ShotCardProps = {
@@ -186,6 +201,8 @@ function ShotCard({ shot, variant = "default" }: ShotCardProps) {
           alt={shot.alt}
           width="2880"
           height="1800"
+          loading={variant === "hero" ? "eager" : "lazy"}
+          decoding="async"
           className={`clean-shot__image ${shot.fit === "cover" ? "clean-shot__image--cover" : ""}`}
           style={shot.position ? { objectPosition: shot.position } : undefined}
         />
@@ -431,7 +448,8 @@ export function HomePage() {
 
             <div className="clean-faq__list">
               {faqItems.map((item, index) => (
-                <details key={item.question} className="clean-faq__item" open={index === 0}>
+                // @ts-expect-error React 18 types don't include defaultOpen for details
+                <details key={item.question} className="clean-faq__item" defaultOpen={index === 0}>
                   <summary className="clean-faq__summary">
                     <span>{item.question}</span>
                     <span className="clean-faq__marker" aria-hidden="true" />

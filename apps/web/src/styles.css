@@ -210,7 +210,7 @@ body {
 }
 
 .site-route-shell {
-  animation: site-route-enter 420ms var(--ease-out-strong);
+  animation: site-route-enter 200ms var(--ease-out-strong);
   view-transition-name: site-route-shell;
 }
 
@@ -315,14 +315,14 @@ body {
   @supports (view-transition-name: site-route-shell) {
     ::view-transition-old(site-route-shell) {
       animation:
-        220ms ease-out both site-route-fade-out,
-        220ms ease-out both site-route-scale-down;
+        180ms ease-in both site-route-fade-out,
+        180ms ease-in both site-route-scale-down;
     }
 
     ::view-transition-new(site-route-shell) {
       animation:
-        320ms var(--ease-out-strong) both site-route-fade-in,
-        320ms var(--ease-out-strong) both site-route-rise-in;
+        200ms var(--ease-out-strong) both site-route-fade-in,
+        200ms var(--ease-out-strong) both site-route-rise-in;
     }
   }
 }
@@ -1146,7 +1146,7 @@ body {
 }
 
 .clean-home__brew {
-  max-width: 41rem;
+  width: max-content;
   margin-top: 1.35rem;
   margin-inline: auto;
   overflow: hidden;
@@ -1513,6 +1513,7 @@ body {
   font-size: 1rem;
   font-weight: 500;
   line-height: 1.45;
+  text-wrap: pretty;
 }
 
 .clean-faq__summary::-webkit-details-marker {
@@ -1536,7 +1537,7 @@ body {
   width: 0.75rem;
   height: 1.5px;
   border-radius: 999px;
-  background: currentColor;
+  background: currentcolor;
   transform: translate(-50%, -50%);
   transition: transform 180ms var(--ease-out-strong);
 }
@@ -1559,6 +1560,7 @@ body {
   color: var(--ink-soft);
   font-size: 0.95rem;
   line-height: 1.78;
+  text-wrap: pretty;
 }
 
 .clean-closing {
@@ -1899,5 +1901,10 @@ body {
   .brew-card__fallback-button {
     transition-duration: 0ms;
     animation: none;
+  }
+
+  .clean-faq__marker::before,
+  .clean-faq__marker::after {
+    transition: none;
   }
 }

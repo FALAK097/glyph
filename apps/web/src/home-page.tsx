@@ -40,7 +40,7 @@ const featureSections: FeatureSection[] = [
       "Custom shortcuts for daily actions",
     ],
     shot: {
-      src: "/keyboard-shortcut.png",
+      src: "/command-palette.png",
       alt: "Glyph command palette and keyboard shortcuts",
     },
   },
@@ -55,10 +55,8 @@ const featureSections: FeatureSection[] = [
     ],
     reverse: true,
     shot: {
-      src: "/demo.png",
+      src: "/dark-theme.png",
       alt: "Glyph workspace with explorer and editor",
-      fit: "cover",
-      position: "left top",
     },
   },
   {
@@ -199,8 +197,8 @@ function ShotCard({ shot, variant = "default" }: ShotCardProps) {
         <img
           src={shot.src}
           alt={shot.alt}
-          width="2880"
-          height="1800"
+          width="1920"
+          height="1080"
           loading={variant === "hero" ? "eager" : "lazy"}
           decoding="async"
           className={`clean-shot__image ${shot.fit === "cover" ? "clean-shot__image--cover" : ""}`}
@@ -339,7 +337,7 @@ export function HomePage() {
             <div className="clean-home__stage-surface">
               <ShotCard
                 shot={{
-                  src: "/demo.png",
+                  src: "/dark-theme.png",
                   alt: "Glyph workspace overview",
                 }}
                 variant="hero"

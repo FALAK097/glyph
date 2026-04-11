@@ -1259,17 +1259,7 @@ body {
 }
 
 .clean-home__stage-surface {
-  border: 1px solid var(--border-soft);
-  border-radius: 2rem;
-  padding: clamp(1rem, 2vw, 1.35rem);
-  background:
-    radial-gradient(circle at top center, oklch(0.952 0.005 95.1 / 0.9), transparent 56%),
-    linear-gradient(
-      180deg,
-      color-mix(in oklab, white 76%, var(--surface-paper)),
-      color-mix(in oklab, white 56%, var(--surface-tint))
-    );
-  box-shadow: 0 34px 82px -58px oklch(0.292 0.012 95 / 0.22);
+  /* No extra background/borders as the image handles its own */
 }
 
 .clean-shot {
@@ -1277,27 +1267,19 @@ body {
 }
 
 .clean-shot__frame {
-  overflow: hidden;
-  border: 1px solid color-mix(in oklab, var(--border-soft) 84%, white);
-  border-radius: 1.7rem;
-  background: color-mix(in oklab, white 84%, var(--surface-page));
-  padding: 0.72rem;
-  box-shadow: 0 18px 56px -44px oklch(0.292 0.012 95 / 0.2);
+  /* Removed unwanted backgrounds and borders so the beautiful 16:9 images shine through directly */
 }
 
 .clean-shot--hero .clean-shot__frame {
-  border-radius: 1.9rem;
-  padding: 0.85rem;
+  /* Inherit clear frame */
 }
 
 .clean-shot__image {
   display: block;
   width: 100%;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 16 / 9;
   object-fit: contain;
   object-position: center top;
-  border-radius: 1.12rem;
-  background: var(--surface-card);
 }
 
 .clean-shot__image--cover {
@@ -1682,7 +1664,7 @@ body {
   }
 
   .clean-shot__frame {
-    padding: 0.58rem;
+    /* Removed mobile padding */
   }
 }
 

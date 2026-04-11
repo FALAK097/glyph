@@ -95,7 +95,6 @@ const MARKDOWN_EXTENSIONS = [".md", ".mdx", ".markdown"] as const;
 const UPDATE_CHECK_INTERVAL_MS = 1000 * 60 * 60 * 6;
 const WELCOME_NOTE_VERSION = 3;
 const WELCOME_NOTE_FILE_NAME = "Welcome to Glyph.md";
-const LEGACY_WELCOME_NOTE_IMAGE_FILE_NAME = "glyph-welcome-hero.svg";
 const WELCOME_NOTE_IMAGE_URL = "https://glyph.falakgala.dev/og-image.png";
 const skillsService = createSkillsService({
   projectRoot: null,
@@ -1518,10 +1517,6 @@ This note is just a normal markdown file inside your Glyph workspace. You can re
 
 async function ensureWelcomeNoteForFirstRun(settings: AppSettings) {
   const welcomeNotePath = path.join(settings.defaultWorkspacePath, WELCOME_NOTE_FILE_NAME);
-  const legacyWelcomeNoteImagePath = path.join(
-    settings.defaultWorkspacePath,
-    LEGACY_WELCOME_NOTE_IMAGE_FILE_NAME,
-  );
 
   if (settings.welcomeNoteVersionSeen >= WELCOME_NOTE_VERSION) {
     return {
@@ -1533,13 +1528,9 @@ async function ensureWelcomeNoteForFirstRun(settings: AppSettings) {
 
   const workspacePath = settings.defaultWorkspacePath;
   await ensureWorkspace(workspacePath);
-  await fs.rm(legacyWelcomeNoteImagePath, { force: true });
   const workspaceEntries = await fs.readdir(workspacePath, { withFileTypes: true });
   const hasOtherWorkspaceContent = workspaceEntries.some((entry) => {
-    if (
-      entry.name === WELCOME_NOTE_FILE_NAME ||
-      entry.name === LEGACY_WELCOME_NOTE_IMAGE_FILE_NAME
-    ) {
+    if (entry.name === WELCOME_NOTE_FILE_NAME) {
       return false;
     }
 
@@ -1748,11 +1739,16 @@ async function openWorkspace(
   const preferredActiveFilePath = options?.preferredActiveFilePath
     ? path.normalize(options.preferredActiveFilePath)
     : null;
-  const activeFilePath =
-    preferredActiveFilePath &&
-    searchableFilesCache.some((filePath) => path.normalize(filePath) === preferredActiveFilePath)
-      ? preferredActiveFilePath
-      : getPreferredWorkspaceFilePath(searchableFilesCache);
+  const preferredActiveFileMatch = preferredActiveFilePath
+    ? (searchableFilesCache.find(
+        (filePath) =>
+          normalizePathForComparison(filePath) ===
+          normalizePathForComparison(preferredActiveFilePath),
+      ) ?? null)
+    : null;
+  const activeFilePath = preferredActiveFileMatch
+    ? preferredActiveFileMatch
+    : getPreferredWorkspaceFilePath(searchableFilesCache);
   const activeFile = activeFilePath ? await readMarkdownFile(activeFilePath) : null;
 
   if (watcherDebounceTimer) {
@@ -2002,12 +1998,21 @@ ipcMain.handle("workspace:openFolder", async (_event, dirPath?: string) => {
 });
 
 ipcMain.handle("workspace:openDefault", async () => {
-  const { settings, shouldOpenWelcomeNote, welcomeNotePath } = await ensureWelcomeNoteForFirstRun(
-    await loadSettings(),
-  );
-  return openWorkspace(settings.defaultWorkspacePath, {
-    preferredActiveFilePath: shouldOpenWelcomeNote ? welcomeNotePath : null,
-  });
+  const settings = await loadSettings();
+
+  try {
+    const {
+      settings: nextSettings,
+      shouldOpenWelcomeNote,
+      welcomeNotePath,
+    } = await ensureWelcomeNoteForFirstRun(settings);
+    return openWorkspace(nextSettings.defaultWorkspacePath, {
+      preferredActiveFilePath: shouldOpenWelcomeNote ? welcomeNotePath : null,
+    });
+  } catch (error) {
+    console.error("Failed to provision welcome note:", error);
+    return openWorkspace(settings.defaultWorkspacePath);
+  }
 });
 
 function assertBasename(name: string) {

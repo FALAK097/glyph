@@ -1590,7 +1590,7 @@ export const useDesktopAppController = (
             try {
               return await glyph.openDefaultWorkspace();
             } catch {
-              return null;
+              // If welcome-note setup fails, still try opening the folder directly.
             }
           }
 

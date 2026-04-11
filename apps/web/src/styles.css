@@ -1666,11 +1666,6 @@ body {
     line-height: 1.5;
   }
 
-  .clean-home__brew-prefix,
-  .clean-home__brew-formula {
-    white-space: nowrap;
-  }
-
   .clean-home__brew-copy {
     position: absolute;
     top: 0.95rem;

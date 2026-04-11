@@ -297,7 +297,7 @@ export function HomePage() {
             <div id="install-with-homebrew" className="clean-home__brew">
               <div className="clean-home__brew-row">
                 <code className="clean-home__brew-command">
-                  <span className="clean-home__brew-prefix">{BREW_COMMAND_PREFIX}</span>
+                  <span className="clean-home__brew-prefix">{BREW_COMMAND_PREFIX}</span>{" "}
                   <span className="clean-home__brew-formula">{BREW_COMMAND_FORMULA}</span>
                 </code>
                 <button

@@ -1146,7 +1146,8 @@ body {
 }
 
 .clean-home__brew {
-  width: max-content;
+  width: fit-content;
+  max-width: 100%;
   margin-top: 1.35rem;
   margin-inline: auto;
   overflow: hidden;
@@ -1160,23 +1161,30 @@ body {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.75rem;
-  align-items: start;
+  align-items: center;
   padding: 0.95rem 1rem;
 }
 
 .clean-home__brew-command {
-  display: block;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.65rem;
   min-width: 0;
   overflow-x: auto;
   color: var(--ink-soft);
   font-size: 0.94rem;
   line-height: 1.8;
-  white-space: nowrap;
   scrollbar-width: none;
 }
 
 .clean-home__brew-command::-webkit-scrollbar {
   display: none;
+}
+
+.clean-home__brew-prefix,
+.clean-home__brew-formula {
+  white-space: nowrap;
 }
 
 .clean-home__brew-copy {
@@ -1639,8 +1647,40 @@ body {
     align-items: flex-start;
   }
 
+  .clean-home__brew {
+    width: 100%;
+  }
+
   .clean-home__brew-row {
-    grid-template-columns: 1fr;
+    position: relative;
+    display: block;
+    padding-right: 3.75rem;
+  }
+
+  .clean-home__brew-command {
+    overflow-x: visible;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+    font-size: 0.86rem;
+    line-height: 1.5;
+  }
+
+  .clean-home__brew-prefix,
+  .clean-home__brew-formula {
+    white-space: nowrap;
+  }
+
+  .clean-home__brew-copy {
+    position: absolute;
+    top: 0.95rem;
+    right: 1rem;
+    justify-self: auto;
+    align-self: auto;
+    border: 0;
+    background: transparent;
+    padding: 0.15rem;
+    color: var(--ink-muted);
   }
 
   .clean-home__brew-fallback-row {

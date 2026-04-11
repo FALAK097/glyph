@@ -93,6 +93,10 @@ let watcherDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let changedPathsBatch = new Set<string>();
 const MARKDOWN_EXTENSIONS = [".md", ".mdx", ".markdown"] as const;
 const UPDATE_CHECK_INTERVAL_MS = 1000 * 60 * 60 * 6;
+const WELCOME_NOTE_VERSION = 3;
+const WELCOME_NOTE_FILE_NAME = "Welcome to Glyph.md";
+const LEGACY_WELCOME_NOTE_IMAGE_FILE_NAME = "glyph-welcome-hero.svg";
+const WELCOME_NOTE_IMAGE_URL = "https://glyph.falakgala.dev/og-image.png";
 const skillsService = createSkillsService({
   projectRoot: null,
   onLibraryChanged: (event) => {
@@ -955,6 +959,8 @@ async function getLinkPreview(
 function getDefaultSettings(): AppSettings {
   return {
     defaultWorkspacePath: getDefaultWorkspacePath(),
+    hasSeenWelcomeNote: false,
+    welcomeNoteVersionSeen: 0,
     themeId: "aura",
     themeMode: "light",
     hiddenFiles: [],
@@ -1260,6 +1266,13 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
       candidate.defaultWorkspacePath.trim().length > 0
         ? candidate.defaultWorkspacePath
         : defaults.defaultWorkspacePath,
+    hasSeenWelcomeNote:
+      typeof candidate.hasSeenWelcomeNote === "boolean" ? candidate.hasSeenWelcomeNote : false,
+    welcomeNoteVersionSeen:
+      typeof candidate.welcomeNoteVersionSeen === "number" &&
+      Number.isFinite(candidate.welcomeNoteVersionSeen)
+        ? Math.max(0, Math.trunc(candidate.welcomeNoteVersionSeen))
+        : 0,
     themeId:
       typeof candidate.themeId === "string" && candidate.themeId.trim().length > 0
         ? candidate.themeId
@@ -1443,6 +1456,134 @@ async function ensureWorkspace(dirPath: string) {
   await fs.mkdir(dirPath, { recursive: true });
 }
 
+function buildWelcomeNoteContent() {
+  return `# Welcome to Glyph
+
+![Welcome to Glyph](${WELCOME_NOTE_IMAGE_URL})
+
+Glyph is a local-first markdown app built around folders, shortcuts, and a writing surface that stays out of your way.
+
+## Start here
+
+- Create notes with \`Cmd/Ctrl + N\`
+- Jump anywhere with the Command Palette using \`Cmd/Ctrl + P\`
+- Use slash commands like \`/heading\`, \`/table\`, and \`/task list\`
+- Open your notes directly from the folders you already own
+
+## What Glyph can do
+
+| Area | What you can try |
+| --- | --- |
+| Writing | Headings, lists, tasks, tables, links, code blocks, and images |
+| Navigation | Tabs, global search, in-note find, outline jump, and back/forward history |
+| File workflow | Reveal in Finder or Explorer, copy note paths, and keep everything as plain markdown |
+| Output | Copy as markdown or export a note as PDF |
+
+## A few useful links
+
+- [GitHub releases](https://github.com/FALAK097/glyph/releases)
+- [Project changelog](https://github.com/FALAK097/glyph/blob/main/CHANGELOG.md)
+- [Report an issue or request a feature](https://github.com/FALAK097/glyph/issues)
+
+## Example task list
+
+- [ ] Create your first note
+- [ ] Pin an important file
+- [ ] Try the command palette
+- [ ] Export something to PDF
+
+## Example table
+
+| Shortcut | Action |
+| --- | --- |
+| \`Cmd/Ctrl + N\` | New note |
+| \`Cmd/Ctrl + P\` | Open the command palette |
+| \`Cmd/Ctrl + F\` | Find in the current note |
+
+## Example code block
+
+\`\`\`md
+# Daily note
+
+- Capture ideas quickly
+- Link related notes together
+- Keep everything in plain markdown
+\`\`\`
+
+## Your files stay local
+
+This note is just a normal markdown file inside your Glyph workspace. You can rename it, move it, edit it, or delete it. Once it is gone, Glyph will not recreate it.
+`;
+}
+
+async function ensureWelcomeNoteForFirstRun(settings: AppSettings) {
+  const welcomeNotePath = path.join(settings.defaultWorkspacePath, WELCOME_NOTE_FILE_NAME);
+  const legacyWelcomeNoteImagePath = path.join(
+    settings.defaultWorkspacePath,
+    LEGACY_WELCOME_NOTE_IMAGE_FILE_NAME,
+  );
+
+  if (settings.welcomeNoteVersionSeen >= WELCOME_NOTE_VERSION) {
+    return {
+      settings,
+      shouldOpenWelcomeNote: false,
+      welcomeNotePath,
+    };
+  }
+
+  const workspacePath = settings.defaultWorkspacePath;
+  await ensureWorkspace(workspacePath);
+  await fs.rm(legacyWelcomeNoteImagePath, { force: true });
+  let nextWelcomeNoteContent = buildWelcomeNoteContent();
+  let shouldRewriteWelcomeNote = false;
+  try {
+    const existingWelcomeNote = await fs.readFile(welcomeNotePath, "utf8");
+    const updatedWelcomeNote = existingWelcomeNote.replace(
+      /!\[Welcome to Glyph]\([^)]+\)/,
+      `![Welcome to Glyph](${WELCOME_NOTE_IMAGE_URL})`,
+    );
+    shouldRewriteWelcomeNote = updatedWelcomeNote !== existingWelcomeNote;
+    nextWelcomeNoteContent = updatedWelcomeNote;
+  } catch (error) {
+    const code =
+      typeof error === "object" && error && "code" in error
+        ? String((error as { code?: unknown }).code)
+        : "";
+    if (code === "ENOENT") {
+      shouldRewriteWelcomeNote = true;
+    } else {
+      throw error;
+    }
+  }
+
+  try {
+    await fs.writeFile(welcomeNotePath, nextWelcomeNoteContent, {
+      encoding: "utf8",
+      flag: shouldRewriteWelcomeNote ? "w" : "wx",
+    });
+  } catch (error) {
+    const code =
+      typeof error === "object" && error && "code" in error
+        ? String((error as { code?: unknown }).code)
+        : "";
+    if (code !== "EEXIST") {
+      throw error;
+    }
+  }
+
+  const nextSettings = {
+    ...settings,
+    hasSeenWelcomeNote: true,
+    welcomeNoteVersionSeen: WELCOME_NOTE_VERSION,
+  };
+  await saveSettings(nextSettings);
+  return {
+    settings: nextSettings,
+    shouldOpenWelcomeNote: true,
+    welcomeNotePath,
+  };
+}
+
 async function readMarkdownFile(filePath: string) {
   let raw: string;
   try {
@@ -1562,14 +1703,26 @@ function getPreferredWorkspaceFilePath(filePaths: string[]) {
   return filePaths[0] ?? null;
 }
 
-async function openWorkspace(dirPath: string): Promise<WorkspaceSnapshot> {
+async function openWorkspace(
+  dirPath: string,
+  options?: {
+    preferredActiveFilePath?: string | null;
+  },
+): Promise<WorkspaceSnapshot> {
   await ensureWorkspace(dirPath);
   activeWorkspaceRoot = dirPath;
   await skillsService.setProjectRoot(dirPath);
 
   const tree = await buildDirectoryTree(dirPath);
   searchableFilesCache = await collectMarkdownFiles(tree);
-  const activeFilePath = getPreferredWorkspaceFilePath(searchableFilesCache);
+  const preferredActiveFilePath = options?.preferredActiveFilePath
+    ? path.normalize(options.preferredActiveFilePath)
+    : null;
+  const activeFilePath =
+    preferredActiveFilePath &&
+    searchableFilesCache.some((filePath) => path.normalize(filePath) === preferredActiveFilePath)
+      ? preferredActiveFilePath
+      : getPreferredWorkspaceFilePath(searchableFilesCache);
   const activeFile = activeFilePath ? await readMarkdownFile(activeFilePath) : null;
 
   if (watcherDebounceTimer) {
@@ -1819,8 +1972,12 @@ ipcMain.handle("workspace:openFolder", async (_event, dirPath?: string) => {
 });
 
 ipcMain.handle("workspace:openDefault", async () => {
-  const settings = await loadSettings();
-  return openWorkspace(settings.defaultWorkspacePath);
+  const { settings, shouldOpenWelcomeNote, welcomeNotePath } = await ensureWelcomeNoteForFirstRun(
+    await loadSettings(),
+  );
+  return openWorkspace(settings.defaultWorkspacePath, {
+    preferredActiveFilePath: shouldOpenWelcomeNote ? welcomeNotePath : null,
+  });
 });
 
 function assertBasename(name: string) {

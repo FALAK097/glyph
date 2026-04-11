@@ -200,6 +200,8 @@ function ShotCard({ shot, variant = "default" }: ShotCardProps) {
           width="1920"
           height="1080"
           loading={variant === "hero" ? "eager" : "lazy"}
+          // @ts-expect-error React 18 types might lack fetchpriority
+          fetchpriority={variant === "hero" ? "high" : "auto"}
           decoding="async"
           className={`clean-shot__image ${shot.fit === "cover" ? "clean-shot__image--cover" : ""}`}
           style={shot.position ? { objectPosition: shot.position } : undefined}
@@ -378,23 +380,25 @@ export function HomePage() {
 
       <section className="mx-auto max-w-screen-2xl px-6 pb-12 pt-4 sm:px-8 lg:px-12 lg:pb-16">
         <div className="mx-auto max-w-[82rem]">
-          <article className="clean-theme-panel">
-            <div className="clean-theme-panel__copy">
-              <span className="clean-section__eyebrow">Skills</span>
-              <h2 className="clean-section__title">All your agents' skills in one place.</h2>
-              <p className="clean-section__body">
-                Glyph allows you to view and manage all your agent skills, custom instructions, and
-                prompts together, keeping your workspace highly organized.
-              </p>
-            </div>
+          <article className="clean-section">
+            <div className="clean-section__grid clean-section__grid--reverse">
+              <div className="clean-section__copy">
+                <span className="clean-section__eyebrow">Skills</span>
+                <h2 className="clean-section__title">All your agents' skills in one place.</h2>
+                <p className="clean-section__body">
+                  Glyph allows you to view and manage all your agent skills, custom instructions,
+                  and prompts together, keeping your workspace highly organized.
+                </p>
+              </div>
 
-            <div className="mt-10 lg:mt-12 w-full lg:w-[85%] mx-auto">
-              <ShotCard
-                shot={{
-                  src: "/light-theme.png",
-                  alt: "Glyph skills management",
-                }}
-              />
+              <div className="clean-section__media">
+                <ShotCard
+                  shot={{
+                    src: "/light-theme.png",
+                    alt: "Glyph skills management",
+                  }}
+                />
+              </div>
             </div>
           </article>
         </div>

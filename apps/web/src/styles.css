@@ -1282,8 +1282,6 @@ body {
   aspect-ratio: 16 / 9;
   object-fit: contain;
   object-position: center top;
-  /* Slightly scale up to bring the app window forward */
-  transform: scale(1.15);
 }
 
 .clean-shot__image--cover {
@@ -1297,9 +1295,13 @@ body {
 
 .clean-section__grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.38fr) minmax(0, 0.62fr);
+  grid-template-columns: minmax(0, 0.45fr) minmax(0, 0.55fr);
   gap: clamp(2rem, 4vw, 4rem);
   align-items: center;
+}
+
+.clean-section__grid--reverse {
+  grid-template-columns: minmax(0, 0.55fr) minmax(0, 0.45fr);
 }
 
 .clean-section__grid--reverse > :first-child {

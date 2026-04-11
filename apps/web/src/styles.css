@@ -206,6 +206,52 @@ body {
   transition: color 160ms ease;
 }
 
+.site-route-shell {
+  animation: site-route-enter 420ms var(--ease-out-strong);
+  view-transition-name: site-route-shell;
+}
+
+.changelog-link {
+  color: var(--ink-strong);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, var(--ink-strong) 38%, transparent);
+  text-underline-offset: 0.18em;
+  transition:
+    color 160ms ease,
+    text-decoration-color 160ms ease;
+}
+
+.timeline-shell {
+  position: relative;
+}
+
+.timeline-date {
+  position: relative;
+  padding-left: 1.6rem;
+}
+
+.timeline-date::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 1.4rem;
+  height: 0.8rem;
+  width: 0.8rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--surface-strong) 78%, white);
+  box-shadow: 0 0 0 6px color-mix(in oklab, white 82%, var(--surface-page));
+}
+
+.timeline-inline-code {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 0.55rem;
+  background: color-mix(in oklab, white 72%, var(--surface-paper));
+  padding: 0.08rem 0.42rem;
+  font-size: 0.9em;
+  color: var(--ink-strong);
+}
+
 .footer-link::after {
   content: "";
   position: absolute;
@@ -228,6 +274,11 @@ body {
     background: oklch(0.22 0.011 110);
   }
 
+  .changelog-link:hover {
+    color: oklch(0.18 0.01 110);
+    text-decoration-color: currentColor;
+  }
+
   .download-button--secondary:hover {
     background: color-mix(in oklab, var(--surface-page) 72%, white);
     border-color: oklch(0.72 0.009 95 / 0.5);
@@ -241,6 +292,92 @@ body {
 
 .download-button:active {
   transform: scale(0.97);
+}
+
+@keyframes site-route-enter {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+    filter: blur(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@supports (view-transition-name: site-route-shell) {
+  ::view-transition-old(site-route-shell) {
+    animation:
+      220ms ease-out both site-route-fade-out,
+      220ms ease-out both site-route-scale-down;
+  }
+
+  ::view-transition-new(site-route-shell) {
+    animation:
+      320ms var(--ease-out-strong) both site-route-fade-in,
+      320ms var(--ease-out-strong) both site-route-rise-in;
+  }
+}
+
+@keyframes site-route-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes site-route-scale-down {
+  to {
+    transform: scale(0.988);
+  }
+}
+
+@keyframes site-route-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes site-route-rise-in {
+  from {
+    transform: translateY(20px);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
+
+@media (min-width: 1024px) {
+  .timeline-shell::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 8.96rem;
+    width: 1px;
+    background: linear-gradient(
+      180deg,
+      color-mix(in oklab, transparent 0%, transparent) 0%,
+      color-mix(in oklab, var(--border-soft) 80%, transparent) 8%,
+      color-mix(in oklab, var(--border-soft) 80%, transparent) 92%,
+      color-mix(in oklab, transparent 0%, transparent) 100%
+    );
+  }
+
+  .timeline-date {
+    position: sticky;
+    top: 6.75rem;
+    padding-left: 0;
+  }
+
+  .timeline-date::before {
+    left: auto;
+    right: -1.62rem;
+    top: 2.3rem;
+  }
 }
 
 @media (max-width: 640px) {
@@ -274,5 +411,11 @@ body {
   .footer-link,
   .footer-link::after {
     transition-duration: 0ms;
+  }
+
+  .changelog-link,
+  .site-route-shell {
+    transition-duration: 0ms;
+    animation: none;
   }
 }

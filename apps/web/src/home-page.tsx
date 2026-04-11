@@ -83,6 +83,10 @@ const featureCards: FeatureCard[] = [
     body: "Keep several notes open, jump between them with shortcuts, and reorder tabs without losing your place.",
   },
   {
+    title: "Direct tab shortcuts",
+    body: "Move through open notes with Cmd or Ctrl plus numbers, plus adjacent-tab navigation when you are moving quickly.",
+  },
+  {
     title: "Global search",
     body: "Search file names, paths, and note content so large folders still feel easy to navigate.",
   },
@@ -95,12 +99,48 @@ const featureCards: FeatureCard[] = [
     body: "Jump by heading when you need structure, then hide extra interface when you want a quieter writing surface.",
   },
   {
+    title: "Internal note links",
+    body: "Follow note-to-note links directly in the workspace and keep your markdown connected instead of siloed.",
+  },
+  {
+    title: "Link previews",
+    body: "Preview linked notes before opening them, which makes cross-referenced writing much easier to scan.",
+  },
+  {
+    title: "Slash commands",
+    body: "Insert headings, lists, tasks, tables, links, and other markdown structure without breaking your typing rhythm.",
+  },
+  {
+    title: "Local image insertion",
+    body: "Drop images into notes and keep them close to the files they belong with on disk.",
+  },
+  {
     title: "Autosave and safe refresh",
     body: "Changes stay saved as you work, and the app stays in sync when files change outside Glyph.",
   },
   {
+    title: "Session restore",
+    body: "Return to your working context with tabs, navigation state, and the flow of the previous session intact.",
+  },
+  {
+    title: "Copy note path",
+    body: "Grab the current file path instantly when you need to share location details or jump to the file outside Glyph.",
+  },
+  {
+    title: "Reveal on disk",
+    body: "Open the current note in Finder or Explorer without leaving the editor to manually hunt through folders.",
+  },
+  {
+    title: "PDF export",
+    body: "Turn a note into a cleaner handoff when you need something easier to share, print, or archive.",
+  },
+  {
     title: "Settings and shortcuts",
     body: "Adjust themes, default folders, PDF behavior, and keyboard shortcuts so the app fits the way you already work.",
+  },
+  {
+    title: "Built-in updates",
+    body: "Stay current through the app itself instead of treating updates like a separate maintenance task.",
   },
 ];
 

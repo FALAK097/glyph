@@ -1414,6 +1414,10 @@ body {
       color-mix(in oklab, white 82%, var(--surface-page)),
       color-mix(in oklab, white 68%, var(--surface-paper))
     );
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
 }
 
 .clean-feature-grid__card::before {
@@ -1439,14 +1443,21 @@ body {
   pointer-events: none;
 }
 
-.clean-feature-grid__card:nth-child(3n + 1),
-.clean-feature-grid__card:nth-child(3n + 2),
-.clean-feature-grid__card:nth-child(3n + 3) {
-  border-bottom: 1px solid color-mix(in oklab, var(--border-soft) 82%, transparent);
+.clean-feature-grid__card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid transparent;
+  transition: border-color 160ms ease;
+  pointer-events: none;
 }
 
 .clean-feature-grid__card:not(:nth-child(3n)) {
   border-right: 1px solid color-mix(in oklab, var(--border-soft) 82%, transparent);
+}
+
+.clean-feature-grid__card:not(:nth-last-child(-n + 3)) {
+  border-bottom: 1px solid color-mix(in oklab, var(--border-soft) 82%, transparent);
 }
 
 .clean-feature-grid__title {
@@ -1568,6 +1579,28 @@ body {
     background: color-mix(in oklab, white 72%, var(--surface-paper));
     border-color: color-mix(in oklab, var(--surface-strong) 18%, var(--border-soft));
   }
+
+  .clean-feature-grid__card:hover {
+    background:
+      radial-gradient(circle at top right, oklch(0.962 0.004 95 / 0.96), transparent 34%),
+      linear-gradient(
+        180deg,
+        color-mix(in oklab, white 80%, var(--surface-page)),
+        color-mix(in oklab, white 60%, var(--surface-paper))
+      );
+  }
+
+  .clean-feature-grid__card:hover::after {
+    border-color: color-mix(in oklab, var(--surface-strong) 28%, var(--border-soft));
+  }
+
+  .clean-feature-grid__card:hover .clean-feature-grid__title {
+    color: var(--surface-strong);
+  }
+
+  .clean-feature-grid__card:hover .clean-feature-grid__body {
+    color: color-mix(in oklab, var(--ink-soft) 82%, var(--surface-strong));
+  }
 }
 
 @media (max-width: 960px) {
@@ -1584,22 +1617,20 @@ body {
     min-height: 12rem;
   }
 
-  .clean-feature-grid__card:nth-child(3n + 1),
-  .clean-feature-grid__card:nth-child(3n + 2),
-  .clean-feature-grid__card:nth-child(3n + 3) {
-    border-bottom: 0;
-  }
-
-  .clean-feature-grid__card:nth-child(-n + 4) {
-    border-bottom: 1px solid color-mix(in oklab, var(--border-soft) 82%, transparent);
-  }
-
   .clean-feature-grid__card:not(:nth-child(3n)) {
     border-right: 0;
   }
 
   .clean-feature-grid__card:nth-child(2n + 1) {
     border-right: 1px solid color-mix(in oklab, var(--border-soft) 82%, transparent);
+  }
+
+  .clean-feature-grid__card:not(:nth-last-child(-n + 2)) {
+    border-bottom: 1px solid color-mix(in oklab, var(--border-soft) 82%, transparent);
+  }
+
+  .clean-feature-grid__card:nth-last-child(-n + 2) {
+    border-bottom: 0;
   }
 
   .clean-section__grid--reverse > :first-child,
@@ -1635,10 +1666,12 @@ body {
   }
 
   .clean-feature-grid__card,
-  .clean-feature-grid__card:nth-child(-n + 4),
   .clean-feature-grid__card:nth-child(2n + 1) {
     min-height: auto;
     border-right: 0;
+  }
+
+  .clean-feature-grid__card:not(:last-child) {
     border-bottom: 1px solid color-mix(in oklab, var(--border-soft) 82%, transparent);
   }
 

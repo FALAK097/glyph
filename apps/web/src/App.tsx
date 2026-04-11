@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ChangelogPage } from "./changelog-page";
 import { HomePage } from "./home-page";
@@ -47,11 +47,41 @@ function updateDocumentMeta(page: SitePage) {
   }
 }
 
+function focusMainContent() {
+  const mainContent = document.getElementById("main-content");
+  if (!(mainContent instanceof HTMLElement)) {
+    return;
+  }
+
+  if (!mainContent.hasAttribute("tabindex")) {
+    mainContent.tabIndex = -1;
+  }
+
+  mainContent.focus();
+}
+
 export function App() {
   const [page, setPage] = useState<SitePage>(() => resolvePage(window.location.pathname));
+  const shouldFocusMainContentRef = useRef(false);
 
   useEffect(() => {
     updateDocumentMeta(page);
+  }, [page]);
+
+  useEffect(() => {
+    if (!shouldFocusMainContentRef.current) {
+      return;
+    }
+
+    shouldFocusMainContentRef.current = false;
+
+    const frame = window.requestAnimationFrame(() => {
+      focusMainContent();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
   }, [page]);
 
   const commitNavigation = useCallback((nextPage: SitePage, pushHistory: boolean) => {
@@ -60,21 +90,21 @@ export function App() {
       window.location.pathname.endsWith("/") || window.location.pathname === "/"
         ? window.location.pathname
         : `${window.location.pathname}/`;
+    const didPushHistory = pushHistory && currentPath !== nextHref;
 
-    if (pushHistory && currentPath !== nextHref) {
+    if (didPushHistory) {
       window.history.pushState({ page: nextPage }, "", nextHref);
+      window.requestAnimationFrame(() => {
+        window.scrollTo({
+          top: 0,
+          left: 0,
+          behavior: "auto",
+        });
+      });
     }
 
     startTransition(() => {
       setPage(nextPage);
-    });
-
-    window.requestAnimationFrame(() => {
-      window.scrollTo({
-        top: 0,
-        left: 0,
-        behavior: "auto",
-      });
     });
   }, []);
 
@@ -84,15 +114,20 @@ export function App() {
         return;
       }
 
+      const performNavigation = () => {
+        shouldFocusMainContentRef.current = true;
+        commitNavigation(nextPage, pushHistory);
+      };
+
       const viewTransitionDocument = document as ViewTransitionDocument;
       if (viewTransitionDocument.startViewTransition) {
         void viewTransitionDocument.startViewTransition(() => {
-          commitNavigation(nextPage, pushHistory);
+          performNavigation();
         });
         return;
       }
 
-      commitNavigation(nextPage, pushHistory);
+      performNavigation();
     },
     [commitNavigation, page],
   );

@@ -17,6 +17,9 @@ export default defineConfig({
   },
   server: {
     fs: {
+      // Intentionally widen `server.fs.allow` to the repo root so Vite can read
+      // shared workspace files like CHANGELOG.md during dev/build; this is a
+      // deliberate security tradeoff and should not be tightened accidentally.
       allow: [resolve(__dirname, "../..")],
     },
     host: "127.0.0.1",

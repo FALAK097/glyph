@@ -1,123 +1,123 @@
-import { Check, Copy } from "lucide-react";
+import { ArrowUpRight, Check, Copy } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { BREW_INSTALL_COMMAND, DOWNLOAD_URLS } from "./site-config";
+import { AppleIcon, BREW_INSTALL_COMMAND, DOWNLOAD_URLS, WindowsIcon } from "./site-config";
 
-type Feature = {
-  eyebrow: string;
-  title: string;
-  description: string;
-  className: string;
-  tone: string;
-  compactHeight?: boolean;
-  emphasis?: "default" | "media";
-  image?: {
-    src: string;
-    alt: string;
-    frame?: "wide" | "compact" | "panel";
-  };
-  themes?: boolean;
+type Shot = {
+  alt: string;
+  fit?: "contain" | "cover";
+  position?: string;
+  src: string;
 };
 
-const features: Feature[] = [
+type FeatureSection = {
+  body: string;
+  eyebrow: string;
+  points: string[];
+  reverse?: boolean;
+  shot: Shot;
+  title: string;
+};
+
+type FaqItem = {
+  answer: string;
+  question: string;
+};
+
+const featureSections: FeatureSection[] = [
   {
-    eyebrow: "Organization",
-    title: "Folders + Editing",
-    description:
-      "Open entire directories and manage your markdown library in one focused editor designed for long-form writing.",
-    className: "md:col-span-8",
-    tone: "feature-card--paper",
-    emphasis: "media",
-    image: {
-      src: "/demo.png",
-      alt: "Glyph interface preview",
-      frame: "wide",
-    },
-  },
-  {
-    eyebrow: "Privacy",
-    title: "Local-First",
-    description:
-      "Your notes stay on your device. No accounts, no forced sync, and no cloud dependency between you and your files.",
-    className: "md:col-span-4",
-    tone: "feature-card--ink",
-    compactHeight: true,
-  },
-  {
-    eyebrow: "Favorites",
-    title: "Pinned Notes",
-    description:
-      "Keep your most important notes anchored for instant access in the sidebar and the command palette.",
-    className: "md:col-span-4",
-    tone: "feature-card--paper",
-  },
-  {
-    eyebrow: "Discovery",
-    title: "Find Notes",
-    description:
-      "Search all your markdown files in one place and find the exact note you need in seconds.",
-    className: "md:col-span-4",
-    tone: "feature-card--white",
-  },
-  {
-    eyebrow: "Ethics",
-    title: "Open Source",
-    description:
-      "Glyph is transparent and community-friendly. Inspect the code, contribute improvements, or adapt it to your workflow.",
-    className: "md:col-span-4",
-    tone: "feature-card--tint",
-  },
-  {
-    eyebrow: "Workflow",
-    title: "Keyboard Shortcuts",
-    description:
-      "Built for speed, with fast navigation and commands that keep your hands on the keyboard.",
-    className: "md:col-span-6",
-    tone: "feature-card--paper",
-    image: {
+    eyebrow: "Command Palette",
+    title: "Everything important stays one shortcut away.",
+    body: "Open notes, pin favorites, switch themes, reveal files, export documents, and move through the app without breaking the flow of writing.",
+    points: [
+      "Cmd/Ctrl+P at the center",
+      "Pinned notes and quick actions",
+      "Custom shortcuts for daily actions",
+    ],
+    shot: {
       src: "/keyboard-shortcut.png",
-      alt: "Glyph keyboard shortcuts interface preview",
-      frame: "wide",
+      alt: "Glyph command palette and keyboard shortcuts",
     },
   },
   {
-    eyebrow: "Visuals",
-    title: "Syntax Highlighting",
-    description:
-      "Readable markdown structure and code blocks make it easier to scan, edit, and stay oriented while writing.",
-    className: "md:col-span-6",
-    tone: "feature-card--white",
-    image: {
+    eyebrow: "Files + Navigation",
+    title: "Your notes stay organized like files, not a database.",
+    body: "Glyph works with folders and markdown files you already own, then adds tabs, search, history, and pinned notes so the workspace stays easy to move through.",
+    points: [
+      "Folders and explorer",
+      "Tabs, back/forward history, and search",
+      "Local-first with no account wall",
+    ],
+    reverse: true,
+    shot: {
+      src: "/demo.png",
+      alt: "Glyph workspace with explorer and editor",
+      fit: "cover",
+      position: "left top",
+    },
+  },
+  {
+    eyebrow: "Writing + Output",
+    title: "A calm editor when you are writing, useful tools when you are done.",
+    body: "Markdown stays readable with syntax highlighting and structured editing, while copy as markdown, reveal in Finder or Explorer, and PDF export stay close at hand.",
+    points: [
+      "Readable code blocks and markdown structure",
+      "Slash-command editing flow",
+      "Copy as markdown, reveal on disk, and export as PDF",
+    ],
+    shot: {
       src: "/syntax-highlighting.png",
-      alt: "Glyph syntax highlighting preview",
-      frame: "wide",
+      alt: "Glyph editor with syntax highlighting",
     },
-  },
-  {
-    eyebrow: "Appearance",
-    title: "Light & Dark Themes",
-    description:
-      "Carefully tuned themes for every lighting condition, whether you are writing in daylight or reviewing notes late at night.",
-    className: "md:col-span-12",
-    tone: "feature-card--paper",
-    themes: true,
   },
 ];
 
-type ProductShotProps = {
-  src: string;
-  alt: string;
-  frame?: "wide" | "compact" | "panel";
+const faqItems: FaqItem[] = [
+  {
+    question: "Does Glyph store my notes in plain markdown files?",
+    answer:
+      "Yes. Glyph works with plain markdown files on disk, so your notes stay portable and readable outside the app.",
+  },
+  {
+    question: "Can I open an existing folder of notes?",
+    answer:
+      "Yes. You can open whole folders or individual markdown files and keep working with the structure you already use.",
+  },
+  {
+    question: "Is Glyph local-first?",
+    answer:
+      "Yes. Glyph is built around local files and does not require an account or a forced cloud workflow between you and your notes.",
+  },
+  {
+    question: "How much of the app is accessible from the keyboard?",
+    answer:
+      "The core workflow is keyboard-first. The command palette, customizable shortcuts, search, navigation, and many note actions are designed to stay easy to reach without leaving the keyboard.",
+  },
+  {
+    question: "Can I export or share notes easily?",
+    answer:
+      "Yes. You can copy notes as markdown, reveal them in Finder or Explorer, and export them as PDF when you need a cleaner handoff.",
+  },
+];
+
+type ShotCardProps = {
+  shot: Shot;
+  variant?: "default" | "hero";
 };
 
-function ProductShot({ src, alt, frame = "compact" }: ProductShotProps) {
+function ShotCard({ shot, variant = "default" }: ShotCardProps) {
   return (
-    <div
-      className={`product-shot ${
-        frame === "wide" ? "product-shot--wide" : frame === "panel" ? "product-shot--panel" : ""
-      }`}
-    >
-      <img src={src} alt={alt} width="2880" height="1800" className="product-shot__image" />
+    <div className={`clean-shot ${variant === "hero" ? "clean-shot--hero" : ""}`}>
+      <div className="clean-shot__frame">
+        <img
+          src={shot.src}
+          alt={shot.alt}
+          width="2880"
+          height="1800"
+          className={`clean-shot__image ${shot.fit === "cover" ? "clean-shot__image--cover" : ""}`}
+          style={shot.position ? { objectPosition: shot.position } : undefined}
+        />
+      </div>
     </div>
   );
 }
@@ -188,189 +188,224 @@ export function HomePage() {
 
   return (
     <>
-      <header className="mx-auto max-w-screen-2xl px-6 pb-18 pt-16 sm:px-8 sm:pb-22 sm:pt-20 lg:px-12 lg:pb-24 lg:pt-24">
-        <div className="mx-auto flex max-w-5xl flex-col items-center text-center">
-          <span className="hero-kicker">The Interface of Thought</span>
-          <h1 id="main-content" className="hero-display mt-6 max-w-[10ch] text-balance">
-            Designed for
-            <span className="hero-display__break">
-              the <em>discerning</em>
-            </span>
-            writer.
-          </h1>
-          <p className="hero-body mt-7 max-w-2xl text-balance">
-            Glyph is free to use, local-first, and built around plain markdown files. It strips away
-            digital noise, leaving only your words, your folders, and a reading experience built for
-            clarity.
-          </p>
-          <div
-            id="install-with-homebrew"
-            className="mt-10 w-full max-w-[46rem] overflow-hidden rounded-2xl border border-black/8 bg-[color:color-mix(in_oklab,white_86%,var(--surface-paper))] text-left shadow-[0_16px_48px_-44px_oklch(0.17_0.01_110_/_0.3)]"
-          >
-            <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-4 sm:gap-4">
-              <code className="block min-w-0 whitespace-normal break-all text-[0.98rem] leading-relaxed text-[var(--ink-soft)] sm:break-words">
-                {BREW_INSTALL_COMMAND}
-              </code>
-              <button
-                type="button"
-                aria-label={hasCopiedBrew ? "Copied command" : "Copy command"}
-                className="inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center self-start rounded-[0.55rem] border border-black/8 bg-[color:color-mix(in_oklab,white_92%,var(--surface-page))] text-[var(--ink-soft)] transition-transform duration-150 ease-out hover:-translate-y-px hover:text-[var(--ink-strong)] sm:h-auto sm:w-auto sm:gap-1.5 sm:px-3 sm:py-2 sm:text-[0.82rem] sm:font-semibold"
-                onClick={() => void handleCopyBrewCommand()}
+      <header className="mx-auto max-w-screen-2xl px-6 pb-18 pt-14 sm:px-8 sm:pb-22 lg:px-12 lg:pb-24 lg:pt-18">
+        <div className="mx-auto max-w-[82rem]">
+          <div className="clean-home__copy">
+            <span className="clean-home__eyebrow">Keyboard-first markdown workspace</span>
+            <h1 id="main-content" className="clean-home__title">
+              A calmer place to write in markdown.
+            </h1>
+            <p className="clean-home__body">
+              Glyph is a local-first desktop app for plain markdown files, built around folders,
+              shortcuts, and a command palette that makes the whole workspace feel easy to move
+              through.
+            </p>
+            <p className="clean-home__meta">
+              Command palette, pinned notes, explorer, copy as markdown, and export all stay close
+              without turning the interface into noise.
+            </p>
+
+            <div className="clean-home__actions">
+              <a href={DOWNLOAD_URLS.mac} className="download-button cursor-pointer border-0">
+                <AppleIcon />
+                <span>Download for macOS</span>
+              </a>
+              <a
+                href={DOWNLOAD_URLS.windows}
+                className="download-button download-button--secondary cursor-pointer border-0"
               >
-                {hasCopiedBrew ? (
-                  <>
-                    <Check size={15} aria-hidden="true" />
-                    <span className="hidden sm:inline">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy size={15} aria-hidden="true" />
-                    <span className="hidden sm:inline">Copy</span>
-                  </>
-                )}
-              </button>
+                <WindowsIcon />
+                <span>Download for Windows</span>
+              </a>
+              <a
+                href={DOWNLOAD_URLS.github}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="clean-home__link"
+              >
+                View on GitHub
+                <ArrowUpRight size={14} aria-hidden="true" />
+              </a>
             </div>
-            {brewCopyError ? (
-              <div className="border-t border-black/8 px-4 py-4">
-                <p className="text-[0.8rem] font-medium text-[var(--ink-soft)]">
-                  Copy failed. Click to select the command manually.
-                </p>
-                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <input
-                    ref={brewFallbackInputRef}
-                    type="text"
-                    readOnly
-                    value={BREW_INSTALL_COMMAND}
-                    onClick={selectBrewFallbackInput}
-                    onFocus={selectBrewFallbackInput}
-                    className="min-w-0 flex-1 rounded-[0.7rem] border border-black/10 bg-white px-3 py-2 text-[0.88rem] text-[var(--ink-soft)] outline-none selection:bg-[var(--surface-strong)]/20"
-                    aria-label="Homebrew install command"
-                  />
-                  <button
-                    type="button"
-                    className="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-[0.55rem] border border-black/8 bg-[color:color-mix(in_oklab,white_92%,var(--surface-page))] px-3 py-2 text-[0.8rem] font-semibold text-[var(--ink-soft)] transition-transform duration-150 ease-out hover:-translate-y-px hover:text-[var(--ink-strong)]"
-                    onClick={selectBrewFallbackInput}
-                  >
-                    Copy failed - Click to select
-                  </button>
-                </div>
+
+            <div id="install-with-homebrew" className="clean-home__brew">
+              <div className="clean-home__brew-row">
+                <code className="clean-home__brew-command">{BREW_INSTALL_COMMAND}</code>
+                <button
+                  type="button"
+                  aria-label={hasCopiedBrew ? "Copied command" : "Copy command"}
+                  className="clean-home__brew-button"
+                  onClick={() => void handleCopyBrewCommand()}
+                >
+                  {hasCopiedBrew ? (
+                    <>
+                      <Check size={15} aria-hidden="true" />
+                      <span>Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy size={15} aria-hidden="true" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
               </div>
-            ) : null}
+
+              {brewCopyError ? (
+                <div className="clean-home__brew-fallback">
+                  <p className="clean-home__brew-fallback-label">
+                    Copy failed. Select the command manually.
+                  </p>
+                  <div className="clean-home__brew-fallback-row">
+                    <input
+                      ref={brewFallbackInputRef}
+                      type="text"
+                      readOnly
+                      value={BREW_INSTALL_COMMAND}
+                      onClick={selectBrewFallbackInput}
+                      onFocus={selectBrewFallbackInput}
+                      className="clean-home__brew-input"
+                      aria-label="Homebrew install command"
+                    />
+                    <button
+                      type="button"
+                      className="clean-home__brew-button"
+                      onClick={selectBrewFallbackInput}
+                    >
+                      Select
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="clean-home__stage">
+            <div className="clean-home__stage-surface">
+              <ShotCard
+                shot={{
+                  src: "/demo.png",
+                  alt: "Glyph workspace overview",
+                }}
+                variant="hero"
+              />
+            </div>
           </div>
         </div>
       </header>
 
-      <section className="mx-auto max-w-screen-2xl px-6 pb-28 sm:px-8 lg:px-12">
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-12 md:auto-rows-[minmax(300px,_auto)]">
-          {features.map((feature) => {
-            const darkCard = feature.title === "Local-First";
-
-            return (
-              <article
-                key={feature.title}
-                className={`${feature.className} ${feature.tone} feature-card ${
-                  feature.compactHeight ? "feature-card--compact" : ""
-                } ${feature.emphasis === "media" ? "feature-card--media" : ""} flex flex-col justify-between`}
+      <section className="mx-auto max-w-screen-2xl px-6 pb-10 sm:px-8 lg:px-12">
+        <div className="mx-auto max-w-[82rem]">
+          {featureSections.map((section) => (
+            <article key={section.title} className="clean-section">
+              <div
+                className={`clean-section__grid ${
+                  section.reverse ? "clean-section__grid--reverse" : ""
+                }`}
               >
-                <div
-                  className={
-                    feature.themes
-                      ? "flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between lg:gap-12"
-                      : feature.emphasis === "media"
-                        ? "max-w-none"
-                        : "max-w-md"
-                  }
-                >
-                  <div className={feature.themes ? "max-w-[44rem]" : undefined}>
-                    <span
-                      className={`feature-card__eyebrow ${darkCard ? "feature-card__eyebrow--dark" : ""}`}
-                    >
-                      {feature.eyebrow}
-                    </span>
-                    <h2
-                      className={`feature-card__title ${darkCard ? "feature-card__title--dark" : ""} ${
-                        feature.emphasis === "media" ? "feature-card__title--media" : ""
-                      } ${
-                        feature.title === "Find Notes" || feature.themes
-                          ? "lg:whitespace-nowrap"
-                          : ""
-                      }`}
-                    >
-                      {feature.title}
-                    </h2>
-                    <p
-                      className={`feature-card__description ${
-                        darkCard ? "feature-card__description--dark" : ""
-                      } ${feature.emphasis === "media" ? "feature-card__description--media" : ""}`}
-                    >
-                      {feature.title === "Open Source" ? (
-                        <>
-                          <a
-                            href={DOWNLOAD_URLS.github}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="footer-link"
-                          >
-                            Glyph
-                          </a>{" "}
-                          is transparent and community-friendly. Inspect the code, contribute
-                          improvements, or adapt it to your workflow.
-                        </>
-                      ) : (
-                        feature.description
-                      )}
-                    </p>
-                  </div>
-
-                  {feature.themes ? (
-                    <div className="hidden w-full max-w-[20rem] lg:mt-6 lg:block">
-                      <div className="rounded-[1.35rem] border border-black/8 bg-white/70 p-5 shadow-[0_10px_30px_-28px_oklch(0.18_0.01_110_/_0.28)]">
-                        <span className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-[var(--ink-muted)]">
-                          Theme Mode
-                        </span>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          <span className="rounded-full border border-black/8 bg-white px-3 py-1.5 text-[0.74rem] font-medium text-[var(--ink-strong)]">
-                            Light
-                          </span>
-                          <span className="rounded-full border border-black/8 bg-[var(--surface-strong)] px-3 py-1.5 text-[0.74rem] font-medium text-[var(--ink-inverse)]">
-                            Dark
-                          </span>
-                          <span className="rounded-full border border-black/8 bg-[color:color-mix(in_oklab,white_88%,var(--surface-page))] px-3 py-1.5 text-[0.74rem] font-medium text-[var(--ink-soft)]">
-                            System
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
+                <div className="clean-section__copy">
+                  <span className="clean-section__eyebrow">{section.eyebrow}</span>
+                  <h2 className="clean-section__title">{section.title}</h2>
+                  <p className="clean-section__body">{section.body}</p>
+                  <ul className="clean-list">
+                    {section.points.map((point) => (
+                      <li key={point}>{point}</li>
+                    ))}
+                  </ul>
                 </div>
 
-                {feature.image ? (
-                  <div className="mt-10">
-                    <ProductShot
-                      src={feature.image.src}
-                      alt={feature.image.alt}
-                      frame={feature.image.frame}
-                    />
-                  </div>
-                ) : null}
+                <div className="clean-section__media">
+                  <ShotCard shot={section.shot} />
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
 
-                {feature.themes ? (
-                  <div className="mt-8 grid gap-5 sm:grid-cols-2">
-                    <ProductShot
-                      src="/light-theme.png"
-                      alt="Glyph light theme preview"
-                      frame="wide"
-                    />
-                    <ProductShot
-                      src="/dark-theme.png"
-                      alt="Glyph dark theme preview"
-                      frame="wide"
-                    />
+      <section className="mx-auto max-w-screen-2xl px-6 pb-12 pt-4 sm:px-8 lg:px-12 lg:pb-16">
+        <div className="mx-auto max-w-[82rem]">
+          <article className="clean-theme-panel">
+            <div className="clean-theme-panel__copy">
+              <span className="clean-section__eyebrow">Themes</span>
+              <h2 className="clean-section__title">Light and dark both feel intentional.</h2>
+              <p className="clean-section__body">
+                Glyph keeps the same calm reading rhythm across light, dark, and system modes, so
+                the interface stays consistent through long sessions.
+              </p>
+            </div>
+
+            <div className="clean-theme-panel__grid">
+              <ShotCard
+                shot={{
+                  src: "/light-theme.png",
+                  alt: "Glyph light theme",
+                }}
+              />
+              <ShotCard
+                shot={{
+                  src: "/dark-theme.png",
+                  alt: "Glyph dark theme",
+                }}
+              />
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-screen-2xl px-6 pb-20 pt-4 sm:px-8 lg:px-12 lg:pb-24">
+        <div className="mx-auto max-w-[82rem]">
+          <div className="clean-faq">
+            <div className="clean-faq__intro">
+              <span className="clean-section__eyebrow">FAQ</span>
+              <h2 className="clean-section__title">A few straightforward answers.</h2>
+              <p className="clean-section__body">
+                The product is intentionally simple, so the questions it raises should be simple
+                too.
+              </p>
+            </div>
+
+            <div className="clean-faq__list">
+              {faqItems.map((item, index) => (
+                <details key={item.question} className="clean-faq__item" open={index === 0}>
+                  <summary className="clean-faq__summary">
+                    <span>{item.question}</span>
+                    <span className="clean-faq__marker" aria-hidden="true" />
+                  </summary>
+                  <div className="clean-faq__answer">
+                    <p>{item.answer}</p>
                   </div>
-                ) : null}
-              </article>
-            );
-          })}
+                </details>
+              ))}
+            </div>
+          </div>
+
+          <div className="clean-closing">
+            <div>
+              <span className="clean-section__eyebrow">Closing</span>
+              <h2 className="clean-section__title">
+                Plain markdown files, with less friction around them.
+              </h2>
+              <p className="clean-section__body">
+                Glyph is for people who want a cleaner writing surface, stronger keyboard access,
+                and files that still belong to them.
+              </p>
+            </div>
+
+            <div className="clean-closing__actions">
+              <a href={DOWNLOAD_URLS.mac} className="download-button cursor-pointer border-0">
+                <AppleIcon />
+                <span>Download for macOS</span>
+              </a>
+              <a
+                href={DOWNLOAD_URLS.windows}
+                className="download-button download-button--secondary cursor-pointer border-0"
+              >
+                <WindowsIcon />
+                <span>Download for Windows</span>
+              </a>
+            </div>
+          </div>
         </div>
       </section>
     </>

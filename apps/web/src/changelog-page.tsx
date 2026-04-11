@@ -1,3 +1,6 @@
+import remarkParse from "remark-parse";
+import { unified } from "unified";
+
 import changelogSource from "../../../CHANGELOG.md?raw";
 
 type InlineToken =
@@ -6,8 +9,8 @@ type InlineToken =
       value: string;
     }
   | {
-      type: "link";
       href: string;
+      type: "link";
       value: string;
     }
   | {
@@ -15,9 +18,14 @@ type InlineToken =
       value: string;
     };
 
+type ChangelogItem = {
+  children: ChangelogItem[];
+  tokens: InlineToken[];
+};
+
 type ChangelogSection = {
+  items: ChangelogItem[];
   title: string;
-  items: string[];
 };
 
 type ChangelogRelease = {
@@ -27,29 +35,244 @@ type ChangelogRelease = {
   version: string;
 };
 
-const VERSION_LINE_REGEX = /^## \[([^\]]+)\]\(([^)]+)\) \((\d{4}-\d{2}-\d{2})\)$/;
-const SECTION_LINE_REGEX = /^### (.+)$/;
-const LIST_ITEM_REGEX = /^\* (.+)$/;
-const INLINE_TOKEN_REGEX = /`([^`]+)`|\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g;
+type MarkdownTextNode = {
+  type: "text";
+  value: string;
+};
+
+type MarkdownInlineCodeNode = {
+  type: "inlineCode";
+  value: string;
+};
+
+type MarkdownBreakNode = {
+  type: "break";
+};
+
+type MarkdownLinkNode = {
+  children: MarkdownInlineNode[];
+  type: "link";
+  url: string;
+};
+
+type MarkdownContainerInlineNode = {
+  children: MarkdownInlineNode[];
+  type: "delete" | "emphasis" | "strong";
+};
+
+type MarkdownInlineNode =
+  | MarkdownBreakNode
+  | MarkdownContainerInlineNode
+  | MarkdownInlineCodeNode
+  | MarkdownLinkNode
+  | MarkdownTextNode;
+
+type MarkdownParagraphNode = {
+  children: MarkdownInlineNode[];
+  type: "paragraph";
+};
+
+type MarkdownListNode = {
+  children: MarkdownListItemNode[];
+  type: "list";
+};
+
+type MarkdownListItemNode = {
+  children: MarkdownBlockNode[];
+  type: "listItem";
+};
+
+type MarkdownHeadingNode = {
+  children: MarkdownInlineNode[];
+  depth: number;
+  type: "heading";
+};
+
+type MarkdownBlockNode = MarkdownHeadingNode | MarkdownListNode | MarkdownParagraphNode;
+
+type MarkdownRoot = {
+  children: MarkdownBlockNode[];
+  type: "root";
+};
+
+const changelogParser = unified().use(remarkParse);
+
+function extractPlainText(nodes: MarkdownInlineNode[]): string {
+  return nodes
+    .map((node) => {
+      if (node.type === "text" || node.type === "inlineCode") {
+        return node.value;
+      }
+
+      if (node.type === "break") {
+        return " ";
+      }
+
+      return extractPlainText(node.children);
+    })
+    .join("");
+}
+
+function mergeInlineTokens(tokens: InlineToken[]): InlineToken[] {
+  const merged: InlineToken[] = [];
+
+  for (const token of tokens) {
+    if (token.type === "text" && token.value.length === 0) {
+      continue;
+    }
+
+    const previousToken = merged.at(-1);
+    if (previousToken?.type === "text" && token.type === "text") {
+      previousToken.value += token.value;
+      continue;
+    }
+
+    merged.push({ ...token });
+  }
+
+  return merged;
+}
+
+function stripScopePrefix(tokens: InlineToken[]): InlineToken[] {
+  const normalizedTokens = mergeInlineTokens(tokens);
+  const firstToken = normalizedTokens[0];
+
+  if (firstToken?.type === "text") {
+    firstToken.value = firstToken.value.replace(/^\s*[a-z0-9_-]+:\s*/i, "");
+  }
+
+  while (normalizedTokens[0]?.type === "text" && normalizedTokens[0].value.length === 0) {
+    normalizedTokens.shift();
+  }
+
+  const firstRemainingToken = normalizedTokens[0];
+  if (firstRemainingToken?.type === "text") {
+    firstRemainingToken.value = firstRemainingToken.value.replace(/^\s+/, "");
+  }
+
+  return normalizedTokens.filter((token) => token.type !== "text" || token.value.length > 0);
+}
+
+function tokenizeInlineNodes(nodes: MarkdownInlineNode[]): InlineToken[] {
+  const tokens: InlineToken[] = [];
+
+  for (const node of nodes) {
+    if (node.type === "text") {
+      tokens.push({
+        type: "text",
+        value: node.value,
+      });
+      continue;
+    }
+
+    if (node.type === "inlineCode") {
+      tokens.push({
+        type: "code",
+        value: node.value,
+      });
+      continue;
+    }
+
+    if (node.type === "break") {
+      tokens.push({
+        type: "text",
+        value: " ",
+      });
+      continue;
+    }
+
+    if (node.type === "link") {
+      const label = extractPlainText(node.children).trim();
+      tokens.push({
+        href: node.url,
+        type: "link",
+        value: label.length > 0 ? label : node.url,
+      });
+      continue;
+    }
+
+    tokens.push(...tokenizeInlineNodes(node.children));
+  }
+
+  return mergeInlineTokens(tokens);
+}
+
+function parseListItem(node: MarkdownListItemNode): ChangelogItem[] {
+  const tokens: InlineToken[] = [];
+  const children: ChangelogItem[] = [];
+
+  for (const child of node.children) {
+    if (child.type === "paragraph") {
+      if (tokens.length > 0) {
+        tokens.push({
+          type: "text",
+          value: " ",
+        });
+      }
+
+      tokens.push(...tokenizeInlineNodes(child.children));
+      continue;
+    }
+
+    if (child.type === "list") {
+      children.push(...child.children.flatMap((listItem) => parseListItem(listItem)));
+    }
+  }
+
+  const normalizedTokens = stripScopePrefix(tokens);
+  if (normalizedTokens.length === 0) {
+    return children;
+  }
+
+  return [
+    {
+      children,
+      tokens: normalizedTokens,
+    },
+  ];
+}
+
+function extractRelease(heading: MarkdownHeadingNode): ChangelogRelease | null {
+  const headingText = extractPlainText(heading.children).trim();
+  const dateMatch = headingText.match(/\((\d{4}-\d{2}-\d{2})\)\s*$/);
+
+  if (!dateMatch) {
+    return null;
+  }
+
+  const compareLink = heading.children.find(
+    (child): child is MarkdownLinkNode => child.type === "link",
+  );
+  const versionSource = compareLink ? extractPlainText(compareLink.children) : headingText;
+  const version = versionSource.replace(/^v/i, "").trim();
+
+  if (version.length === 0) {
+    return null;
+  }
+
+  return {
+    compareHref: compareLink?.url ?? null,
+    date: dateMatch[1],
+    sections: [],
+    version,
+  };
+}
 
 function parseChangelog(markdown: string): ChangelogRelease[] {
+  const tree = changelogParser.parse(markdown) as MarkdownRoot;
   const releases: ChangelogRelease[] = [];
   let currentRelease: ChangelogRelease | null = null;
   let currentSection: ChangelogSection | null = null;
 
-  for (const rawLine of markdown.split(/\r?\n/)) {
-    const line = rawLine.trimEnd();
-    const versionMatch = line.match(VERSION_LINE_REGEX);
-
-    if (versionMatch) {
-      currentRelease = {
-        version: versionMatch[1],
-        compareHref: versionMatch[2],
-        date: versionMatch[3],
-        sections: [],
-      };
-      releases.push(currentRelease);
+  for (const node of tree.children) {
+    if (node.type === "heading" && node.depth === 2) {
+      currentRelease = extractRelease(node);
       currentSection = null;
+
+      if (currentRelease) {
+        releases.push(currentRelease);
+      }
+
       continue;
     }
 
@@ -57,82 +280,32 @@ function parseChangelog(markdown: string): ChangelogRelease[] {
       continue;
     }
 
-    const sectionMatch = line.match(SECTION_LINE_REGEX);
-    if (sectionMatch) {
+    if (node.type === "heading" && node.depth === 3) {
+      const title = extractPlainText(node.children).trim();
+      if (title.length === 0) {
+        currentSection = null;
+        continue;
+      }
+
       currentSection = {
-        title: sectionMatch[1],
         items: [],
+        title,
       };
       currentRelease.sections.push(currentSection);
       continue;
     }
 
-    const itemMatch = line.match(LIST_ITEM_REGEX);
-    if (itemMatch && currentSection) {
-      currentSection.items.push(itemMatch[1]);
+    if (node.type === "list" && currentSection) {
+      currentSection.items.push(...node.children.flatMap((listItem) => parseListItem(listItem)));
     }
   }
 
-  return releases.filter((release) => release.sections.length > 0);
-}
-
-function normalizeChangelogItem(value: string): string {
-  return value
-    .replace(/^\*\*[^*]+:\*\*\s*/, "")
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/^-+\s*/, "")
-    .trim();
-}
-
-function tokenizeInlineMarkdown(value: string): InlineToken[] {
-  const tokens: InlineToken[] = [];
-  let lastIndex = 0;
-
-  for (const match of value.matchAll(INLINE_TOKEN_REGEX)) {
-    const fullMatch = match[0];
-    const codeValue = match[1];
-    const label = match[2];
-    const href = match[3];
-    const matchIndex = match.index ?? 0;
-
-    if (matchIndex > lastIndex) {
-      tokens.push({
-        type: "text",
-        value: value.slice(lastIndex, matchIndex),
-      });
-    }
-
-    if (codeValue) {
-      tokens.push({
-        type: "code",
-        value: codeValue,
-      });
-    } else if (href && label) {
-      tokens.push({
-        type: "link",
-        href,
-        value: label,
-      });
-    }
-
-    lastIndex = matchIndex + fullMatch.length;
-  }
-
-  if (lastIndex < value.length) {
-    tokens.push({
-      type: "text",
-      value: value.slice(lastIndex),
-    });
-  }
-
-  return tokens.length > 0
-    ? tokens
-    : [
-        {
-          type: "text",
-          value,
-        },
-      ];
+  return releases
+    .map((release) => ({
+      ...release,
+      sections: release.sections.filter((section) => section.items.length > 0),
+    }))
+    .filter((release) => release.sections.length > 0);
 }
 
 function formatReleaseDate(date: string) {
@@ -140,19 +313,19 @@ function formatReleaseDate(date: string) {
 
   return {
     day: new Intl.DateTimeFormat("en-US", { day: "2-digit", timeZone: "UTC" }).format(value),
-    month: new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" }).format(value),
-    year: new Intl.DateTimeFormat("en-US", { year: "numeric", timeZone: "UTC" }).format(value),
     long: new Intl.DateTimeFormat("en-US", {
       day: "numeric",
       month: "long",
       year: "numeric",
       timeZone: "UTC",
     }).format(value),
+    month: new Intl.DateTimeFormat("en-US", { month: "short", timeZone: "UTC" }).format(value),
+    year: new Intl.DateTimeFormat("en-US", { year: "numeric", timeZone: "UTC" }).format(value),
   };
 }
 
-function renderInlineMarkdown(value: string, keyPrefix: string) {
-  return tokenizeInlineMarkdown(normalizeChangelogItem(value)).map((token, index) => {
+function renderInlineTokens(tokens: InlineToken[], keyPrefix: string) {
+  return tokens.map((token, index) => {
     if (token.type === "text") {
       return <span key={`${keyPrefix}-${index}`}>{token.value}</span>;
     }
@@ -179,6 +352,31 @@ function renderInlineMarkdown(value: string, keyPrefix: string) {
   });
 }
 
+function renderChangelogItems(items: ChangelogItem[], keyPrefix: string, nested = false) {
+  return (
+    <ul className={nested ? "mt-3 space-y-3 border-l border-black/8 pl-5" : "space-y-3"}>
+      {items.map((item, index) => {
+        const itemKey = `${keyPrefix}-${index}`;
+
+        return (
+          <li key={itemKey} className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3">
+            <span
+              aria-hidden="true"
+              className="mt-3 h-1.5 w-1.5 rounded-full bg-[var(--ink-muted)]"
+            />
+            <div className="min-w-0">
+              <p className="min-w-0 text-[0.97rem] leading-7 text-[var(--ink-soft)]">
+                {renderInlineTokens(item.tokens, itemKey)}
+              </p>
+              {item.children.length > 0 ? renderChangelogItems(item.children, itemKey, true) : null}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 const releases = parseChangelog(changelogSource);
 
 export function ChangelogPage() {
@@ -187,7 +385,7 @@ export function ChangelogPage() {
       <section className="mx-auto max-w-screen-2xl px-6 pb-14 pt-16 sm:px-8 sm:pb-18 sm:pt-20 lg:px-12 lg:pb-20 lg:pt-24">
         <div className="mx-auto max-w-5xl text-center">
           <span className="hero-kicker">Release History</span>
-          <h1 id="main-content" className="hero-display mt-6 max-w-[12ch] text-balance mx-auto">
+          <h1 id="main-content" className="hero-display mx-auto mt-6 max-w-[12ch] text-balance">
             Every release,
             <span className="hero-display__break">
               held in <em>view</em>.
@@ -259,25 +457,7 @@ export function ChangelogPage() {
                           <span className="h-px flex-1 bg-black/8" />
                         </div>
 
-                        <ul className="space-y-3">
-                          {section.items.map((item, index) => (
-                            <li
-                              key={`${release.version}-${section.title}-${index}`}
-                              className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3"
-                            >
-                              <span
-                                aria-hidden="true"
-                                className="mt-3 h-1.5 w-1.5 rounded-full bg-[var(--ink-muted)]"
-                              />
-                              <p className="min-w-0 text-[0.97rem] leading-7 text-[var(--ink-soft)]">
-                                {renderInlineMarkdown(
-                                  item,
-                                  `${release.version}-${section.title}-${index}`,
-                                )}
-                              </p>
-                            </li>
-                          ))}
-                        </ul>
+                        {renderChangelogItems(section.items, `${release.version}-${section.title}`)}
                       </section>
                     ))}
                   </div>

@@ -98,6 +98,8 @@ export type EditorPreferences = {
 
 export type AppSettings = {
   defaultWorkspacePath: string;
+  hasSeenWelcomeNote: boolean;
+  welcomeNoteVersionSeen: number;
   themeId: string;
   themeMode: ThemeMode;
   hiddenFiles: string[];

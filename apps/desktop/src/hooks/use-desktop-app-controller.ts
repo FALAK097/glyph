@@ -765,7 +765,6 @@ export const useDesktopAppController = (
         setIsWorkspaceMode(true);
         setSidebarNodes((prev) => upsertSidebarFile(prev, file));
         pushHistory(file.path);
-        requestEditorFocus("preserve");
         return file;
       })();
 
@@ -1587,6 +1586,14 @@ export const useDesktopAppController = (
       let bootFocusMode: "start" | "end" | "preserve" = "start";
       const tryOpenWorkspace = async (targetPath: string | null) => {
         if (targetPath) {
+          if (isSamePath(targetPath, nextSettings.defaultWorkspacePath)) {
+            try {
+              return await glyph.openDefaultWorkspace();
+            } catch {
+              // If welcome-note setup fails, still try opening the folder directly.
+            }
+          }
+
           try {
             const existingWorkspace = await glyph.getSidebarNode("directory", targetPath);
             if (existingWorkspace) {

@@ -185,6 +185,11 @@ const faqItems: FaqItem[] = [
   },
 ];
 
+const BREW_COMMAND_PREFIX = "brew install --cask";
+const BREW_COMMAND_FORMULA = BREW_INSTALL_COMMAND.startsWith(`${BREW_COMMAND_PREFIX} `)
+  ? BREW_INSTALL_COMMAND.slice(BREW_COMMAND_PREFIX.length + 1)
+  : BREW_INSTALL_COMMAND;
+
 type ShotCardProps = {
   shot: Shot;
   variant?: "default" | "hero";
@@ -291,7 +296,10 @@ export function HomePage() {
 
             <div id="install-with-homebrew" className="clean-home__brew">
               <div className="clean-home__brew-row">
-                <code className="clean-home__brew-command">{BREW_INSTALL_COMMAND}</code>
+                <code className="clean-home__brew-command">
+                  <span className="clean-home__brew-prefix">{BREW_COMMAND_PREFIX}</span>{" "}
+                  <span className="clean-home__brew-formula">{BREW_COMMAND_FORMULA}</span>
+                </code>
                 <button
                   type="button"
                   aria-label={hasCopiedBrew ? "Copied command" : "Copy command"}

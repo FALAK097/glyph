@@ -282,14 +282,21 @@ export function EditorToolbar({
               Zoom Out{zoomOutShortcut ? ` (${zoomOutShortcut})` : ""}
             </TooltipContent>
           </Tooltip>
-          <button
-            type="button"
-            onClick={handleZoomReset}
-            className="min-w-[48px] px-1.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
-            aria-label={`Reset zoom to 100% (${zoomResetShortcut})`}
-          >
-            {editorScale}%
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={handleZoomReset}
+                className="min-w-[48px] px-1.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                aria-label={`Reset zoom to 100%${zoomResetShortcut ? ` (${zoomResetShortcut})` : ""}`}
+              >
+                {editorScale}%
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              Reset to 100%{zoomResetShortcut ? ` (${zoomResetShortcut})` : ""}
+            </TooltipContent>
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button

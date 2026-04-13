@@ -871,6 +871,36 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
           void handleExportCurrentNote();
         },
       },
+      {
+        id: "zoom-in",
+        title: "Zoom In",
+        subtitle: "Increase editor zoom level",
+        section: "Note",
+        kind: "command",
+        onSelect: () => {
+          controller.setEditorScale(Math.min(200, controller.editorScale + 10));
+        },
+      },
+      {
+        id: "zoom-out",
+        title: "Zoom Out",
+        subtitle: "Decrease editor zoom level",
+        section: "Note",
+        kind: "command",
+        onSelect: () => {
+          controller.setEditorScale(Math.max(50, controller.editorScale - 10));
+        },
+      },
+      {
+        id: "zoom-reset",
+        title: "Reset Zoom",
+        subtitle: "Reset editor zoom to 100%",
+        section: "Note",
+        kind: "command",
+        onSelect: () => {
+          controller.setEditorScale(100);
+        },
+      },
     ];
 
     return items.filter((item) => matchesPaletteQuery(query, item.title, item.subtitle));
@@ -886,6 +916,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     handleRevealCurrentNote,
     paletteFilterQuery,
     viewerMode,
+    controller.editorScale,
   ]);
 
   const skillPaletteItems = useMemo<CommandPaletteItem[]>(() => {

@@ -1262,6 +1262,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                 }
                 onOutlineJumpHandled={controller.clearOutlineJumpRequest}
                 onToggleFocusMode={() => void controller.toggleFocusMode()}
+                editorScale={controller.editorScale}
+                onEditorScaleChange={(scale) => void controller.setEditorScale(scale)}
                 onTogglePinnedFile={
                   controller.activeFile
                     ? () => void controller.togglePinnedFile(controller.activeFile!.path)

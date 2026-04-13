@@ -32,6 +32,11 @@ type NoteViewProps = {
   isActiveFilePinned: boolean;
   isFocusMode: boolean;
   showOutline: boolean;
+  editorScale: number;
+  onEditorScaleChange: (scale: number) => void;
+  zoomInShortcut?: string;
+  zoomOutShortcut?: string;
+  zoomResetShortcut?: string;
   outlineItems: OutlineItem[];
   outlineJumpRequest: { id: string; nonce: number } | null;
   updateState: UpdateState | null;
@@ -80,6 +85,8 @@ export function NoteView({
   isActiveFilePinned,
   isFocusMode,
   showOutline,
+  editorScale,
+  onEditorScaleChange,
   outlineItems,
   outlineJumpRequest,
   updateState,
@@ -175,6 +182,9 @@ export function NoteView({
         navigator.platform,
       )}
       focusModeShortcut={getShortcutDisplay(shortcuts, "focus-mode", navigator.platform)}
+      zoomInShortcut={getShortcutDisplay(shortcuts, "zoom-in", navigator.platform)}
+      zoomOutShortcut={getShortcutDisplay(shortcuts, "zoom-out", navigator.platform)}
+      zoomResetShortcut={getShortcutDisplay(shortcuts, "zoom-reset", navigator.platform)}
       onDeleteNote={onDeleteNote}
       onOpenNewWindow={onOpenNewWindow}
       canGoBack={canGoBack}
@@ -190,6 +200,8 @@ export function NoteView({
       outlineJumpRequest={outlineJumpRequest}
       scrollRestorationKey={filePath}
       showOutline={showOutline}
+      editorScale={editorScale}
+      onEditorScaleChange={onEditorScaleChange}
       updateState={updateState}
       updatesMode={updatesMode}
       dismissedUpdateVersion={dismissedUpdateVersion}

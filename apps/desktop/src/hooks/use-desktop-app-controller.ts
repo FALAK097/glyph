@@ -234,6 +234,7 @@ export const useDesktopAppController = (
   const editorPreferences = settings?.editorPreferences;
   const isFocusMode = editorPreferences?.focusMode ?? false;
   const showOutline = editorPreferences?.showOutline ?? true;
+  const editorScale = editorPreferences?.editorScale ?? 100;
   const folderRevealLabel = getFolderRevealLabel(appInfo?.platform);
   const isActiveFilePinned = activeFile
     ? (settings?.pinnedFiles ?? []).some((filePath) => isSamePath(filePath, activeFile.path))
@@ -998,18 +999,34 @@ export const useDesktopAppController = (
       editorPreferences: {
         focusMode: !isFocusMode,
         showOutline,
+        editorScale,
       },
     });
-  }, [isFocusMode, showOutline, saveSettings]);
+  }, [isFocusMode, showOutline, editorScale, saveSettings]);
 
   const toggleOutline = useCallback(async () => {
     await saveSettings({
       editorPreferences: {
         focusMode: isFocusMode,
         showOutline: !showOutline,
+        editorScale,
       },
     });
-  }, [isFocusMode, showOutline, saveSettings]);
+  }, [isFocusMode, showOutline, editorScale, saveSettings]);
+
+  const setEditorScale = useCallback(
+    async (nextScale: number) => {
+      const clampedScale = Math.min(110, Math.max(50, nextScale));
+      await saveSettings({
+        editorPreferences: {
+          focusMode: isFocusMode,
+          showOutline,
+          editorScale: clampedScale,
+        },
+      });
+    },
+    [isFocusMode, showOutline, saveSettings],
+  );
 
   const triggerUpdateAction = useCallback(async () => {
     if (!updateState) {
@@ -1584,6 +1601,8 @@ export const useDesktopAppController = (
     setIsSettingsOpen,
     setIsSidebarCollapsed,
     toggleFocusMode,
+    setEditorScale,
+    editorScale,
   });
 
   // Boot sequence
@@ -2127,5 +2146,7 @@ export const useDesktopAppController = (
     visibleSidebarNodes,
     wordCount,
     hasBooted,
+    editorScale,
+    setEditorScale,
   };
 };

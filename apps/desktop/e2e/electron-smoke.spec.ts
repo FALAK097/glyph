@@ -1141,3 +1141,114 @@ test("focus mode persists in settings", async ({}, testInfo) => {
     await glyph.stop(testInfo);
   }
 });
+
+test("zoom controls appear in toolbar when a note is open", async ({}, testInfo) => {
+  const glyph = await launchGlyph();
+  try {
+    await expectAppShell(glyph.window);
+    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
+    await selectPaletteItem(glyph.window, "welcome", /welcome\.md/i);
+
+    // Zoom controls should be visible in the toolbar
+    const zoomInButton = glyph.window.getByRole("button", { name: "Zoom in" });
+    const zoomOutButton = glyph.window.getByRole("button", { name: "Zoom out" });
+
+    await expect(zoomInButton).toBeVisible();
+    await expect(zoomOutButton).toBeVisible();
+
+    // Default zoom level should be 100%
+    await expect(glyph.window.getByRole("button", { name: /100%/ })).toBeVisible();
+  } finally {
+    await glyph.stop(testInfo);
+  }
+});
+
+test("zoom in increases editor scale", async ({}, testInfo) => {
+  const glyph = await launchGlyph();
+  try {
+    await expectAppShell(glyph.window);
+    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
+    await selectPaletteItem(glyph.window, "welcome", /welcome\.md/i);
+
+    // Click zoom in button
+    const zoomInButton = glyph.window.getByRole("button", { name: "Zoom in" });
+    await zoomInButton.click();
+
+    // Settings should persist the new zoom level
+    await expect
+      .poll(async () => {
+        const settings = await readJson<{
+          editorPreferences?: { editorScale?: number };
+        }>(glyph.sandbox.settingsPath);
+        return settings?.editorPreferences?.editorScale ?? null;
+      })
+      .toBe(110);
+  } finally {
+    await glyph.stop(testInfo);
+  }
+});
+
+test("zoom out decreases editor scale", async ({}, testInfo) => {
+  const glyph = await launchGlyph();
+  try {
+    await expectAppShell(glyph.window);
+    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
+    await selectPaletteItem(glyph.window, "welcome", /welcome\.md/i);
+
+    // Click zoom out button twice
+    const zoomOutButton = glyph.window.getByRole("button", { name: "Zoom out" });
+    await zoomOutButton.click();
+    await zoomOutButton.click();
+
+    // Settings should persist the new zoom level
+    await expect
+      .poll(async () => {
+        const settings = await readJson<{
+          editorPreferences?: { editorScale?: number };
+        }>(glyph.sandbox.settingsPath);
+        return settings?.editorPreferences?.editorScale ?? null;
+      })
+      .toBe(80);
+  } finally {
+    await glyph.stop(testInfo);
+  }
+});
+
+test("reset zoom to 100% via click on percentage", async ({}, testInfo) => {
+  const glyph = await launchGlyph();
+  try {
+    await expectAppShell(glyph.window);
+    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
+    await selectPaletteItem(glyph.window, "welcome", /welcome\.md/i);
+
+    // Zoom in first (settings file should now have 110)
+    const zoomInButton = glyph.window.getByRole("button", { name: "Zoom in" });
+    await zoomInButton.click();
+
+    // Wait for settings to persist
+    await expect
+      .poll(async () => {
+        const settings = await readJson<{
+          editorPreferences?: { editorScale?: number };
+        }>(glyph.sandbox.settingsPath);
+        return settings?.editorPreferences?.editorScale ?? null;
+      })
+      .toBe(110);
+
+    // Click the zoom percentage button to reset it to 100%
+    const zoomLevelButton = glyph.window.locator("button", { hasText: /110%/ });
+    await zoomLevelButton.click();
+
+    // Should return to 100%
+    await expect
+      .poll(async () => {
+        const settings = await readJson<{
+          editorPreferences?: { editorScale?: number };
+        }>(glyph.sandbox.settingsPath);
+        return settings?.editorPreferences?.editorScale ?? null;
+      })
+      .toBe(100);
+  } finally {
+    await glyph.stop(testInfo);
+  }
+});

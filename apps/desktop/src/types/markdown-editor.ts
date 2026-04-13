@@ -26,6 +26,10 @@ export type MarkdownEditorProps = {
   footerMetaLabel?: string;
   wordCount: number;
   readingTime: number;
+  editorScale?: number;
+  zoomInShortcut?: string;
+  zoomOutShortcut?: string;
+  zoomResetShortcut?: string;
   onChange: (value: string) => void;
   onToggleSidebar?: () => void;
   isSidebarCollapsed?: boolean;
@@ -61,6 +65,7 @@ export type MarkdownEditorProps = {
   onOpenNewWindow?: () => void;
   onDeleteNote?: () => void;
   onTogglePinnedFile?: () => void;
+  onEditorScaleChange?: (scale: number) => void;
   onScrollPositionChange?: (targetPath: string | null, scrollTop: number) => void;
   folderRevealLabel?: string;
   documentLabel?: string;

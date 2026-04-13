@@ -972,6 +972,7 @@ function getDefaultSettings(): AppSettings {
     editorPreferences: {
       focusMode: false,
       showOutline: true,
+      editorScale: 100,
     },
     autoOpenPDF: true,
     dismissedUpdateVersion: null,
@@ -1017,9 +1018,12 @@ function normalizePersistedFileList(input: unknown) {
 function normalizeEditorPreferences(
   input: Partial<AppSettings["editorPreferences"]> | undefined,
 ): AppSettings["editorPreferences"] {
+  const editorScale =
+    typeof input?.editorScale === "number" ? Math.min(200, Math.max(50, input.editorScale)) : 100;
   return {
     focusMode: typeof input?.focusMode === "boolean" ? input.focusMode : false,
     showOutline: typeof input?.showOutline === "boolean" ? input.showOutline : true,
+    editorScale,
   };
 }
 

@@ -23,6 +23,8 @@ import {
   PlusIcon,
   SearchIcon,
   XIcon,
+  ZoomInIcon,
+  ZoomOutIcon,
 } from "@/components/icons";
 import { FileManagerLogo } from "./file-manager-logo";
 
@@ -68,6 +70,11 @@ type EditorToolbarProps = {
   onExportPDF: () => Promise<void>;
   onTogglePinnedFile: (() => void) | undefined;
   isActiveFilePinned: boolean | undefined;
+  editorScale: number;
+  onEditorScaleChange: ((scale: number) => void) | undefined;
+  zoomInShortcut: string | undefined;
+  zoomOutShortcut: string | undefined;
+  zoomResetShortcut: string | undefined;
 };
 
 export function EditorToolbar({
@@ -111,7 +118,23 @@ export function EditorToolbar({
   onExportPDF,
   onTogglePinnedFile,
   isActiveFilePinned,
+  editorScale = 100,
+  onEditorScaleChange,
+  zoomInShortcut,
+  zoomOutShortcut,
+  zoomResetShortcut,
 }: EditorToolbarProps) {
+  const handleZoomIn = useCallback(() => {
+    onEditorScaleChange?.(Math.min(editorScale + 10, 110));
+  }, [editorScale, onEditorScaleChange]);
+
+  const handleZoomOut = useCallback(() => {
+    onEditorScaleChange?.(Math.max(editorScale - 10, 50));
+  }, [editorScale, onEditorScaleChange]);
+
+  const handleZoomReset = useCallback(() => {
+    onEditorScaleChange?.(100);
+  }, [onEditorScaleChange]);
   const handleCopy = useCallback(async () => {
     await onCopy();
   }, [onCopy]);
@@ -236,6 +259,54 @@ export function EditorToolbar({
               {commandPaletteShortcut}
             </span>
           </Button>
+        </div>
+      ) : null}
+
+      {/* Center: zoom controls (shown when there's a file open) */}
+      {fileName && onEditorScaleChange ? (
+        <div className="flex items-center gap-0.5 relative">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground hover:text-foreground hover:bg-muted"
+                onClick={handleZoomOut}
+                aria-label="Zoom out"
+                type="button"
+              >
+                <ZoomOutIcon size={14} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              Zoom Out{zoomOutShortcut ? ` (${zoomOutShortcut})` : ""}
+            </TooltipContent>
+          </Tooltip>
+          <button
+            type="button"
+            onClick={handleZoomReset}
+            className="min-w-[48px] px-1.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+            aria-label={`Reset zoom to 100% (${zoomResetShortcut})`}
+          >
+            {editorScale}%
+          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground hover:text-foreground hover:bg-muted"
+                onClick={handleZoomIn}
+                aria-label="Zoom in"
+                type="button"
+              >
+                <ZoomInIcon size={14} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              Zoom In{zoomInShortcut ? ` (${zoomInShortcut})` : ""}
+            </TooltipContent>
+          </Tooltip>
         </div>
       ) : null}
 

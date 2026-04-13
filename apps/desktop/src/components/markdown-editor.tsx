@@ -390,11 +390,16 @@ export const MarkdownEditor = ({
   showOutline = true,
   onToggleFocusMode,
   focusModeShortcut,
+  zoomInShortcut,
+  zoomOutShortcut,
+  zoomResetShortcut,
   onTogglePinnedFile,
+  onEditorScaleChange,
   onScrollPositionChange,
   folderRevealLabel,
   documentLabel = "note",
   outlineJumpRequest,
+  editorScale = 100,
 }: MarkdownEditorProps) => {
   const lastSyncedMarkdown = useRef(content);
   const onChangeRef = useRef(onChange);
@@ -1469,6 +1474,11 @@ export const MarkdownEditor = ({
         onExportPDF={handleExportPDF}
         onTogglePinnedFile={onTogglePinnedFile}
         isActiveFilePinned={isActiveFilePinned}
+        editorScale={editorScale}
+        onEditorScaleChange={onEditorScaleChange}
+        zoomInShortcut={zoomInShortcut}
+        zoomOutShortcut={zoomOutShortcut}
+        zoomResetShortcut={zoomResetShortcut}
       />
       {subheaderContent ? (
         <div className="border-b border-border/30">{subheaderContent}</div>
@@ -1768,7 +1778,14 @@ export const MarkdownEditor = ({
               </Button>
             </div>
           ) : null}
-          <EditorContent editor={editor} />
+          <div
+            className="overflow-auto"
+            style={{
+              zoom: editorScale !== 100 ? `${editorScale}%` : undefined,
+            }}
+          >
+            <EditorContent editor={editor} />
+          </div>
         </div>
       </div>
       {shouldShowOutlineRail ? (

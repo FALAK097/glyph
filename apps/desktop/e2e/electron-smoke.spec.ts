@@ -1263,8 +1263,8 @@ test("zoom in via keyboard shortcut increases editor scale", async ({}, testInfo
     // Default zoom should be 100%
     await expect(glyph.window.getByRole("button", { name: /100%/ })).toBeVisible();
 
-    // Press Ctrl++ (Zoom In) - using + key which is Shift+= on most keyboards
-    await glyph.window.keyboard.press(`${modKey}++`);
+    // Press Ctrl+= (Zoom In) - shortcut is Ctrl+= without Shift
+    await glyph.window.keyboard.press(`${modKey}+=`);
 
     // Settings should persist the new zoom level (100 + 10 = 110)
     await expect

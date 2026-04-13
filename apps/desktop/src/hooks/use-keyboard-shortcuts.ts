@@ -199,7 +199,7 @@ export function useKeyboardShortcuts({
             void closeOtherTabs();
             break;
           case "zoom-in":
-            void setEditorScale(Math.min(110, editorScale + 10));
+            void setEditorScale(Math.min(200, editorScale + 10));
             break;
           case "zoom-out":
             void setEditorScale(Math.max(50, editorScale - 10));

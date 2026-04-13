@@ -125,7 +125,7 @@ export function EditorToolbar({
   zoomResetShortcut,
 }: EditorToolbarProps) {
   const handleZoomIn = useCallback(() => {
-    onEditorScaleChange?.(Math.min(editorScale + 10, 110));
+    onEditorScaleChange?.(Math.min(editorScale + 10, 200));
   }, [editorScale, onEditorScaleChange]);
 
   const handleZoomOut = useCallback(() => {

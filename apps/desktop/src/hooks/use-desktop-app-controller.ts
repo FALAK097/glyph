@@ -1016,7 +1016,7 @@ export const useDesktopAppController = (
 
   const setEditorScale = useCallback(
     async (nextScale: number) => {
-      const clampedScale = Math.min(110, Math.max(50, nextScale));
+      const clampedScale = Math.min(200, Math.max(50, nextScale));
       await saveSettings({
         editorPreferences: {
           focusMode: isFocusMode,

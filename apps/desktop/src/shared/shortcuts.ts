@@ -45,6 +45,48 @@ export const MODIFIER_TOKENS = {
   shift: "⇧",
 } as const;
 
+/**
+ * Returns true when the given platform string identifies macOS.
+ * Accepts `navigator.platform` values (e.g. "MacIntel") and
+ * `process.platform` values (e.g. "darwin").
+ */
+export function isMacPlatform(platform?: string): boolean {
+  const normalized = platform?.toLowerCase() ?? "";
+  return normalized.includes("mac") || normalized === "darwin";
+}
+
+/**
+ * Converts an internal shortcut key string (e.g. "⇧ ⌘ N") to the
+ * platform-appropriate display format.
+ *
+ * - macOS  → compact symbol form: "⇧⌘N"
+ * - Windows/Linux → text form: "Ctrl+Shift+N"
+ */
+export function formatKeysForPlatform(keys: string, platform?: string): string {
+  if (isMacPlatform(platform)) {
+    return keys.replace(/\s+/g, "");
+  }
+
+  const parsed = parseShortcut(keys);
+  if (!parsed) {
+    return keys.replace(/\s+/g, "");
+  }
+
+  const parts: string[] = [];
+  if (parsed.primary) {
+    parts.push("Ctrl");
+  }
+  if (parsed.shift) {
+    parts.push("Shift");
+  }
+  if (parsed.alt) {
+    parts.push("Alt");
+  }
+  parts.push(formatShortcutKey(parsed.key));
+
+  return parts.join("+");
+}
+
 export const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
   // App shortcuts (fire globally, even from inside the editor)
   { id: "command-palette", label: "Command Palette", keys: `${MODIFIER_TOKENS.cmdOrCtrl} P` },
@@ -85,11 +127,7 @@ export const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
 ];
 
 export function getPrimaryShortcutPrefix(platform?: string): string {
-  const normalizedPlatform = platform?.toLowerCase() ?? "";
-
-  return normalizedPlatform.includes("mac") || normalizedPlatform === "darwin"
-    ? MODIFIER_TOKENS.cmdOrCtrl
-    : MODIFIER_TOKENS.ctrl;
+  return isMacPlatform(platform) ? MODIFIER_TOKENS.cmdOrCtrl : MODIFIER_TOKENS.ctrl;
 }
 
 export const MAX_DIRECT_NOTE_TAB_SHORTCUTS = 9;
@@ -142,10 +180,7 @@ export function getAdjacentTabShortcutDisplay(
   direction: "next" | "previous",
   platform?: string,
 ): string {
-  const normalizedPlatform = platform?.toLowerCase() ?? "";
-  const isMacPlatform = normalizedPlatform.includes("mac") || normalizedPlatform === "darwin";
-
-  if (isMacPlatform) {
+  if (isMacPlatform(platform)) {
     return direction === "next" ? "⇧⌘]" : "⇧⌘[";
   }
 
@@ -157,14 +192,12 @@ export function matchAdjacentTabShortcut(
   direction: "next" | "previous",
   platform?: string,
 ): boolean {
-  const normalizedPlatform = platform?.toLowerCase() ?? "";
-  const isMacPlatform = normalizedPlatform.includes("mac") || normalizedPlatform === "darwin";
-
   return matchShortcut(
     event,
-    isMacPlatform
+    isMacPlatform(platform)
       ? `⇧ ⌘ ${direction === "next" ? "]" : "["}`
       : `${direction === "next" ? "⌘ Tab" : "⇧ ⌘ Tab"}`,
+    platform,
   );
 }
 
@@ -364,12 +397,37 @@ export function getShortcutKeys(
 export function getShortcutDisplay(
   shortcuts: ShortcutSetting[] | undefined | null,
   id: ShortcutId,
+  platform?: string,
 ): string | undefined {
   const keys = getShortcutKeys(shortcuts, id);
-  return keys?.replace(/\s+/g, "");
+  if (!keys) {
+    return undefined;
+  }
+
+  return formatKeysForPlatform(keys, platform);
 }
 
-export function matchShortcut(event: ShortcutEventLike, shortcut: string): boolean {
+/**
+ * Returns true when the platform's primary modifier is pressed — `Meta` (⌘)
+ * on macOS, `Ctrl` on Windows/Linux — without the other modifier also being
+ * held. The platform string should come from `navigator.platform` (renderer)
+ * or `process.platform` (main process).
+ */
+export function isPrimaryModifierPressed(event: ShortcutEventLike, platform?: string): boolean {
+  const isMac = isMacPlatform(platform);
+
+  if (isMac) {
+    return event.metaKey && !event.ctrlKey;
+  }
+
+  return event.ctrlKey && !event.metaKey;
+}
+
+export function matchShortcut(
+  event: ShortcutEventLike,
+  shortcut: string,
+  platform?: string,
+): boolean {
   if (event.repeat) {
     return false;
   }
@@ -380,7 +438,7 @@ export function matchShortcut(event: ShortcutEventLike, shortcut: string): boole
   }
 
   const eventKey = normalizeShortcutKeyToken(event.key);
-  const primaryPressed = event.metaKey !== event.ctrlKey && (event.metaKey || event.ctrlKey);
+  const primaryPressed = isPrimaryModifierPressed(event, platform);
 
   return (
     eventKey === parsed.key &&
@@ -388,6 +446,21 @@ export function matchShortcut(event: ShortcutEventLike, shortcut: string): boole
     event.altKey === parsed.alt &&
     event.shiftKey === parsed.shift
   );
+}
+
+/**
+ * Split a platform-display shortcut string into individual key tokens for
+ * rendering in `<kbd>` elements.
+ *
+ * - macOS  compact symbols: "⇧⌘N" → ["⇧", "⌘", "N"]
+ * - Windows text form:      "Ctrl+Shift+N" → ["Ctrl", "Shift", "N"]
+ */
+export function splitShortcutTokens(shortcut: string): string[] {
+  if (shortcut.includes("+")) {
+    return shortcut.split("+").filter(Boolean);
+  }
+
+  return shortcut.split("");
 }
 
 export function toElectronAccelerator(shortcut: string): string | undefined {

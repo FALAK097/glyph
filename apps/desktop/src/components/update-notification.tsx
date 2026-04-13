@@ -9,11 +9,14 @@ type UpdateNotificationProps = {
   updateState: UpdateState | null;
   updatesMode?: AppInfo["updatesMode"];
   onUpdateAction: (() => void) | undefined;
+  dismissedUpdateVersion?: string | null;
+  onDismissUpdateAction?: (() => void) | undefined;
 };
 
 export function useUpdateStateFlags(
   updateState: UpdateState | null,
   updatesMode?: AppInfo["updatesMode"],
+  dismissedUpdateVersion?: string | null,
 ) {
   return useMemo((): {
     shouldShowUpdateActionButton: boolean;
@@ -21,6 +24,7 @@ export function useUpdateStateFlags(
     updateButtonTooltip: string;
     isUpdateButtonDisabled: boolean | undefined;
     updateButtonVariant: "default" | "outline";
+    isManualReleaseButton: boolean;
   } => {
     const shouldShowUpdateButton =
       updateState?.status === "error" ||
@@ -32,12 +36,20 @@ export function useUpdateStateFlags(
       (updateState?.status === "idle" || updateState?.status === "not-available") &&
       Boolean(updateState?.recentlyInstalledVersion);
 
-    const shouldShowUpdateActionButton = shouldShowUpdateButton || shouldShowChangelogButton;
     const isManualReleaseButton =
       updatesMode === "manual" &&
       (updateState?.status === "available" ||
         updateState?.status === "downloading" ||
         updateState?.status === "downloaded");
+
+    const isDismissed = Boolean(
+      isManualReleaseButton &&
+      updateState?.availableVersion &&
+      updateState.availableVersion === dismissedUpdateVersion,
+    );
+
+    const shouldShowUpdateActionButton =
+      !isDismissed && (shouldShowUpdateButton || shouldShowChangelogButton);
 
     const updateButtonLabel = shouldShowChangelogButton
       ? "View changelog"
@@ -81,14 +93,16 @@ export function useUpdateStateFlags(
       updateButtonTooltip,
       isUpdateButtonDisabled,
       updateButtonVariant,
+      isManualReleaseButton,
     };
-  }, [updateState, updatesMode]);
+  }, [updateState, updatesMode, dismissedUpdateVersion]);
 }
 
 export function UpdateNotification({
   updateState,
   updatesMode,
   onUpdateAction,
+  dismissedUpdateVersion,
 }: UpdateNotificationProps) {
   const {
     shouldShowUpdateActionButton,
@@ -96,7 +110,7 @@ export function UpdateNotification({
     updateButtonTooltip,
     isUpdateButtonDisabled,
     updateButtonVariant,
-  } = useUpdateStateFlags(updateState, updatesMode);
+  } = useUpdateStateFlags(updateState, updatesMode, dismissedUpdateVersion);
 
   if (!shouldShowUpdateActionButton || !onUpdateAction) {
     return null;

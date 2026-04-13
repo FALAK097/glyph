@@ -64,8 +64,10 @@ export function SkillView({
   onReloadAfterExternalChange,
   onSelectDocumentTab,
 }: SkillViewProps) {
-  const commandPaletteShortcut = getShortcutDisplay(shortcuts, "command-palette") ?? "⌘P";
-  const toggleSidebarShortcut = getShortcutDisplay(shortcuts, "toggle-sidebar");
+  const commandPaletteShortcut =
+    getShortcutDisplay(shortcuts, "command-palette", navigator.platform) ??
+    (navigator.platform.includes("Mac") ? "⌘P" : "Ctrl+P");
+  const toggleSidebarShortcut = getShortcutDisplay(shortcuts, "toggle-sidebar", navigator.platform);
 
   const handleOpenCommandPalette = useCallback(() => {
     onSetIsPaletteOpen(true);

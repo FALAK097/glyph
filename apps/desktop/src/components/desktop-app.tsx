@@ -1268,7 +1268,9 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                     : undefined
                 }
                 updatesMode={controller.appInfo?.updatesMode}
+                dismissedUpdateVersion={controller.settings?.dismissedUpdateVersion ?? null}
                 onUpdateAction={() => void controller.triggerUpdateAction()}
+                onDismissUpdateAction={() => void controller.dismissUpdateNotification()}
               />
             )}
           </div>

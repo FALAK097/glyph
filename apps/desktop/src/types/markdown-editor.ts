@@ -52,6 +52,8 @@ export type MarkdownEditorProps = {
   updateState?: UpdateState | null;
   updatesMode?: AppInfo["updatesMode"];
   onUpdateAction?: () => void;
+  onDismissUpdateAction?: () => void;
+  dismissedUpdateVersion?: string | null;
   isFocusMode?: boolean;
   showOutline?: boolean;
   onToggleFocusMode?: () => void;

@@ -22,6 +22,7 @@ import {
   PinOffIcon,
   PlusIcon,
   SearchIcon,
+  XIcon,
 } from "@/components/icons";
 import { FileManagerLogo } from "./file-manager-logo";
 
@@ -53,6 +54,8 @@ type EditorToolbarProps = {
   updateButtonLabel: string;
   updateButtonTooltip: string;
   onUpdateAction: (() => void) | undefined;
+  onDismissUpdateAction: (() => void) | undefined;
+  isManualReleaseButton: boolean;
   headerPaddingClass: string;
   onOpenSettings: (() => void) | undefined;
   headerAccessory: React.ReactNode;
@@ -94,6 +97,8 @@ export function EditorToolbar({
   updateButtonLabel,
   updateButtonTooltip,
   onUpdateAction,
+  onDismissUpdateAction,
+  isManualReleaseButton,
   headerPaddingClass,
   onOpenSettings,
   headerAccessory,
@@ -262,21 +267,35 @@ export function EditorToolbar({
           </div>
         ) : null}
         {shouldShowUpdateActionButton && onUpdateAction ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
+          <div className="flex items-center">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={updateButtonVariant}
+                  size="sm"
+                  className="h-8 shrink-0 rounded-full px-3 text-xs font-semibold shadow-sm"
+                  onClick={onUpdateAction}
+                  disabled={isUpdateButtonDisabled}
+                  type="button"
+                >
+                  {updateButtonLabel}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">{updateButtonTooltip}</TooltipContent>
+            </Tooltip>
+            {isManualReleaseButton && onDismissUpdateAction && (
               <Button
-                variant={updateButtonVariant}
-                size="sm"
-                className="h-8 shrink-0 rounded-full px-3 text-xs font-semibold shadow-sm"
-                onClick={onUpdateAction}
-                disabled={isUpdateButtonDisabled}
+                variant="ghost"
+                size="icon-sm"
+                className="ml-1 h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-muted"
+                onClick={onDismissUpdateAction}
+                aria-label="Dismiss update notification"
                 type="button"
               >
-                {updateButtonLabel}
+                <XIcon size={14} />
               </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">{updateButtonTooltip}</TooltipContent>
-          </Tooltip>
+            )}
+          </div>
         ) : null}
         {headerAccessory ? <div className="mr-1 flex items-center">{headerAccessory}</div> : null}
         <DropdownMenu>

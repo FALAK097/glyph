@@ -974,6 +974,7 @@ function getDefaultSettings(): AppSettings {
       showOutline: true,
     },
     autoOpenPDF: true,
+    dismissedUpdateVersion: null,
   };
 }
 
@@ -1294,6 +1295,11 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
     editorPreferences: normalizeEditorPreferences(candidate.editorPreferences),
     autoOpenPDF:
       typeof candidate.autoOpenPDF === "boolean" ? candidate.autoOpenPDF : defaults.autoOpenPDF,
+    dismissedUpdateVersion:
+      typeof candidate.dismissedUpdateVersion === "string" ||
+      candidate.dismissedUpdateVersion === null
+        ? candidate.dismissedUpdateVersion
+        : defaults.dismissedUpdateVersion,
   };
 }
 
@@ -1399,6 +1405,17 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
     nextPatch.autoOpenPDF = candidate.autoOpenPDF;
   }
 
+  if ("dismissedUpdateVersion" in candidate) {
+    if (
+      candidate.dismissedUpdateVersion !== null &&
+      typeof candidate.dismissedUpdateVersion !== "string"
+    ) {
+      throw new Error("dismissedUpdateVersion must be a string or null.");
+    }
+
+    nextPatch.dismissedUpdateVersion = candidate.dismissedUpdateVersion;
+  }
+
   const invalidKeys = Object.keys(candidate).filter(
     (key) =>
       ![
@@ -1411,6 +1428,7 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
         "sidebar",
         "editorPreferences",
         "autoOpenPDF",
+        "dismissedUpdateVersion",
       ].includes(key),
   );
 

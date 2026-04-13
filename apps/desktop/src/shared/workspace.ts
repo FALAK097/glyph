@@ -108,6 +108,7 @@ export type AppSettings = {
   sidebar: SidebarState;
   editorPreferences: EditorPreferences;
   autoOpenPDF: boolean;
+  dismissedUpdateVersion: string | null;
 };
 
 export type AppInfo = {

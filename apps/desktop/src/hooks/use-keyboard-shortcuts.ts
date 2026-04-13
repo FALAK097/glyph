@@ -293,5 +293,7 @@ export function useKeyboardShortcuts({
     setIsSettingsOpen,
     setIsSidebarCollapsed,
     toggleFocusMode,
+    setEditorScale,
+    editorScale,
   ]);
 }

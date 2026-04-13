@@ -1990,6 +1990,23 @@ export const useDesktopAppController = (
         return;
       }
 
+      if (command === "zoom-in") {
+        const nextScale = Math.min(200, editorScale + 10);
+        await setEditorScale(nextScale);
+        return;
+      }
+
+      if (command === "zoom-out") {
+        const nextScale = Math.max(50, editorScale - 10);
+        await setEditorScale(nextScale);
+        return;
+      }
+
+      if (command === "zoom-reset") {
+        await setEditorScale(100);
+        return;
+      }
+
       if (command === "check-updates") {
         await triggerUpdateAction();
         return;
@@ -2073,6 +2090,8 @@ export const useDesktopAppController = (
     triggerUpdateAction,
     setIsPaletteOpen,
     setIsSidebarCollapsed,
+    setEditorScale,
+    editorScale,
   ]);
 
   return {

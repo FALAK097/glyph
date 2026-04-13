@@ -1779,7 +1779,6 @@ export const MarkdownEditor = ({
             </div>
           ) : null}
           <div
-            className="overflow-auto"
             style={{
               zoom: editorScale !== 100 ? `${editorScale}%` : undefined,
             }}

@@ -1252,3 +1252,73 @@ test("reset zoom to 100% via click on percentage", async ({}, testInfo) => {
     await glyph.stop(testInfo);
   }
 });
+
+test("zoom in via keyboard shortcut increases editor scale", async ({}, testInfo) => {
+  const glyph = await launchGlyph();
+  try {
+    await expectAppShell(glyph.window);
+    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
+    await selectPaletteItem(glyph.window, "welcome", /welcome\.md/i);
+
+    // Default zoom should be 100%
+    await expect(glyph.window.getByRole("button", { name: /100%/ })).toBeVisible();
+
+    // Press Cmd+Shift+= (Zoom In) - on macOS the default shortcut requires Shift to produce +
+    await glyph.window.keyboard.press("Meta+Shift+=");
+
+    // Settings should persist the new zoom level (100 + 10 = 110)
+    await expect
+      .poll(async () => {
+        const settings = await readJson<{
+          editorPreferences?: { editorScale?: number };
+        }>(glyph.sandbox.settingsPath);
+        return settings?.editorPreferences?.editorScale ?? null;
+      })
+      .toBe(110);
+
+    // Button should now show 110%
+    await expect(glyph.window.getByRole("button", { name: /110%/ })).toBeVisible();
+  } finally {
+    await glyph.stop(testInfo);
+  }
+});
+
+test("zoom reset via keyboard shortcut returns to 100%", async ({}, testInfo) => {
+  const glyph = await launchGlyph();
+  try {
+    await expectAppShell(glyph.window);
+    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
+    await selectPaletteItem(glyph.window, "welcome", /welcome\.md/i);
+
+    // Zoom in first
+    const zoomInButton = glyph.window.getByRole("button", { name: "Zoom in" });
+    await zoomInButton.click();
+
+    await expect
+      .poll(async () => {
+        const settings = await readJson<{
+          editorPreferences?: { editorScale?: number };
+        }>(glyph.sandbox.settingsPath);
+        return settings?.editorPreferences?.editorScale ?? null;
+      })
+      .toBe(110);
+
+    // Press Cmd+0 (Reset Zoom)
+    await glyph.window.keyboard.press("Meta+0");
+
+    // Settings should return to 100
+    await expect
+      .poll(async () => {
+        const settings = await readJson<{
+          editorPreferences?: { editorScale?: number };
+        }>(glyph.sandbox.settingsPath);
+        return settings?.editorPreferences?.editorScale ?? null;
+      })
+      .toBe(100);
+
+    // Button should show 100%
+    await expect(glyph.window.getByRole("button", { name: /100%/ })).toBeVisible();
+  } finally {
+    await glyph.stop(testInfo);
+  }
+});

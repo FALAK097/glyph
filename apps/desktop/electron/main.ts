@@ -1067,6 +1067,21 @@ function buildApplicationMenu(shortcuts: AppSettings["shortcuts"]) {
     accelerator: getAccelerator("focus-mode"),
     click: () => mainWindow?.webContents.send("app:command", "focus-mode" satisfies AppCommand),
   };
+  const zoomInItem: Electron.MenuItemConstructorOptions = {
+    label: "Zoom In",
+    accelerator: getAccelerator("zoom-in"),
+    click: () => mainWindow?.webContents.send("app:command", "zoom-in" satisfies AppCommand),
+  };
+  const zoomOutItem: Electron.MenuItemConstructorOptions = {
+    label: "Zoom Out",
+    accelerator: getAccelerator("zoom-out"),
+    click: () => mainWindow?.webContents.send("app:command", "zoom-out" satisfies AppCommand),
+  };
+  const zoomResetItem: Electron.MenuItemConstructorOptions = {
+    label: "Reset Zoom",
+    accelerator: getAccelerator("zoom-reset"),
+    click: () => mainWindow?.webContents.send("app:command", "zoom-reset" satisfies AppCommand),
+  };
 
   const viewSubmenu: Electron.MenuItemConstructorOptions[] = isDev
     ? [
@@ -1075,8 +1090,20 @@ function buildApplicationMenu(shortcuts: AppSettings["shortcuts"]) {
         { role: "toggleDevTools" },
         { type: "separator" },
         focusModeItem,
+        { type: "separator" },
+        zoomInItem,
+        zoomOutItem,
+        zoomResetItem,
       ]
-    : [{ role: "togglefullscreen" }, { type: "separator" }, focusModeItem];
+    : [
+        { role: "togglefullscreen" },
+        { type: "separator" },
+        focusModeItem,
+        { type: "separator" },
+        zoomInItem,
+        zoomOutItem,
+        zoomResetItem,
+      ];
 
   const menuTemplate: Electron.MenuItemConstructorOptions[] = [
     {

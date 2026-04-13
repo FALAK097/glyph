@@ -68,7 +68,7 @@ export function AppLayout({
 }: AppLayoutProps) {
   return (
     <div
-      className={`grid h-screen min-h-0 overflow-hidden transition-[grid-template-columns] duration-200 ${
+      className={`grid h-screen min-h-0 overflow-hidden transition-[grid-template-columns] duration-200 ease-out motion-reduce:transition-none ${
         shouldCollapseSidebar ? "grid-cols-[0_minmax(0,1fr)]" : "grid-cols-[280px_minmax(0,1fr)]"
       }`}
     >
@@ -104,7 +104,13 @@ export function AppLayout({
         />
       )}
 
-      <main className="relative h-full min-h-0 overflow-hidden bg-background">{children}</main>
+      <main
+        id="main-content"
+        className="relative h-full min-h-0 overflow-hidden bg-background"
+        tabIndex={-1}
+      >
+        {children}
+      </main>
     </div>
   );
 }

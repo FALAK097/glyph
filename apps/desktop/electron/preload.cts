@@ -137,6 +137,15 @@ const api = {
   getAppInfo() {
     return invokeWithRetry<AppInfo>("app:getInfo");
   },
+  getDefaultAppStatus() {
+    return ipcRenderer.invoke("app:getDefaultAppStatus") as Promise<{
+      isDefault: boolean;
+      platform: string;
+    }>;
+  },
+  openDefaultAppSettings() {
+    return ipcRenderer.invoke("app:openDefaultAppSettings") as Promise<void>;
+  },
   getUpdateState() {
     return invokeWithRetry<UpdateState>("app:getUpdateState");
   },

@@ -1095,6 +1095,32 @@ export const useDesktopAppController = (
     await saveSettings({ dismissedUpdateVersion: updateState.availableVersion });
   }, [updateState?.availableVersion, saveSettings]);
 
+  const [defaultAppStatus, setDefaultAppStatus] = useState<{
+    isDefault: boolean;
+    platform: string;
+  } | null>(null);
+
+  const checkDefaultAppStatus = useCallback(async () => {
+    try {
+      const status = await glyph.getDefaultAppStatus();
+      setDefaultAppStatus(status);
+    } catch {
+      setDefaultAppStatus(null);
+    }
+  }, [glyph]);
+
+  const openSystemDefaultAppSettings = useCallback(async () => {
+    try {
+      await glyph.openDefaultAppSettings();
+    } catch {
+      // Silently fail if system settings can't be opened
+    }
+  }, [glyph]);
+
+  const dismissDefaultAppPrompt = useCallback(async () => {
+    await saveSettings({ dismissedDefaultAppPrompt: true });
+  }, [saveSettings]);
+
   const updateActionConfig = useMemo(() => {
     if (!appInfo?.updatesEnabled || !updateState) {
       return null;
@@ -2167,5 +2193,9 @@ export const useDesktopAppController = (
     hasBooted,
     editorScale,
     setEditorScale,
+    defaultAppStatus,
+    checkDefaultAppStatus,
+    openSystemDefaultAppSettings,
+    dismissDefaultAppPrompt,
   };
 };

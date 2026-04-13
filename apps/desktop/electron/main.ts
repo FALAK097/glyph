@@ -976,6 +976,7 @@ function getDefaultSettings(): AppSettings {
     },
     autoOpenPDF: true,
     dismissedUpdateVersion: null,
+    dismissedDefaultAppPrompt: null,
   };
 }
 
@@ -1335,6 +1336,12 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
         : candidate.dismissedUpdateVersion === null
           ? null
           : defaults.dismissedUpdateVersion,
+    dismissedDefaultAppPrompt:
+      typeof candidate.dismissedDefaultAppPrompt === "boolean"
+        ? candidate.dismissedDefaultAppPrompt
+        : candidate.dismissedDefaultAppPrompt === null
+          ? null
+          : defaults.dismissedDefaultAppPrompt,
   };
 }
 
@@ -1454,6 +1461,17 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
         : null;
   }
 
+  if ("dismissedDefaultAppPrompt" in candidate) {
+    if (
+      candidate.dismissedDefaultAppPrompt !== null &&
+      typeof candidate.dismissedDefaultAppPrompt !== "boolean"
+    ) {
+      throw new Error("dismissedDefaultAppPrompt must be a boolean or null.");
+    }
+
+    nextPatch.dismissedDefaultAppPrompt = candidate.dismissedDefaultAppPrompt;
+  }
+
   const invalidKeys = Object.keys(candidate).filter(
     (key) =>
       ![
@@ -1467,6 +1485,7 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
         "editorPreferences",
         "autoOpenPDF",
         "dismissedUpdateVersion",
+        "dismissedDefaultAppPrompt",
       ].includes(key),
   );
 
@@ -2226,6 +2245,76 @@ ipcMain.handle("settings:update", async (_event, patch: unknown) => {
   const nextSettings = await updateSettings(sanitizedPatch);
   refreshApplicationMenu(nextSettings.shortcuts);
   return nextSettings;
+});
+
+ipcMain.handle("app:getDefaultAppStatus", async () => {
+  if (process.platform === "darwin") {
+    try {
+      const { exec } = await import("node:child_process");
+
+      const isDefaultForExtension = (ext: string): Promise<boolean> => {
+        return new Promise((resolve) => {
+          exec(
+            `osascript -e 'tell app "System Events" to get the default application of file extension "${ext}"'`,
+            (error, stdout) => {
+              if (error) {
+                resolve(true);
+                return;
+              }
+              resolve(stdout.toLowerCase().includes("glyph"));
+            },
+          );
+        });
+      };
+
+      const mdResult = await isDefaultForExtension("md");
+      const mdxResult = await isDefaultForExtension("mdx");
+      const allDefault = mdResult && mdxResult;
+
+      return { isDefault: allDefault, platform: "darwin" };
+    } catch {
+      return { isDefault: true, platform: "darwin" };
+    }
+  }
+
+  if (process.platform === "win32") {
+    try {
+      const { exec } = await import("node:child_process");
+
+      const isDefaultForExtension = (ext: string): Promise<boolean> => {
+        return new Promise((resolve) => {
+          const extName = ext.slice(1);
+          exec(`ftype ${extName}`, (error, stdout) => {
+            if (error) {
+              resolve(true);
+              return;
+            }
+            resolve(stdout.toLowerCase().includes("glyph"));
+          });
+        });
+      };
+
+      const mdResult = await isDefaultForExtension(".md");
+      const mdxResult = await isDefaultForExtension(".mdx");
+      const allDefault = mdResult && mdxResult;
+
+      return { isDefault: allDefault, platform: "win32" };
+    } catch {
+      return { isDefault: true, platform: "win32" };
+    }
+  }
+
+  return { isDefault: true, platform: process.platform };
+});
+
+ipcMain.handle("app:openDefaultAppSettings", async () => {
+  if (process.platform === "darwin") {
+    shell.openExternal(
+      "https://support.apple.com/guide/mac-help/change-the-app-that-opens-a-file-mh35855/mac",
+    );
+  } else if (process.platform === "win32") {
+    shell.openExternal("ms-settings:defaultapps");
+  }
 });
 
 ipcMain.handle("app:getInfo", async () => getAppInfo());

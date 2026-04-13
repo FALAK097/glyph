@@ -34,9 +34,6 @@ type NoteViewProps = {
   showOutline: boolean;
   editorScale: number;
   onEditorScaleChange: (scale: number) => void;
-  zoomInShortcut?: string;
-  zoomOutShortcut?: string;
-  zoomResetShortcut?: string;
   outlineItems: OutlineItem[];
   outlineJumpRequest: { id: string; nonce: number } | null;
   updateState: UpdateState | null;

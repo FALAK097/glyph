@@ -881,7 +881,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         shortcut:
           getShortcutDisplay(controller.shortcuts, "zoom-in", navigator.platform) ?? undefined,
         onSelect: () => {
-          controller.setEditorScale(Math.min(200, controller.editorScale + 10));
+          void controller.setEditorScale(Math.min(200, controller.editorScale + 10));
+          closePalette();
         },
       },
       {
@@ -893,7 +894,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         shortcut:
           getShortcutDisplay(controller.shortcuts, "zoom-out", navigator.platform) ?? undefined,
         onSelect: () => {
-          controller.setEditorScale(Math.max(50, controller.editorScale - 10));
+          void controller.setEditorScale(Math.max(50, controller.editorScale - 10));
+          closePalette();
         },
       },
       {
@@ -905,7 +907,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         shortcut:
           getShortcutDisplay(controller.shortcuts, "zoom-reset", navigator.platform) ?? undefined,
         onSelect: () => {
-          controller.setEditorScale(100);
+          void controller.setEditorScale(100);
+          closePalette();
         },
       },
     ];
@@ -925,6 +928,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     viewerMode,
     controller.editorScale,
     controller.shortcuts,
+    closePalette,
   ]);
 
   const skillPaletteItems = useMemo<CommandPaletteItem[]>(() => {

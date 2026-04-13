@@ -1018,8 +1018,11 @@ function normalizePersistedFileList(input: unknown) {
 function normalizeEditorPreferences(
   input: Partial<AppSettings["editorPreferences"]> | undefined,
 ): AppSettings["editorPreferences"] {
+  const rawScale = input?.editorScale;
   const editorScale =
-    typeof input?.editorScale === "number" ? Math.min(200, Math.max(50, input.editorScale)) : 100;
+    typeof rawScale === "number" && Number.isFinite(rawScale)
+      ? Math.min(200, Math.max(50, rawScale))
+      : 100;
   return {
     focusMode: typeof input?.focusMode === "boolean" ? input.focusMode : false,
     showOutline: typeof input?.showOutline === "boolean" ? input.showOutline : true,

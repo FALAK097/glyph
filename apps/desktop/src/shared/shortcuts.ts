@@ -129,7 +129,6 @@ export const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
   },
   { id: "zoom-in", label: "Zoom In", keys: `${MODIFIER_TOKENS.cmdOrCtrl} =` },
   { id: "zoom-out", label: "Zoom Out", keys: `${MODIFIER_TOKENS.cmdOrCtrl} -` },
-  { id: "zoom-out", label: "Zoom Out", keys: `${MODIFIER_TOKENS.cmdOrCtrl} -` },
   { id: "zoom-reset", label: "Reset Zoom", keys: `${MODIFIER_TOKENS.cmdOrCtrl} 0` },
 ];
 

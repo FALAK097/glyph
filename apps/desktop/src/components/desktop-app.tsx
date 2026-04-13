@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { getDisplayFileName, isSamePath } from "@/lib/paths";
 import { countGroupedSkills, groupSkillsForBrowse } from "@/lib/skill-groups";
 import { formatByteSize } from "@/lib/format-byte-size";
+import { getShortcutDisplay } from "@/shared/shortcuts";
 import { SKILL_AGENT_CATALOG } from "@/shared/skill-agent-catalog";
 import type { SkillEntry, SkillSourceKind, SkillToolKind } from "@/shared/skills";
 import { useSessionStore } from "@/store/session";
@@ -877,6 +878,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         subtitle: "Increase editor zoom level",
         section: "Note",
         kind: "command",
+        shortcut:
+          getShortcutDisplay(controller.shortcuts, "zoom-in", navigator.platform) ?? undefined,
         onSelect: () => {
           controller.setEditorScale(Math.min(200, controller.editorScale + 10));
         },
@@ -887,6 +890,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         subtitle: "Decrease editor zoom level",
         section: "Note",
         kind: "command",
+        shortcut:
+          getShortcutDisplay(controller.shortcuts, "zoom-out", navigator.platform) ?? undefined,
         onSelect: () => {
           controller.setEditorScale(Math.max(50, controller.editorScale - 10));
         },
@@ -897,6 +902,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         subtitle: "Reset editor zoom to 100%",
         section: "Note",
         kind: "command",
+        shortcut:
+          getShortcutDisplay(controller.shortcuts, "zoom-reset", navigator.platform) ?? undefined,
         onSelect: () => {
           controller.setEditorScale(100);
         },
@@ -917,6 +924,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     paletteFilterQuery,
     viewerMode,
     controller.editorScale,
+    controller.shortcuts,
   ]);
 
   const skillPaletteItems = useMemo<CommandPaletteItem[]>(() => {

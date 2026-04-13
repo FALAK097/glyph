@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { matchShortcut, isPrimaryModifierPressed } from "@/shared/shortcuts";
+import { matchShortcut, isPrimaryModifierPressed, MODIFIER_TOKENS } from "@/shared/shortcuts";
 import type { FileDocument, ShortcutSetting, WorkspaceSnapshot } from "@/shared/workspace";
 
 type UseKeyboardShortcutsOptions = {
@@ -99,9 +99,13 @@ export function useKeyboardShortcuts({
       }
 
       const isPreviousBracketShortcut =
-        primaryPressed && !event.altKey && matchShortcut(event, "⇧ ⌘ [", platform);
+        primaryPressed &&
+        !event.altKey &&
+        matchShortcut(event, `${MODIFIER_TOKENS.shift} ${MODIFIER_TOKENS.cmdOrCtrl} [`, platform);
       const isNextBracketShortcut =
-        primaryPressed && !event.altKey && matchShortcut(event, "⇧ ⌘ ]", platform);
+        primaryPressed &&
+        !event.altKey &&
+        matchShortcut(event, `${MODIFIER_TOKENS.shift} ${MODIFIER_TOKENS.cmdOrCtrl} ]`, platform);
       const isPreviousCtrlTabShortcut =
         !hasConfiguredShortcutMatch &&
         event.ctrlKey &&

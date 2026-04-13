@@ -71,6 +71,10 @@ export const SettingsPanel = ({
 
     // On macOS: Cmd (metaKey) is the primary modifier, Ctrl is separate.
     // On Windows/Linux: Ctrl (ctrlKey) is the primary modifier, ignore Win key (metaKey).
+    if (!isMac && e.metaKey) {
+      // Win key pressed on Windows/Linux — not a supported modifier; discard.
+      return "";
+    }
     if (isMac) {
       if (e.metaKey) parts.push(MODIFIER_TOKENS.cmdOrCtrl);
     } else {

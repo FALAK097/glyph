@@ -1035,7 +1035,7 @@ export const useDesktopAppController = (
         updateState.status === "downloaded"
       ) {
         if (updateState.availableVersion) {
-          await saveSettings({ dismissedUpdateVersion: updateState.availableVersion });
+          void saveSettings({ dismissedUpdateVersion: updateState.availableVersion });
         }
         await glyph.openExternal(updateState.releasePageUrl ?? APP_RELEASES_URL);
         return;
@@ -1106,6 +1106,7 @@ export const useDesktopAppController = (
           ? `Open GitHub Releases to download Glyph ${updateState.availableVersion} manually`
           : "Open GitHub Releases to download and install manually",
         isDisabled: false,
+        isManualRelease: true,
       };
     }
 
@@ -1265,6 +1266,21 @@ export const useDesktopAppController = (
                 if (!updateActionConfig.isDisabled) {
                   void triggerUpdateAction();
                 }
+                setIsPaletteOpen(false);
+              },
+            },
+          ]
+        : []),
+      ...(updateActionConfig?.isManualRelease
+        ? [
+            {
+              id: "dismiss-update",
+              title: "Dismiss Update Notification",
+              subtitle: "Hide the update banner for this version",
+              section: "Actions",
+              kind: "command" as const,
+              onSelect: () => {
+                void dismissUpdateNotification();
                 setIsPaletteOpen(false);
               },
             },

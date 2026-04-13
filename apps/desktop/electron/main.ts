@@ -1296,10 +1296,11 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
     autoOpenPDF:
       typeof candidate.autoOpenPDF === "boolean" ? candidate.autoOpenPDF : defaults.autoOpenPDF,
     dismissedUpdateVersion:
-      typeof candidate.dismissedUpdateVersion === "string" ||
-      candidate.dismissedUpdateVersion === null
-        ? candidate.dismissedUpdateVersion
-        : defaults.dismissedUpdateVersion,
+      typeof candidate.dismissedUpdateVersion === "string"
+        ? candidate.dismissedUpdateVersion.trim().replace(/^v/i, "")
+        : candidate.dismissedUpdateVersion === null
+          ? null
+          : defaults.dismissedUpdateVersion,
   };
 }
 
@@ -1413,7 +1414,10 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
       throw new Error("dismissedUpdateVersion must be a string or null.");
     }
 
-    nextPatch.dismissedUpdateVersion = candidate.dismissedUpdateVersion;
+    nextPatch.dismissedUpdateVersion =
+      typeof candidate.dismissedUpdateVersion === "string"
+        ? candidate.dismissedUpdateVersion.trim().replace(/^v/i, "")
+        : null;
   }
 
   const invalidKeys = Object.keys(candidate).filter(

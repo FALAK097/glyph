@@ -284,16 +284,21 @@ export function EditorToolbar({
               <TooltipContent side="bottom">{updateButtonTooltip}</TooltipContent>
             </Tooltip>
             {isManualReleaseButton && onDismissUpdateAction && (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="ml-1 h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-muted"
-                onClick={onDismissUpdateAction}
-                aria-label="Dismiss update notification"
-                type="button"
-              >
-                <XIcon size={14} />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="ml-1 h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-muted"
+                    onClick={onDismissUpdateAction}
+                    aria-label="Dismiss update notification"
+                    type="button"
+                  >
+                    <XIcon size={14} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Dismiss update</TooltipContent>
+              </Tooltip>
             )}
           </div>
         ) : null}

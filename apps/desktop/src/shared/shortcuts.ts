@@ -460,7 +460,22 @@ export function splitShortcutTokens(shortcut: string): string[] {
     return shortcut.split("+").filter(Boolean);
   }
 
-  return shortcut.split("");
+  // macOS compact form: scan for known single-char modifier symbols, then
+  // treat the remainder as the key token (which may be multi-char, e.g. "Tab").
+  const MODIFIER_SYMBOLS = ["⌘", "⌥", "⇧", "⌃"];
+  const tokens: string[] = [];
+  let i = 0;
+  while (i < shortcut.length) {
+    if (MODIFIER_SYMBOLS.includes(shortcut[i])) {
+      tokens.push(shortcut[i]);
+      i++;
+    } else {
+      // Everything remaining is the key (handles "Tab", "F1", single chars, etc.)
+      tokens.push(shortcut.slice(i));
+      break;
+    }
+  }
+  return tokens.filter(Boolean);
 }
 
 export function toElectronAccelerator(shortcut: string): string | undefined {

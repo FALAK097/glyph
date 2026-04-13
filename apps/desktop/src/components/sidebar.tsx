@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getDisplayFileName, normalizePath } from "@/lib/paths";
+import { getShortcutDisplay } from "@/shared/shortcuts";
 
 import type { NoteShortcutItem } from "@/types/navigation";
 import type {
@@ -534,7 +535,7 @@ export const Sidebar = ({
                       <PlusIcon size={12} />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom">{`New Note (${navigator.platform.includes("Mac") ? "⌘N" : "Ctrl+N"})`}</TooltipContent>
+                  <TooltipContent side="bottom">{`New Note (${getShortcutDisplay(null, "new-note", navigator.platform) ?? "⌘N"})`}</TooltipContent>
                 </Tooltip>
               ) : null}
               {onCreateFolder ? (
@@ -549,7 +550,7 @@ export const Sidebar = ({
                       <FolderPlusIcon size={12} />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom">{`New Folder (${navigator.platform.includes("Mac") ? "⇧⌘N" : "Ctrl+Shift+N"})`}</TooltipContent>
+                  <TooltipContent side="bottom">{`New Folder (${getShortcutDisplay(null, "new-folder", navigator.platform) ?? "⇧⌘N"})`}</TooltipContent>
                 </Tooltip>
               ) : null}
               <button

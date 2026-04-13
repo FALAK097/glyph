@@ -1034,6 +1034,9 @@ export const useDesktopAppController = (
         updateState.status === "downloading" ||
         updateState.status === "downloaded"
       ) {
+        if (updateState.availableVersion) {
+          void saveSettings({ dismissedUpdateVersion: updateState.availableVersion });
+        }
         await glyph.openExternal(updateState.releasePageUrl ?? APP_RELEASES_URL);
         return;
       }
@@ -1066,7 +1069,14 @@ export const useDesktopAppController = (
     ) {
       await glyph.checkForUpdates();
     }
-  }, [appInfo?.updatesEnabled, appInfo?.updatesMode, glyph, updateState]);
+  }, [appInfo?.updatesEnabled, appInfo?.updatesMode, glyph, updateState, saveSettings]);
+
+  const dismissUpdateNotification = useCallback(async () => {
+    if (!updateState?.availableVersion) {
+      return;
+    }
+    await saveSettings({ dismissedUpdateVersion: updateState.availableVersion });
+  }, [updateState?.availableVersion, saveSettings]);
 
   const updateActionConfig = useMemo(() => {
     if (!appInfo?.updatesEnabled || !updateState) {
@@ -1096,6 +1106,7 @@ export const useDesktopAppController = (
           ? `Open GitHub Releases to download Glyph ${updateState.availableVersion} manually`
           : "Open GitHub Releases to download and install manually",
         isDisabled: false,
+        isManualRelease: true,
       };
     }
 
@@ -1199,7 +1210,7 @@ export const useDesktopAppController = (
         id: "new-note",
         title: "New note",
         subtitle: "Create a fresh markdown note",
-        shortcut: getShortcutDisplay(shortcuts, "new-note"),
+        shortcut: getShortcutDisplay(shortcuts, "new-note", appInfo?.platform),
         section: "Actions",
         kind: "command",
         onSelect: () => void createNote(),
@@ -1208,7 +1219,7 @@ export const useDesktopAppController = (
         id: "new-folder",
         title: "New folder",
         subtitle: "Create a new folder in the current directory",
-        shortcut: "⇧⌘N",
+        shortcut: getShortcutDisplay(shortcuts, "new-folder", appInfo?.platform),
         section: "Actions",
         kind: "command",
         onSelect: () => void createFolder(),
@@ -1217,7 +1228,7 @@ export const useDesktopAppController = (
         id: "open-file",
         title: "Open File",
         subtitle: "Open an existing markdown file",
-        shortcut: getShortcutDisplay(shortcuts, "open-file"),
+        shortcut: getShortcutDisplay(shortcuts, "open-file", appInfo?.platform),
         section: "Actions",
         kind: "command",
         onSelect: async () => {
@@ -1230,7 +1241,7 @@ export const useDesktopAppController = (
         id: "open-folder",
         title: "Open Folder",
         subtitle: "Open a folder as a workspace",
-        shortcut: getShortcutDisplay(shortcuts, "open-folder"),
+        shortcut: getShortcutDisplay(shortcuts, "open-folder", appInfo?.platform),
         section: "Actions",
         kind: "command",
         onSelect: async () => {
@@ -1248,7 +1259,7 @@ export const useDesktopAppController = (
               id: "check-updates",
               title: updateActionConfig.title,
               subtitle: updateActionConfig.subtitle,
-              shortcut: getShortcutDisplay(shortcuts, "check-updates"),
+              shortcut: getShortcutDisplay(shortcuts, "check-updates", appInfo?.platform),
               section: "Actions",
               kind: "command" as const,
               onSelect: () => {
@@ -1260,11 +1271,26 @@ export const useDesktopAppController = (
             },
           ]
         : []),
+      ...(updateActionConfig?.isManualRelease
+        ? [
+            {
+              id: "dismiss-update",
+              title: "Dismiss Update Notification",
+              subtitle: "Hide the update banner for this version",
+              section: "Actions",
+              kind: "command" as const,
+              onSelect: () => {
+                void dismissUpdateNotification();
+                setIsPaletteOpen(false);
+              },
+            },
+          ]
+        : []),
       {
         id: "settings",
         title: "Settings",
         subtitle: "Adjust workspace defaults",
-        shortcut: getShortcutDisplay(shortcuts, "settings"),
+        shortcut: getShortcutDisplay(shortcuts, "settings", appInfo?.platform),
         section: "Actions",
         kind: "command",
         onSelect: () => {
@@ -1276,7 +1302,7 @@ export const useDesktopAppController = (
         id: "navigate-back",
         title: "Navigate Back",
         subtitle: "Go to previous file in history",
-        shortcut: getShortcutDisplay(shortcuts, "navigate-back"),
+        shortcut: getShortcutDisplay(shortcuts, "navigate-back", appInfo?.platform),
         section: "Navigation",
         kind: "command",
         onSelect: () => {
@@ -1288,7 +1314,7 @@ export const useDesktopAppController = (
         id: "navigate-forward",
         title: "Navigate Forward",
         subtitle: "Go to next file in history",
-        shortcut: getShortcutDisplay(shortcuts, "navigate-forward"),
+        shortcut: getShortcutDisplay(shortcuts, "navigate-forward", appInfo?.platform),
         section: "Navigation",
         kind: "command",
         onSelect: () => {
@@ -1330,7 +1356,7 @@ export const useDesktopAppController = (
               id: "close-tab",
               title: "Close Current Tab",
               subtitle: "Close the current note tab",
-              shortcut: getShortcutDisplay(shortcuts, "close-tab"),
+              shortcut: getShortcutDisplay(shortcuts, "close-tab", appInfo?.platform),
               section: "Tabs",
               kind: "command" as const,
               onSelect: () => {
@@ -1349,7 +1375,7 @@ export const useDesktopAppController = (
               id: "close-other-tabs",
               title: "Close Other Tabs",
               subtitle: "Keep only the current note open",
-              shortcut: getShortcutDisplay(shortcuts, "close-other-tabs"),
+              shortcut: getShortcutDisplay(shortcuts, "close-other-tabs", appInfo?.platform),
               section: "Tabs",
               kind: "command" as const,
               onSelect: () => {
@@ -1365,7 +1391,7 @@ export const useDesktopAppController = (
       {
         id: "toggle-focus-mode",
         title: isFocusMode ? "Exit Focus Mode" : "Enter Focus Mode",
-        shortcut: getShortcutDisplay(shortcuts, "focus-mode"),
+        shortcut: getShortcutDisplay(shortcuts, "focus-mode", appInfo?.platform),
         subtitle: "Hide navigation and keep the note centered",
         section: "View",
         kind: "command",
@@ -1458,6 +1484,7 @@ export const useDesktopAppController = (
       closeOtherNoteTabs,
       createNote,
       createFolder,
+      dismissUpdateNotification,
       glyph,
       isActiveFilePinned,
       isFocusMode,
@@ -1499,6 +1526,7 @@ export const useDesktopAppController = (
   useKeyboardShortcuts({
     glyph,
     shortcuts,
+    platform: appInfo?.platform ?? navigator.platform,
     activeFile,
     saveActiveNote: async () => {
       const activeTab = getActiveTab();
@@ -2093,6 +2121,7 @@ export const useDesktopAppController = (
     toggleOutline,
     togglePinnedFile,
     triggerUpdateAction,
+    dismissUpdateNotification,
     updateState,
     updateDraftContent: handleDraftChange,
     visibleSidebarNodes,

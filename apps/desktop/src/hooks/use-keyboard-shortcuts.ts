@@ -1,11 +1,12 @@
 import { useEffect } from "react";
 
-import { matchShortcut } from "@/shared/shortcuts";
+import { matchShortcut, isPrimaryModifierPressed, MODIFIER_TOKENS } from "@/shared/shortcuts";
 import type { FileDocument, ShortcutSetting, WorkspaceSnapshot } from "@/shared/workspace";
 
 type UseKeyboardShortcutsOptions = {
   glyph: NonNullable<Window["glyph"]>;
   shortcuts: ShortcutSetting[];
+  platform: string;
   activeFile: FileDocument | null;
   saveActiveNote: () => Promise<void>;
   createNote: () => Promise<void>;
@@ -33,6 +34,7 @@ type UseKeyboardShortcutsOptions = {
 export function useKeyboardShortcuts({
   glyph,
   shortcuts,
+  platform,
   activeFile,
   saveActiveNote,
   createNote,
@@ -80,9 +82,9 @@ export function useKeyboardShortcuts({
       }
 
       const hasConfiguredShortcutMatch = shortcuts.some((entry) =>
-        matchShortcut(event, entry.keys),
+        matchShortcut(event, entry.keys, platform),
       );
-      const primaryPressed = event.metaKey !== event.ctrlKey && (event.metaKey || event.ctrlKey);
+      const primaryPressed = isPrimaryModifierPressed(event, platform);
       if (
         !hasConfiguredShortcutMatch &&
         primaryPressed &&
@@ -97,9 +99,13 @@ export function useKeyboardShortcuts({
       }
 
       const isPreviousBracketShortcut =
-        primaryPressed && !event.altKey && matchShortcut(event, "⇧ ⌘ [");
+        primaryPressed &&
+        !event.altKey &&
+        matchShortcut(event, `${MODIFIER_TOKENS.shift} ${MODIFIER_TOKENS.cmdOrCtrl} [`, platform);
       const isNextBracketShortcut =
-        primaryPressed && !event.altKey && matchShortcut(event, "⇧ ⌘ ]");
+        primaryPressed &&
+        !event.altKey &&
+        matchShortcut(event, `${MODIFIER_TOKENS.shift} ${MODIFIER_TOKENS.cmdOrCtrl} ]`, platform);
       const isPreviousCtrlTabShortcut =
         !hasConfiguredShortcutMatch &&
         event.ctrlKey &&
@@ -144,7 +150,7 @@ export function useKeyboardShortcuts({
         "close-other-tabs",
       ]);
       const globalShortcut = shortcuts.find(
-        (entry) => globalShortcutIds.has(entry.id) && matchShortcut(event, entry.keys),
+        (entry) => globalShortcutIds.has(entry.id) && matchShortcut(event, entry.keys, platform),
       );
       if (globalShortcut) {
         event.preventDefault();
@@ -192,7 +198,7 @@ export function useKeyboardShortcuts({
       // Allow save shortcut even inside editable inputs (e.g. the editor)
       if (isEditableInput) {
         const saveShortcut = shortcuts.find(
-          (entry) => entry.id === "save" && matchShortcut(event, entry.keys),
+          (entry) => entry.id === "save" && matchShortcut(event, entry.keys, platform),
         );
 
         if (saveShortcut && activeFile) {
@@ -204,7 +210,7 @@ export function useKeyboardShortcuts({
 
       if (!isEditableInput) {
         const shortcut = shortcuts.find(
-          (entry) => !globalShortcutIds.has(entry.id) && matchShortcut(event, entry.keys),
+          (entry) => !globalShortcutIds.has(entry.id) && matchShortcut(event, entry.keys, platform),
         );
 
         if (shortcut) {
@@ -247,6 +253,7 @@ export function useKeyboardShortcuts({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [
     shortcuts,
+    platform,
     activeFile,
     saveActiveNote,
     glyph,

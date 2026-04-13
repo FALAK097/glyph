@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import type { CommandPaletteItem, CommandPaletteProps } from "../types/command-palette";
+import { splitShortcutTokens } from "../shared/shortcuts";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -227,16 +228,16 @@ export const CommandPalette = memo(
                             ) : null}
                             {item.shortcut
                               ? (() => {
-                                  const shortcut = item.shortcut;
+                                  const tokens = splitShortcutTokens(item.shortcut);
 
                                   return (
                                     <div className="flex gap-1">
-                                      {shortcut.split("").map((char, index) => (
+                                      {tokens.map((token, tokenIdx) => (
                                         <kbd
-                                          key={`${item.id}:${shortcut.slice(0, index + 1)}`}
+                                          key={`${item.id}:${tokenIdx}:${token}`}
                                           className="rounded border border-border/40 bg-muted/40 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
                                         >
-                                          {char}
+                                          {token}
                                         </kbd>
                                       ))}
                                     </div>

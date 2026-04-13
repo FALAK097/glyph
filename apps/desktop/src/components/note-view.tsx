@@ -36,6 +36,7 @@ type NoteViewProps = {
   outlineJumpRequest: { id: string; nonce: number } | null;
   updateState: UpdateState | null;
   updatesMode?: AppInfo["updatesMode"];
+  dismissedUpdateVersion?: string | null;
   onContentChange: (value: string) => void;
   onSelectTab: (path: string) => void;
   onCloseTab: (path: string) => void;
@@ -54,6 +55,7 @@ type NoteViewProps = {
   onToggleFocusMode: () => void;
   onTogglePinnedFile: (() => void) | undefined;
   onUpdateAction: () => void;
+  onDismissUpdateAction?: () => void;
 };
 
 export function NoteView({
@@ -82,6 +84,7 @@ export function NoteView({
   outlineJumpRequest,
   updateState,
   updatesMode,
+  dismissedUpdateVersion,
   onContentChange,
   onSelectTab,
   onCloseTab,
@@ -100,6 +103,7 @@ export function NoteView({
   onToggleFocusMode,
   onTogglePinnedFile,
   onUpdateAction,
+  onDismissUpdateAction,
 }: NoteViewProps) {
   const handleOpenCommandPalette = useCallback(() => {
     onOpenCommandPalette();
@@ -151,19 +155,26 @@ export function NoteView({
       onToggleSidebar={onToggleSidebar}
       isSidebarCollapsed={isSidebarCollapsed}
       onCreateNote={onCreateNote}
-      toggleSidebarShortcut={getShortcutDisplay(shortcuts, "toggle-sidebar")}
-      newNoteShortcut={getShortcutDisplay(shortcuts, "new-note")}
+      toggleSidebarShortcut={getShortcutDisplay(shortcuts, "toggle-sidebar", navigator.platform)}
+      newNoteShortcut={getShortcutDisplay(shortcuts, "new-note", navigator.platform)}
       onOpenSettings={handleOpenSettings}
       onOpenCommandPalette={handleOpenCommandPalette}
       commandPaletteLabel="Search notes and skills"
       onOpenLinkedFile={onOpenLinkedFile}
-      commandPaletteShortcut={getShortcutDisplay(shortcuts, "command-palette") ?? "⌘P"}
+      commandPaletteShortcut={
+        getShortcutDisplay(shortcuts, "command-palette", navigator.platform) ??
+        (navigator.platform.includes("Mac") ? "⌘P" : "Ctrl+P")
+      }
       onScrollPositionChange={onScrollPositionChange}
       onNavigateBack={onNavigateBack}
       onNavigateForward={onNavigateForward}
-      navigateBackShortcut={getShortcutDisplay(shortcuts, "navigate-back")}
-      navigateForwardShortcut={getShortcutDisplay(shortcuts, "navigate-forward")}
-      focusModeShortcut={getShortcutDisplay(shortcuts, "focus-mode")}
+      navigateBackShortcut={getShortcutDisplay(shortcuts, "navigate-back", navigator.platform)}
+      navigateForwardShortcut={getShortcutDisplay(
+        shortcuts,
+        "navigate-forward",
+        navigator.platform,
+      )}
+      focusModeShortcut={getShortcutDisplay(shortcuts, "focus-mode", navigator.platform)}
       onDeleteNote={onDeleteNote}
       onOpenNewWindow={onOpenNewWindow}
       canGoBack={canGoBack}
@@ -181,7 +192,9 @@ export function NoteView({
       showOutline={showOutline}
       updateState={updateState}
       updatesMode={updatesMode}
+      dismissedUpdateVersion={dismissedUpdateVersion}
       onUpdateAction={onUpdateAction}
+      onDismissUpdateAction={onDismissUpdateAction}
     />
   );
 }

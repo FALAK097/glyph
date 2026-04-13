@@ -15,6 +15,8 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip
 import {
   DEFAULT_SHORTCUTS,
   canonicalizeShortcut,
+  formatKeysForPlatform,
+  isMacPlatform,
   mergeShortcutSettings,
   MODIFIER_TOKENS,
 } from "../shared/shortcuts";
@@ -65,7 +67,19 @@ export const SettingsPanel = ({
 
   const formatKeyCombo = (e: React.KeyboardEvent<HTMLInputElement>): string => {
     const parts: string[] = [];
-    if (e.metaKey || e.ctrlKey) parts.push(MODIFIER_TOKENS.cmdOrCtrl);
+    const isMac = isMacPlatform(navigator.platform);
+
+    // On macOS: Cmd (metaKey) is the primary modifier, Ctrl is separate.
+    // On Windows/Linux: Ctrl (ctrlKey) is the primary modifier, ignore Win key (metaKey).
+    if (!isMac && e.metaKey) {
+      // Win key pressed on Windows/Linux — not a supported modifier; discard.
+      return "";
+    }
+    if (isMac) {
+      if (e.metaKey) parts.push(MODIFIER_TOKENS.cmdOrCtrl);
+    } else {
+      if (e.ctrlKey) parts.push(MODIFIER_TOKENS.cmdOrCtrl);
+    }
     if (e.altKey) parts.push(MODIFIER_TOKENS.alt);
     if (e.shiftKey) parts.push(MODIFIER_TOKENS.shift);
     const key = e.key;
@@ -320,7 +334,7 @@ export const SettingsPanel = ({
                         ref={inputRef}
                         type="text"
                         className="h-8 w-32 border-primary bg-background text-center font-mono text-xs shadow-sm"
-                        value={capturedKeys}
+                        value={formatKeysForPlatform(capturedKeys, navigator.platform)}
                         onKeyDown={handleKeyDown}
                         onBlur={() => {
                           if (capturedKeys && editingShortcut) {
@@ -349,7 +363,7 @@ export const SettingsPanel = ({
                           setConflictIds(new Set());
                         }}
                       >
-                        {shortcut.keys}
+                        {formatKeysForPlatform(shortcut.keys, navigator.platform)}
                       </Button>
                     )}
                   </div>

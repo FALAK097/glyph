@@ -13,14 +13,16 @@ import type {
   SlashCommandListHandle,
   SlashCommandWithKey,
 } from "../types/slash-command";
+import { MODIFIER_TOKENS } from "../shared/shortcuts";
 
 /**
  * Hardcoded TipTap/StarterKit default shortcuts displayed as hints in the
  * slash command menu. These are the real bindings — not configurable — so the
  * hint always matches what actually works in the editor.
  *
- * macOS symbols: ⌘ = Cmd, ⌥ = Alt/Option, ⇧ = Shift
- * Windows/Linux: ⌘ → Ctrl, ⌥ → Alt
+ * Stored in the internal space-separated token format (same as settings
+ * shortcuts) and converted to the platform-appropriate display form at
+ * render time by the ShortcutBadge component.
  */
 const COMMANDS: SlashCommandWithKey[] = [
   {
@@ -30,7 +32,7 @@ const COMMANDS: SlashCommandWithKey[] = [
     keywords: ["h1", "heading", "title", "#"],
     group: "Headings",
     icon: "Heading01Icon",
-    shortcut: "⌘⌥1",
+    shortcut: `${MODIFIER_TOKENS.cmdOrCtrl} ${MODIFIER_TOKENS.alt} 1`,
   },
   {
     id: "h2",
@@ -39,7 +41,7 @@ const COMMANDS: SlashCommandWithKey[] = [
     keywords: ["h2", "heading", "##"],
     group: "Headings",
     icon: "Heading02Icon",
-    shortcut: "⌘⌥2",
+    shortcut: `${MODIFIER_TOKENS.cmdOrCtrl} ${MODIFIER_TOKENS.alt} 2`,
   },
   {
     id: "h3",
@@ -48,7 +50,7 @@ const COMMANDS: SlashCommandWithKey[] = [
     keywords: ["h3", "heading", "###"],
     group: "Headings",
     icon: "Heading03Icon",
-    shortcut: "⌘⌥3",
+    shortcut: `${MODIFIER_TOKENS.cmdOrCtrl} ${MODIFIER_TOKENS.alt} 3`,
   },
   {
     id: "bullet",
@@ -84,7 +86,7 @@ const COMMANDS: SlashCommandWithKey[] = [
     keywords: ["quote", "blockquote", ">"],
     group: "Blocks",
     icon: "QuoteDownIcon",
-    shortcut: "⌘⇧B",
+    shortcut: `${MODIFIER_TOKENS.cmdOrCtrl} ${MODIFIER_TOKENS.shift} B`,
   },
   {
     id: "table",
@@ -120,7 +122,7 @@ const COMMANDS: SlashCommandWithKey[] = [
     keywords: ["bold", "strong", "**"],
     group: "Inline",
     icon: "TextBoldIcon",
-    shortcut: "⌘B",
+    shortcut: `${MODIFIER_TOKENS.cmdOrCtrl} B`,
   },
   {
     id: "italic",
@@ -129,7 +131,7 @@ const COMMANDS: SlashCommandWithKey[] = [
     keywords: ["italic", "emphasis", "*"],
     group: "Inline",
     icon: "TextItalicIcon",
-    shortcut: "⌘I",
+    shortcut: `${MODIFIER_TOKENS.cmdOrCtrl} I`,
   },
   {
     id: "strike",
@@ -138,7 +140,7 @@ const COMMANDS: SlashCommandWithKey[] = [
     keywords: ["strike", "strikethrough", "~~"],
     group: "Inline",
     icon: "TextStrikethroughIcon",
-    shortcut: "⌘⇧S",
+    shortcut: `${MODIFIER_TOKENS.cmdOrCtrl} ${MODIFIER_TOKENS.shift} S`,
   },
   {
     id: "inlinecode",
@@ -147,7 +149,7 @@ const COMMANDS: SlashCommandWithKey[] = [
     keywords: ["inline", "code", "`"],
     group: "Inline",
     icon: "CodeSimpleIcon",
-    shortcut: "⌘E",
+    shortcut: `${MODIFIER_TOKENS.cmdOrCtrl} E`,
   },
   {
     id: "link",
@@ -156,7 +158,7 @@ const COMMANDS: SlashCommandWithKey[] = [
     keywords: ["link", "url", "[]()"],
     group: "Inline",
     icon: "Link01Icon",
-    shortcut: "⌘K",
+    shortcut: `${MODIFIER_TOKENS.cmdOrCtrl} K`,
   },
   {
     id: "image",

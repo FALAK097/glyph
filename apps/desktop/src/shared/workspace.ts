@@ -94,6 +94,7 @@ export type SidebarState = {
 export type EditorPreferences = {
   focusMode: boolean;
   showOutline: boolean;
+  editorScale: number;
 };
 
 export type AppSettings = {
@@ -157,7 +158,10 @@ export type AppCommand =
   | "quick-open"
   | "find-in-note"
   | "toggle-sidebar"
-  | "focus-mode";
+  | "focus-mode"
+  | "zoom-in"
+  | "zoom-out"
+  | "zoom-reset";
 
 export type ExternalFileTarget = {
   path: string;

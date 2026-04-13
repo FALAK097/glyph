@@ -86,3 +86,42 @@ export const PinOffIcon = (props: IconProps) => <HugeIcon icon={HugePinOffIcon} 
 
 export const FocusIcon = (props: IconProps) => <HugeIcon icon={Maximize01Svg} {...props} />;
 export const OutlineIcon = (props: IconProps) => <HugeIcon icon={ListViewSvg} {...props} />;
+
+export const ZoomInIcon = (props: IconProps) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={props.size ?? 16}
+    height={props.size ?? 16}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={props.color ?? "currentColor"}
+    strokeWidth={props.strokeWidth ?? 2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={props.className}
+  >
+    <circle cx="11" cy="11" r="8" />
+    <path d="M21 21l-4.35-4.35" />
+    <path d="M11 8v6" />
+    <path d="M8 11h6" />
+  </svg>
+);
+
+export const ZoomOutIcon = (props: IconProps) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={props.size ?? 16}
+    height={props.size ?? 16}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke={props.color ?? "currentColor"}
+    strokeWidth={props.strokeWidth ?? 2}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={props.className}
+  >
+    <circle cx="11" cy="11" r="8" />
+    <path d="M21 21l-4.35-4.35" />
+    <path d="M8 11h6" />
+  </svg>
+);

@@ -15,7 +15,10 @@ export type ShortcutId =
   | "toggle-sidebar"
   | "navigate-back"
   | "navigate-forward"
-  | "focus-mode";
+  | "focus-mode"
+  | "zoom-in"
+  | "zoom-out"
+  | "zoom-reset";
 
 export type ShortcutDefinition = ShortcutSetting & {
   id: ShortcutId;
@@ -124,6 +127,9 @@ export const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
     label: "Toggle Focus Mode",
     keys: `${MODIFIER_TOKENS.shift} ${MODIFIER_TOKENS.cmdOrCtrl} F`,
   },
+  { id: "zoom-in", label: "Zoom In", keys: `${MODIFIER_TOKENS.cmdOrCtrl} =` },
+  { id: "zoom-out", label: "Zoom Out", keys: `${MODIFIER_TOKENS.cmdOrCtrl} -` },
+  { id: "zoom-reset", label: "Reset Zoom", keys: `${MODIFIER_TOKENS.cmdOrCtrl} 0` },
 ];
 
 export function getPrimaryShortcutPrefix(platform?: string): string {

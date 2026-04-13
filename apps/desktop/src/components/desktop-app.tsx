@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { getDisplayFileName, isSamePath } from "@/lib/paths";
 import { countGroupedSkills, groupSkillsForBrowse } from "@/lib/skill-groups";
 import { formatByteSize } from "@/lib/format-byte-size";
+import { getShortcutDisplay } from "@/shared/shortcuts";
 import { SKILL_AGENT_CATALOG } from "@/shared/skill-agent-catalog";
 import type { SkillEntry, SkillSourceKind, SkillToolKind } from "@/shared/skills";
 import { useSessionStore } from "@/store/session";
@@ -871,6 +872,45 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
           void handleExportCurrentNote();
         },
       },
+      {
+        id: "zoom-in",
+        title: "Zoom In",
+        subtitle: "Increase editor zoom level",
+        section: "Note",
+        kind: "command",
+        shortcut:
+          getShortcutDisplay(controller.shortcuts, "zoom-in", navigator.platform) ?? undefined,
+        onSelect: () => {
+          void controller.setEditorScale(Math.min(200, controller.editorScale + 10));
+          closePalette();
+        },
+      },
+      {
+        id: "zoom-out",
+        title: "Zoom Out",
+        subtitle: "Decrease editor zoom level",
+        section: "Note",
+        kind: "command",
+        shortcut:
+          getShortcutDisplay(controller.shortcuts, "zoom-out", navigator.platform) ?? undefined,
+        onSelect: () => {
+          void controller.setEditorScale(Math.max(50, controller.editorScale - 10));
+          closePalette();
+        },
+      },
+      {
+        id: "zoom-reset",
+        title: "Reset Zoom",
+        subtitle: "Reset editor zoom to 100%",
+        section: "Note",
+        kind: "command",
+        shortcut:
+          getShortcutDisplay(controller.shortcuts, "zoom-reset", navigator.platform) ?? undefined,
+        onSelect: () => {
+          void controller.setEditorScale(100);
+          closePalette();
+        },
+      },
     ];
 
     return items.filter((item) => matchesPaletteQuery(query, item.title, item.subtitle));
@@ -886,6 +926,9 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     handleRevealCurrentNote,
     paletteFilterQuery,
     viewerMode,
+    controller.editorScale,
+    controller.shortcuts,
+    closePalette,
   ]);
 
   const skillPaletteItems = useMemo<CommandPaletteItem[]>(() => {
@@ -1262,6 +1305,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                 }
                 onOutlineJumpHandled={controller.clearOutlineJumpRequest}
                 onToggleFocusMode={() => void controller.toggleFocusMode()}
+                editorScale={controller.editorScale}
+                onEditorScaleChange={(scale) => void controller.setEditorScale(scale)}
                 onTogglePinnedFile={
                   controller.activeFile
                     ? () => void controller.togglePinnedFile(controller.activeFile!.path)

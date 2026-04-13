@@ -29,6 +29,8 @@ type UseKeyboardShortcutsOptions = {
   setIsSettingsOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setIsSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
   toggleFocusMode: () => Promise<void>;
+  setEditorScale: (scale: number) => Promise<void>;
+  editorScale: number;
 };
 
 export function useKeyboardShortcuts({
@@ -57,6 +59,8 @@ export function useKeyboardShortcuts({
   setIsSettingsOpen,
   setIsSidebarCollapsed,
   toggleFocusMode,
+  setEditorScale,
+  editorScale,
 }: UseKeyboardShortcutsOptions) {
   useEffect(() => {
     const onKeyDown = async (event: KeyboardEvent) => {
@@ -148,6 +152,9 @@ export function useKeyboardShortcuts({
         "new-folder",
         "close-tab",
         "close-other-tabs",
+        "zoom-in",
+        "zoom-out",
+        "zoom-reset",
       ]);
       const globalShortcut = shortcuts.find(
         (entry) => globalShortcutIds.has(entry.id) && matchShortcut(event, entry.keys, platform),
@@ -190,6 +197,15 @@ export function useKeyboardShortcuts({
             break;
           case "close-other-tabs":
             void closeOtherTabs();
+            break;
+          case "zoom-in":
+            void setEditorScale(Math.min(200, editorScale + 10));
+            break;
+          case "zoom-out":
+            void setEditorScale(Math.max(50, editorScale - 10));
+            break;
+          case "zoom-reset":
+            void setEditorScale(100);
             break;
         }
         return;
@@ -277,5 +293,7 @@ export function useKeyboardShortcuts({
     setIsSettingsOpen,
     setIsSidebarCollapsed,
     toggleFocusMode,
+    setEditorScale,
+    editorScale,
   ]);
 }

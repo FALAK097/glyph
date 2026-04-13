@@ -291,8 +291,8 @@ export function EditorToolbar({
                 className="min-w-[48px] px-1.5 h-7 text-xs font-medium"
                 aria-label={
                   zoomResetShortcut
-                    ? `Reset zoom to 100% (${zoomResetShortcut})`
-                    : "Reset zoom to 100%"
+                    ? `${editorScale}% — Reset zoom to 100% (${zoomResetShortcut})`
+                    : `${editorScale}% — Reset zoom to 100%`
                 }
                 type="button"
               >

@@ -1484,6 +1484,7 @@ export const useDesktopAppController = (
       closeOtherNoteTabs,
       createNote,
       createFolder,
+      dismissUpdateNotification,
       glyph,
       isActiveFilePinned,
       isFocusMode,

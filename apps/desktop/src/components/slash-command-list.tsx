@@ -4,12 +4,19 @@ import type {
   SlashCommandListHandle,
   SlashCommandListProps,
 } from "../types/slash-command";
+import { formatKeysForPlatform, splitShortcutTokens } from "../shared/shortcuts";
 
-/** Split a shortcut string like "⌘ ⇧ B" into individual token spans. */
+/**
+ * Render a shortcut string as individual `<kbd>` token spans.
+ * Converts the internal format (e.g. "⌘ ⌥ 1") to the platform-appropriate
+ * display (e.g. "⌘⌥1" on macOS, "Ctrl+Alt+1" on Windows) then splits into
+ * per-key tokens.
+ */
 function ShortcutBadge({ shortcut }: { shortcut: string }) {
-  const tokens = shortcut.trim().split(/\s+/).filter(Boolean);
+  const display = formatKeysForPlatform(shortcut, navigator.platform);
+  const tokens = splitShortcutTokens(display);
   return (
-    <span className="slash-kbd-group" aria-label={shortcut}>
+    <span className="slash-kbd-group" aria-label={display}>
       {tokens.map((token, i) => (
         <kbd key={i} className="slash-kbd">
           {token}

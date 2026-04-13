@@ -534,7 +534,7 @@ export const Sidebar = ({
                       <PlusIcon size={12} />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom">New Note (⌘N)</TooltipContent>
+                  <TooltipContent side="bottom">{`New Note (${navigator.platform.includes("Mac") ? "⌘N" : "Ctrl+N"})`}</TooltipContent>
                 </Tooltip>
               ) : null}
               {onCreateFolder ? (
@@ -549,7 +549,7 @@ export const Sidebar = ({
                       <FolderPlusIcon size={12} />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom">New Folder (⇧⌘N)</TooltipContent>
+                  <TooltipContent side="bottom">{`New Folder (${navigator.platform.includes("Mac") ? "⇧⌘N" : "Ctrl+Shift+N"})`}</TooltipContent>
                 </Tooltip>
               ) : null}
               <button

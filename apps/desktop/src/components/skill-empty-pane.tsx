@@ -75,7 +75,7 @@ export function SkillEmptyPane({
                 <span>Search notes and skills</span>
               </div>
               <span className="ml-4 flex-shrink-0 font-mono text-xs opacity-50">
-                {commandPaletteShortcut ?? "⌘P"}
+                {commandPaletteShortcut ?? (navigator.platform.includes("Mac") ? "⌘P" : "Ctrl+P")}
               </span>
             </Button>
           </div>

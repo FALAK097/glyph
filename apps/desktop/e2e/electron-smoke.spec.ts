@@ -1263,8 +1263,8 @@ test("zoom in via keyboard shortcut increases editor scale", async ({}, testInfo
     // Default zoom should be 100%
     await expect(glyph.window.getByRole("button", { name: /100%/ })).toBeVisible();
 
-    // Press Cmd+Shift+= (Zoom In) - on macOS the default shortcut requires Shift to produce +
-    await glyph.window.keyboard.press("Meta+Shift+=");
+    // Press Ctrl+Shift+= (Zoom In) - keyboard shortcut uses CommandOrControl
+    await glyph.window.keyboard.press(`${modKey}+Shift+=`);
 
     // Settings should persist the new zoom level (100 + 10 = 110)
     await expect
@@ -1303,8 +1303,8 @@ test("zoom reset via keyboard shortcut returns to 100%", async ({}, testInfo) =>
       })
       .toBe(110);
 
-    // Press Cmd+0 (Reset Zoom)
-    await glyph.window.keyboard.press("Meta+0");
+    // Press Ctrl+0 (Reset Zoom)
+    await glyph.window.keyboard.press(`${modKey}+0`);
 
     // Settings should return to 100
     await expect

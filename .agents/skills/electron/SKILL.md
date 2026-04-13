@@ -7,6 +7,7 @@ license: Complete terms in LICENSE.txt
 ## When to use this skill
 
 Use this skill whenever the user wants to:
+
 - Build cross-platform desktop applications with Electron
 - Understand Electron architecture (main process, renderer process, preload)
 - Implement IPC (Inter-Process Communication) between processes
@@ -85,7 +86,6 @@ This skill is organized to match the Electron official documentation structure (
    - `templates/renderer-process.md` - Renderer process template
    - `templates/package-json.md` - package.json template
 
-
 ### Doc mapping (one-to-one with official documentation)
 
 - `examples/` → https://www.electronjs.org/zh/docs/latest/
@@ -96,12 +96,14 @@ This skill is organized to match the Electron official documentation structure (
 This skill includes detailed examples organized to match the official documentation structure. All examples are in the `examples/` directory (see mapping above).
 
 **To use examples:**
+
 - Identify the topic from the user's request
 - Load the appropriate example file from the mapping above
 - Follow the instructions, syntax, and best practices in that file
 - Adapt the code examples to your specific use case
 
 **To use templates:**
+
 - Reference templates in `templates/` directory for common scaffolding
 - Adapt templates to your specific needs and coding style
 
@@ -110,6 +112,7 @@ This skill includes detailed examples organized to match the official documentat
 Detailed API documentation is available in the `api/` directory, organized to match the official Electron API documentation structure:
 
 ### Core APIs (`api/`)
+
 - `api/app.md` - app module API
 - `api/browser-window.md` - BrowserWindow API
 - `api/ipc-main.md` - ipcMain API
@@ -119,6 +122,7 @@ Detailed API documentation is available in the `api/` directory, organized to ma
 - `api/dialog.md` - Dialog API
 
 **To use API reference:**
+
 1. Identify the API you need help with
 2. Load the corresponding API file from the `api/` directory
 3. Find the API signature, parameters, return type, and examples

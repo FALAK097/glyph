@@ -3,6 +3,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 import { normalizePath } from "@/lib/paths";
 import type { SkillDocumentKind } from "@/shared/skills";
+import type { LayoutNode, PaneState } from "@/shared/workspace";
 
 const SESSION_STORAGE_KEY = "glyph.editor-session";
 const MAX_SCROLL_ENTRIES = 160;
@@ -27,6 +28,9 @@ type SessionState = {
   skillDocumentKind: SkillDocumentKind;
   skillDocumentKindsById: Record<string, SkillDocumentKind>;
   scrollPositions: Record<string, ScrollEntry>;
+  layoutRoot: LayoutNode | null;
+  layoutActivePaneId: string | null;
+  layoutPanes: Record<string, PaneState> | null;
   setHasHydrated: (value: boolean) => void;
   setViewerMode: (mode: ViewerMode) => void;
   setNotesExpanded: (value: boolean) => void;
@@ -44,6 +48,16 @@ type SessionState = {
   setDocumentScroll: (targetPath: string | null, top: number) => void;
   getDocumentScroll: (targetPath: string | null | undefined) => number;
   hasDocumentScroll: (targetPath: string | null | undefined) => boolean;
+  setLayoutSession: (
+    root: LayoutNode,
+    activePaneId: string,
+    panes: Record<string, PaneState>,
+  ) => void;
+  getLayoutSession: () => {
+    root: LayoutNode;
+    activePaneId: string;
+    panes: Record<string, PaneState>;
+  } | null;
 };
 
 const toScrollKey = (targetPath: string) => normalizePath(targetPath).toLowerCase();
@@ -97,6 +111,9 @@ export const useSessionStore = create<SessionState>()(
       skillDocumentKind: "skill",
       skillDocumentKindsById: {},
       scrollPositions: {},
+      layoutRoot: null,
+      layoutActivePaneId: null,
+      layoutPanes: null,
       setHasHydrated: (value) => {
         set({ hasHydrated: value });
       },
@@ -195,6 +212,24 @@ export const useSessionStore = create<SessionState>()(
 
         return Object.hasOwn(get().scrollPositions, toScrollKey(targetPath));
       },
+      setLayoutSession: (root, activePaneId, panes) => {
+        set({
+          layoutRoot: root,
+          layoutActivePaneId: activePaneId,
+          layoutPanes: panes,
+        });
+      },
+      getLayoutSession: () => {
+        const state = get();
+        if (!state.layoutRoot || !state.layoutActivePaneId || !state.layoutPanes) {
+          return null;
+        }
+        return {
+          root: state.layoutRoot,
+          activePaneId: state.layoutActivePaneId,
+          panes: state.layoutPanes,
+        };
+      },
     }),
     {
       name: SESSION_STORAGE_KEY,
@@ -211,6 +246,9 @@ export const useSessionStore = create<SessionState>()(
         skillDocumentKind: state.skillDocumentKind,
         skillDocumentKindsById: state.skillDocumentKindsById,
         scrollPositions: state.scrollPositions,
+        layoutRoot: state.layoutRoot,
+        layoutActivePaneId: state.layoutActivePaneId,
+        layoutPanes: state.layoutPanes,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);

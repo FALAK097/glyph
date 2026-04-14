@@ -155,6 +155,7 @@ type LayoutState = {
 
   // ── Bulk initialisation (boot / session restore) ──
   initializePane: (tabIds: string[], activeTabId: string | null) => void;
+  restoreLayout: (root: LayoutNode, activePaneId: string, panes: Record<string, PaneState>) => void;
   resetLayout: () => void;
 };
 
@@ -508,6 +509,32 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
         },
       },
     }));
+  },
+
+  restoreLayout: (root, activePaneId, panes) => {
+    // Reset counters to avoid ID collisions with restored IDs
+    const maxPaneNum = Object.keys(panes).reduce((max, id) => {
+      const match = id.match(/^pane-(\d+)$/);
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0);
+    paneCounter = maxPaneNum;
+
+    const countSplits = (node: LayoutNode): number => {
+      if (node.type === "pane") return 0;
+      const match = node.id.match(/^split-(\d+)$/);
+      const num = match ? Number(match[1]) : 0;
+      return Math.max(num, countSplits(node.children[0]), countSplits(node.children[1]));
+    };
+    splitCounter = countSplits(root);
+
+    // Validate activePaneId exists in panes
+    const validActivePaneId = panes[activePaneId] ? activePaneId : getFirstPaneId(root);
+
+    set({
+      root,
+      activePaneId: validActivePaneId,
+      panes,
+    });
   },
 
   resetLayout: () => {

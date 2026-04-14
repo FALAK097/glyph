@@ -102,6 +102,7 @@ type WorkspaceState = {
   attachActiveFile: (file: FileDocument) => void;
   updateActiveFile: (file: FileDocument) => void;
   updateDraftContent: (content: string) => void;
+  updateTabDraftContent: (tabId: string, content: string) => void;
   markSaved: (file: FileDocument) => void;
   markTabSaved: (filePath: string, file: FileDocument) => void;
   setSaving: (isSaving: boolean) => void;
@@ -287,6 +288,24 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         draftContent,
         isDirty: true,
       };
+    }),
+  updateTabDraftContent: (tabId, content) =>
+    set((state) => {
+      const tab = state.noteTabs.find((t) => t.id === tabId);
+      if (!tab) {
+        return state;
+      }
+
+      const noteTabs = state.noteTabs.map((t) =>
+        t.id === tabId ? { ...t, draftContent: content, isDirty: true } : t,
+      );
+
+      // If this is the active tab, also update top-level derived state
+      if (state.activeTabId === tabId) {
+        return { noteTabs, draftContent: content, isDirty: true };
+      }
+
+      return { noteTabs };
     }),
   markSaved: (activeFile) =>
     set((state) => {

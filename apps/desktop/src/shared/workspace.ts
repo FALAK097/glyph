@@ -161,9 +161,37 @@ export type AppCommand =
   | "focus-mode"
   | "zoom-in"
   | "zoom-out"
-  | "zoom-reset";
+  | "zoom-reset"
+  | "split-right"
+  | "split-down"
+  | "close-pane"
+  | "focus-next-pane"
+  | "focus-previous-pane";
 
 export type ExternalFileTarget = {
   path: string;
   isDirectory: boolean;
+};
+
+// ─── Split View Layout ──────────────────────────────────────────────
+
+export type SplitDirection = "horizontal" | "vertical";
+
+export type PaneNode = {
+  type: "pane";
+  id: string;
+};
+
+export type SplitNode = {
+  type: "split";
+  id: string;
+  direction: SplitDirection;
+  children: [LayoutNode, LayoutNode];
+};
+
+export type LayoutNode = PaneNode | SplitNode;
+
+export type PaneState = {
+  tabIds: string[];
+  activeTabId: string | null;
 };

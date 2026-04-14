@@ -18,7 +18,12 @@ export type ShortcutId =
   | "focus-mode"
   | "zoom-in"
   | "zoom-out"
-  | "zoom-reset";
+  | "zoom-reset"
+  | "split-right"
+  | "split-down"
+  | "close-pane"
+  | "focus-next-pane"
+  | "focus-previous-pane";
 
 export type ShortcutDefinition = ShortcutSetting & {
   id: ShortcutId;
@@ -130,6 +135,32 @@ export const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
   { id: "zoom-in", label: "Zoom In", keys: `${MODIFIER_TOKENS.cmdOrCtrl} =` },
   { id: "zoom-out", label: "Zoom Out", keys: `${MODIFIER_TOKENS.cmdOrCtrl} -` },
   { id: "zoom-reset", label: "Reset Zoom", keys: `${MODIFIER_TOKENS.cmdOrCtrl} 0` },
+  // ── Split view ───────────────────────────────────────────────
+  {
+    id: "split-right",
+    label: "Split Right",
+    keys: `${MODIFIER_TOKENS.alt} ${MODIFIER_TOKENS.cmdOrCtrl} \\`,
+  },
+  {
+    id: "split-down",
+    label: "Split Down",
+    keys: `${MODIFIER_TOKENS.shift} ${MODIFIER_TOKENS.alt} ${MODIFIER_TOKENS.cmdOrCtrl} \\`,
+  },
+  {
+    id: "close-pane",
+    label: "Close Pane",
+    keys: `${MODIFIER_TOKENS.alt} ${MODIFIER_TOKENS.cmdOrCtrl} W`,
+  },
+  {
+    id: "focus-next-pane",
+    label: "Focus Next Pane",
+    keys: `${MODIFIER_TOKENS.alt} ${MODIFIER_TOKENS.cmdOrCtrl} ]`,
+  },
+  {
+    id: "focus-previous-pane",
+    label: "Focus Previous Pane",
+    keys: `${MODIFIER_TOKENS.alt} ${MODIFIER_TOKENS.cmdOrCtrl} [`,
+  },
 ];
 
 export function getPrimaryShortcutPrefix(platform?: string): string {

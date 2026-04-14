@@ -9,6 +9,7 @@ import {
   getShortcutDisplay,
 } from "@/shared/shortcuts";
 import type { DirectoryNode, FileDocument, TabMovePosition } from "@/shared/workspace";
+import { useLayoutStore } from "@/store/layout";
 import { useSessionStore } from "@/store/session";
 import { useWorkspaceStore } from "@/store/workspace";
 import { applyTheme } from "@/theme/themes";
@@ -337,6 +338,7 @@ export const useDesktopAppController = (
           replaceTabPath(previousPath, nextFile);
           replaceHistoryPath(previousPath, nextFile.path);
           await syncTrackedPaths(previousPath, nextFile.path);
+          useLayoutStore.getState().replaceTabId(toPathKey(previousPath), toPathKey(nextFile.path));
           currentPath = nextFile.path;
 
           if (options?.restoreFocus) {
@@ -399,6 +401,9 @@ export const useDesktopAppController = (
       const currentRootPath = useWorkspaceStore.getState().rootPath;
       const shouldPreserveFocus = useSessionStore.getState().hasDocumentScroll(file.path);
       setActiveFile(file);
+      useLayoutStore
+        .getState()
+        .addTabToPane(useLayoutStore.getState().activePaneId, toPathKey(file.path));
       setIsWorkspaceMode(isFileInsideWorkspace(file.path, currentRootPath));
       setSidebarNodes((prev) => upsertSidebarFile(prev, file));
       if (options?.recordHistory) {
@@ -443,6 +448,9 @@ export const useDesktopAppController = (
       const currentRootPath = useWorkspaceStore.getState().rootPath;
       const shouldPreserveFocus = useSessionStore.getState().hasDocumentScroll(filePath);
       activateTab(filePath);
+      useLayoutStore
+        .getState()
+        .activateTabInPane(useLayoutStore.getState().activePaneId, toPathKey(filePath));
       setIsWorkspaceMode(isFileInsideWorkspace(filePath, currentRootPath));
       if (options?.recordHistory) {
         pushHistory(filePath);
@@ -531,43 +539,206 @@ export const useDesktopAppController = (
     [moveTab],
   );
 
+  // ── Split view methods ───────────────────────────────────────────
+
+  const closeTabFromActivePane = useCallback(
+    async (filePath: string) => {
+      const tabId = toPathKey(filePath);
+      const layoutState = useLayoutStore.getState();
+      const paneState = layoutState.panes[layoutState.activePaneId];
+      if (!paneState || !paneState.tabIds.includes(tabId)) {
+        return;
+      }
+
+      // Save dirty tab first
+      const targetTab = getTabByPath(filePath);
+      if (targetTab?.isDirty) {
+        const isClosingActiveTab = isSamePath(activeFile?.path, filePath);
+        const savedPath = await persistNoteDraft(
+          {
+            draftContent: targetTab.draftContent,
+            file: targetTab.file,
+            isDirty: targetTab.isDirty,
+          },
+          {
+            isActive: isClosingActiveTab,
+            restoreFocus: isClosingActiveTab,
+          },
+        );
+        if (!savedPath) return;
+      }
+
+      // Remove from layout pane
+      useLayoutStore.getState().removeTabFromPane(layoutState.activePaneId, tabId);
+
+      // Check if tab still exists in another pane
+      const updatedLayout = useLayoutStore.getState();
+      const tabStillInOtherPane = Object.entries(updatedLayout.panes).some(
+        ([paneId, ps]) => paneId !== layoutState.activePaneId && ps.tabIds.includes(tabId),
+      );
+
+      if (!tabStillInOtherPane) {
+        // Tab not in any other pane — close from workspace store too
+        closeTab(filePath);
+      }
+
+      // Sync workspace active tab to the pane's new active tab
+      const currentPaneState = updatedLayout.panes[layoutState.activePaneId];
+      if (currentPaneState?.activeTabId) {
+        const nextTab = useWorkspaceStore
+          .getState()
+          .noteTabs.find((t) => t.id === currentPaneState.activeTabId);
+        if (nextTab) {
+          activateTab(nextTab.file.path);
+          const currentRootPath = useWorkspaceStore.getState().rootPath;
+          setIsWorkspaceMode(isFileInsideWorkspace(nextTab.file.path, currentRootPath));
+          const shouldPreserveFocus = useSessionStore
+            .getState()
+            .hasDocumentScroll(nextTab.file.path);
+          requestEditorFocus(shouldPreserveFocus ? "preserve" : "end");
+        }
+      }
+    },
+    [activeFile?.path, activateTab, closeTab, getTabByPath, persistNoteDraft, requestEditorFocus],
+  );
+
+  const splitRight = useCallback(() => {
+    const layoutState = useLayoutStore.getState();
+    const paneState = layoutState.panes[layoutState.activePaneId];
+    if (!paneState?.activeTabId) return;
+    useLayoutStore.getState().splitPane("horizontal");
+  }, []);
+
+  const splitDown = useCallback(() => {
+    const layoutState = useLayoutStore.getState();
+    const paneState = layoutState.panes[layoutState.activePaneId];
+    if (!paneState?.activeTabId) return;
+    useLayoutStore.getState().splitPane("vertical");
+  }, []);
+
+  const closeActivePane = useCallback(() => {
+    const layoutState = useLayoutStore.getState();
+    // Don't close the last pane
+    if (Object.keys(layoutState.panes).length <= 1) return;
+
+    const closingPaneId = layoutState.activePaneId;
+    const closingPaneState = layoutState.panes[closingPaneId];
+
+    useLayoutStore.getState().closePane(closingPaneId);
+
+    // Clean up tabs that are no longer in any pane
+    if (closingPaneState) {
+      const updatedLayout = useLayoutStore.getState();
+      for (const tabId of closingPaneState.tabIds) {
+        const stillExists = Object.values(updatedLayout.panes).some((ps) =>
+          ps.tabIds.includes(tabId),
+        );
+        if (!stillExists) {
+          // Find the tab by ID and close it from workspace
+          const tab = useWorkspaceStore.getState().noteTabs.find((t) => t.id === tabId);
+          if (tab) {
+            closeTab(tab.file.path);
+          }
+        }
+      }
+    }
+
+    // Sync workspace active tab to new active pane
+    const updatedLayout = useLayoutStore.getState();
+    const newPaneState = updatedLayout.panes[updatedLayout.activePaneId];
+    if (newPaneState?.activeTabId) {
+      const nextTab = useWorkspaceStore
+        .getState()
+        .noteTabs.find((t) => t.id === newPaneState.activeTabId);
+      if (nextTab) {
+        activateTab(nextTab.file.path);
+        requestEditorFocus("preserve");
+      }
+    }
+  }, [activateTab, closeTab, requestEditorFocus]);
+
+  const focusNextPane = useCallback(() => {
+    useLayoutStore.getState().focusNextPane();
+    const updatedLayout = useLayoutStore.getState();
+    const paneState = updatedLayout.panes[updatedLayout.activePaneId];
+    if (paneState?.activeTabId) {
+      const nextTab = useWorkspaceStore
+        .getState()
+        .noteTabs.find((t) => t.id === paneState.activeTabId);
+      if (nextTab) {
+        activateTab(nextTab.file.path);
+        requestEditorFocus("preserve");
+      }
+    }
+  }, [activateTab, requestEditorFocus]);
+
+  const focusPreviousPane = useCallback(() => {
+    useLayoutStore.getState().focusPreviousPane();
+    const updatedLayout = useLayoutStore.getState();
+    const paneState = updatedLayout.panes[updatedLayout.activePaneId];
+    if (paneState?.activeTabId) {
+      const nextTab = useWorkspaceStore
+        .getState()
+        .noteTabs.find((t) => t.id === paneState.activeTabId);
+      if (nextTab) {
+        activateTab(nextTab.file.path);
+        requestEditorFocus("preserve");
+      }
+    }
+  }, [activateTab, requestEditorFocus]);
+
   const activateTabByIndex = useCallback(
     async (index: number) => {
-      const targetIndex = getDirectTabTargetIndex(index, noteTabs.length);
+      const layoutState = useLayoutStore.getState();
+      const paneState = layoutState.panes[layoutState.activePaneId];
+      if (!paneState) return;
+
+      const paneTabs = paneState.tabIds
+        .map((id) => useWorkspaceStore.getState().noteTabs.find((t) => t.id === id))
+        .filter(Boolean);
+      const targetIndex = getDirectTabTargetIndex(index, paneTabs.length);
       if (targetIndex === null) {
         return;
       }
 
-      const targetTab = noteTabs[targetIndex];
+      const targetTab = paneTabs[targetIndex];
       if (!targetTab) {
         return;
       }
 
       await activateNoteTab(targetTab.file.path, { recordHistory: true });
     },
-    [activateNoteTab, noteTabs],
+    [activateNoteTab],
   );
 
   const activateAdjacentNoteTab = useCallback(
     async (direction: -1 | 1) => {
-      if (noteTabs.length <= 1 || !activeTabId) {
+      const layoutState = useLayoutStore.getState();
+      const paneState = layoutState.panes[layoutState.activePaneId];
+      if (!paneState || paneState.tabIds.length <= 1 || !paneState.activeTabId) {
         return;
       }
 
-      const currentIndex = noteTabs.findIndex((tab) => tab.id === activeTabId);
+      const currentIndex = paneState.tabIds.indexOf(paneState.activeTabId);
       if (currentIndex < 0) {
         return;
       }
 
-      const targetIndex = (currentIndex + direction + noteTabs.length) % noteTabs.length;
-      const targetTab = noteTabs[targetIndex];
+      const targetIndex =
+        (currentIndex + direction + paneState.tabIds.length) % paneState.tabIds.length;
+      const targetTabId = paneState.tabIds[targetIndex];
+      if (!targetTabId) {
+        return;
+      }
+
+      const targetTab = useWorkspaceStore.getState().noteTabs.find((t) => t.id === targetTabId);
       if (!targetTab) {
         return;
       }
 
       await activateNoteTab(targetTab.file.path, { recordHistory: true });
     },
-    [activateNoteTab, activeTabId, noteTabs],
+    [activateNoteTab],
   );
 
   const openFile = useCallback(
@@ -623,6 +794,9 @@ export const useDesktopAppController = (
     setIsPaletteOpen(false);
     const file = await glyph.createFile(baseDir, `Untitled-${Date.now()}.md`);
     setActiveFile(file);
+    useLayoutStore
+      .getState()
+      .addTabToPane(useLayoutStore.getState().activePaneId, toPathKey(file.path));
     setIsWorkspaceMode(true);
 
     // Find which top-level workspace directory node owns the new file.
@@ -811,6 +985,7 @@ export const useDesktopAppController = (
         setSidebarNodes((prev) => removeSidebarPath(prev, filePath));
         removeHistoryPath(filePath);
         await syncTrackedPaths(filePath);
+        useLayoutStore.getState().removeTabFromAllPanes(toPathKey(filePath));
         const nextActivePath = closeTab(filePath);
         if (nextActivePath) {
           const currentRootPath = useWorkspaceStore.getState().rootPath;
@@ -895,6 +1070,7 @@ export const useDesktopAppController = (
           pinnedFiles: nextPinnedFiles,
         });
         removeHistoryPath(targetPath);
+        useLayoutStore.getState().removeTabFromAllPanes(toPathKey(targetPath));
         const nextActivePath = closeTab(targetPath);
         if (nextActivePath) {
           const currentRootPath = useWorkspaceStore.getState().rootPath;
@@ -936,6 +1112,7 @@ export const useDesktopAppController = (
         await syncTrackedPaths(filePath, renamedFile.path);
         if (getTabByPath(filePath)) {
           replaceTabPath(filePath, renamedFile);
+          useLayoutStore.getState().replaceTabId(toPathKey(filePath), toPathKey(renamedFile.path));
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to rename file");
@@ -1379,7 +1556,7 @@ export const useDesktopAppController = (
               onSelect: () => {
                 const currentActiveTab = useWorkspaceStore.getState().getActiveTab();
                 if (currentActiveTab) {
-                  void closeNoteTab(currentActiveTab.file.path);
+                  void closeTabFromActivePane(currentActiveTab.file.path);
                 }
                 setIsPaletteOpen(false);
               },
@@ -1400,6 +1577,74 @@ export const useDesktopAppController = (
                 if (currentActiveTab) {
                   void closeOtherNoteTabs(currentActiveTab.file.path);
                 }
+                setIsPaletteOpen(false);
+              },
+            },
+          ]
+        : []),
+      ...(activeFile
+        ? [
+            {
+              id: "split-right",
+              title: "Split Right",
+              subtitle: "Open a split pane to the right",
+              shortcut: getShortcutDisplay(shortcuts, "split-right", appInfo?.platform),
+              section: "View",
+              kind: "command" as const,
+              onSelect: () => {
+                splitRight();
+                setIsPaletteOpen(false);
+              },
+            },
+            {
+              id: "split-down",
+              title: "Split Down",
+              subtitle: "Open a split pane below",
+              shortcut: getShortcutDisplay(shortcuts, "split-down", appInfo?.platform),
+              section: "View",
+              kind: "command" as const,
+              onSelect: () => {
+                splitDown();
+                setIsPaletteOpen(false);
+              },
+            },
+          ]
+        : []),
+      ...(Object.keys(useLayoutStore.getState().panes).length > 1
+        ? [
+            {
+              id: "close-pane",
+              title: "Close Pane",
+              subtitle: "Close the active split pane",
+              shortcut: getShortcutDisplay(shortcuts, "close-pane", appInfo?.platform),
+              section: "View",
+              kind: "command" as const,
+              onSelect: () => {
+                closeActivePane();
+                setIsPaletteOpen(false);
+              },
+            },
+            {
+              id: "focus-next-pane",
+              title: "Focus Next Pane",
+              subtitle: "Move focus to the next split pane",
+              shortcut: getShortcutDisplay(shortcuts, "focus-next-pane", appInfo?.platform),
+              section: "View",
+              kind: "command" as const,
+              onSelect: () => {
+                focusNextPane();
+                setIsPaletteOpen(false);
+              },
+            },
+            {
+              id: "focus-previous-pane",
+              title: "Focus Previous Pane",
+              subtitle: "Move focus to the previous split pane",
+              shortcut: getShortcutDisplay(shortcuts, "focus-previous-pane", appInfo?.platform),
+              section: "View",
+              kind: "command" as const,
+              onSelect: () => {
+                focusPreviousPane();
                 setIsPaletteOpen(false);
               },
             },
@@ -1512,6 +1757,12 @@ export const useDesktopAppController = (
       saveSettings,
       shortcuts,
       showOutline,
+      splitRight,
+      splitDown,
+      closeActivePane,
+      closeTabFromActivePane,
+      focusNextPane,
+      focusPreviousPane,
       triggerUpdateAction,
       syncOpenedFile,
       syncWorkspace,
@@ -1571,7 +1822,7 @@ export const useDesktopAppController = (
         return;
       }
 
-      await closeNoteTab(currentActiveTab.file.path);
+      await closeTabFromActivePane(currentActiveTab.file.path);
     },
     closeOtherTabs: async () => {
       const currentActiveTab = useWorkspaceStore.getState().getActiveTab();
@@ -1595,6 +1846,11 @@ export const useDesktopAppController = (
     navigateForward,
     requestFindInNote,
     triggerUpdateAction,
+    splitRight,
+    splitDown,
+    closeActivePane,
+    focusNextPane,
+    focusPreviousPane,
     isPaletteOpen,
     isSettingsOpen,
     setIsPaletteOpen,
@@ -1794,6 +2050,17 @@ export const useDesktopAppController = (
       setSidebarNodes(nextSidebarNodes);
       setExpandedFolderPaths(Array.from(nextExpandedFolders));
       setHasHydratedSidebar(true);
+
+      // Initialize layout store with current tabs
+      const bootTabs = useWorkspaceStore.getState().noteTabs;
+      const bootActiveTabId = useWorkspaceStore.getState().activeTabId;
+      if (bootTabs.length > 0) {
+        useLayoutStore.getState().initializePane(
+          bootTabs.map((t) => t.id),
+          bootActiveTabId,
+        );
+      }
+
       requestEditorFocus(bootFocusMode);
       setHasBooted(true);
     };
@@ -2023,7 +2290,32 @@ export const useDesktopAppController = (
           return;
         }
 
-        await closeNoteTab(currentActiveTab.file.path);
+        await closeTabFromActivePane(currentActiveTab.file.path);
+        return;
+      }
+
+      if (command === "split-right") {
+        splitRight();
+        return;
+      }
+
+      if (command === "split-down") {
+        splitDown();
+        return;
+      }
+
+      if (command === "close-pane") {
+        closeActivePane();
+        return;
+      }
+
+      if (command === "focus-next-pane") {
+        focusNextPane();
+        return;
+      }
+
+      if (command === "focus-previous-pane") {
+        focusPreviousPane();
         return;
       }
 
@@ -2075,13 +2367,18 @@ export const useDesktopAppController = (
     });
   }, [
     activeFile,
-    closeNoteTab,
+    closeTabFromActivePane,
     activateAdjacentNoteTab,
     createNote,
     draftContent,
     getActiveTab,
     persistNoteDraft,
     setError,
+    splitRight,
+    splitDown,
+    closeActivePane,
+    focusNextPane,
+    focusPreviousPane,
     syncOpenedFile,
     syncWorkspace,
     glyph,
@@ -2107,6 +2404,12 @@ export const useDesktopAppController = (
     clearOutlineJumpRequest,
     closeNoteTab,
     closeOtherNoteTabs,
+    closeTabFromActivePane,
+    splitRight,
+    splitDown,
+    closeActivePane,
+    focusNextPane,
+    focusPreviousPane,
     createNote,
     createFolder,
     draftContent,

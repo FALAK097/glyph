@@ -1,9 +1,10 @@
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback, useLayoutEffect, useMemo, useState } from "react";
 
 import { getDisplayFileName, isSamePath } from "@/lib/paths";
 import { getDirectTabShortcutDisplay, getShortcutDisplay } from "@/shared/shortcuts";
 import type { NoteTab, TabMovePosition } from "@/shared/workspace";
 import { useLayoutStore } from "@/store/layout";
+import { useSessionStore } from "@/store/session";
 import { useWorkspaceStore } from "@/store/workspace";
 
 import { MarkdownEditor } from "./markdown-editor";
@@ -66,6 +67,13 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
     if (!filePath) return false;
     return ctx.pinnedFilePaths.some((p) => isSamePath(p, filePath));
   }, [ctx.pinnedFilePaths, filePath]);
+
+  // ── Scroll position restoration ────────────────────────────────────
+  const [initialScrollTop, setInitialScrollTop] = useState(0);
+
+  useLayoutEffect(() => {
+    setInitialScrollTop(filePath ? useSessionStore.getState().getDocumentScroll(filePath) : 0);
+  }, [filePath]);
 
   const handleTogglePinnedFile = useCallback(() => {
     if (filePath) {
@@ -159,7 +167,7 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
         filePath={filePath}
         editorFocusRequest={editorFocusRequest}
         findRequest={findRequest}
-        initialScrollTop={0}
+        initialScrollTop={initialScrollTop}
         saveStateLabel={saveStateLabel}
         footerMetaLabel={footerMetaLabel}
         wordCount={wordCount}

@@ -8,7 +8,7 @@ import {
   getDirectTabTargetIndex,
   getShortcutDisplay,
 } from "@/shared/shortcuts";
-import type { DirectoryNode, FileDocument, TabMovePosition } from "@/shared/workspace";
+import type { DirectoryNode, FileDocument, LayoutNode, TabMovePosition } from "@/shared/workspace";
 import { useLayoutStore } from "@/store/layout";
 import { useSessionStore } from "@/store/session";
 import { useWorkspaceStore } from "@/store/workspace";
@@ -143,6 +143,7 @@ export const useDesktopAppController = (
     removeHistoryPath,
   } = useWorkspaceStore();
   const setNoteSession = useSessionStore((state) => state.setNoteSession);
+  const setLayoutSession = useSessionStore((state) => state.setLayoutSession);
 
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -2051,10 +2052,61 @@ export const useDesktopAppController = (
       setExpandedFolderPaths(Array.from(nextExpandedFolders));
       setHasHydratedSidebar(true);
 
-      // Initialize layout store with current tabs
+      // Initialize layout store with current tabs — restore persisted layout if available
       const bootTabs = useWorkspaceStore.getState().noteTabs;
       const bootActiveTabId = useWorkspaceStore.getState().activeTabId;
-      if (bootTabs.length > 0) {
+      const bootTabIds = new Set(bootTabs.map((t) => t.id));
+      const savedLayout = useSessionStore.getState().getLayoutSession();
+
+      if (savedLayout && Object.keys(savedLayout.panes).length > 1) {
+        // Validate: only keep panes whose tabs still exist in the workspace
+        const validPanes: Record<string, { tabIds: string[]; activeTabId: string | null }> = {};
+        for (const [paneId, pane] of Object.entries(savedLayout.panes)) {
+          const validTabIds = pane.tabIds.filter((id) => bootTabIds.has(id));
+          if (validTabIds.length > 0) {
+            validPanes[paneId] = {
+              tabIds: validTabIds,
+              activeTabId:
+                pane.activeTabId && validTabIds.includes(pane.activeTabId)
+                  ? pane.activeTabId
+                  : validTabIds[0],
+            };
+          }
+        }
+
+        if (Object.keys(validPanes).length > 1) {
+          // Prune the layout tree to only include panes that survived validation
+          const validPaneIds = new Set(Object.keys(validPanes));
+          const pruneTree = (node: LayoutNode): LayoutNode | null => {
+            if (node.type === "pane") {
+              return validPaneIds.has(node.id) ? node : null;
+            }
+            const left = pruneTree(node.children[0]);
+            const right = pruneTree(node.children[1]);
+            if (left && right) {
+              return { ...node, children: [left, right] };
+            }
+            return left ?? right;
+          };
+
+          const prunedRoot = pruneTree(savedLayout.root);
+          if (prunedRoot) {
+            useLayoutStore
+              .getState()
+              .restoreLayout(prunedRoot, savedLayout.activePaneId, validPanes);
+          } else if (bootTabs.length > 0) {
+            useLayoutStore.getState().initializePane(
+              bootTabs.map((t) => t.id),
+              bootActiveTabId,
+            );
+          }
+        } else if (bootTabs.length > 0) {
+          useLayoutStore.getState().initializePane(
+            bootTabs.map((t) => t.id),
+            bootActiveTabId,
+          );
+        }
+      } else if (bootTabs.length > 0) {
         useLayoutStore.getState().initializePane(
           bootTabs.map((t) => t.id),
           bootActiveTabId,
@@ -2169,6 +2221,42 @@ export const useDesktopAppController = (
     return () => window.clearTimeout(timer);
   }, [activeFile?.path, draftContent, getActiveTab, isDirty, isSaving, persistNoteDraft]);
 
+  // Auto-save non-active dirty tabs (e.g. tabs in background panes)
+  useEffect(() => {
+    const dirtyBackgroundTabs = noteTabs.filter(
+      (tab) => tab.isDirty && !tab.isSaving && tab.id !== activeTabId,
+    );
+
+    if (dirtyBackgroundTabs.length === 0) {
+      return;
+    }
+
+    const timer = window.setTimeout(async () => {
+      // Re-check in case state changed during the delay
+      const currentTabs = useWorkspaceStore.getState().noteTabs;
+      const currentActiveTabId = useWorkspaceStore.getState().activeTabId;
+      const tabsToSave = currentTabs.filter(
+        (tab) => tab.isDirty && !tab.isSaving && tab.id !== currentActiveTabId,
+      );
+
+      for (const tab of tabsToSave) {
+        await persistNoteDraft(
+          {
+            draftContent: tab.draftContent,
+            file: tab.file,
+            isDirty: tab.isDirty,
+          },
+          {
+            isActive: false,
+            restoreFocus: false,
+          },
+        );
+      }
+    }, 1200);
+
+    return () => window.clearTimeout(timer);
+  }, [activeTabId, noteTabs, persistNoteDraft]);
+
   // Session sync
   useLayoutEffect(() => {
     if (!sessionReady || !hasBooted) {
@@ -2181,6 +2269,19 @@ export const useDesktopAppController = (
       activeFile?.path ?? null,
     );
   }, [activeFile?.path, hasBooted, noteTabs, rootPath, sessionReady, setNoteSession]);
+
+  // Layout session sync — persist layout tree structure across restarts
+  const layoutRoot = useLayoutStore((s) => s.root);
+  const layoutActivePaneId = useLayoutStore((s) => s.activePaneId);
+  const layoutPanes = useLayoutStore((s) => s.panes);
+
+  useLayoutEffect(() => {
+    if (!sessionReady || !hasBooted) {
+      return;
+    }
+
+    setLayoutSession(layoutRoot, layoutActivePaneId, layoutPanes);
+  }, [hasBooted, layoutActivePaneId, layoutPanes, layoutRoot, sessionReady, setLayoutSession]);
 
   const requestOutlineJump = useCallback((id: string) => {
     setOutlineJumpRequest({

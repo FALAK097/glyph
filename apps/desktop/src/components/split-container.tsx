@@ -23,7 +23,7 @@ function ResizeHandle({ direction }: { direction: "horizontal" | "vertical" }) {
       } bg-border/55 transition-colors duration-100 hover:bg-border/80 active:bg-border`}
     >
       <div
-        className={`absolute z-10 cursor-${isVertical ? "row" : "col"}-resize ${
+        className={`absolute z-10 cursor-grab active:cursor-grabbing ${
           HANDLE_HIT_TARGET_CLASS[direction]
         }`}
       />

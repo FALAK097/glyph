@@ -354,6 +354,7 @@ export const MarkdownEditor = ({
   scrollRestorationKey = null,
   editorFocusRequest,
   findRequest,
+  showToolbar = true,
   saveStateLabel,
   footerMetaLabel,
   wordCount,
@@ -1432,54 +1433,56 @@ export const MarkdownEditor = ({
 
   return (
     <section className="relative h-full min-h-0 flex flex-col bg-background">
-      <EditorToolbar
-        _isMacLike={isMacLike}
-        isSidebarCollapsed={isSidebarCollapsed}
-        toggleSidebarShortcut={toggleSidebarShortcut}
-        onToggleSidebar={onToggleSidebar}
-        canGoBack={canGoBack}
-        canGoForward={canGoForward}
-        navigateBackShortcut={navigateBackShortcut}
-        navigateForwardShortcut={navigateForwardShortcut}
-        onNavigateBack={onNavigateBack}
-        onNavigateForward={onNavigateForward}
-        onCreateNote={onCreateNote}
-        newNoteShortcut={newNoteShortcut}
-        fileName={fileName}
-        filePath={filePath}
-        shouldShowCommandPalette={shouldShowCommandPalette}
-        onOpenCommandPalette={onOpenCommandPalette}
-        commandPaletteShortcut={commandPaletteShortcut}
-        commandPaletteLabel={commandPaletteLabel}
-        isFocusMode={isFocusLayout}
-        onToggleFocusMode={onToggleFocusMode}
-        focusModeShortcut={focusModeShortcut}
-        shouldShowUpdateActionButton={updateStateFlags.shouldShowUpdateActionButton}
-        updateButtonVariant={updateStateFlags.updateButtonVariant}
-        isUpdateButtonDisabled={updateStateFlags.isUpdateButtonDisabled}
-        updateButtonLabel={updateStateFlags.updateButtonLabel}
-        updateButtonTooltip={updateStateFlags.updateButtonTooltip}
-        onUpdateAction={onUpdateAction}
-        onDismissUpdateAction={onDismissUpdateAction}
-        isManualReleaseButton={updateStateFlags.isManualReleaseButton}
-        headerPaddingClass={headerPaddingClass}
-        onOpenSettings={onOpenSettings}
-        headerAccessory={headerAccessory}
-        content={content}
-        documentLabel={normalizedDocumentLabel}
-        revealInFolderLabel={revealInFolderLabel}
-        onCopy={handleCopy}
-        onCopyPath={handleCopyPath}
-        onOpenExternal={handleOpenExternal}
-        onExportPDF={handleExportPDF}
-        onTogglePinnedFile={onTogglePinnedFile}
-        isActiveFilePinned={isActiveFilePinned}
-        editorScale={editorScale}
-        onEditorScaleChange={onEditorScaleChange}
-        zoomInShortcut={zoomInShortcut}
-        zoomOutShortcut={zoomOutShortcut}
-        zoomResetShortcut={zoomResetShortcut}
-      />
+      {showToolbar ? (
+        <EditorToolbar
+          _isMacLike={isMacLike}
+          isSidebarCollapsed={isSidebarCollapsed}
+          toggleSidebarShortcut={toggleSidebarShortcut}
+          onToggleSidebar={onToggleSidebar}
+          canGoBack={canGoBack}
+          canGoForward={canGoForward}
+          navigateBackShortcut={navigateBackShortcut}
+          navigateForwardShortcut={navigateForwardShortcut}
+          onNavigateBack={onNavigateBack}
+          onNavigateForward={onNavigateForward}
+          onCreateNote={onCreateNote}
+          newNoteShortcut={newNoteShortcut}
+          fileName={fileName}
+          filePath={filePath}
+          shouldShowCommandPalette={shouldShowCommandPalette}
+          onOpenCommandPalette={onOpenCommandPalette}
+          commandPaletteShortcut={commandPaletteShortcut}
+          commandPaletteLabel={commandPaletteLabel}
+          isFocusMode={isFocusLayout}
+          onToggleFocusMode={onToggleFocusMode}
+          focusModeShortcut={focusModeShortcut}
+          shouldShowUpdateActionButton={updateStateFlags.shouldShowUpdateActionButton}
+          updateButtonVariant={updateStateFlags.updateButtonVariant}
+          isUpdateButtonDisabled={updateStateFlags.isUpdateButtonDisabled}
+          updateButtonLabel={updateStateFlags.updateButtonLabel}
+          updateButtonTooltip={updateStateFlags.updateButtonTooltip}
+          onUpdateAction={onUpdateAction}
+          onDismissUpdateAction={onDismissUpdateAction}
+          isManualReleaseButton={updateStateFlags.isManualReleaseButton}
+          headerPaddingClass={headerPaddingClass}
+          onOpenSettings={onOpenSettings}
+          headerAccessory={headerAccessory}
+          content={content}
+          documentLabel={normalizedDocumentLabel}
+          revealInFolderLabel={revealInFolderLabel}
+          onCopy={handleCopy}
+          onCopyPath={handleCopyPath}
+          onOpenExternal={handleOpenExternal}
+          onExportPDF={handleExportPDF}
+          onTogglePinnedFile={onTogglePinnedFile}
+          isActiveFilePinned={isActiveFilePinned}
+          editorScale={editorScale}
+          onEditorScaleChange={onEditorScaleChange}
+          zoomInShortcut={zoomInShortcut}
+          zoomOutShortcut={zoomOutShortcut}
+          zoomResetShortcut={zoomResetShortcut}
+        />
+      ) : null}
       {subheaderContent ? (
         <div className="border-b border-border/30">{subheaderContent}</div>
       ) : null}

@@ -25,7 +25,7 @@ type UseKeyboardShortcutsOptions = {
   triggerUpdateAction: () => Promise<void>;
   splitRight: () => void;
   splitDown: () => void;
-  closeActivePane: () => void;
+  closeActivePane: () => Promise<void> | void;
   focusNextPane: () => void;
   focusPreviousPane: () => void;
   isPaletteOpen: boolean;
@@ -229,7 +229,7 @@ export function useKeyboardShortcuts({
             splitDown();
             break;
           case "close-pane":
-            closeActivePane();
+            void closeActivePane();
             break;
           case "focus-next-pane":
             focusNextPane();

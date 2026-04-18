@@ -49,6 +49,9 @@ export type SplitViewContextValue = {
   onUpdateAction: () => void;
   onDismissUpdateAction: () => void;
 
+  // NoteView-only note actions are intentionally omitted here until split view
+  // grows pane-aware versions of those workflows.
+
   // ── Pinned files ──
   pinnedFilePaths: string[];
   onTogglePinnedFile: (filePath: string) => void;

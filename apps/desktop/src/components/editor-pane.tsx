@@ -21,7 +21,16 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
   // ── Layout store selectors ─────────────────────────────────────────
   const isActivePane = useLayoutStore((s) => s.activePaneId === paneId);
   const paneState = useLayoutStore((s) => s.panes[paneId]);
-  const hasMultiplePanes = useLayoutStore((s) => Object.keys(s.panes).length > 1);
+  const hasMultiplePanes = useLayoutStore((s) => {
+    let paneCount = 0;
+    for (const _paneId in s.panes) {
+      paneCount += 1;
+      if (paneCount > 1) {
+        return true;
+      }
+    }
+    return false;
+  });
 
   const paneTabIds = paneState?.tabIds ?? [];
   const paneActiveTabId = paneState?.activeTabId ?? null;
@@ -79,7 +88,7 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
     if (filePath) {
       ctx.onTogglePinnedFile(filePath);
     }
-  }, [ctx, filePath]);
+  }, [ctx.onTogglePinnedFile, filePath]);
 
   const footerMetaLabel = useMemo(() => {
     if (!content) return "";
@@ -108,7 +117,7 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
     if (!isActivePane) {
       ctx.onActivatePane(paneId);
     }
-  }, [ctx, isActivePane, paneId]);
+  }, [ctx.onActivatePane, isActivePane, paneId]);
 
   const handleContentChange = useCallback(
     (value: string) => {
@@ -116,28 +125,28 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
         ctx.onContentChange(paneId, paneActiveTabId, value);
       }
     },
-    [ctx, paneId, paneActiveTabId],
+    [ctx.onContentChange, paneId, paneActiveTabId],
   );
 
   const handleSelectTab = useCallback(
     (path: string) => {
       ctx.onSelectTab(paneId, path);
     },
-    [ctx, paneId],
+    [ctx.onSelectTab, paneId],
   );
 
   const handleCloseTab = useCallback(
     (path: string) => {
       ctx.onCloseTab(paneId, path);
     },
-    [ctx, paneId],
+    [ctx.onCloseTab, paneId],
   );
 
   const handleMoveTab = useCallback(
     (sourcePath: string, targetPath: string, position: TabMovePosition) => {
       ctx.onMoveTab(paneId, sourcePath, targetPath, position);
     },
-    [ctx, paneId],
+    [ctx.onMoveTab, paneId],
   );
 
   // Only the active pane receives focus / find requests
@@ -165,6 +174,7 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
         content={content}
         fileName={fileName}
         filePath={filePath}
+        showToolbar={false}
         editorFocusRequest={editorFocusRequest}
         findRequest={findRequest}
         initialScrollTop={initialScrollTop}

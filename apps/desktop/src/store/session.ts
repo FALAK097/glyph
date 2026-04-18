@@ -18,6 +18,7 @@ type ScrollEntry = {
 type SessionState = {
   hasHydrated: boolean;
   viewerMode: ViewerMode;
+  isSidebarCollapsed: boolean;
   isNotesExpanded: boolean;
   isSkillsExpanded: boolean;
   selectedSkillCollectionId: string | null;
@@ -33,6 +34,7 @@ type SessionState = {
   layoutPanes: Record<string, PaneState> | null;
   setHasHydrated: (value: boolean) => void;
   setViewerMode: (mode: ViewerMode) => void;
+  setSidebarCollapsed: (value: boolean) => void;
   setNotesExpanded: (value: boolean) => void;
   setSkillsExpanded: (value: boolean) => void;
   setSelectedSkillCollectionId: (value: string | null) => void;
@@ -101,6 +103,7 @@ export const useSessionStore = create<SessionState>()(
     (set, get) => ({
       hasHydrated: false,
       viewerMode: "note",
+      isSidebarCollapsed: false,
       isNotesExpanded: true,
       isSkillsExpanded: false,
       selectedSkillCollectionId: null,
@@ -119,6 +122,9 @@ export const useSessionStore = create<SessionState>()(
       },
       setViewerMode: (viewerMode) => {
         set({ viewerMode });
+      },
+      setSidebarCollapsed: (isSidebarCollapsed) => {
+        set({ isSidebarCollapsed });
       },
       setNotesExpanded: (isNotesExpanded) => {
         set({ isNotesExpanded });
@@ -236,6 +242,7 @@ export const useSessionStore = create<SessionState>()(
       storage: createJSONStorage(() => window.localStorage),
       partialize: (state) => ({
         viewerMode: state.viewerMode,
+        isSidebarCollapsed: state.isSidebarCollapsed,
         isNotesExpanded: state.isNotesExpanded,
         isSkillsExpanded: state.isSkillsExpanded,
         selectedSkillCollectionId: state.selectedSkillCollectionId,

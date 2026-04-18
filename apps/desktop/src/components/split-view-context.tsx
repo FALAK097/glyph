@@ -41,8 +41,10 @@ export type SplitViewContextValue = {
   onUpdateAction: () => void;
   onDismissUpdateAction: () => void;
 
-  // NoteView-only note actions are intentionally omitted here until split view
-  // grows pane-aware versions of those workflows.
+  // TODO(split-view): add pane-aware note actions here before split view
+  // reuses NoteView behaviors directly. The next callbacks to add are
+  // onDeleteNote(paneId, path) and onOpenNewWindow(paneId, path), and callers
+  // should migrate from note-view.tsx once those flows are pane-aware.
 
   // ── Pinned files ──
   pinnedFilePaths: string[];

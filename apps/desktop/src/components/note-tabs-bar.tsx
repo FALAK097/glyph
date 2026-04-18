@@ -214,7 +214,7 @@ export function NoteTabsBar({
                   }}
                   type="button"
                   role="tab"
-                  draggable={tabs.length > 1}
+                  draggable
                   aria-selected={isActive}
                   title={tab.path}
                   onDragEnd={clearDragState}

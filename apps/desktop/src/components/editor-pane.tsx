@@ -164,16 +164,52 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
 
   // ── Active pane highlight ──────────────────────────────────────────
   const showActiveBorder = hasMultiplePanes;
+  const paneContainerClassName = `relative flex h-full min-h-0 flex-col ${
+    showActiveBorder
+      ? isActivePane
+        ? "ring-1 ring-inset ring-primary/30"
+        : "ring-1 ring-inset ring-transparent"
+      : ""
+  }`;
+
+  if (!activeTab) {
+    return (
+      <div
+        className={paneContainerClassName}
+        onFocusCapture={handleFocus}
+        onPointerDown={handleFocus}
+      >
+        {noteTabItems.length > 0 ? (
+          <div className="border-b border-border/40 bg-background">
+            <NoteTabsBar
+              activeTabId={paneActiveTabId}
+              tabs={noteTabItems}
+              onSelectTab={handleSelectTab}
+              onCloseTab={handleCloseTab}
+              onMoveTab={handleMoveTab}
+            />
+          </div>
+        ) : null}
+        <div className="flex min-h-0 flex-1 items-center justify-center px-8">
+          <div className="max-w-sm text-center">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Split View
+            </p>
+            <h2 className="mt-3 text-xl font-semibold tracking-tight text-foreground">
+              No active note in this pane
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground">
+              Select a tab in this pane or drag a note tab here to keep working.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
-      className={`relative flex h-full min-h-0 flex-col ${
-        showActiveBorder
-          ? isActivePane
-            ? "ring-1 ring-inset ring-primary/30"
-            : "ring-1 ring-inset ring-transparent"
-          : ""
-      }`}
+      className={paneContainerClassName}
       onFocusCapture={handleFocus}
       onPointerDown={handleFocus}
     >

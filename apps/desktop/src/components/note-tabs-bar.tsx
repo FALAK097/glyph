@@ -7,6 +7,18 @@ import type { TabMovePosition } from "@/shared/workspace";
 
 import { XIcon } from "./icons";
 
+const NOTE_TAB_DRAG_MIME = "application/x-glyph-note-tab";
+
+const readDraggedTabPath = (event: DragEvent<HTMLElement | HTMLDivElement>): string | null => {
+  const dragPayload = event.dataTransfer.getData(NOTE_TAB_DRAG_MIME);
+  if (dragPayload) {
+    return dragPayload;
+  }
+
+  const plainTextPayload = event.dataTransfer.getData("text/plain");
+  return plainTextPayload || null;
+};
+
 export type NoteTabRailItem = {
   id: string;
   label: string;
@@ -90,12 +102,14 @@ export function NoteTabsBar({
   }, []);
 
   const handleTabDragOver = useCallback((event: DragEvent<HTMLElement>, tabPath: string) => {
-    const currentDraggedTabPath = draggedTabPathRef.current;
+    const currentDraggedTabPath = draggedTabPathRef.current ?? readDraggedTabPath(event);
     if (!currentDraggedTabPath || isSamePath(currentDraggedTabPath, tabPath)) {
       return;
     }
 
     event.preventDefault();
+    draggedTabPathRef.current = currentDraggedTabPath;
+    setDraggedTabPath((current) => current ?? currentDraggedTabPath);
     const bounds = event.currentTarget.getBoundingClientRect();
     const position: TabMovePosition =
       event.clientX < bounds.left + bounds.width / 2 ? "before" : "after";
@@ -107,11 +121,14 @@ export function NoteTabsBar({
   }, []);
 
   const handleContainerDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
-    if (!draggedTabPathRef.current) {
+    const currentDraggedTabPath = draggedTabPathRef.current ?? readDraggedTabPath(event);
+    if (!currentDraggedTabPath) {
       return;
     }
 
     event.preventDefault();
+    draggedTabPathRef.current = currentDraggedTabPath;
+    setDraggedTabPath((current) => current ?? currentDraggedTabPath);
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) {
       return;
@@ -128,7 +145,7 @@ export function NoteTabsBar({
 
   const handleContainerDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
-      const currentDraggedTabPath = draggedTabPathRef.current;
+      const currentDraggedTabPath = draggedTabPathRef.current ?? readDraggedTabPath(event);
       if (!currentDraggedTabPath) {
         return;
       }
@@ -215,12 +232,14 @@ export function NoteTabsBar({
                   onDragStart={(event) => {
                     event.dataTransfer.effectAllowed = "move";
                     event.dataTransfer.setData("text/plain", tab.path);
+                    event.dataTransfer.setData(NOTE_TAB_DRAG_MIME, tab.path);
                     draggedTabPathRef.current = tab.path;
                     setDraggedTabPath(tab.path);
                   }}
                   onDragOver={(event) => handleTabDragOver(event, tab.path)}
                   onDrop={(event) => {
-                    const currentDraggedTabPath = draggedTabPathRef.current;
+                    const currentDraggedTabPath =
+                      draggedTabPathRef.current ?? readDraggedTabPath(event);
                     if (!currentDraggedTabPath || isSamePath(currentDraggedTabPath, tab.path)) {
                       clearDragState();
                       return;

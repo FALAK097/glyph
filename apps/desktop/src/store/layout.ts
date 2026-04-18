@@ -149,7 +149,13 @@ type LayoutState = {
     targetTabId: string,
     position: TabMovePosition,
   ) => void;
-  moveTabToPane: (tabId: string, fromPaneId: string, toPaneId: string) => void;
+  moveTabToPane: (
+    tabId: string,
+    fromPaneId: string,
+    toPaneId: string,
+    targetTabId?: string | null,
+    position?: TabMovePosition,
+  ) => void;
   replaceTabId: (oldTabId: string, newTabId: string) => void;
   removeTabFromAllPanes: (tabId: string) => void;
 
@@ -407,7 +413,7 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
     });
   },
 
-  moveTabToPane: (tabId, fromPaneId, toPaneId) => {
+  moveTabToPane: (tabId, fromPaneId, toPaneId, targetTabId, position = "after") => {
     set((state) => {
       const fromPane = state.panes[fromPaneId];
       const toPane = state.panes[toPaneId];
@@ -423,10 +429,19 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
         nextFromActiveTabId = fromPane.tabIds[idx - 1] ?? fromPane.tabIds[idx + 1] ?? null;
       }
 
-      // Add to target pane (avoid duplicates)
-      const nextToTabIds = toPane.tabIds.includes(tabId)
-        ? toPane.tabIds
-        : [...toPane.tabIds, tabId];
+      const targetIdsWithoutTab = toPane.tabIds.filter((id) => id !== tabId);
+      const targetIndex = targetTabId ? targetIdsWithoutTab.indexOf(targetTabId) : -1;
+      const insertAt =
+        targetIndex < 0
+          ? targetIdsWithoutTab.length
+          : position === "before"
+            ? targetIndex
+            : targetIndex + 1;
+      const nextToTabIds = [
+        ...targetIdsWithoutTab.slice(0, insertAt),
+        tabId,
+        ...targetIdsWithoutTab.slice(insertAt),
+      ];
 
       return {
         panes: {

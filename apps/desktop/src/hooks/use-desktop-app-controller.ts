@@ -587,17 +587,19 @@ export const useDesktopAppController = (
 
   const closeTabFromActivePane = useCallback(
     async (filePath: string) => {
-      const tabId = toPathKey(filePath);
       const layoutState = useLayoutStore.getState();
-      const paneState = layoutState.panes[layoutState.activePaneId];
-      if (!paneState || !paneState.tabIds.includes(tabId)) {
+      const activePaneId = layoutState.activePaneId;
+      const paneState = layoutState.panes[activePaneId];
+      let nextFilePath = filePath;
+      let nextTabId = toPathKey(nextFilePath);
+      if (!paneState || !paneState.tabIds.includes(nextTabId)) {
         return;
       }
 
       // Save dirty tab first
-      const targetTab = getTabByPath(filePath);
+      const targetTab = getTabByPath(nextFilePath);
       if (targetTab?.isDirty) {
-        const isClosingActiveTab = isSamePath(activeFile?.path, filePath);
+        const isClosingActiveTab = isSamePath(activeFile?.path, nextFilePath);
         const savedPath = await persistNoteDraft(
           {
             draftContent: targetTab.draftContent,
@@ -610,24 +612,26 @@ export const useDesktopAppController = (
           },
         );
         if (!savedPath) return;
+        nextFilePath = savedPath;
+        nextTabId = toPathKey(savedPath);
       }
 
       // Remove from layout pane
-      useLayoutStore.getState().removeTabFromPane(layoutState.activePaneId, tabId);
+      useLayoutStore.getState().removeTabFromPane(activePaneId, nextTabId);
 
       // Check if tab still exists in another pane
       const updatedLayout = useLayoutStore.getState();
       const tabStillInOtherPane = Object.entries(updatedLayout.panes).some(
-        ([paneId, ps]) => paneId !== layoutState.activePaneId && ps.tabIds.includes(tabId),
+        ([paneId, ps]) => paneId !== activePaneId && ps.tabIds.includes(nextTabId),
       );
 
       if (!tabStillInOtherPane) {
         // Tab not in any other pane — close from workspace store too
-        closeTab(filePath);
+        closeTab(nextFilePath);
       }
 
       // Sync workspace active tab to the pane's new active tab
-      const currentPaneState = updatedLayout.panes[layoutState.activePaneId];
+      const currentPaneState = updatedLayout.panes[activePaneId];
       if (currentPaneState?.activeTabId) {
         const nextTab = useWorkspaceStore
           .getState()
@@ -1086,12 +1090,19 @@ export const useDesktopAppController = (
       try {
         await glyph.deleteFolder(folderPath);
         setSidebarNodes((prev) => removeSidebarPath(prev, folderPath));
+        const removedLayoutTabIds = useWorkspaceStore
+          .getState()
+          .noteTabs.filter((tab) => isFileInsideWorkspace(tab.file.path, folderPath))
+          .map((tab) => tab.id);
         Array.from(
           new Set(navigationHistory.filter((entry) => isFileInsideWorkspace(entry, folderPath))),
         ).forEach((entry) => {
           removeHistoryPath(entry);
         });
         removeTabsInFolder(folderPath);
+        for (const tabId of removedLayoutTabIds) {
+          useLayoutStore.getState().removeTabFromAllPanes(tabId);
+        }
 
         if (rootPath && isSamePath(rootPath, folderPath)) {
           setWorkspace({ rootPath: "", tree: [], activeFile: null });
@@ -1210,12 +1221,25 @@ export const useDesktopAppController = (
       try {
         const { oldPath, newPath } = await glyph.renameFolder(folderPath, newName);
         setSidebarNodes((prev) => renameSidebarFolder(prev, oldPath, newPath, newName));
+        const layoutTabRemaps = useWorkspaceStore
+          .getState()
+          .noteTabs.filter((tab) => isFileInsideWorkspace(tab.file.path, oldPath))
+          .map(
+            (tab) =>
+              [
+                toPathKey(tab.file.path),
+                toPathKey(getRenamedFolderFilePath(oldPath, newPath, tab.file.path)),
+              ] as const,
+          );
         Array.from(
           new Set(navigationHistory.filter((entry) => isFileInsideWorkspace(entry, oldPath))),
         ).forEach((entry) => {
           replaceHistoryPath(entry, getRenamedFolderFilePath(oldPath, newPath, entry));
         });
         remapTabsForFolderRename(oldPath, newPath);
+        for (const [oldTabId, nextTabId] of layoutTabRemaps) {
+          useLayoutStore.getState().replaceTabId(oldTabId, nextTabId);
+        }
 
         // If the renamed folder was the workspace root, reopen to restart the watcher
         if (rootPath && isSamePath(rootPath, oldPath)) {
@@ -2171,9 +2195,10 @@ export const useDesktopAppController = (
 
           const prunedRoot = pruneTree(savedLayout.root);
           if (prunedRoot) {
-            useLayoutStore
-              .getState()
-              .restoreLayout(prunedRoot, savedLayout.activePaneId, validPanes);
+            const nextActivePaneId = validPanes[savedLayout.activePaneId]
+              ? savedLayout.activePaneId
+              : Object.keys(validPanes)[0];
+            useLayoutStore.getState().restoreLayout(prunedRoot, nextActivePaneId, validPanes);
           } else if (bootTabs.length > 0) {
             useLayoutStore.getState().initializePane(
               bootTabs.map((t) => t.id),

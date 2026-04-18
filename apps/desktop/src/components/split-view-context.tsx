@@ -7,7 +7,8 @@ import type { OutlineItem } from "@/types/navigation";
 /**
  * Shared controller state passed through the split layout tree so that
  * individual pane components don't need the full controller prop-drilled
- * from DesktopApp. Everything here is "global" (not pane-specific).
+ * from DesktopApp. Keep this context stable and avoid putting high-churn
+ * editor state here so inactive panes don't rerender on every keystroke.
  */
 export type SplitViewContextValue = {
   // ── Appearance / settings ──
@@ -26,14 +27,6 @@ export type SplitViewContextValue = {
   canGoBack: boolean;
   canGoForward: boolean;
 
-  // ── Focus / find requests (only apply to the active pane) ──
-  editorFocusRequest: EditorFocusRequest | null;
-  findRequest: EditorFindRequest | null;
-
-  // ── Outline ──
-  outlineItems: OutlineItem[];
-  outlineJumpRequest: { id: string; nonce: number } | null;
-
   // ── Callbacks ──
   onToggleSidebar: () => void;
   onCreateNote: () => void;
@@ -43,7 +36,6 @@ export type SplitViewContextValue = {
   onScrollPositionChange: (targetPath: string | null, scrollTop: number) => void;
   onNavigateBack: () => void;
   onNavigateForward: () => void;
-  onOutlineJumpHandled: () => void;
   onToggleFocusMode: () => void;
   onEditorScaleChange: (scale: number) => void;
   onUpdateAction: () => void;
@@ -69,14 +61,34 @@ export type SplitViewContextValue = {
   onActivatePane: (paneId: string) => void;
 };
 
+export type SplitViewActivePaneContextValue = {
+  editorFocusRequest: EditorFocusRequest | null;
+  findRequest: EditorFindRequest | null;
+  outlineItems: OutlineItem[];
+  outlineJumpRequest: { id: string; nonce: number } | null;
+  onOutlineJumpHandled: () => void;
+};
+
 const SplitViewContext = createContext<SplitViewContextValue | null>(null);
+const SplitViewActivePaneContext = createContext<SplitViewActivePaneContextValue | null>(null);
 
 export const SplitViewProvider = SplitViewContext.Provider;
+export const SplitViewActivePaneProvider = SplitViewActivePaneContext.Provider;
 
 export function useSplitViewContext(): SplitViewContextValue {
   const context = useContext(SplitViewContext);
   if (!context) {
     throw new Error("useSplitViewContext must be used within a SplitViewProvider");
+  }
+  return context;
+}
+
+export function useSplitViewActivePaneContext(): SplitViewActivePaneContextValue {
+  const context = useContext(SplitViewActivePaneContext);
+  if (!context) {
+    throw new Error(
+      "useSplitViewActivePaneContext must be used within a SplitViewActivePaneProvider",
+    );
   }
   return context;
 }

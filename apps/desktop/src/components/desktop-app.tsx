@@ -24,8 +24,8 @@ import { SettingsPanel } from "./settings-panel";
 import { SkillView } from "./skill-view";
 import { SkillsBrowserPane } from "./skills-browser-pane";
 import { SplitContainer } from "./split-container";
-import { SplitViewProvider } from "./split-view-context";
-import type { SplitViewContextValue } from "./split-view-context";
+import { SplitViewActivePaneProvider, SplitViewProvider } from "./split-view-context";
+import type { SplitViewActivePaneContextValue, SplitViewContextValue } from "./split-view-context";
 import { TooltipProvider } from "./ui/tooltip";
 import { useUpdateStateFlags } from "./update-notification";
 
@@ -1138,6 +1138,114 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     controller.appInfo?.updatesMode,
     controller.settings?.dismissedUpdateVersion ?? null,
   );
+  const handleCreateNote = useCallback(() => {
+    void controller.createNote();
+  }, [controller.createNote]);
+  const handleNavigateBack = useCallback(() => {
+    void controller.navigateBack();
+  }, [controller.navigateBack]);
+  const handleNavigateForward = useCallback(() => {
+    void controller.navigateForward();
+  }, [controller.navigateForward]);
+  const handleToggleFocusMode = useCallback(() => {
+    void controller.toggleFocusMode();
+  }, [controller.toggleFocusMode]);
+  const handleEditorScaleChange = useCallback(
+    (scale: number) => {
+      void controller.setEditorScale(scale);
+    },
+    [controller.setEditorScale],
+  );
+  const handleUpdateAction = useCallback(() => {
+    void controller.triggerUpdateAction();
+  }, [controller.triggerUpdateAction]);
+  const handleDismissUpdateAction = useCallback(() => {
+    void controller.dismissUpdateNotification();
+  }, [controller.dismissUpdateNotification]);
+  const handleTogglePinnedPath = useCallback(
+    (filePath: string) => {
+      void controller.togglePinnedFile(filePath);
+    },
+    [controller.togglePinnedFile],
+  );
+  const handleSelectPaneTab = useCallback(
+    (paneId: string, path: string) => {
+      useLayoutStore.getState().setActivePaneId(paneId);
+      useLayoutStore.getState().activateTabInPane(paneId, toPathKey(path));
+      void controller.activateNoteTab(path, { recordHistory: true });
+    },
+    [controller.activateNoteTab, toPathKey],
+  );
+  const handleClosePaneTab = useCallback(
+    (paneId: string, path: string) => {
+      useLayoutStore.getState().setActivePaneId(paneId);
+      void controller.closeTabFromActivePane(path);
+    },
+    [controller.closeTabFromActivePane],
+  );
+  const handleMovePaneTab = useCallback(
+    (paneId: string, sourcePath: string, targetPath: string, position: TabMovePosition) => {
+      const layoutState = useLayoutStore.getState();
+      const sourceTabId = toPathKey(sourcePath);
+      const targetTabId = toPathKey(targetPath);
+      const sourcePaneId = layoutState.getPaneForTab(sourceTabId);
+
+      layoutState.setActivePaneId(paneId);
+      if (sourcePaneId && sourcePaneId !== paneId) {
+        layoutState.moveTabToPane(sourceTabId, sourcePaneId, paneId, targetTabId, position);
+      } else {
+        layoutState.reorderTabInPane(paneId, sourceTabId, targetTabId, position);
+      }
+
+      controller.moveNoteTab(sourcePath, targetPath, position);
+    },
+    [controller.moveNoteTab, toPathKey],
+  );
+  const handlePaneContentChange = useCallback(
+    (_paneId: string, tabId: string, content: string) => {
+      const workspaceState = useWorkspaceStore.getState();
+      if (workspaceState.activeTabId === tabId) {
+        controller.updateDraftContent(content);
+        return;
+      }
+
+      workspaceState.updateTabDraftContent(tabId, content);
+    },
+    [controller.updateDraftContent],
+  );
+  const handleActivatePane = useCallback(
+    (paneId: string) => {
+      useLayoutStore.getState().setActivePaneId(paneId);
+      const paneState = useLayoutStore.getState().panes[paneId];
+      if (!paneState?.activeTabId) {
+        return;
+      }
+
+      const tab = useWorkspaceStore
+        .getState()
+        .noteTabs.find((entry) => entry.id === paneState.activeTabId);
+      if (tab) {
+        void controller.activateNoteTab(tab.file.path, { recordHistory: true });
+      }
+    },
+    [controller.activateNoteTab],
+  );
+  const splitViewActivePaneContextValue = useMemo<SplitViewActivePaneContextValue>(
+    () => ({
+      editorFocusRequest: controller.editorFocusRequest,
+      findRequest: controller.findRequest,
+      outlineItems: controller.outlineItems,
+      outlineJumpRequest: controller.outlineJumpRequest,
+      onOutlineJumpHandled: controller.clearOutlineJumpRequest,
+    }),
+    [
+      controller.clearOutlineJumpRequest,
+      controller.editorFocusRequest,
+      controller.findRequest,
+      controller.outlineItems,
+      controller.outlineJumpRequest,
+    ],
+  );
 
   const splitViewContextValue = useMemo<SplitViewContextValue>(
     () => ({
@@ -1157,115 +1265,64 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       canGoBack: controller.canGoBack,
       canGoForward: controller.canGoForward,
 
-      // Focus / find requests
-      editorFocusRequest: controller.editorFocusRequest,
-      findRequest: controller.findRequest,
-
-      // Outline
-      outlineItems: controller.outlineItems,
-      outlineJumpRequest: controller.outlineJumpRequest,
-
       // Callbacks
       onToggleSidebar: handleToggleSidebar,
-      onCreateNote: () => void controller.createNote(),
+      onCreateNote: handleCreateNote,
       onOpenSettings: handleOpenSettings,
       onOpenCommandPalette: handleOpenCommandPalette,
       onOpenLinkedFile: (path: string) => void handleOpenSkillLink(path),
       onScrollPositionChange: handleDocumentScrollPositionChange,
-      onNavigateBack: () => void controller.navigateBack(),
-      onNavigateForward: () => void controller.navigateForward(),
-      onOutlineJumpHandled: controller.clearOutlineJumpRequest,
-      onToggleFocusMode: () => void controller.toggleFocusMode(),
-      onEditorScaleChange: (scale: number) => void controller.setEditorScale(scale),
-      onUpdateAction: () => void controller.triggerUpdateAction(),
-      onDismissUpdateAction: () => void controller.dismissUpdateNotification(),
+      onNavigateBack: handleNavigateBack,
+      onNavigateForward: handleNavigateForward,
+      onToggleFocusMode: handleToggleFocusMode,
+      onEditorScaleChange: handleEditorScaleChange,
+      onUpdateAction: handleUpdateAction,
+      onDismissUpdateAction: handleDismissUpdateAction,
 
       // Pinned files
       pinnedFilePaths: controller.settings?.pinnedFiles ?? [],
-      onTogglePinnedFile: (filePath: string) => void controller.togglePinnedFile(filePath),
+      onTogglePinnedFile: handleTogglePinnedPath,
 
       // Pane-aware tab operations
-      onSelectTab: (paneId: string, path: string) => {
-        useLayoutStore.getState().setActivePaneId(paneId);
-        useLayoutStore.getState().activateTabInPane(paneId, toPathKey(path));
-        void controller.activateNoteTab(path, { recordHistory: true });
-      },
-      onCloseTab: (paneId: string, path: string) => {
-        useLayoutStore.getState().setActivePaneId(paneId);
-        void controller.closeTabFromActivePane(path);
-      },
-      onMoveTab: (
-        paneId: string,
-        sourcePath: string,
-        targetPath: string,
-        position: TabMovePosition,
-      ) => {
-        useLayoutStore.getState().setActivePaneId(paneId);
-        useLayoutStore
-          .getState()
-          .reorderTabInPane(paneId, toPathKey(sourcePath), toPathKey(targetPath), position);
-        controller.moveNoteTab(sourcePath, targetPath, position);
-      },
-      onContentChange: (paneId: string, tabId: string, content: string) => {
-        const wsState = useWorkspaceStore.getState();
-        const isGloballyActive = wsState.activeTabId === tabId;
-        if (isGloballyActive) {
-          controller.updateDraftContent(content);
-        } else {
-          wsState.updateTabDraftContent(tabId, content);
-        }
-      },
-      onActivatePane: (paneId: string) => {
-        useLayoutStore.getState().setActivePaneId(paneId);
-        const layoutState = useLayoutStore.getState();
-        const paneState = layoutState.panes[paneId];
-        if (paneState?.activeTabId) {
-          const tab = useWorkspaceStore
-            .getState()
-            .noteTabs.find((t) => t.id === paneState.activeTabId);
-          if (tab) {
-            void controller.activateNoteTab(tab.file.path, { recordHistory: true });
-          }
-        }
-      },
+      onSelectTab: handleSelectPaneTab,
+      onCloseTab: handleClosePaneTab,
+      onMoveTab: handleMovePaneTab,
+      onContentChange: handlePaneContentChange,
+      onActivatePane: handleActivatePane,
     }),
     [
-      controller.activateNoteTab,
       controller.appInfo?.updatesMode,
       controller.canGoBack,
       controller.canGoForward,
-      controller.clearOutlineJumpRequest,
-      controller.closeTabFromActivePane,
-      controller.createNote,
-      controller.dismissUpdateNotification,
-      controller.editorFocusRequest,
       controller.editorScale,
-      controller.findRequest,
       controller.folderRevealLabel,
       controller.isFocusMode,
       controller.isSidebarCollapsed,
-      controller.moveNoteTab,
-      controller.navigateBack,
-      controller.navigateForward,
-      controller.outlineItems,
-      controller.outlineJumpRequest,
-      controller.setEditorScale,
       controller.settings?.autoOpenPDF,
       controller.settings?.dismissedUpdateVersion,
       controller.settings?.pinnedFiles,
       controller.shortcuts,
       controller.showOutline,
-      controller.toggleFocusMode,
-      controller.togglePinnedFile,
-      controller.triggerUpdateAction,
-      controller.updateDraftContent,
       controller.updateState,
-      handleToggleSidebar,
-      handleOpenSettings,
-      handleOpenCommandPalette,
-      handleOpenSkillLink,
+      handleActivatePane,
+      handleClosePaneTab,
+      handleCreateNote,
+      handleDismissUpdateAction,
       handleDocumentScrollPositionChange,
+      handleEditorScaleChange,
+      handleMovePaneTab,
+      handleNavigateBack,
+      handleNavigateForward,
+      handleOpenCommandPalette,
+      handleOpenSettings,
+      handleOpenSkillLink,
+      handlePaneContentChange,
+      handleSelectPaneTab,
+      handleToggleFocusMode,
+      handleTogglePinnedPath,
       toPathKey,
+      handleToggleSidebar,
+      handleUpdateAction,
     ],
   );
   const activeNoteFile = controller.activeFile;
@@ -1493,7 +1550,9 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                 </div>
                 <div className="min-h-0 flex-1">
                   <SplitViewProvider value={splitViewContextValue}>
-                    <SplitContainer />
+                    <SplitViewActivePaneProvider value={splitViewActivePaneContextValue}>
+                      <SplitContainer />
+                    </SplitViewActivePaneProvider>
                   </SplitViewProvider>
                 </div>
               </div>

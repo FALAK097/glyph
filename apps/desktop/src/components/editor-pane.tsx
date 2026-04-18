@@ -1,7 +1,12 @@
 import { memo, useCallback, useLayoutEffect, useMemo, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 
 import { getDisplayFileName, isSamePath } from "@/lib/paths";
-import { getDirectTabShortcutDisplay, getShortcutDisplay } from "@/shared/shortcuts";
+import {
+  getDirectTabShortcutDisplay,
+  getPrimaryShortcutPrefix,
+  getShortcutDisplay,
+} from "@/shared/shortcuts";
 import type { NoteTab, TabMovePosition } from "@/shared/workspace";
 import { useLayoutStore } from "@/store/layout";
 import { useSessionStore } from "@/store/session";
@@ -9,7 +14,7 @@ import { useWorkspaceStore } from "@/store/workspace";
 
 import { MarkdownEditor } from "./markdown-editor";
 import { NoteTabsBar } from "./note-tabs-bar";
-import { useSplitViewContext } from "./split-view-context";
+import { useSplitViewActivePaneContext, useSplitViewContext } from "./split-view-context";
 
 type EditorPaneProps = {
   paneId: string;
@@ -17,6 +22,7 @@ type EditorPaneProps = {
 
 export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) {
   const ctx = useSplitViewContext();
+  const activePaneCtx = useSplitViewActivePaneContext();
 
   // ── Layout store selectors ─────────────────────────────────────────
   const isActivePane = useLayoutStore((s) => s.activePaneId === paneId);
@@ -36,15 +42,13 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
   const paneActiveTabId = paneState?.activeTabId ?? null;
 
   // ── Workspace store: get NoteTab objects for this pane ─────────────
-  const allNoteTabs = useWorkspaceStore((s) => s.noteTabs);
-
-  const paneTabs = useMemo(() => {
-    const tabMap = new Map<string, NoteTab>();
-    for (const tab of allNoteTabs) {
-      tabMap.set(tab.id, tab);
-    }
-    return paneTabIds.map((id) => tabMap.get(id)).filter(Boolean) as NoteTab[];
-  }, [allNoteTabs, paneTabIds]);
+  const paneTabs = useWorkspaceStore(
+    useShallow((state) =>
+      paneTabIds
+        .map((tabId) => state.noteTabs.find((tab) => tab.id === tabId))
+        .filter((tab): tab is NoteTab => Boolean(tab)),
+    ),
+  );
 
   const activeTab = useMemo(
     () => paneTabs.find((tab) => tab.id === paneActiveTabId) ?? null,
@@ -111,6 +115,9 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
       })),
     [paneTabs],
   );
+  const commandPaletteShortcut =
+    getShortcutDisplay(ctx.shortcuts, "command-palette", navigator.platform) ??
+    `${getPrimaryShortcutPrefix(navigator.platform)}P`;
 
   // ── Handlers (bind paneId) ─────────────────────────────────────────
   const handleFocus = useCallback(() => {
@@ -150,10 +157,10 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
   );
 
   // Only the active pane receives focus / find requests
-  const editorFocusRequest = isActivePane ? ctx.editorFocusRequest : null;
-  const findRequest = isActivePane ? ctx.findRequest : null;
-  const outlineItems = isActivePane ? ctx.outlineItems : [];
-  const outlineJumpRequest = isActivePane ? ctx.outlineJumpRequest : null;
+  const editorFocusRequest = isActivePane ? activePaneCtx.editorFocusRequest : null;
+  const findRequest = isActivePane ? activePaneCtx.findRequest : null;
+  const outlineItems = isActivePane ? activePaneCtx.outlineItems : [];
+  const outlineJumpRequest = isActivePane ? activePaneCtx.outlineJumpRequest : null;
 
   // ── Active pane highlight ──────────────────────────────────────────
   const showActiveBorder = hasMultiplePanes;
@@ -207,10 +214,7 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
         onOpenCommandPalette={ctx.onOpenCommandPalette}
         commandPaletteLabel="Search notes and skills"
         onOpenLinkedFile={ctx.onOpenLinkedFile}
-        commandPaletteShortcut={
-          getShortcutDisplay(ctx.shortcuts, "command-palette", navigator.platform) ??
-          (navigator.platform.includes("Mac") ? "⌘P" : "Ctrl+P")
-        }
+        commandPaletteShortcut={commandPaletteShortcut}
         onScrollPositionChange={ctx.onScrollPositionChange}
         onNavigateBack={ctx.onNavigateBack}
         onNavigateForward={ctx.onNavigateForward}
@@ -238,7 +242,7 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
         showOutline={ctx.showOutline}
         outlineItems={outlineItems}
         outlineJumpRequest={outlineJumpRequest}
-        onOutlineJumpHandled={ctx.onOutlineJumpHandled}
+        onOutlineJumpHandled={activePaneCtx.onOutlineJumpHandled}
         onToggleFocusMode={ctx.onToggleFocusMode}
         editorScale={ctx.editorScale}
         onEditorScaleChange={ctx.onEditorScaleChange}

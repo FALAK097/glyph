@@ -327,43 +327,33 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   },
 
   removeTabFromPane: (paneId, tabId) => {
-    let result: string | null = null;
+    const pane = get().panes[paneId];
+    if (!pane) {
+      return null;
+    }
 
-    set((state) => {
-      const pane = state.panes[paneId];
-      if (!pane) {
-        return state;
-      }
+    const tabIndex = pane.tabIds.indexOf(tabId);
+    if (tabIndex < 0) {
+      return pane.activeTabId;
+    }
 
-      const tabIndex = pane.tabIds.indexOf(tabId);
-      if (tabIndex < 0) {
-        result = pane.activeTabId;
-        return state;
-      }
+    const nextTabIds = pane.tabIds.filter((id) => id !== tabId);
+    const nextActiveTabId =
+      pane.activeTabId === tabId
+        ? (pane.tabIds[tabIndex - 1] ?? pane.tabIds[tabIndex + 1] ?? null)
+        : pane.activeTabId;
 
-      const nextTabIds = pane.tabIds.filter((id) => id !== tabId);
-      let nextActiveTabId = pane.activeTabId;
-
-      if (pane.activeTabId === tabId) {
-        // Pick adjacent tab
-        const prevTab = pane.tabIds[tabIndex - 1] ?? null;
-        const nextTab = pane.tabIds[tabIndex + 1] ?? null;
-        nextActiveTabId = prevTab ?? nextTab ?? null;
-      }
-
-      result = nextActiveTabId;
-      return {
-        panes: {
-          ...state.panes,
-          [paneId]: {
-            tabIds: nextTabIds,
-            activeTabId: nextActiveTabId,
-          },
+    set((state) => ({
+      panes: {
+        ...state.panes,
+        [paneId]: {
+          tabIds: nextTabIds,
+          activeTabId: nextActiveTabId,
         },
-      };
-    });
+      },
+    }));
 
-    return result;
+    return nextActiveTabId;
   },
 
   activateTabInPane: (paneId, tabId) => {

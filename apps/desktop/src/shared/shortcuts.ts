@@ -39,6 +39,7 @@ type ParsedShortcut = {
 
 export type ShortcutEventLike = {
   key: string;
+  code?: string;
   metaKey: boolean;
   ctrlKey: boolean;
   altKey: boolean;
@@ -262,7 +263,38 @@ const NORMALIZED_KEY_ALIASES: Record<string, string> = {
   tab: "tab",
   backspace: "backspace",
   delete: "delete",
+  "\\": "backslash",
+  backslash: "backslash",
 };
+
+const NORMALIZED_CODE_ALIASES: Record<string, string> = {
+  arrowup: "arrowup",
+  arrowdown: "arrowdown",
+  arrowleft: "arrowleft",
+  arrowright: "arrowright",
+  backslash: "backslash",
+  bracketleft: "[",
+  bracketright: "]",
+  comma: ",",
+  period: ".",
+  slash: "/",
+  equal: "=",
+  minus: "-",
+  digit0: "0",
+  digit1: "1",
+  digit2: "2",
+  digit3: "3",
+  digit4: "4",
+  digit5: "5",
+  digit6: "6",
+  digit7: "7",
+  digit8: "8",
+  digit9: "9",
+};
+
+for (const letter of "abcdefghijklmnopqrstuvwxyz") {
+  NORMALIZED_CODE_ALIASES[`key${letter}`] = letter;
+}
 
 const DISPLAY_KEY_ALIASES: Record<string, string> = {
   arrowup: "↑",
@@ -275,6 +307,7 @@ const DISPLAY_KEY_ALIASES: Record<string, string> = {
   tab: "Tab",
   backspace: "Backspace",
   delete: "Delete",
+  backslash: "\\",
 };
 
 const ELECTRON_KEY_ALIASES: Record<string, string> = {
@@ -340,6 +373,19 @@ function normalizeShortcutKeyToken(token: string): string | null {
   }
 
   return lower;
+}
+
+function normalizeShortcutCodeToken(token?: string): string | null {
+  const trimmed = token?.trim().toLowerCase();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (NORMALIZED_CODE_ALIASES[trimmed]) {
+    return normalizeShortcutKeyToken(NORMALIZED_CODE_ALIASES[trimmed]);
+  }
+
+  return null;
 }
 
 function formatShortcutKey(key: string): string {
@@ -475,10 +521,11 @@ export function matchShortcut(
   }
 
   const eventKey = normalizeShortcutKeyToken(event.key);
+  const eventCodeKey = normalizeShortcutCodeToken(event.code);
   const primaryPressed = isPrimaryModifierPressed(event, platform);
 
   return (
-    eventKey === parsed.key &&
+    (eventKey === parsed.key || eventCodeKey === parsed.key) &&
     primaryPressed === parsed.primary &&
     event.altKey === parsed.alt &&
     event.shiftKey === parsed.shift

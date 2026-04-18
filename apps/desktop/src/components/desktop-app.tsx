@@ -17,6 +17,7 @@ import { useSkillLibraryController } from "@/hooks/use-skill-library-controller"
 
 import { AppLayout } from "./app-layout";
 import { CommandPalette } from "./command-palette";
+import { EditorToolbar } from "./editor-toolbar";
 import { NoteConfirmDialog } from "./note-confirm-dialog";
 import { NoteRenameDialog } from "./note-rename-dialog";
 import { SettingsPanel } from "./settings-panel";
@@ -26,6 +27,7 @@ import { SplitContainer } from "./split-container";
 import { SplitViewProvider } from "./split-view-context";
 import type { SplitViewContextValue } from "./split-view-context";
 import { TooltipProvider } from "./ui/tooltip";
+import { useUpdateStateFlags } from "./update-notification";
 
 type SkillCollection = {
   id: string;
@@ -1128,6 +1130,14 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   }, [controller.setIsSettingsOpen]);
 
   const toPathKey = useCallback((path: string) => normalizePath(path).toLowerCase(), []);
+  const isMacLike = useMemo(() => navigator.platform.includes("Mac"), []);
+  const noteHeaderPaddingClass =
+    (controller.isSidebarCollapsed || controller.isFocusMode) && isMacLike ? "pl-20 pr-4" : "px-4";
+  const noteUpdateStateFlags = useUpdateStateFlags(
+    controller.updateState,
+    controller.appInfo?.updatesMode,
+    controller.settings?.dismissedUpdateVersion ?? null,
+  );
 
   const splitViewContextValue = useMemo<SplitViewContextValue>(
     () => ({
@@ -1191,6 +1201,9 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         position: TabMovePosition,
       ) => {
         useLayoutStore.getState().setActivePaneId(paneId);
+        useLayoutStore
+          .getState()
+          .reorderTabInPane(paneId, toPathKey(sourcePath), toPathKey(targetPath), position);
         controller.moveNoteTab(sourcePath, targetPath, position);
       },
       onContentChange: (paneId: string, tabId: string, content: string) => {
@@ -1217,7 +1230,36 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       },
     }),
     [
-      controller,
+      controller.activateNoteTab,
+      controller.appInfo?.updatesMode,
+      controller.canGoBack,
+      controller.canGoForward,
+      controller.clearOutlineJumpRequest,
+      controller.closeTabFromActivePane,
+      controller.createNote,
+      controller.dismissUpdateNotification,
+      controller.editorFocusRequest,
+      controller.editorScale,
+      controller.findRequest,
+      controller.folderRevealLabel,
+      controller.isFocusMode,
+      controller.isSidebarCollapsed,
+      controller.moveNoteTab,
+      controller.navigateBack,
+      controller.navigateForward,
+      controller.outlineItems,
+      controller.outlineJumpRequest,
+      controller.setEditorScale,
+      controller.settings?.autoOpenPDF,
+      controller.settings?.dismissedUpdateVersion,
+      controller.settings?.pinnedFiles,
+      controller.shortcuts,
+      controller.showOutline,
+      controller.toggleFocusMode,
+      controller.togglePinnedFile,
+      controller.triggerUpdateAction,
+      controller.updateDraftContent,
+      controller.updateState,
       handleToggleSidebar,
       handleOpenSettings,
       handleOpenCommandPalette,
@@ -1226,6 +1268,12 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       toPathKey,
     ],
   );
+  const activeNoteFile = controller.activeFile;
+  const isActiveNotePinned =
+    activeNoteFile &&
+    (controller.settings?.pinnedFiles ?? []).some((filePath) =>
+      isSamePath(filePath, activeNoteFile.path),
+    );
 
   return (
     <TooltipProvider>
@@ -1342,9 +1390,113 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                 onSelectDocumentTab={(kind) => void skillsController.openDocumentTab(kind)}
               />
             ) : (
-              <SplitViewProvider value={splitViewContextValue}>
-                <SplitContainer />
-              </SplitViewProvider>
+              <div className="flex h-full min-h-0 flex-col bg-background">
+                <div className="sticky top-0 z-20 shrink-0 bg-background/95 supports-backdrop-filter:backdrop-blur-md">
+                  <EditorToolbar
+                    _isMacLike={isMacLike}
+                    isSidebarCollapsed={controller.isSidebarCollapsed}
+                    toggleSidebarShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "toggle-sidebar",
+                      navigator.platform,
+                    )}
+                    onToggleSidebar={handleToggleSidebar}
+                    canGoBack={controller.canGoBack}
+                    canGoForward={controller.canGoForward}
+                    navigateBackShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "navigate-back",
+                      navigator.platform,
+                    )}
+                    navigateForwardShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "navigate-forward",
+                      navigator.platform,
+                    )}
+                    onNavigateBack={() => void controller.navigateBack()}
+                    onNavigateForward={() => void controller.navigateForward()}
+                    onCreateNote={() => void controller.createNote()}
+                    newNoteShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "new-note",
+                      navigator.platform,
+                    )}
+                    fileName={activeNoteFile?.name ?? null}
+                    filePath={activeNoteFile?.path ?? null}
+                    shouldShowCommandPalette={true}
+                    onOpenCommandPalette={handleOpenCommandPalette}
+                    commandPaletteShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "command-palette",
+                      navigator.platform,
+                    )}
+                    commandPaletteLabel="Search notes and skills"
+                    isFocusMode={controller.isFocusMode}
+                    onToggleFocusMode={() => void controller.toggleFocusMode()}
+                    focusModeShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "focus-mode",
+                      navigator.platform,
+                    )}
+                    shouldShowUpdateActionButton={noteUpdateStateFlags.shouldShowUpdateActionButton}
+                    updateButtonVariant={noteUpdateStateFlags.updateButtonVariant}
+                    isUpdateButtonDisabled={noteUpdateStateFlags.isUpdateButtonDisabled}
+                    updateButtonLabel={noteUpdateStateFlags.updateButtonLabel}
+                    updateButtonTooltip={noteUpdateStateFlags.updateButtonTooltip}
+                    onUpdateAction={() => void controller.triggerUpdateAction()}
+                    onDismissUpdateAction={() => void controller.dismissUpdateNotification()}
+                    isManualReleaseButton={noteUpdateStateFlags.isManualReleaseButton}
+                    headerPaddingClass={noteHeaderPaddingClass}
+                    onOpenSettings={handleOpenSettings}
+                    headerAccessory={null}
+                    content={controller.draftContent}
+                    documentLabel="note"
+                    revealInFolderLabel={controller.folderRevealLabel}
+                    onCopy={() => copyText(controller.draftContent)}
+                    onCopyPath={() =>
+                      activeNoteFile ? copyText(activeNoteFile.path) : Promise.resolve()
+                    }
+                    onOpenExternal={() =>
+                      activeNoteFile
+                        ? controller.revealInFinder(activeNoteFile.path)
+                        : Promise.resolve()
+                    }
+                    onExportPDF={() =>
+                      activeNoteFile
+                        ? exportDocumentToPdf(controller.draftContent, activeNoteFile.name)
+                        : Promise.resolve()
+                    }
+                    onTogglePinnedFile={
+                      activeNoteFile
+                        ? () => void controller.togglePinnedFile(activeNoteFile.path)
+                        : undefined
+                    }
+                    isActiveFilePinned={Boolean(isActiveNotePinned)}
+                    editorScale={controller.editorScale}
+                    onEditorScaleChange={(scale) => void controller.setEditorScale(scale)}
+                    zoomInShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "zoom-in",
+                      navigator.platform,
+                    )}
+                    zoomOutShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "zoom-out",
+                      navigator.platform,
+                    )}
+                    zoomResetShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "zoom-reset",
+                      navigator.platform,
+                    )}
+                  />
+                </div>
+                <div className="min-h-0 flex-1">
+                  <SplitViewProvider value={splitViewContextValue}>
+                    <SplitContainer />
+                  </SplitViewProvider>
+                </div>
+              </div>
             )}
           </div>
         </div>

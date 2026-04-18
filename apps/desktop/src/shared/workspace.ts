@@ -110,6 +110,7 @@ export type AppSettings = {
   editorPreferences: EditorPreferences;
   autoOpenPDF: boolean;
   dismissedUpdateVersion: string | null;
+  dismissedDefaultAppPrompt: boolean | null;
 };
 
 export type AppInfo = {

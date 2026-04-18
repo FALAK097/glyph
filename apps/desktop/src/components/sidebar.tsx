@@ -198,7 +198,7 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
 
   return (
     <div
-      className={`group/shortcut relative mb-0.5 flex min-w-0 items-center overflow-hidden rounded-xl border border-transparent transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out active:scale-[0.98]`}
+      className={`group/shortcut relative mb-0.5 flex min-w-0 items-center overflow-hidden rounded-xl border border-transparent transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out motion-reduce:transition-none active:scale-[0.98]`}
     >
       <div
         className={`mx-1 flex min-w-0 flex-1 cursor-pointer items-center rounded-md transition-colors ${

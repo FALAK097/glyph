@@ -34,6 +34,8 @@ export const SettingsPanel = ({
   onChangeMode,
   onChangeShortcuts,
   onChangeAutoOpenPDF,
+  onOpenDefaultAppSettings,
+  defaultAppStatus,
 }: SettingsPanelProps) => {
   const [activeTab, setActiveTab] = useState("general");
   const [shortcuts, setShortcuts] = useState(DEFAULT_SHORTCUTS);
@@ -294,6 +296,62 @@ export const SettingsPanel = ({
                       />
                       <span className="text-sm font-medium">Automatically open exported PDF</span>
                     </label>
+                  </div>
+
+                  <div className="flex flex-col justify-between gap-4 border-b border-border/40 py-4 sm:flex-row sm:items-center sm:gap-8">
+                    <div className="shrink-0 space-y-1">
+                      <p className="text-sm font-medium">Default App</p>
+                      <p className="text-xs text-muted-foreground">
+                        Open .md and .mdx files in Glyph by default
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {defaultAppStatus &&
+                        (defaultAppStatus.platform === "darwin" ||
+                          defaultAppStatus.platform === "win32") && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (!defaultAppStatus.isDefault) {
+                                onOpenDefaultAppSettings?.();
+                              }
+                            }}
+                            disabled={defaultAppStatus.isDefault}
+                            className={`flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
+                              defaultAppStatus.isDefault
+                                ? "border-green-500/50 bg-green-500/10 text-green-600 dark:text-green-400 cursor-default"
+                                : "border-border bg-background hover:bg-muted cursor-pointer"
+                            }`}
+                          >
+                            {defaultAppStatus.isDefault ? (
+                              <>
+                                <svg
+                                  className="h-4 w-4 text-green-600 dark:text-green-400"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M5 13l4 4L19 7"
+                                  />
+                                </svg>
+                                Enabled
+                              </>
+                            ) : (
+                              "Enable"
+                            )}
+                          </button>
+                        )}
+                      {(defaultAppStatus?.platform === "darwin" ||
+                        defaultAppStatus?.platform === "win32") === false && (
+                        <span className="text-xs text-muted-foreground">
+                          Not supported on this platform
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

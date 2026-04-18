@@ -61,6 +61,8 @@ declare global {
       getSettings: () => Promise<AppSettings>;
       updateSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>;
       getAppInfo: () => Promise<AppInfo>;
+      getDefaultAppStatus: () => Promise<{ isDefault: boolean; platform: string }>;
+      openDefaultAppSettings: () => Promise<void>;
       getUpdateState: () => Promise<UpdateState>;
       checkForUpdates: () => Promise<UpdateState>;
       downloadUpdate: () => Promise<UpdateState>;

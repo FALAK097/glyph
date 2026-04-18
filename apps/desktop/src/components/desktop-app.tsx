@@ -16,6 +16,7 @@ import { useSkillLibraryController } from "@/hooks/use-skill-library-controller"
 
 import { AppLayout } from "./app-layout";
 import { CommandPalette } from "./command-palette";
+import { DefaultAppPrompt } from "./default-app-prompt";
 import { NoteConfirmDialog } from "./note-confirm-dialog";
 import { NoteRenameDialog } from "./note-rename-dialog";
 import { NoteView } from "./note-view";
@@ -138,6 +139,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const [skillInitialScrollTop, setSkillInitialScrollTop] = useState(0);
   const [pendingSkillRestorePath, setPendingSkillRestorePath] = useState<string | null>(null);
   const [isInitialSkillRestorePending, setIsInitialSkillRestorePending] = useState(false);
+  const [showDefaultAppPrompt, setShowDefaultAppPrompt] = useState(false);
   const paletteSkillSearchNonceRef = useRef(0);
   const paletteFilterQuery = controller.paletteQuery.trim().toLowerCase();
   const shouldCollapseSidebar =
@@ -429,6 +431,46 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     skillsController.activeDocument,
     skillsController.isDocumentLoading,
   ]);
+
+  useEffect(() => {
+    if (!sessionHasHydrated || !controller.hasBooted || !controller.settings) {
+      return;
+    }
+
+    const hasDismissed = controller.settings.dismissedDefaultAppPrompt === true;
+    if (hasDismissed) {
+      return;
+    }
+
+    if (!controller.defaultAppStatus) {
+      controller.checkDefaultAppStatus();
+      return;
+    }
+
+    const platform = controller.defaultAppStatus.platform;
+    const isSupportedPlatform = platform === "darwin" || platform === "win32";
+    if (!isSupportedPlatform) {
+      return;
+    }
+
+    if (controller.defaultAppStatus.isDefault) {
+      return;
+    }
+
+    setShowDefaultAppPrompt(true);
+  }, [
+    sessionHasHydrated,
+    controller.hasBooted,
+    controller.settings,
+    controller.defaultAppStatus,
+    controller.checkDefaultAppStatus,
+  ]);
+
+  useEffect(() => {
+    if (controller.hasBooted && !controller.defaultAppStatus) {
+      controller.checkDefaultAppStatus();
+    }
+  }, [controller.hasBooted, controller.defaultAppStatus, controller.checkDefaultAppStatus]);
 
   useEffect(() => {
     if (
@@ -1340,6 +1382,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         onChangeMode={(mode: ThemeMode) => void controller.changeThemeMode(mode)}
         onChangeShortcuts={(shortcuts) => void controller.changeShortcuts(shortcuts)}
         onChangeAutoOpenPDF={(enabled) => void controller.saveSettings({ autoOpenPDF: enabled })}
+        onOpenDefaultAppSettings={() => controller.openSystemDefaultAppSettings()}
+        defaultAppStatus={controller.defaultAppStatus}
       />
       <NoteRenameDialog
         pending={pendingNoteRename}
@@ -1352,6 +1396,19 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         pending={pendingNoteConfirm}
         onDismiss={() => setPendingNoteConfirm(null)}
         onConfirm={() => void handleConfirmCurrentNoteAction()}
+      />
+      <DefaultAppPrompt
+        isOpen={showDefaultAppPrompt}
+        platform={controller.appInfo?.platform ?? "darwin"}
+        onDismiss={() => {
+          setShowDefaultAppPrompt(false);
+          controller.dismissDefaultAppPrompt();
+        }}
+        onMakeDefault={() => {
+          controller.openSystemDefaultAppSettings();
+          setShowDefaultAppPrompt(false);
+          controller.dismissDefaultAppPrompt();
+        }}
       />
     </TooltipProvider>
   );

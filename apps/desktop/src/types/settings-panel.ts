@@ -9,4 +9,6 @@ export type SettingsPanelProps = {
   onChangeMode: (mode: ThemeMode) => void;
   onChangeShortcuts: (shortcuts: ShortcutSetting[]) => void;
   onChangeAutoOpenPDF?: (enabled: boolean) => void;
+  onOpenDefaultAppSettings?: () => void;
+  defaultAppStatus?: { isDefault: boolean; platform: string } | null;
 };

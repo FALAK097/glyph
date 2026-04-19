@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.8.0](https://github.com/FALAK097/glyph/compare/v0.7.0...v0.8.0) (2026-04-19)
+
+
+### Features
+
+* **desktop:** add layout persistence, scroll restoration, and background auto-save for split view ([82f6cde](https://github.com/FALAK097/glyph/commit/82f6cdefe591b0b17ee3f305f766a2ef8e5c1c2e))
+* **desktop:** add split view for editing multiple files side-by-side ([1de4576](https://github.com/FALAK097/glyph/commit/1de457639a59f156bcaabc78ceb602d8bade7733))
+
+
+### Bug Fixes
+
+* **desktop:** collapse empty split panes ([90305df](https://github.com/FALAK097/glyph/commit/90305df0527f4231b5bc494f1b236fcbaf4a2158))
+* **desktop:** finalize split view interactions ([417a904](https://github.com/FALAK097/glyph/commit/417a90434147fc3747d46136a336f127c1486937))
+* **desktop:** harden split pane edge cases ([074cc6a](https://github.com/FALAK097/glyph/commit/074cc6a7471778ef62b62db65ccf4141f4d8cb1d))
+* **desktop:** harden split view state sync ([09e265a](https://github.com/FALAK097/glyph/commit/09e265af0925ac193322f03fab740ba47d2decce))
+* **desktop:** optimize split view interactions ([693d691](https://github.com/FALAK097/glyph/commit/693d691a90d504d78fe284bbff941c4aa4caa8ab))
+* **desktop:** prune empty panes during layout restore ([29a3092](https://github.com/FALAK097/glyph/commit/29a309242f8904ddf9d68d87aa62d30abbacbd86))
+* **desktop:** restore split view interactions ([c570d9d](https://github.com/FALAK097/glyph/commit/c570d9d0f046e3f71f733c4bcba70b9f7a6d3b8f))
+* og image ([beb19a4](https://github.com/FALAK097/glyph/commit/beb19a472daa64a4757fdd06157a70578fd22cf0))
+
 ## [0.7.0](https://github.com/FALAK097/glyph/compare/v0.6.0...v0.7.0) (2026-04-13)
 
 

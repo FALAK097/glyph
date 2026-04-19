@@ -8,8 +8,13 @@ import type { TabMovePosition } from "@/shared/workspace";
 import { XIcon } from "./icons";
 
 const NOTE_TAB_DRAG_MIME = "application/x-glyph-note-tab";
+let globalDraggedTabPath: string | null = null;
 
 const readDraggedTabPath = (event: DragEvent<HTMLElement | HTMLDivElement>): string | null => {
+  if (globalDraggedTabPath) {
+    return globalDraggedTabPath;
+  }
+
   const dragPayload = event.dataTransfer.getData(NOTE_TAB_DRAG_MIME);
   if (dragPayload) {
     return dragPayload;
@@ -96,6 +101,7 @@ export function NoteTabsBar({
   }, [activeTabId, tabOrderKey]);
 
   const clearDragState = useCallback(() => {
+    globalDraggedTabPath = null;
     draggedTabPathRef.current = null;
     setDraggedTabPath(null);
     setDropTarget(null);
@@ -233,6 +239,7 @@ export function NoteTabsBar({
                     event.dataTransfer.effectAllowed = "move";
                     event.dataTransfer.setData("text/plain", tab.path);
                     event.dataTransfer.setData(NOTE_TAB_DRAG_MIME, tab.path);
+                    globalDraggedTabPath = tab.path;
                     draggedTabPathRef.current = tab.path;
                     setDraggedTabPath(tab.path);
                   }}

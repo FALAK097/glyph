@@ -147,11 +147,14 @@ export function NoteView({
       subheaderContent={
         noteTabItems.length > 0 ? (
           <NoteTabsBar
+            paneId="pane-0"
             activeTabId={activeTabId}
             tabs={noteTabItems}
             onSelectTab={onSelectTab}
             onCloseTab={onCloseTab}
-            onMoveTab={onMoveTab}
+            onMoveTab={(_sourcePaneId, sourcePath, targetPath, position) =>
+              onMoveTab(sourcePath, targetPath, position)
+            }
           />
         ) : null
       }

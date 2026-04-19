@@ -150,8 +150,8 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
   );
 
   const handleMoveTab = useCallback(
-    (sourcePath: string, targetPath: string, position: TabMovePosition) => {
-      ctx.onMoveTab(paneId, sourcePath, targetPath, position);
+    (sourcePaneId: string, sourcePath: string, targetPath: string, position: TabMovePosition) => {
+      ctx.onMoveTab(sourcePaneId, paneId, sourcePath, targetPath, position);
     },
     [ctx.onMoveTab, paneId],
   );
@@ -182,6 +182,7 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
         {noteTabItems.length > 0 ? (
           <div className="border-b border-border/40 bg-background">
             <NoteTabsBar
+              paneId={paneId}
               activeTabId={paneActiveTabId}
               tabs={noteTabItems}
               onSelectTab={handleSelectTab}
@@ -228,6 +229,7 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
         subheaderContent={
           noteTabItems.length > 0 ? (
             <NoteTabsBar
+              paneId={paneId}
               activeTabId={paneActiveTabId}
               tabs={noteTabItems}
               onSelectTab={handleSelectTab}

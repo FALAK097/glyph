@@ -1184,17 +1184,22 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     [controller.closeTabFromActivePane],
   );
   const handleMovePaneTab = useCallback(
-    (paneId: string, sourcePath: string, targetPath: string, position: TabMovePosition) => {
+    (
+      sourcePaneId: string,
+      targetPaneId: string,
+      sourcePath: string,
+      targetPath: string,
+      position: TabMovePosition,
+    ) => {
       const layoutState = useLayoutStore.getState();
       const sourceTabId = toPathKey(sourcePath);
       const targetTabId = toPathKey(targetPath);
-      const sourcePaneId = layoutState.getPaneForTab(sourceTabId);
 
-      layoutState.setActivePaneId(paneId);
-      if (sourcePaneId && sourcePaneId !== paneId) {
-        layoutState.moveTabToPane(sourceTabId, sourcePaneId, paneId, targetTabId, position);
+      layoutState.setActivePaneId(targetPaneId);
+      if (sourcePaneId !== targetPaneId) {
+        layoutState.moveTabToPane(sourceTabId, sourcePaneId, targetPaneId, targetTabId, position);
       } else {
-        layoutState.reorderTabInPane(paneId, sourceTabId, targetTabId, position);
+        layoutState.reorderTabInPane(targetPaneId, sourceTabId, targetTabId, position);
       }
 
       controller.moveNoteTab(sourcePath, targetPath, position);

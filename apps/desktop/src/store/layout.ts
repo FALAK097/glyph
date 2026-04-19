@@ -443,6 +443,23 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
         ...targetIdsWithoutTab.slice(insertAt),
       ];
 
+      if (nextFromTabIds.length === 0 && Object.keys(state.panes).length > 1) {
+        const nextRoot = removePaneFromTree(state.root, fromPaneId);
+        if (!nextRoot) {
+          return state;
+        }
+
+        const { [fromPaneId]: _removed, ...remainingPanes } = state.panes;
+        return {
+          root: nextRoot,
+          panes: {
+            ...remainingPanes,
+            [toPaneId]: { tabIds: nextToTabIds, activeTabId: tabId },
+          },
+          activePaneId: toPaneId,
+        };
+      }
+
       return {
         panes: {
           ...state.panes,

@@ -77,6 +77,18 @@ const featureSections: FeatureSection[] = [
 
 const featureCards: FeatureCard[] = [
   {
+    title: "Split view",
+    body: "Open notes side by side in resizable panes, keep a global toolbar visible, and compare or edit multiple documents without losing flow.",
+  },
+  {
+    title: "Cross-pane tab moves",
+    body: "Drag tabs between panes, merge panes by moving the last tab out, and keep the layout tidy without ending up in dead empty states.",
+  },
+  {
+    title: "Pane-first keyboard flow",
+    body: "Split right or down, move focus between panes, and close the current pane directly from the keyboard even while the editor is focused.",
+  },
+  {
     title: "Multi-note tabs",
     body: "Keep several notes open, jump between them with shortcuts, and reorder tabs without losing your place.",
   },
@@ -352,10 +364,11 @@ export function HomePage() {
                     loop
                     muted
                     playsInline
+                    preload="metadata"
                     className="clean-shot__image clean-shot__image--cover"
                     poster="/dark-theme.png"
                   >
-                    <source src="/glyph-demo.mp4" type="video/mp4" />
+                    <source src="/demo.mp4" type="video/mp4" />
                   </video>
                 </div>
               </div>

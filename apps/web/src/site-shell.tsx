@@ -44,7 +44,7 @@ export function SiteLayout({ activePage, children, onNavigate }: SiteLayoutProps
       </a>
 
       <nav className="sticky top-0 z-40 border-b border-black/5 bg-[color:color-mix(in_oklab,var(--surface-page)_88%,white)]/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-2 px-4 py-3 sm:gap-4 sm:px-8 sm:py-0 lg:px-12">
+        <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-2 px-5 py-3 sm:gap-4 sm:px-9 sm:py-0 lg:px-14">
           <a
             href="/"
             aria-label="Glyph Home"
@@ -60,7 +60,7 @@ export function SiteLayout({ activePage, children, onNavigate }: SiteLayoutProps
             />
           </a>
 
-          <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+          <div className="ml-auto flex items-center gap-1.5 sm:mr-2 sm:gap-2 lg:mr-3">
             <a href={DOWNLOAD_URLS.mac} className="download-button cursor-pointer border-0">
               <AppleIcon />
               <span className="sm:hidden">macOS</span>

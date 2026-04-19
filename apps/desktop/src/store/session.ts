@@ -3,6 +3,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 import { normalizePath } from "@/lib/paths";
 import type { SkillDocumentKind } from "@/shared/skills";
+import type { LayoutNode, PaneState } from "@/shared/workspace";
 
 const SESSION_STORAGE_KEY = "glyph.editor-session";
 const MAX_SCROLL_ENTRIES = 160;
@@ -17,6 +18,7 @@ type ScrollEntry = {
 type SessionState = {
   hasHydrated: boolean;
   viewerMode: ViewerMode;
+  isSidebarCollapsed: boolean;
   isNotesExpanded: boolean;
   isSkillsExpanded: boolean;
   selectedSkillCollectionId: string | null;
@@ -27,8 +29,12 @@ type SessionState = {
   skillDocumentKind: SkillDocumentKind;
   skillDocumentKindsById: Record<string, SkillDocumentKind>;
   scrollPositions: Record<string, ScrollEntry>;
+  layoutRoot: LayoutNode | null;
+  layoutActivePaneId: string | null;
+  layoutPanes: Record<string, PaneState> | null;
   setHasHydrated: (value: boolean) => void;
   setViewerMode: (mode: ViewerMode) => void;
+  setSidebarCollapsed: (value: boolean) => void;
   setNotesExpanded: (value: boolean) => void;
   setSkillsExpanded: (value: boolean) => void;
   setSelectedSkillCollectionId: (value: string | null) => void;
@@ -44,6 +50,16 @@ type SessionState = {
   setDocumentScroll: (targetPath: string | null, top: number) => void;
   getDocumentScroll: (targetPath: string | null | undefined) => number;
   hasDocumentScroll: (targetPath: string | null | undefined) => boolean;
+  setLayoutSession: (
+    root: LayoutNode,
+    activePaneId: string,
+    panes: Record<string, PaneState>,
+  ) => void;
+  getLayoutSession: () => {
+    root: LayoutNode;
+    activePaneId: string;
+    panes: Record<string, PaneState>;
+  } | null;
 };
 
 const toScrollKey = (targetPath: string) => normalizePath(targetPath).toLowerCase();
@@ -87,6 +103,7 @@ export const useSessionStore = create<SessionState>()(
     (set, get) => ({
       hasHydrated: false,
       viewerMode: "note",
+      isSidebarCollapsed: false,
       isNotesExpanded: true,
       isSkillsExpanded: false,
       selectedSkillCollectionId: null,
@@ -97,11 +114,17 @@ export const useSessionStore = create<SessionState>()(
       skillDocumentKind: "skill",
       skillDocumentKindsById: {},
       scrollPositions: {},
+      layoutRoot: null,
+      layoutActivePaneId: null,
+      layoutPanes: null,
       setHasHydrated: (value) => {
         set({ hasHydrated: value });
       },
       setViewerMode: (viewerMode) => {
         set({ viewerMode });
+      },
+      setSidebarCollapsed: (isSidebarCollapsed) => {
+        set({ isSidebarCollapsed });
       },
       setNotesExpanded: (isNotesExpanded) => {
         set({ isNotesExpanded });
@@ -195,12 +218,31 @@ export const useSessionStore = create<SessionState>()(
 
         return Object.hasOwn(get().scrollPositions, toScrollKey(targetPath));
       },
+      setLayoutSession: (root, activePaneId, panes) => {
+        set({
+          layoutRoot: root,
+          layoutActivePaneId: activePaneId,
+          layoutPanes: panes,
+        });
+      },
+      getLayoutSession: () => {
+        const state = get();
+        if (!state.layoutRoot || !state.layoutActivePaneId || !state.layoutPanes) {
+          return null;
+        }
+        return {
+          root: state.layoutRoot,
+          activePaneId: state.layoutActivePaneId,
+          panes: state.layoutPanes,
+        };
+      },
     }),
     {
       name: SESSION_STORAGE_KEY,
       storage: createJSONStorage(() => window.localStorage),
       partialize: (state) => ({
         viewerMode: state.viewerMode,
+        isSidebarCollapsed: state.isSidebarCollapsed,
         isNotesExpanded: state.isNotesExpanded,
         isSkillsExpanded: state.isSkillsExpanded,
         selectedSkillCollectionId: state.selectedSkillCollectionId,
@@ -211,6 +253,9 @@ export const useSessionStore = create<SessionState>()(
         skillDocumentKind: state.skillDocumentKind,
         skillDocumentKindsById: state.skillDocumentKindsById,
         scrollPositions: state.scrollPositions,
+        layoutRoot: state.layoutRoot,
+        layoutActivePaneId: state.layoutActivePaneId,
+        layoutPanes: state.layoutPanes,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);

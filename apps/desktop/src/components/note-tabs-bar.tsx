@@ -7,6 +7,35 @@ import type { TabMovePosition } from "@/shared/workspace";
 
 import { XIcon } from "./icons";
 
+const NOTE_TAB_DRAG_MIME = "application/x-glyph-note-tab";
+let globalDraggedTab: { paneId: string; path: string } | null = null;
+
+const readDraggedTab = (
+  event: DragEvent<HTMLElement | HTMLDivElement>,
+): { paneId: string | null; path: string } | null => {
+  if (globalDraggedTab) {
+    return globalDraggedTab;
+  }
+
+  const dragPayload = event.dataTransfer.getData(NOTE_TAB_DRAG_MIME);
+  if (dragPayload) {
+    try {
+      const parsed = JSON.parse(dragPayload) as { paneId?: string; path?: string };
+      if (parsed.path) {
+        return {
+          paneId: parsed.paneId ?? null,
+          path: parsed.path,
+        };
+      }
+    } catch {
+      return { paneId: null, path: dragPayload };
+    }
+  }
+
+  const plainTextPayload = event.dataTransfer.getData("text/plain");
+  return plainTextPayload ? { paneId: null, path: plainTextPayload } : null;
+};
+
 export type NoteTabRailItem = {
   id: string;
   label: string;
@@ -15,14 +44,21 @@ export type NoteTabRailItem = {
 };
 
 type NoteTabsBarProps = {
+  paneId: string;
   activeTabId: string | null;
   onCloseTab: (path: string) => void;
-  onMoveTab: (sourcePath: string, targetPath: string, position: TabMovePosition) => void;
+  onMoveTab: (
+    sourcePaneId: string,
+    sourcePath: string,
+    targetPath: string,
+    position: TabMovePosition,
+  ) => void;
   onSelectTab: (path: string) => void;
   tabs: NoteTabRailItem[];
 };
 
 export function NoteTabsBar({
+  paneId,
   activeTabId,
   onCloseTab,
   onMoveTab,
@@ -84,18 +120,22 @@ export function NoteTabsBar({
   }, [activeTabId, tabOrderKey]);
 
   const clearDragState = useCallback(() => {
+    globalDraggedTab = null;
     draggedTabPathRef.current = null;
     setDraggedTabPath(null);
     setDropTarget(null);
   }, []);
 
   const handleTabDragOver = useCallback((event: DragEvent<HTMLElement>, tabPath: string) => {
-    const currentDraggedTabPath = draggedTabPathRef.current;
+    const currentDraggedTab = readDraggedTab(event);
+    const currentDraggedTabPath = currentDraggedTab?.path ?? draggedTabPathRef.current;
     if (!currentDraggedTabPath || isSamePath(currentDraggedTabPath, tabPath)) {
       return;
     }
 
     event.preventDefault();
+    draggedTabPathRef.current = currentDraggedTabPath;
+    setDraggedTabPath((current) => current ?? currentDraggedTabPath);
     const bounds = event.currentTarget.getBoundingClientRect();
     const position: TabMovePosition =
       event.clientX < bounds.left + bounds.width / 2 ? "before" : "after";
@@ -107,11 +147,14 @@ export function NoteTabsBar({
   }, []);
 
   const handleContainerDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
-    if (!draggedTabPathRef.current) {
+    const currentDraggedTabPath = readDraggedTab(event)?.path ?? draggedTabPathRef.current;
+    if (!currentDraggedTabPath) {
       return;
     }
 
     event.preventDefault();
+    draggedTabPathRef.current = currentDraggedTabPath;
+    setDraggedTabPath((current) => current ?? currentDraggedTabPath);
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer) {
       return;
@@ -128,8 +171,10 @@ export function NoteTabsBar({
 
   const handleContainerDrop = useCallback(
     (event: DragEvent<HTMLDivElement>) => {
-      const currentDraggedTabPath = draggedTabPathRef.current;
-      if (!currentDraggedTabPath) {
+      const currentDraggedTab = readDraggedTab(event);
+      const currentDraggedTabPath = currentDraggedTab?.path ?? draggedTabPathRef.current;
+      const sourcePaneId = currentDraggedTab?.paneId;
+      if (!currentDraggedTabPath || !sourcePaneId) {
         return;
       }
 
@@ -144,7 +189,7 @@ export function NoteTabsBar({
       const lastTab = tabs.at(-1);
       if (lastTab && !isSamePath(lastTab.path, currentDraggedTabPath)) {
         event.preventDefault();
-        onMoveTab(currentDraggedTabPath, lastTab.path, "after");
+        onMoveTab(sourcePaneId, currentDraggedTabPath, lastTab.path, "after");
       }
 
       clearDragState();
@@ -197,7 +242,7 @@ export function NoteTabsBar({
                   }}
                   type="button"
                   role="tab"
-                  draggable={tabs.length > 1}
+                  draggable
                   aria-selected={isActive}
                   title={tab.path}
                   onDragEnd={clearDragState}
@@ -215,13 +260,25 @@ export function NoteTabsBar({
                   onDragStart={(event) => {
                     event.dataTransfer.effectAllowed = "move";
                     event.dataTransfer.setData("text/plain", tab.path);
+                    event.dataTransfer.setData(
+                      NOTE_TAB_DRAG_MIME,
+                      JSON.stringify({ paneId, path: tab.path }),
+                    );
+                    globalDraggedTab = { paneId, path: tab.path };
                     draggedTabPathRef.current = tab.path;
                     setDraggedTabPath(tab.path);
                   }}
                   onDragOver={(event) => handleTabDragOver(event, tab.path)}
                   onDrop={(event) => {
-                    const currentDraggedTabPath = draggedTabPathRef.current;
-                    if (!currentDraggedTabPath || isSamePath(currentDraggedTabPath, tab.path)) {
+                    const currentDraggedTab = readDraggedTab(event);
+                    const currentDraggedTabPath =
+                      currentDraggedTab?.path ?? draggedTabPathRef.current;
+                    const sourcePaneId = currentDraggedTab?.paneId;
+                    if (
+                      !currentDraggedTabPath ||
+                      !sourcePaneId ||
+                      isSamePath(currentDraggedTabPath, tab.path)
+                    ) {
                       clearDragState();
                       return;
                     }
@@ -229,7 +286,7 @@ export function NoteTabsBar({
                     event.preventDefault();
                     event.stopPropagation();
                     const position = dropTarget?.path === tab.path ? dropTarget.position : "after";
-                    onMoveTab(currentDraggedTabPath, tab.path, position);
+                    onMoveTab(sourcePaneId, currentDraggedTabPath, tab.path, position);
                     clearDragState();
                   }}
                   onClick={() => onSelectTab(tab.path)}

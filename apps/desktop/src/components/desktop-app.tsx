@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { getDisplayFileName, isSamePath } from "@/lib/paths";
+import { getDisplayFileName, isSamePath, normalizePath } from "@/lib/paths";
 import { countGroupedSkills, groupSkillsForBrowse } from "@/lib/skill-groups";
-import { formatByteSize } from "@/lib/format-byte-size";
 import { getShortcutDisplay } from "@/shared/shortcuts";
 import { SKILL_AGENT_CATALOG } from "@/shared/skill-agent-catalog";
 import type { SkillEntry, SkillSourceKind, SkillToolKind } from "@/shared/skills";
+import { useLayoutStore } from "@/store/layout";
 import { useSessionStore } from "@/store/session";
-import type { ThemeMode } from "@/shared/workspace";
+import { useWorkspaceStore } from "@/store/workspace";
+import type { ThemeMode, TabMovePosition } from "@/shared/workspace";
 import type { DesktopAppProps } from "@/types/app";
 import type { CommandPaletteItem } from "@/types/command-palette";
 
@@ -16,13 +17,17 @@ import { useSkillLibraryController } from "@/hooks/use-skill-library-controller"
 
 import { AppLayout } from "./app-layout";
 import { CommandPalette } from "./command-palette";
+import { EditorToolbar } from "./editor-toolbar";
 import { NoteConfirmDialog } from "./note-confirm-dialog";
 import { NoteRenameDialog } from "./note-rename-dialog";
-import { NoteView } from "./note-view";
 import { SettingsPanel } from "./settings-panel";
 import { SkillView } from "./skill-view";
 import { SkillsBrowserPane } from "./skills-browser-pane";
+import { SplitContainer } from "./split-container";
+import { SplitViewActivePaneProvider, SplitViewProvider } from "./split-view-context";
+import type { SplitViewActivePaneContextValue, SplitViewContextValue } from "./split-view-context";
 import { TooltipProvider } from "./ui/tooltip";
+import { useUpdateStateFlags } from "./update-notification";
 
 type SkillCollection = {
   id: string;
@@ -134,7 +139,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const [pendingNoteConfirm, setPendingNoteConfirm] = useState<PendingNoteConfirm | null>(null);
   const [paletteSkillResultIds, setPaletteSkillResultIds] = useState<string[] | null>(null);
   const [resolvedPaletteSkillQuery, setResolvedPaletteSkillQuery] = useState("");
-  const [noteInitialScrollTop, setNoteInitialScrollTop] = useState(0);
   const [skillInitialScrollTop, setSkillInitialScrollTop] = useState(0);
   const [pendingSkillRestorePath, setPendingSkillRestorePath] = useState<string | null>(null);
   const [isInitialSkillRestorePending, setIsInitialSkillRestorePending] = useState(false);
@@ -235,10 +239,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       skillCollections.find((collection) => collection.id === selectedSkillCollectionId) ?? null,
     [selectedSkillCollectionId, skillCollections],
   );
-  const noteFileSizeLabel = useMemo(() => {
-    const bytes = new TextEncoder().encode(controller.draftContent).length;
-    return formatByteSize(bytes);
-  }, [controller.draftContent]);
   const currentNoteDisplayName = useMemo(
     () => (controller.activeFile ? getDisplayFileName(controller.activeFile.name) : ""),
     [controller.activeFile],
@@ -249,14 +249,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     },
     [setDocumentScroll],
   );
-
-  useLayoutEffect(() => {
-    setNoteInitialScrollTop(
-      controller.activeFile
-        ? useSessionStore.getState().getDocumentScroll(controller.activeFile.path)
-        : 0,
-    );
-  }, [controller.activeFile, viewerMode]);
 
   useLayoutEffect(() => {
     setSkillInitialScrollTop(
@@ -1137,6 +1129,214 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     controller.setIsSettingsOpen(true);
   }, [controller.setIsSettingsOpen]);
 
+  const toPathKey = useCallback((path: string) => normalizePath(path).toLowerCase(), []);
+  const isMacLike = useMemo(() => navigator.platform.includes("Mac"), []);
+  const noteHeaderPaddingClass =
+    (controller.isSidebarCollapsed || controller.isFocusMode) && isMacLike ? "pl-20 pr-4" : "px-4";
+  const noteUpdateStateFlags = useUpdateStateFlags(
+    controller.updateState,
+    controller.appInfo?.updatesMode,
+    controller.settings?.dismissedUpdateVersion ?? null,
+  );
+  const handleCreateNote = useCallback(() => {
+    void controller.createNote();
+  }, [controller.createNote]);
+  const handleNavigateBack = useCallback(() => {
+    void controller.navigateBack();
+  }, [controller.navigateBack]);
+  const handleNavigateForward = useCallback(() => {
+    void controller.navigateForward();
+  }, [controller.navigateForward]);
+  const handleToggleFocusMode = useCallback(() => {
+    void controller.toggleFocusMode();
+  }, [controller.toggleFocusMode]);
+  const handleEditorScaleChange = useCallback(
+    (scale: number) => {
+      void controller.setEditorScale(scale);
+    },
+    [controller.setEditorScale],
+  );
+  const handleUpdateAction = useCallback(() => {
+    void controller.triggerUpdateAction();
+  }, [controller.triggerUpdateAction]);
+  const handleDismissUpdateAction = useCallback(() => {
+    void controller.dismissUpdateNotification();
+  }, [controller.dismissUpdateNotification]);
+  const handleTogglePinnedPath = useCallback(
+    (filePath: string) => {
+      void controller.togglePinnedFile(filePath);
+    },
+    [controller.togglePinnedFile],
+  );
+  const handleSelectPaneTab = useCallback(
+    (paneId: string, path: string) => {
+      useLayoutStore.getState().setActivePaneId(paneId);
+      useLayoutStore.getState().activateTabInPane(paneId, toPathKey(path));
+      void controller.activateNoteTab(path, { recordHistory: true });
+    },
+    [controller.activateNoteTab, toPathKey],
+  );
+  const handleClosePaneTab = useCallback(
+    (paneId: string, path: string) => {
+      useLayoutStore.getState().setActivePaneId(paneId);
+      void controller.closeTabFromActivePane(path);
+    },
+    [controller.closeTabFromActivePane],
+  );
+  const handleMovePaneTab = useCallback(
+    (
+      sourcePaneId: string,
+      targetPaneId: string,
+      sourcePath: string,
+      targetPath: string,
+      position: TabMovePosition,
+    ) => {
+      const layoutState = useLayoutStore.getState();
+      const sourceTabId = toPathKey(sourcePath);
+      const targetTabId = toPathKey(targetPath);
+
+      layoutState.setActivePaneId(targetPaneId);
+      if (sourcePaneId !== targetPaneId) {
+        layoutState.moveTabToPane(sourceTabId, sourcePaneId, targetPaneId, targetTabId, position);
+      } else {
+        layoutState.reorderTabInPane(targetPaneId, sourceTabId, targetTabId, position);
+      }
+
+      controller.moveNoteTab(sourcePath, targetPath, position);
+    },
+    [controller.moveNoteTab, toPathKey],
+  );
+  const handlePaneContentChange = useCallback(
+    (_paneId: string, tabId: string, content: string) => {
+      const workspaceState = useWorkspaceStore.getState();
+      if (workspaceState.activeTabId === tabId) {
+        controller.updateDraftContent(content);
+        return;
+      }
+
+      workspaceState.updateTabDraftContent(tabId, content);
+    },
+    [controller.updateDraftContent],
+  );
+  const handleActivatePane = useCallback(
+    (paneId: string) => {
+      useLayoutStore.getState().setActivePaneId(paneId);
+      const paneState = useLayoutStore.getState().panes[paneId];
+      if (!paneState?.activeTabId) {
+        return;
+      }
+
+      const tab = useWorkspaceStore
+        .getState()
+        .noteTabs.find((entry) => entry.id === paneState.activeTabId);
+      if (tab) {
+        void controller.activateNoteTab(tab.file.path, { recordHistory: true });
+      }
+    },
+    [controller.activateNoteTab],
+  );
+  const splitViewActivePaneContextValue = useMemo<SplitViewActivePaneContextValue>(
+    () => ({
+      editorFocusRequest: controller.editorFocusRequest,
+      findRequest: controller.findRequest,
+      outlineItems: controller.outlineItems,
+      outlineJumpRequest: controller.outlineJumpRequest,
+      onOutlineJumpHandled: controller.clearOutlineJumpRequest,
+    }),
+    [
+      controller.clearOutlineJumpRequest,
+      controller.editorFocusRequest,
+      controller.findRequest,
+      controller.outlineItems,
+      controller.outlineJumpRequest,
+    ],
+  );
+
+  const splitViewContextValue = useMemo<SplitViewContextValue>(
+    () => ({
+      // Appearance / settings
+      shortcuts: controller.shortcuts,
+      isSidebarCollapsed: controller.isSidebarCollapsed,
+      isFocusMode: controller.isFocusMode,
+      showOutline: controller.showOutline,
+      editorScale: controller.editorScale,
+      autoOpenPDFSetting: controller.settings?.autoOpenPDF ?? true,
+      folderRevealLabel: controller.folderRevealLabel,
+      updateState: controller.updateState,
+      updatesMode: controller.appInfo?.updatesMode,
+      dismissedUpdateVersion: controller.settings?.dismissedUpdateVersion ?? null,
+
+      // Navigation
+      canGoBack: controller.canGoBack,
+      canGoForward: controller.canGoForward,
+
+      // Callbacks
+      onToggleSidebar: handleToggleSidebar,
+      onCreateNote: handleCreateNote,
+      onOpenSettings: handleOpenSettings,
+      onOpenCommandPalette: handleOpenCommandPalette,
+      onOpenLinkedFile: (path: string) => void handleOpenSkillLink(path),
+      onScrollPositionChange: handleDocumentScrollPositionChange,
+      onNavigateBack: handleNavigateBack,
+      onNavigateForward: handleNavigateForward,
+      onToggleFocusMode: handleToggleFocusMode,
+      onEditorScaleChange: handleEditorScaleChange,
+      onUpdateAction: handleUpdateAction,
+      onDismissUpdateAction: handleDismissUpdateAction,
+
+      // Pinned files
+      pinnedFilePaths: controller.settings?.pinnedFiles ?? [],
+      onTogglePinnedFile: handleTogglePinnedPath,
+
+      // Pane-aware tab operations
+      onSelectTab: handleSelectPaneTab,
+      onCloseTab: handleClosePaneTab,
+      onMoveTab: handleMovePaneTab,
+      onContentChange: handlePaneContentChange,
+      onActivatePane: handleActivatePane,
+    }),
+    [
+      controller.appInfo?.updatesMode,
+      controller.canGoBack,
+      controller.canGoForward,
+      controller.editorScale,
+      controller.folderRevealLabel,
+      controller.isFocusMode,
+      controller.isSidebarCollapsed,
+      controller.settings?.autoOpenPDF,
+      controller.settings?.dismissedUpdateVersion,
+      controller.settings?.pinnedFiles,
+      controller.shortcuts,
+      controller.showOutline,
+      controller.updateState,
+      handleActivatePane,
+      handleClosePaneTab,
+      handleCreateNote,
+      handleDismissUpdateAction,
+      handleDocumentScrollPositionChange,
+      handleEditorScaleChange,
+      handleMovePaneTab,
+      handleNavigateBack,
+      handleNavigateForward,
+      handleOpenCommandPalette,
+      handleOpenSettings,
+      handleOpenSkillLink,
+      handlePaneContentChange,
+      handleSelectPaneTab,
+      handleToggleFocusMode,
+      handleTogglePinnedPath,
+      toPathKey,
+      handleToggleSidebar,
+      handleUpdateAction,
+    ],
+  );
+  const activeNoteFile = controller.activeFile;
+  const isActiveNotePinned =
+    activeNoteFile &&
+    (controller.settings?.pinnedFiles ?? []).some((filePath) =>
+      isSamePath(filePath, activeNoteFile.path),
+    );
+
   return (
     <TooltipProvider>
       <AppLayout
@@ -1252,71 +1452,115 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                 onSelectDocumentTab={(kind) => void skillsController.openDocumentTab(kind)}
               />
             ) : (
-              <NoteView
-                content={controller.draftContent}
-                fileName={controller.activeFile?.name ?? null}
-                filePath={controller.activeFile?.path ?? null}
-                editorFocusRequest={controller.editorFocusRequest}
-                findRequest={controller.findRequest}
-                initialScrollTop={noteInitialScrollTop}
-                saveStateLabel={controller.saveStateLabel}
-                footerMetaLabel={noteFileSizeLabel}
-                wordCount={controller.wordCount}
-                readingTime={controller.readingTime}
-                isSidebarCollapsed={controller.isSidebarCollapsed}
-                activeTabId={controller.activeTabId}
-                noteTabs={controller.noteTabs}
-                shortcuts={controller.shortcuts}
-                canGoBack={controller.canGoBack}
-                canGoForward={controller.canGoForward}
-                autoOpenPDFSetting={controller.settings?.autoOpenPDF ?? true}
-                folderRevealLabel={controller.folderRevealLabel}
-                isActiveFilePinned={controller.isActiveFilePinned}
-                isFocusMode={controller.isFocusMode}
-                showOutline={controller.showOutline}
-                outlineItems={controller.outlineItems}
-                outlineJumpRequest={controller.outlineJumpRequest}
-                updateState={controller.updateState}
-                onContentChange={controller.updateDraftContent}
-                onSelectTab={(path) =>
-                  void controller.activateNoteTab(path, { recordHistory: true })
-                }
-                onCloseTab={(path) => void controller.closeNoteTab(path)}
-                onMoveTab={(sourcePath, targetPath, position) =>
-                  controller.moveNoteTab(sourcePath, targetPath, position)
-                }
-                onToggleSidebar={handleToggleSidebar}
-                onCreateNote={() => void controller.createNote()}
-                onOpenSettings={handleOpenSettings}
-                onOpenCommandPalette={handleOpenCommandPalette}
-                onOpenLinkedFile={(path) => void handleOpenSkillLink(path)}
-                onScrollPositionChange={handleDocumentScrollPositionChange}
-                onNavigateBack={() => void controller.navigateBack()}
-                onNavigateForward={() => void controller.navigateForward()}
-                onDeleteNote={
-                  controller.activeFile
-                    ? () => void controller.handleDeleteFile(controller.activeFile!.path)
-                    : undefined
-                }
-                onOpenNewWindow={
-                  controller.activeFile
-                    ? () => void window.glyph?.openExternal(controller.activeFile!.path)
-                    : undefined
-                }
-                onOutlineJumpHandled={controller.clearOutlineJumpRequest}
-                onToggleFocusMode={() => void controller.toggleFocusMode()}
-                editorScale={controller.editorScale}
-                onEditorScaleChange={(scale) => void controller.setEditorScale(scale)}
-                onTogglePinnedFile={
-                  controller.activeFile
-                    ? () => void controller.togglePinnedFile(controller.activeFile!.path)
-                    : undefined
-                }
-                updatesMode={controller.appInfo?.updatesMode}
-                dismissedUpdateVersion={controller.settings?.dismissedUpdateVersion ?? null}
-                onUpdateAction={() => void controller.triggerUpdateAction()}
-                onDismissUpdateAction={() => void controller.dismissUpdateNotification()}
-              />
+              <div className="flex h-full min-h-0 flex-col bg-background">
+                <div className="sticky top-0 z-20 shrink-0 bg-background/95 supports-backdrop-filter:backdrop-blur-md">
+                  <EditorToolbar
+                    _isMacLike={isMacLike}
+                    isSidebarCollapsed={controller.isSidebarCollapsed}
+                    toggleSidebarShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "toggle-sidebar",
+                      navigator.platform,
+                    )}
+                    onToggleSidebar={handleToggleSidebar}
+                    canGoBack={controller.canGoBack}
+                    canGoForward={controller.canGoForward}
+                    navigateBackShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "navigate-back",
+                      navigator.platform,
+                    )}
+                    navigateForwardShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "navigate-forward",
+                      navigator.platform,
+                    )}
+                    onNavigateBack={() => void controller.navigateBack()}
+                    onNavigateForward={() => void controller.navigateForward()}
+                    onCreateNote={() => void controller.createNote()}
+                    newNoteShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "new-note",
+                      navigator.platform,
+                    )}
+                    fileName={activeNoteFile?.name ?? null}
+                    filePath={activeNoteFile?.path ?? null}
+                    shouldShowCommandPalette={true}
+                    onOpenCommandPalette={handleOpenCommandPalette}
+                    commandPaletteShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "command-palette",
+                      navigator.platform,
+                    )}
+                    commandPaletteLabel="Search notes and skills"
+                    isFocusMode={controller.isFocusMode}
+                    onToggleFocusMode={() => void controller.toggleFocusMode()}
+                    focusModeShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "focus-mode",
+                      navigator.platform,
+                    )}
+                    shouldShowUpdateActionButton={noteUpdateStateFlags.shouldShowUpdateActionButton}
+                    updateButtonVariant={noteUpdateStateFlags.updateButtonVariant}
+                    isUpdateButtonDisabled={noteUpdateStateFlags.isUpdateButtonDisabled}
+                    updateButtonLabel={noteUpdateStateFlags.updateButtonLabel}
+                    updateButtonTooltip={noteUpdateStateFlags.updateButtonTooltip}
+                    onUpdateAction={() => void controller.triggerUpdateAction()}
+                    onDismissUpdateAction={() => void controller.dismissUpdateNotification()}
+                    isManualReleaseButton={noteUpdateStateFlags.isManualReleaseButton}
+                    headerPaddingClass={noteHeaderPaddingClass}
+                    onOpenSettings={handleOpenSettings}
+                    headerAccessory={null}
+                    content={controller.draftContent}
+                    documentLabel="note"
+                    revealInFolderLabel={controller.folderRevealLabel}
+                    onCopy={() => copyText(controller.draftContent)}
+                    onCopyPath={() =>
+                      activeNoteFile ? copyText(activeNoteFile.path) : Promise.resolve()
+                    }
+                    onOpenExternal={() =>
+                      activeNoteFile
+                        ? controller.revealInFinder(activeNoteFile.path)
+                        : Promise.resolve()
+                    }
+                    onExportPDF={() =>
+                      activeNoteFile
+                        ? exportDocumentToPdf(controller.draftContent, activeNoteFile.name)
+                        : Promise.resolve()
+                    }
+                    onTogglePinnedFile={
+                      activeNoteFile
+                        ? () => void controller.togglePinnedFile(activeNoteFile.path)
+                        : undefined
+                    }
+                    isActiveFilePinned={Boolean(isActiveNotePinned)}
+                    editorScale={controller.editorScale}
+                    onEditorScaleChange={(scale) => void controller.setEditorScale(scale)}
+                    zoomInShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "zoom-in",
+                      navigator.platform,
+                    )}
+                    zoomOutShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "zoom-out",
+                      navigator.platform,
+                    )}
+                    zoomResetShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "zoom-reset",
+                      navigator.platform,
+                    )}
+                  />
+                </div>
+                <div className="min-h-0 flex-1">
+                  <SplitViewProvider value={splitViewContextValue}>
+                    <SplitViewActivePaneProvider value={splitViewActivePaneContextValue}>
+                      <SplitContainer />
+                    </SplitViewActivePaneProvider>
+                  </SplitViewProvider>
+                </div>
+              </div>
             )}
           </div>
         </div>

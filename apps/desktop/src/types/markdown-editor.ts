@@ -21,6 +21,7 @@ export type MarkdownEditorProps = {
   scrollRestorationKey?: string | null;
   editorFocusRequest?: EditorFocusRequest | null;
   findRequest?: EditorFindRequest | null;
+  showToolbar?: boolean;
   workspaceRootPath?: string | null;
   saveStateLabel: string;
   footerMetaLabel?: string;

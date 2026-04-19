@@ -37,10 +37,9 @@ export function useSettingsController({ glyph }: UseSettingsControllerOptions) {
     [saveSettings],
   );
 
-  const shortcuts = useMemo(
-    () => mergeShortcutSettings(settings?.shortcuts),
-    [settings?.shortcuts],
-  );
+  const shortcuts = useMemo(() => {
+    return mergeShortcutSettings(settings?.shortcuts ?? null);
+  }, [settings?.shortcuts]);
 
   useEffect(() => {
     if (!settings) {

@@ -23,6 +23,11 @@ type UseKeyboardShortcutsOptions = {
   navigateForward: () => Promise<void>;
   requestFindInNote: () => void;
   triggerUpdateAction: () => Promise<void>;
+  splitRight: () => void;
+  splitDown: () => void;
+  closeActivePane: () => Promise<void> | void;
+  focusNextPane: () => void;
+  focusPreviousPane: () => void;
   isPaletteOpen: boolean;
   isSettingsOpen: boolean;
   setIsPaletteOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -53,6 +58,11 @@ export function useKeyboardShortcuts({
   navigateForward,
   requestFindInNote,
   triggerUpdateAction,
+  splitRight,
+  splitDown,
+  closeActivePane,
+  focusNextPane,
+  focusPreviousPane,
   isPaletteOpen,
   isSettingsOpen,
   setIsPaletteOpen,
@@ -155,6 +165,11 @@ export function useKeyboardShortcuts({
         "zoom-in",
         "zoom-out",
         "zoom-reset",
+        "split-right",
+        "split-down",
+        "close-pane",
+        "focus-next-pane",
+        "focus-previous-pane",
       ]);
       const globalShortcut = shortcuts.find(
         (entry) => globalShortcutIds.has(entry.id) && matchShortcut(event, entry.keys, platform),
@@ -206,6 +221,21 @@ export function useKeyboardShortcuts({
             break;
           case "zoom-reset":
             void setEditorScale(100);
+            break;
+          case "split-right":
+            splitRight();
+            break;
+          case "split-down":
+            splitDown();
+            break;
+          case "close-pane":
+            void closeActivePane();
+            break;
+          case "focus-next-pane":
+            focusNextPane();
+            break;
+          case "focus-previous-pane":
+            focusPreviousPane();
             break;
         }
         return;
@@ -287,6 +317,11 @@ export function useKeyboardShortcuts({
     navigateForward,
     requestFindInNote,
     triggerUpdateAction,
+    splitRight,
+    splitDown,
+    closeActivePane,
+    focusNextPane,
+    focusPreviousPane,
     isPaletteOpen,
     isSettingsOpen,
     setIsPaletteOpen,

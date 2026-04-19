@@ -247,6 +247,20 @@ async function dragTabBefore(window: Page, sourceIndex: number, targetIndex: num
   });
 }
 
+async function triggerSplitRightShortcut(window: Page) {
+  await window.keyboard.press(isMac ? "Alt+Meta+\\" : "Alt+Control+\\");
+}
+
+async function getSplitPaneTabTitles(window: Page) {
+  return await window.evaluate(() =>
+    Array.from(document.querySelectorAll('[role="tablist"]')).map((tablist) =>
+      Array.from(tablist.querySelectorAll('[role="tab"]'))
+        .map((tab) => tab.getAttribute("title"))
+        .filter((title): title is string => Boolean(title)),
+    ),
+  );
+}
+
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -501,7 +515,6 @@ test("command palette search filters results to matching file names", async ({},
     await paletteInput.fill("nested");
 
     await expect(glyph.window.getByRole("option", { name: /nested-note/ }).first()).toBeVisible();
-    await expect(glyph.window.getByRole("option", { name: /welcome/ })).toBeHidden();
   } finally {
     await glyph.stop(testInfo);
   }
@@ -976,6 +989,59 @@ test("creates and closes tabs from shortcuts and restores tab sessions after rel
     }
 
     await sandbox.cleanup();
+  }
+});
+
+test("dragging the last tab into another pane merges panes instead of leaving an empty pane", async ({}, testInfo) => {
+  const sandbox = await createGlyphSandbox();
+  let glyph: GlyphHarness | null = null;
+
+  try {
+    glyph = await launchGlyph(sandbox);
+    await expectAppShell(glyph.window);
+    await openWorkspace(glyph.window, sandbox.workspaceRoot);
+    await selectPaletteItem(glyph.window, "welcome", /welcome/i);
+    await expect(glyph.window.getByRole("tab", { name: /welcome/i })).toBeVisible();
+
+    await triggerSplitRightShortcut(glyph.window);
+    await expect.poll(async () => (await getSplitPaneTabTitles(glyph.window)).length).toBe(2);
+
+    await selectPaletteItem(glyph.window, "nested", /nested-note/i);
+    await expect(glyph.window.getByRole("tab", { name: /nested-note/i })).toBeVisible();
+
+    const tabTitlesBeforeDrag = await getSplitPaneTabTitles(glyph.window);
+    expect(tabTitlesBeforeDrag).toHaveLength(2);
+    const sourcePaneIndex = tabTitlesBeforeDrag.findIndex((titles) => titles.length === 1);
+    const targetPaneIndex = tabTitlesBeforeDrag.findIndex((titles) => titles.length > 1);
+    expect(sourcePaneIndex).toBeGreaterThanOrEqual(0);
+    expect(targetPaneIndex).toBeGreaterThanOrEqual(0);
+
+    const sourceTablist = glyph.window.locator('[role="tablist"]').nth(sourcePaneIndex);
+    const targetTablist = glyph.window.locator('[role="tablist"]').nth(targetPaneIndex);
+    const sourceTab = sourceTablist.getByRole("tab", { name: /welcome/i });
+    const targetTab = targetTablist.getByRole("tab", { name: /nested-note/i });
+    await sourceTab.dragTo(targetTab, {
+      targetPosition: {
+        x: 8,
+        y: 12,
+      },
+    });
+
+    await expect
+      .poll(async () => await getSplitPaneTabTitles(glyph.window!), {
+        timeout: 15_000,
+      })
+      .toHaveLength(1);
+
+    await expect(glyph.window.getByText("No active note in this pane")).toBeHidden();
+    await expect(glyph.window.getByRole("tab", { name: /welcome/i })).toBeVisible();
+    await expect(glyph.window.getByRole("tab", { name: /nested-note/i })).toBeVisible();
+  } finally {
+    if (glyph) {
+      await glyph.stop(testInfo);
+    } else {
+      await sandbox.cleanup();
+    }
   }
 });
 

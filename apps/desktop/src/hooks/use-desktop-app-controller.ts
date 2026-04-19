@@ -473,10 +473,14 @@ export const useDesktopAppController = (
 
       const currentRootPath = useWorkspaceStore.getState().rootPath;
       const shouldPreserveFocus = useSessionStore.getState().hasDocumentScroll(filePath);
+      const nextTabId = toPathKey(filePath);
+      const layoutState = useLayoutStore.getState();
+      const owningPaneId = layoutState.getPaneForTab(nextTabId);
       activateTab(filePath);
-      useLayoutStore
-        .getState()
-        .activateTabInPane(useLayoutStore.getState().activePaneId, toPathKey(filePath));
+      if (owningPaneId) {
+        layoutState.setActivePaneId(owningPaneId);
+        layoutState.activateTabInPane(owningPaneId, nextTabId);
+      }
       setIsWorkspaceMode(isFileInsideWorkspace(filePath, currentRootPath));
       if (options?.recordHistory) {
         pushHistory(filePath);
@@ -558,20 +562,33 @@ export const useDesktopAppController = (
       closeOtherTabs(filePath);
       const layoutState = useLayoutStore.getState();
       const nextPanes = Object.fromEntries(
-        Object.entries(layoutState.panes).map(([paneKey, pane]) => {
-          const nextTabIds = pane.tabIds.filter((tabId) => tabId === activeTabId);
-          return [
-            paneKey,
-            {
-              tabIds: nextTabIds,
-              activeTabId: nextTabIds[0] ?? null,
-            },
-          ];
-        }),
+        Object.entries(layoutState.panes)
+          .map(([paneKey, pane]) => {
+            const nextTabIds = pane.tabIds.filter((tabId) => tabId === activeTabId);
+            if (nextTabIds.length === 0) {
+              return null;
+            }
+
+            return [
+              paneKey,
+              {
+                tabIds: nextTabIds,
+                activeTabId: nextTabIds[0] ?? null,
+              },
+            ] as const;
+          })
+          .filter(Boolean) as Array<
+          readonly [string, { tabIds: string[]; activeTabId: string | null }]
+        >,
       );
-      useLayoutStore
-        .getState()
-        .restoreLayout(layoutState.root, layoutState.activePaneId, nextPanes);
+      const nextActivePaneId = nextPanes[layoutState.activePaneId]
+        ? layoutState.activePaneId
+        : Object.keys(nextPanes)[0];
+      if (!nextActivePaneId) {
+        useLayoutStore.getState().resetLayout();
+        return;
+      }
+      useLayoutStore.getState().restoreLayout(layoutState.root, nextActivePaneId, nextPanes);
     },
     [activeFile?.path, closeOtherTabs, persistNoteDraft],
   );

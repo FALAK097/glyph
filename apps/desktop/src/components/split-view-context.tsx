@@ -54,7 +54,8 @@ export type SplitViewContextValue = {
   onSelectTab: (paneId: string, path: string) => void;
   onCloseTab: (paneId: string, path: string) => void;
   onMoveTab: (
-    paneId: string,
+    sourcePaneId: string,
+    targetPaneId: string,
     sourcePath: string,
     targetPath: string,
     position: TabMovePosition,

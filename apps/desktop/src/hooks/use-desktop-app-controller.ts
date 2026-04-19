@@ -630,8 +630,13 @@ export const useDesktopAppController = (
         closeTab(nextFilePath);
       }
 
+      if (updatedLayout.panes[activePaneId]?.tabIds.length === 0 && paneCount > 1) {
+        updatedLayout.closePane(activePaneId);
+      }
+
       // Sync workspace active tab to the pane's new active tab
-      const currentPaneState = updatedLayout.panes[activePaneId];
+      const nextLayoutState = useLayoutStore.getState();
+      const currentPaneState = nextLayoutState.panes[nextLayoutState.activePaneId];
       if (currentPaneState?.activeTabId) {
         const nextTab = useWorkspaceStore
           .getState()
@@ -647,7 +652,15 @@ export const useDesktopAppController = (
         }
       }
     },
-    [activeFile?.path, activateTab, closeTab, getTabByPath, persistNoteDraft, requestEditorFocus],
+    [
+      activeFile?.path,
+      activateTab,
+      closeTab,
+      getTabByPath,
+      paneCount,
+      persistNoteDraft,
+      requestEditorFocus,
+    ],
   );
 
   const splitRight = useCallback(() => {

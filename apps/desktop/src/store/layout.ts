@@ -117,6 +117,20 @@ const collectPaneIdsInOrder = (node: LayoutNode): string[] => {
   return [...collectPaneIdsInOrder(node.children[0]), ...collectPaneIdsInOrder(node.children[1])];
 };
 
+const pruneLayoutTree = (node: LayoutNode, validPaneIds: Set<string>): LayoutNode | null => {
+  if (node.type === "pane") {
+    return validPaneIds.has(node.id) ? node : null;
+  }
+
+  const left = pruneLayoutTree(node.children[0], validPaneIds);
+  const right = pruneLayoutTree(node.children[1], validPaneIds);
+  if (left && right) {
+    return { ...node, children: [left, right] };
+  }
+
+  return left ?? right;
+};
+
 // ─── Store ───────────────────────────────────────────────────────────
 
 type LayoutState = {
@@ -534,7 +548,14 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   },
 
   restoreLayout: (root, activePaneId, panes) => {
-    const restoredPaneIds = new Set(collectPaneIdsInOrder(root));
+    const validPaneIds = new Set(Object.keys(panes));
+    const prunedRoot = pruneLayoutTree(root, validPaneIds);
+    if (!prunedRoot) {
+      get().resetLayout();
+      return;
+    }
+
+    const restoredPaneIds = new Set(collectPaneIdsInOrder(prunedRoot));
     const restoredPanes = Object.fromEntries(
       Object.entries(panes).filter(([paneId]) => restoredPaneIds.has(paneId)),
     );
@@ -552,13 +573,15 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
       const num = match ? Number(match[1]) : 0;
       return Math.max(num, countSplits(node.children[0]), countSplits(node.children[1]));
     };
-    splitCounter = countSplits(root);
+    splitCounter = countSplits(prunedRoot);
 
     // Validate activePaneId exists in the restored tree and pane map
-    const validActivePaneId = restoredPanes[activePaneId] ? activePaneId : getFirstPaneId(root);
+    const validActivePaneId = restoredPanes[activePaneId]
+      ? activePaneId
+      : getFirstPaneId(prunedRoot);
 
     set({
-      root,
+      root: prunedRoot,
       activePaneId: validActivePaneId,
       panes: restoredPanes,
     });

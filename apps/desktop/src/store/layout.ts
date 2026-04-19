@@ -534,8 +534,13 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
   },
 
   restoreLayout: (root, activePaneId, panes) => {
+    const restoredPaneIds = new Set(collectPaneIdsInOrder(root));
+    const restoredPanes = Object.fromEntries(
+      Object.entries(panes).filter(([paneId]) => restoredPaneIds.has(paneId)),
+    );
+
     // Reset counters to avoid ID collisions with restored IDs
-    const maxPaneNum = Object.keys(panes).reduce((max, id) => {
+    const maxPaneNum = Object.keys(restoredPanes).reduce((max, id) => {
       const match = id.match(/^pane-(\d+)$/);
       return match ? Math.max(max, Number(match[1])) : max;
     }, 0);
@@ -549,13 +554,13 @@ export const useLayoutStore = create<LayoutState>((set, get) => ({
     };
     splitCounter = countSplits(root);
 
-    // Validate activePaneId exists in panes
-    const validActivePaneId = panes[activePaneId] ? activePaneId : getFirstPaneId(root);
+    // Validate activePaneId exists in the restored tree and pane map
+    const validActivePaneId = restoredPanes[activePaneId] ? activePaneId : getFirstPaneId(root);
 
     set({
       root,
       activePaneId: validActivePaneId,
-      panes,
+      panes: restoredPanes,
     });
   },
 

@@ -26,6 +26,7 @@ import { applyTheme } from "@/theme/themes";
 import { getErrorMessage } from "@/lib/errors";
 import { buildBreadcrumbs, extractMarkdownOutline } from "@/lib/note-navigation";
 import {
+  getBaseName,
   getDirName,
   getRelativePath,
   isFileInsideWorkspace,
@@ -69,6 +70,56 @@ const getRenamedFolderFilePath = (
   const suffix = normalizePath(filePath).slice(normalizedOldFolderPath.length);
 
   return `${normalizedNewFolderPath}${suffix}`;
+};
+
+const findSidebarNodeByPath = (
+  nodes: DirectoryNode[],
+  targetPath: string,
+): DirectoryNode | null => {
+  for (const node of nodes) {
+    if (isSamePath(node.path, targetPath)) {
+      return node;
+    }
+
+    if (node.type === "directory") {
+      const match = findSidebarNodeByPath(node.children, targetPath);
+      if (match) {
+        return match;
+      }
+    }
+  }
+
+  return null;
+};
+
+const findOwningWorkspaceRoots = (nodes: DirectoryNode[], ...filePaths: string[]) =>
+  nodes
+    .filter(
+      (node): node is Extract<DirectoryNode, { type: "directory" }> => node.type === "directory",
+    )
+    .filter((node) => filePaths.some((filePath) => isFileInsideWorkspace(filePath, node.path)))
+    .map((node) => node.path);
+
+const findSidebarFileByName = (
+  nodes: DirectoryNode[],
+  fileName: string,
+  targetDir?: string,
+): Extract<DirectoryNode, { type: "file" }> | null => {
+  for (const node of nodes) {
+    if (node.type === "file") {
+      if (node.name === fileName && (!targetDir || !isSamePath(getDirName(node.path), targetDir))) {
+        return node;
+      }
+      continue;
+    }
+
+    const match = findSidebarFileByName(node.children, fileName, targetDir);
+    if (match) {
+      return match;
+    }
+  }
+
+  return null;
 };
 
 const getDraftTitleLine = (content: string) =>
@@ -220,7 +271,7 @@ export const useDesktopAppController = (
     restoreSidebarNodes,
     syncWorkspace: _syncWorkspace,
     handleToggleFolder,
-    handleReorderNodes,
+    handleReorderNodes: handleSidebarNodeReorder,
     handleRemoveFolder,
   } = sidebarController;
 
@@ -1289,6 +1340,125 @@ export const useDesktopAppController = (
       remapTabsForFolderRename,
       rootPath,
       setError,
+      syncWorkspace,
+    ],
+  );
+
+  const handleReorderNodes = useCallback(
+    async (sourcePath: string, targetPath: string, position: "before" | "after" | "inside") => {
+      const sourceNode =
+        findSidebarNodeByPath(sidebarNodes, sourcePath) ??
+        findSidebarFileByName(sidebarNodes, getBaseName(sourcePath), targetPath);
+      const targetNode = findSidebarNodeByPath(sidebarNodes, targetPath);
+
+      if (!sourceNode || !targetNode) {
+        if (position !== "inside") {
+          handleSidebarNodeReorder(sourcePath, targetPath, position);
+        }
+        return;
+      }
+
+      if (sourceNode.type !== "file") {
+        if (position !== "inside") {
+          handleSidebarNodeReorder(sourcePath, targetPath, position);
+        }
+        return;
+      }
+
+      const targetDir =
+        position === "inside"
+          ? targetNode.type === "directory"
+            ? targetNode.path
+            : null
+          : targetNode.type === "file"
+            ? getDirName(targetNode.path)
+            : null;
+
+      if (!targetDir) {
+        if (position !== "inside") {
+          handleSidebarNodeReorder(sourcePath, targetPath, position);
+        }
+        return;
+      }
+
+      const currentParentPath = getDirName(sourceNode.path);
+      if (isSamePath(currentParentPath, targetDir)) {
+        if (position !== "inside") {
+          handleSidebarNodeReorder(sourcePath, targetPath, position);
+        }
+        return;
+      }
+
+      try {
+        let resolvedSourcePath = sourceNode.path;
+        let movedFile: FileDocument;
+
+        try {
+          movedFile = await glyph.moveFile(resolvedSourcePath, targetDir);
+        } catch (moveError) {
+          const recoveredSourceNode = findSidebarFileByName(
+            sidebarNodes,
+            sourceNode.name,
+            targetDir,
+          );
+          if (!recoveredSourceNode || isSamePath(recoveredSourceNode.path, resolvedSourcePath)) {
+            throw moveError;
+          }
+
+          resolvedSourcePath = recoveredSourceNode.path;
+          movedFile = await glyph.moveFile(resolvedSourcePath, targetDir);
+        }
+
+        replaceTabPath(resolvedSourcePath, movedFile);
+        replaceHistoryPath(resolvedSourcePath, movedFile.path);
+        await syncTrackedPaths(resolvedSourcePath, movedFile.path);
+        useLayoutStore
+          .getState()
+          .replaceTabId(toPathKey(resolvedSourcePath), toPathKey(movedFile.path));
+        const ownerRoots = Array.from(
+          new Set(findOwningWorkspaceRoots(sidebarNodes, resolvedSourcePath, movedFile.path)),
+        );
+
+        if (ownerRoots.length > 0) {
+          for (const ownerRoot of ownerRoots) {
+            if (rootPath && isSamePath(rootPath, ownerRoot)) {
+              const workspace = await glyph.openFolder(ownerRoot);
+              if (workspace) {
+                syncWorkspace(workspace);
+              }
+              continue;
+            }
+
+            const workspaceNode = await glyph.getSidebarNode("directory", ownerRoot);
+            if (workspaceNode?.type === "directory") {
+              setSidebarNodes((prev) =>
+                upsertSidebarFolder(prev, {
+                  rootPath: ownerRoot,
+                  tree: workspaceNode.children,
+                  activeFile: null,
+                }),
+              );
+            }
+          }
+        } else {
+          setSidebarNodes((prev) =>
+            upsertSidebarFile(removeSidebarPath(prev, resolvedSourcePath), movedFile),
+          );
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to move note into folder");
+      }
+    },
+    [
+      glyph,
+      handleSidebarNodeReorder,
+      replaceHistoryPath,
+      replaceTabPath,
+      rootPath,
+      setError,
+      setSidebarNodes,
+      sidebarNodes,
+      syncTrackedPaths,
       syncWorkspace,
     ],
   );

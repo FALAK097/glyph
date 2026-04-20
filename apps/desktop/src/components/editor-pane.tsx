@@ -54,6 +54,7 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
     () => paneTabs.find((tab) => tab.id === paneActiveTabId) ?? null,
     [paneTabs, paneActiveTabId],
   );
+  const isEditorEditable = Boolean(activeTab && paneActiveTabId);
 
   // ── Derived display values ─────────────────────────────────────────
   const content = activeTab?.draftContent ?? "";
@@ -182,6 +183,7 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
         content={content}
         fileName={fileName}
         filePath={filePath}
+        isEditable={isEditorEditable}
         showToolbar={false}
         editorFocusRequest={editorFocusRequest}
         findRequest={findRequest}

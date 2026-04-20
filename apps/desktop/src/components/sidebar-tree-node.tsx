@@ -147,6 +147,20 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
       event.stopPropagation();
       const bounds = event.currentTarget.getBoundingClientRect();
       if (node.type === "directory") {
+        const offsetY = event.clientY - bounds.top;
+        const topZoneHeight = bounds.height * 0.25;
+        const bottomZoneStart = bounds.height * 0.75;
+
+        if (offsetY < topZoneHeight) {
+          setDropPosition("before");
+          return;
+        }
+
+        if (offsetY > bottomZoneStart) {
+          setDropPosition("after");
+          return;
+        }
+
         setDropPosition("inside");
         return;
       }

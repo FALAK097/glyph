@@ -1,5 +1,53 @@
 # Changelog
 
+## [0.8.0](https://github.com/FALAK097/glyph/compare/v0.7.0...v0.8.0) (2026-04-19)
+
+
+### Features
+
+* **desktop:** add layout persistence, scroll restoration, and background auto-save for split view ([82f6cde](https://github.com/FALAK097/glyph/commit/82f6cdefe591b0b17ee3f305f766a2ef8e5c1c2e))
+* **desktop:** add split view for editing multiple files side-by-side ([1de4576](https://github.com/FALAK097/glyph/commit/1de457639a59f156bcaabc78ceb602d8bade7733))
+
+
+### Bug Fixes
+
+* **desktop:** collapse empty split panes ([90305df](https://github.com/FALAK097/glyph/commit/90305df0527f4231b5bc494f1b236fcbaf4a2158))
+* **desktop:** finalize split view interactions ([417a904](https://github.com/FALAK097/glyph/commit/417a90434147fc3747d46136a336f127c1486937))
+* **desktop:** harden split pane edge cases ([074cc6a](https://github.com/FALAK097/glyph/commit/074cc6a7471778ef62b62db65ccf4141f4d8cb1d))
+* **desktop:** harden split view state sync ([09e265a](https://github.com/FALAK097/glyph/commit/09e265af0925ac193322f03fab740ba47d2decce))
+* **desktop:** optimize split view interactions ([693d691](https://github.com/FALAK097/glyph/commit/693d691a90d504d78fe284bbff941c4aa4caa8ab))
+* **desktop:** prune empty panes during layout restore ([29a3092](https://github.com/FALAK097/glyph/commit/29a309242f8904ddf9d68d87aa62d30abbacbd86))
+* **desktop:** restore split view interactions ([c570d9d](https://github.com/FALAK097/glyph/commit/c570d9d0f046e3f71f733c4bcba70b9f7a6d3b8f))
+* og image ([beb19a4](https://github.com/FALAK097/glyph/commit/beb19a472daa64a4757fdd06157a70578fd22cf0))
+
+## [0.7.0](https://github.com/FALAK097/glyph/compare/v0.6.0...v0.7.0) (2026-04-13)
+
+
+### Features
+
+* **desktop:** add dismiss button for manual update notification ([f3d9fa7](https://github.com/FALAK097/glyph/commit/f3d9fa7a71f437dd43d9f58b5f21f2c7521b635e))
+* **desktop:** add zoom controls for editor content ([67bb4fd](https://github.com/FALAK097/glyph/commit/67bb4fdb303eb55a858307fa9a53460d49c3b742)), closes [#149](https://github.com/FALAK097/glyph/issues/149)
+* **repo:** add welcome note onboarding and web asset fixes ([c7cb339](https://github.com/FALAK097/glyph/commit/c7cb339c75bf468036ff0de191fe50996aa68e4a))
+
+
+### Bug Fixes
+
+* **a11y:** include current scale in zoom reset button aria-label ([f98cf90](https://github.com/FALAK097/glyph/commit/f98cf9025c829f074fd90bd3b56b70d54b6bc4a6))
+* **desktop:** add dismissUpdateNotification to baseCommands useMemo deps ([711787c](https://github.com/FALAK097/glyph/commit/711787c9c76cdfa49f5e5169af1f543e7198cc71))
+* **desktop:** add tooltip for zoom percentage and zoom commands in palette ([384252c](https://github.com/FALAK097/glyph/commit/384252cad39c4a0a5c119bcda4fdd6c326e3ec9e))
+* **desktop:** address PR review comments ([4bf2bb1](https://github.com/FALAK097/glyph/commit/4bf2bb107aa80ba34a0029537757838b39679890))
+* **desktop:** address PR review comments for zoom controls ([ed7c86e](https://github.com/FALAK097/glyph/commit/ed7c86ea9b8fb77df8c08c223be683db90f39a0e))
+* **desktop:** address PR review comments on dismiss update and Windows shortcuts ([7c61ed6](https://github.com/FALAK097/glyph/commit/7c61ed6412b0e3d6684c3a1052a7d06271307b27))
+* **desktop:** allow zoom up to 200% ([cf73fdc](https://github.com/FALAK097/glyph/commit/cf73fdce9402c6901fe7fb88aea46a77ef6bc8c0)), closes [#149](https://github.com/FALAK097/glyph/issues/149)
+* **desktop:** display and handle keyboard shortcuts correctly on Windows ([4a498b9](https://github.com/FALAK097/glyph/commit/4a498b90ef8e58961943bb1de58f8528c899e4c8))
+* **desktop:** show zoom shortcuts in command palette ([2fe3bac](https://github.com/FALAK097/glyph/commit/2fe3bac7d6b2e0bf65d994b98e0f9751f7806765))
+* **desktop:** skip welcome note seeding in populated workspaces ([908386c](https://github.com/FALAK097/glyph/commit/908386cd5acfd7531f05f56a02a4ee95086bbc6f))
+* **e2e:** try Meta++ for zoom-in shortcut ([ae4a9a6](https://github.com/FALAK097/glyph/commit/ae4a9a63710b09789535f2049cbb48da53d55a5b))
+* **e2e:** use command palette for zoom-in test instead of keyboard shortcut ([18ee694](https://github.com/FALAK097/glyph/commit/18ee6947066cf20b2e845479f0bb844e15f20bc2))
+* **e2e:** use modKey variable for cross-platform keyboard shortcuts ([c6b60fd](https://github.com/FALAK097/glyph/commit/c6b60fd449f11871f3f327806ed8643ad86eacff))
+* **repo:** address PR review follow-ups ([b2fe4fa](https://github.com/FALAK097/glyph/commit/b2fe4fad323e87e85c6021024d414dbba5f8ab3c))
+* simplify zoom-in shortcut to Ctrl+= without Shift ([d47c502](https://github.com/FALAK097/glyph/commit/d47c502f16cc69589c40bdfb01edf249666629de))
+
 ## [0.6.0](https://github.com/FALAK097/glyph/compare/v0.5.2...v0.6.0) (2026-04-11)
 
 ### Features

@@ -44,6 +44,7 @@ body {
 .brand-lockup {
   display: inline-flex;
   align-items: center;
+  transform: translateX(0.2rem);
   color: var(--ink-strong);
   text-decoration: none;
 }
@@ -1267,21 +1268,23 @@ body {
 }
 
 .clean-home__stage-surface {
-  /* No extra background/borders as the image handles its own */
+  position: relative;
 }
 
 .clean-shot {
+  position: relative;
+  z-index: 1;
   margin: 0;
 }
 
 .clean-shot__frame {
-  /* No background/borders, but apply a nice curve and crop the scale */
   overflow: hidden;
-  border-radius: 1rem;
+  border-radius: 2rem;
+  box-shadow: 0 38px 80px -56px oklch(0.2 0.012 98 / 0.26);
 }
 
 .clean-shot--hero .clean-shot__frame {
-  /* Inherit clear frame */
+  border-radius: 2.4rem;
 }
 
 .clean-shot__image {
@@ -1290,10 +1293,25 @@ body {
   aspect-ratio: 16 / 9;
   object-fit: contain;
   object-position: center top;
+  background: color-mix(in oklab, white 96%, var(--surface-page));
+  border-radius: 1.45rem;
 }
 
 .clean-shot__image--cover {
   object-fit: cover;
+}
+
+.clean-home__stage-surface::before {
+  content: "";
+  position: absolute;
+  inset: 4% 2% auto;
+  height: 64%;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, oklch(0.78 0.03 100 / 0.18) 0%, transparent 60%),
+    radial-gradient(circle at 72% 35%, oklch(0.67 0.06 260 / 0.12), transparent 42%);
+  filter: blur(44px);
+  pointer-events: none;
 }
 
 .clean-section {

@@ -43,6 +43,7 @@ declare global {
       saveFile: (filePath: string, content: string) => Promise<FileDocument>;
       createFile: (parentDir: string, fileName: string) => Promise<FileDocument>;
       renameFile: (oldPath: string, newName: string) => Promise<FileDocument>;
+      moveFile: (oldPath: string, targetDir: string) => Promise<FileDocument>;
       renameFolder: (
         oldPath: string,
         newName: string,

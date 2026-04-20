@@ -2,7 +2,7 @@ import type { SkillSourceKind } from "../shared/skills";
 import type { DirectoryNode } from "../shared/workspace";
 import type { NoteShortcutItem } from "./navigation";
 
-export type DragPosition = "before" | "after";
+export type DragPosition = "before" | "after" | "inside";
 
 export type SidebarTopLevelNode = {
   node: DirectoryNode;
@@ -44,7 +44,11 @@ export type SidebarProps = {
   onRevealInFinder: (targetPath: string) => void;
   onTogglePinnedFile?: (filePath: string) => void;
   onToggleFolder: (folderPath: string) => void;
-  onReorderNodes: (sourcePath: string, targetPath: string, position: DragPosition) => void;
+  onReorderNodes: (
+    sourcePath: string,
+    targetPath: string,
+    position: DragPosition,
+  ) => void | Promise<void>;
   onCreateNote?: () => void;
   onCreateFolder?: () => void;
 };
@@ -83,5 +87,9 @@ export type SidebarTreeNodeProps = {
   onToggleFolder: (folderPath: string) => void;
   draggable?: boolean;
   onDragStartTopLevel?: (sourcePath: string) => void;
-  onDropNode?: (targetPath: string, position: DragPosition) => void;
+  onDropNode?: (
+    sourcePath: string,
+    targetPath: string,
+    position: DragPosition,
+  ) => void | Promise<void>;
 };

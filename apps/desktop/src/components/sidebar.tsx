@@ -382,7 +382,6 @@ export const Sidebar = ({
   const [folderToDelete, setFolderToDelete] = useState<SidebarDeleteTarget | null>(null);
   const [fileToRemove, setFileToRemove] = useState<SidebarRemoveTarget | null>(null);
   const [folderToRemove, setFolderToRemove] = useState<SidebarRemoveTarget | null>(null);
-  const [draggedPath, setDraggedPath] = useState<string | null>(null);
   const pinnedList = pinnedNotes ?? [];
   const revealLabel = folderRevealLabel ?? openInFolderLabel ?? "Open in Finder";
   const pinnedPaths = useMemo(() => pinnedList.map((note) => note.path), [pinnedList]);
@@ -396,15 +395,14 @@ export const Sidebar = ({
     setNodeToDelete(node);
   }, []);
   const handleDropNode = useCallback(
-    (targetPath: string, position: DragPosition) => {
-      if (!draggedPath || draggedPath === targetPath) {
+    async (sourcePath: string, targetPath: string, position: DragPosition) => {
+      if (!sourcePath || sourcePath === targetPath) {
         return;
       }
 
-      onReorderNodes(draggedPath, targetPath, position);
-      setDraggedPath(null);
+      await onReorderNodes(sourcePath, targetPath, position);
     },
-    [draggedPath, onReorderNodes],
+    [onReorderNodes],
   );
 
   const handleConfirmDelete = () => {
@@ -614,7 +612,6 @@ export const Sidebar = ({
                         onToggleFolder={onToggleFolder}
                         onTogglePinnedFile={onTogglePinnedFile}
                         draggable
-                        onDragStartTopLevel={setDraggedPath}
                         onDropNode={handleDropNode}
                       />
                     ))}

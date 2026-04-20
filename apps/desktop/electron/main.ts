@@ -2130,6 +2130,14 @@ ipcMain.handle("workspace:renameFile", async (_event, oldPath: string, newName: 
   return readMarkdownFile(newPath);
 });
 
+ipcMain.handle("workspace:moveFile", async (_event, oldPath: string, targetDir: string) => {
+  assertSafePath(oldPath);
+  assertSafePath(targetDir);
+  const newPath = path.join(targetDir, path.basename(oldPath));
+  await fs.rename(oldPath, newPath);
+  return readMarkdownFile(newPath);
+});
+
 ipcMain.handle("workspace:renameFolder", async (_event, oldPath: string, newName: string) => {
   assertSafePath(oldPath);
   assertBasename(newName);

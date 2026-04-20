@@ -25,6 +25,8 @@ import type {
   SidebarTreeNodeProps,
 } from "../types/sidebar";
 
+let globalDraggedSidebarPath: string | null = null;
+
 export const SidebarTreeNode = memo(function SidebarTreeNode({
   node,
   activePath,
@@ -75,6 +77,10 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
       return "border-b-2 border-primary/70 bg-primary/5 ring-1 ring-primary/20";
     }
 
+    if (dropPosition === "inside") {
+      return "bg-primary/6 ring-1 ring-inset ring-primary/30";
+    }
+
     return "border-transparent";
   }, [dropPosition]);
 
@@ -117,34 +123,116 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
     setShowMenu((prev) => !prev);
   };
 
+  const handleDragStart = useCallback(
+    (event: DragEvent<HTMLElement>) => {
+      if (!draggable) {
+        return;
+      }
+
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", node.path);
+      globalDraggedSidebarPath = node.path;
+      onDragStartTopLevel?.(node.path);
+    },
+    [draggable, node.path, onDragStartTopLevel],
+  );
+
+  const handleDragOver = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (!onDropNode) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      const bounds = event.currentTarget.getBoundingClientRect();
+      if (node.type === "directory") {
+        const offsetY = event.clientY - bounds.top;
+        const topZoneHeight = bounds.height * 0.25;
+        const bottomZoneStart = bounds.height * 0.75;
+
+        if (offsetY < topZoneHeight) {
+          setDropPosition("before");
+          return;
+        }
+
+        if (offsetY > bottomZoneStart) {
+          setDropPosition("after");
+          return;
+        }
+
+        setDropPosition("inside");
+        return;
+      }
+
+      setDropPosition(event.clientY < bounds.top + bounds.height / 2 ? "before" : "after");
+    },
+    [node.type, onDropNode],
+  );
+
+  const handleDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (!onDropNode) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      const sourcePath = event.dataTransfer.getData("text/plain") || globalDraggedSidebarPath;
+      if (!sourcePath) {
+        setDropPosition(null);
+        return;
+      }
+
+      void onDropNode(sourcePath, node.path, dropPosition ?? "after");
+      setDropPosition(null);
+    },
+    [dropPosition, node.path, onDropNode],
+  );
+
+  const handleDragEnd = useCallback(() => {
+    globalDraggedSidebarPath = null;
+    setDropPosition(null);
+  }, []);
+
+  const handleDirectoryContentDragOver = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (!onDropNode || node.type !== "directory") {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      setDropPosition("inside");
+    },
+    [node.type, onDropNode],
+  );
+
+  const handleDirectoryContentDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (!onDropNode || node.type !== "directory") {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      const sourcePath = event.dataTransfer.getData("text/plain") || globalDraggedSidebarPath;
+      if (!sourcePath) {
+        setDropPosition(null);
+        return;
+      }
+
+      void onDropNode(sourcePath, node.path, "inside");
+      setDropPosition(null);
+    },
+    [node.path, node.type, onDropNode],
+  );
+
   const dragHandlers = draggable
     ? {
-        draggable: true,
-        onDragStart: (event: DragEvent<HTMLDivElement>) => {
-          event.dataTransfer.effectAllowed = "move";
-          event.dataTransfer.setData("text/plain", node.path);
-          onDragStartTopLevel?.(node.path);
-        },
-        onDragOver: (event: DragEvent<HTMLDivElement>) => {
-          if (!onDropNode) {
-            return;
-          }
-
-          event.preventDefault();
-          const bounds = event.currentTarget.getBoundingClientRect();
-          setDropPosition(event.clientY < bounds.top + bounds.height / 2 ? "before" : "after");
-        },
+        onDragOver: handleDragOver,
         onDragLeave: () => setDropPosition(null),
-        onDrop: (event: DragEvent<HTMLDivElement>) => {
-          if (!onDropNode) {
-            return;
-          }
-
-          event.preventDefault();
-          onDropNode(node.path, dropPosition ?? "after");
-          setDropPosition(null);
-        },
-        onDragEnd: () => setDropPosition(null),
+        onDrop: handleDrop,
       }
     : {};
 
@@ -181,7 +269,6 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
     return (
       <div
         className={`relative mb-1 rounded-xl border border-transparent transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out ${containerClassName}`}
-        {...dragHandlers}
       >
         <div
           className="group/folder-row mx-1 flex min-w-0 items-center rounded-lg border border-transparent text-sidebar-foreground transition-[background-color,border-color,color] duration-150 ease-out hover:border-sidebar-accent/20 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground focus-within:border-sidebar-accent/30 focus-within:bg-sidebar-accent/50"
@@ -191,6 +278,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
             paddingTop: "4px",
             paddingBottom: "4px",
           }}
+          {...dragHandlers}
         >
           <Button
             variant="ghost"
@@ -199,6 +287,9 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
             className={`h-auto min-w-0 flex-1 cursor-pointer justify-start gap-2 rounded-md bg-transparent px-0 py-1 text-left hover:!bg-transparent ${
               draggable ? "cursor-grab active:cursor-grabbing" : ""
             }`}
+            draggable={draggable}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
             onClick={() => {
               if (depth === 0) {
                 onToggleFolder(node.path);
@@ -265,7 +356,11 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
         </div>
 
         {isFolderExpanded ? (
-          <div className="mt-1">
+          <div
+            className="mt-1"
+            onDragOver={handleDirectoryContentDragOver}
+            onDrop={handleDirectoryContentDrop}
+          >
             {node.children.map((child) => (
               <SidebarTreeNode
                 key={child.path}
@@ -284,6 +379,9 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
                 onRenameFile={onRenameFile}
                 onRenameFolder={onRenameFolder}
                 onToggleFolder={onToggleFolder}
+                draggable={draggable}
+                onDragStartTopLevel={onDragStartTopLevel}
+                onDropNode={onDropNode}
               />
             ))}
           </div>
@@ -365,7 +463,6 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
   return (
     <div
       className={`group/file-row relative mb-0.5 flex min-w-0 items-center overflow-hidden rounded-xl border border-transparent transition-[background-color,border-color,color,box-shadow,transform] duration-200 ease-out active:scale-[0.98] ${containerClassName}`}
-      {...dragHandlers}
     >
       <div
         className={`mx-1 flex min-w-0 flex-1 cursor-pointer items-center rounded-md transition-colors ${
@@ -379,6 +476,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
           paddingTop: "6px",
           paddingBottom: "6px",
         }}
+        {...dragHandlers}
       >
         <span className="relative flex h-4 w-4 shrink-0 items-center justify-center mr-2">
           <FileIcon
@@ -431,6 +529,9 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
             variant="ghost"
             size="sm"
             className="h-auto min-w-0 flex-1 cursor-pointer justify-start truncate bg-transparent px-0 py-0 text-left text-sm hover:!bg-transparent"
+            draggable={draggable}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
             onClick={() => onOpenFile(node.path)}
             type="button"
           >

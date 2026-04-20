@@ -103,6 +103,9 @@ const api = {
   renameFile(oldPath: string, newName: string) {
     return ipcRenderer.invoke("workspace:renameFile", oldPath, newName) as Promise<FileDocument>;
   },
+  moveFile(oldPath: string, targetDir: string) {
+    return ipcRenderer.invoke("workspace:moveFile", oldPath, targetDir) as Promise<FileDocument>;
+  },
   renameFolder(oldPath: string, newName: string) {
     return ipcRenderer.invoke("workspace:renameFolder", oldPath, newName) as Promise<{
       oldPath: string;

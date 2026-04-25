@@ -359,6 +359,7 @@ export const MarkdownEditor = ({
   footerMetaLabel,
   wordCount,
   readingTime,
+  contextIndexStatus,
   onChange,
   onToggleSidebar,
   isSidebarCollapsed,
@@ -1830,6 +1831,7 @@ export const MarkdownEditor = ({
         readingTime={readingTime}
         footerMetaLabel={footerMetaLabel}
         saveStateLabel={saveStateLabel}
+        contextIndexStatus={contextIndexStatus}
         toast={toast}
       />
       <EditorDialogs

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import type { AppInfo, UpdateState } from "../shared/workspace";
+import type { AppInfo, ContextIndexStatus, UpdateState } from "../shared/workspace";
 import type { OutlineItem } from "@/types/navigation";
 
 export type EditorFocusRequest = {
@@ -27,6 +27,7 @@ export type MarkdownEditorProps = {
   footerMetaLabel?: string;
   wordCount: number;
   readingTime: number;
+  contextIndexStatus?: ContextIndexStatus | null;
   editorScale?: number;
   zoomInShortcut?: string;
   zoomOutShortcut?: string;

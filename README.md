@@ -28,6 +28,16 @@ It opens local markdown folders, lets you move quickly between notes, and keeps 
 - local image picker flow
 - markdown export and PDF export
 
+### Local context index
+
+Glyph now keeps a rebuildable local context cache inside each opened workspace at `.glyph/index.json`.
+
+- source Markdown stays canonical; `.glyph/` is generated cache and import state only
+- the index currently stores relative path, document kind, frontmatter, tags, headings, outbound links, backlinks, timestamps, and file size
+- indexing runs in the Electron main process and stays hidden from the sidebar and file watcher UI
+- workspace search falls back to direct file scanning if indexed results are unavailable
+- renderer code reads index status and entry metadata only through preload APIs
+
 ### Web app
 
 - landing page for Glyph

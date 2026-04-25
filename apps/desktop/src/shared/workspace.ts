@@ -74,6 +74,63 @@ export type SearchResult = {
   snippet: string;
 };
 
+export type ContextIndexValue =
+  | string
+  | number
+  | boolean
+  | null
+  | ContextIndexValue[]
+  | {
+      [key: string]: ContextIndexValue;
+    };
+
+export type ContextIndexHeading = {
+  level: number;
+  text: string;
+  line: number;
+};
+
+export type ContextIndexLink = {
+  kind: "markdown" | "wiki";
+  target: string;
+  label: string | null;
+  line: number;
+};
+
+export type ContextIndexBacklink = {
+  sourcePath: string;
+  sourceRelativePath: string;
+  label: string | null;
+  line: number;
+};
+
+export type ContextIndexEntryKind = "note" | "skill" | "agents";
+
+export type ContextIndexEntry = {
+  kind: ContextIndexEntryKind;
+  path: string;
+  name: string;
+  relativePath: string;
+  frontmatter: Record<string, ContextIndexValue>;
+  frontmatterText: string | null;
+  tags: string[];
+  headings: ContextIndexHeading[];
+  links: ContextIndexLink[];
+  backlinks: ContextIndexBacklink[];
+  modifiedAt: string;
+  size: number;
+  indexedAt: string;
+};
+
+export type ContextIndexStatus = {
+  rootPath: string | null;
+  indexPath: string | null;
+  state: "idle" | "building" | "ready" | "error";
+  noteCount: number;
+  lastBuiltAt: string | null;
+  errorMessage: string | null;
+};
+
 export type ThemeMode = "light" | "dark" | "system";
 
 export type ShortcutSetting = {

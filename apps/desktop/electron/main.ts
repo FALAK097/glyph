@@ -15,12 +15,15 @@ import { watch } from "chokidar";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { createContextIndexService } from "./context-index-service.js";
 import { createSkillsService } from "./skills-service.js";
 import type {
   AppCommand,
   AppInfo,
   AssetSelection,
   AppSettings,
+  ContextIndexEntry,
+  ContextIndexStatus,
   DialogKind,
   DirectoryNode,
   FileOpenResult,
@@ -58,6 +61,7 @@ const GITHUB_RELEASES_URL = "https://github.com/FALAK097/glyph/releases";
 const GITHUB_LATEST_RELEASE_API_URL = "https://api.github.com/repos/FALAK097/glyph/releases/latest";
 const MARKDOWN_PREVIEW_SUFFIX_PATTERN = /\.(md|mdx|markdown)$/i;
 const MARKDOWN_HEADING_PATTERN = /^#{1,6}\s+(.*)$/;
+const WORKSPACE_CACHE_DIRECTORY_NAME = ".glyph";
 
 type PersistedUpdateState = {
   stagedVersion: string | null;
@@ -104,6 +108,15 @@ const skillsService = createSkillsService({
     }
 
     mainWindow.webContents.send("skills:changed", event);
+  },
+});
+const contextIndexService = createContextIndexService({
+  onStatusChanged: (status) => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return;
+    }
+
+    mainWindow.webContents.send("context-index:status", status);
   },
 });
 
@@ -689,6 +702,13 @@ function getMarkdownExtension(fileName: string) {
 
 function isMarkdownFile(fileName: string) {
   return getMarkdownExtension(fileName) !== null;
+}
+
+function isWorkspaceCachePath(targetPath: string) {
+  return path
+    .normalize(targetPath)
+    .split(path.sep)
+    .some((segment) => segment.toLowerCase() === WORKSPACE_CACHE_DIRECTORY_NAME);
 }
 
 function getSettingsPath() {
@@ -1737,6 +1757,10 @@ async function buildDirectoryTree(dirPath: string): Promise<DirectoryNode[]> {
 
         try {
           if (entry.isDirectory()) {
+            if (entry.name.toLowerCase() === WORKSPACE_CACHE_DIRECTORY_NAME) {
+              return null;
+            }
+
             return {
               type: "directory" as const,
               name: entry.name,
@@ -1766,7 +1790,9 @@ async function collectMarkdownFiles(nodes: DirectoryNode[]): Promise<string[]> {
 
   for (const node of nodes) {
     if (node.type === "file") {
-      paths.push(node.path);
+      if (isMarkdownFile(node.path)) {
+        paths.push(node.path);
+      }
       continue;
     }
 
@@ -1819,6 +1845,7 @@ async function openWorkspace(
 
   activeWatcher = watch(dirPath, {
     ignoreInitial: true,
+    ignored: (targetPath) => isWorkspaceCachePath(targetPath),
     awaitWriteFinish: {
       stabilityThreshold: 150,
       pollInterval: 50,
@@ -1857,6 +1884,7 @@ async function openWorkspace(
 
       const nextTree = await buildDirectoryTree(dirPath);
       searchableFilesCache = await collectMarkdownFiles(nextTree);
+      await contextIndexService.refresh(changedPaths);
       mainWindow.webContents.send("workspace:changed", {
         rootPath: dirPath,
         tree: nextTree,
@@ -1864,6 +1892,8 @@ async function openWorkspace(
       });
     }, 100);
   });
+
+  await contextIndexService.rebuild(dirPath, tree);
 
   return {
     rootPath: dirPath,
@@ -1875,6 +1905,11 @@ async function openWorkspace(
 async function searchWorkspace(query: string): Promise<SearchResult[]> {
   if (!activeWorkspaceRoot || !query.trim()) {
     return [];
+  }
+
+  const indexedResults = contextIndexService.search(query);
+  if (indexedResults.length > 0) {
+    return indexedResults;
   }
 
   const needle = query.toLowerCase();
@@ -2178,6 +2213,17 @@ ipcMain.handle("workspace:createFolder", async (_event, parentDir: string, folde
 });
 
 ipcMain.handle("workspace:search", async (_event, query: string) => searchWorkspace(query));
+
+ipcMain.handle(
+  "context-index:getStatus",
+  async (): Promise<ContextIndexStatus> => contextIndexService.getStatus(),
+);
+
+ipcMain.handle(
+  "context-index:getEntry",
+  async (_event, filePath: string): Promise<ContextIndexEntry | null> =>
+    contextIndexService.getEntry(filePath),
+);
 
 ipcMain.handle("sidebar:getNode", async (_event, kind: "file" | "directory", targetPath: string) =>
   getSidebarNode(kind, targetPath),

@@ -90,7 +90,7 @@ export function SidebarDeleteDialogs({
     <>
       {nodeToDelete ? (
         <DeleteDialog
-          open={true}
+          open={!!nodeToDelete}
           onOpenChange={(open) => {
             if (!open) onDismissDelete();
           }}
@@ -108,7 +108,7 @@ export function SidebarDeleteDialogs({
 
       {folderToDelete ? (
         <DeleteDialog
-          open={true}
+          open={!!folderToDelete}
           onOpenChange={(open) => {
             if (!open) onDismissDeleteFolder();
           }}
@@ -126,7 +126,7 @@ export function SidebarDeleteDialogs({
 
       {folderToRemove ? (
         <DeleteDialog
-          open={true}
+          open={!!folderToRemove}
           onOpenChange={(open) => {
             if (!open) onDismissRemoveFolder();
           }}
@@ -146,7 +146,7 @@ export function SidebarDeleteDialogs({
 
       {fileToRemove ? (
         <DeleteDialog
-          open={true}
+          open={!!fileToRemove}
           onOpenChange={(open) => {
             if (!open) onDismissRemoveFile();
           }}

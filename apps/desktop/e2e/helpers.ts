@@ -93,7 +93,7 @@ export async function launchGlyph(existingSandbox?: GlyphSandbox): Promise<Glyph
     });
 
     window.on("pageerror", (error) => {
-      consoleMessages.push(`[pageerror] ${error.message}`);
+      consoleMessages.push(`[pageerror] ${error.message}${error.stack ? `\n${error.stack}` : ""}`);
     });
 
     await window.context().tracing.start({
@@ -104,12 +104,12 @@ export async function launchGlyph(existingSandbox?: GlyphSandbox): Promise<Glyph
     const stop = async (testInfo: TestInfo) => {
       try {
         if (testInfo.status !== testInfo.expectedStatus) {
+          await window.context().tracing.stop({
+            path: testInfo.outputPath("trace.zip"),
+          });
           await window.screenshot({
             animations: "disabled",
             path: testInfo.outputPath("failure.png"),
-          });
-          await window.context().tracing.stop({
-            path: testInfo.outputPath("trace.zip"),
           });
 
           if (consoleMessages.length > 0) {

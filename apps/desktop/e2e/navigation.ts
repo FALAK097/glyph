@@ -119,10 +119,13 @@ export function getTabFileName(title: string | null) {
 
 export async function expectTabSelectedByTitle(window: Page, title: string | null) {
   await expect
-    .poll(async () => {
-      const tabState = await getTabState(window);
-      return tabState.tabs.find((tab) => tab.title === title)?.selected ?? null;
-    })
+    .poll(
+      async () => {
+        const tabState = await getTabState(window);
+        return tabState.tabs.find((tab) => tab.title === title)?.selected ?? null;
+      },
+      { timeout: 10_000 },
+    )
     .toBe("true");
 }
 

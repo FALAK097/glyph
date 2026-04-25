@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { Editor } from "@tiptap/core";
 import type { TableControlsState } from "../types/markdown-editor";
 
@@ -9,7 +10,7 @@ type TableControlsProps = {
   editor: Editor | null;
 };
 
-export function TableControls({
+export const TableControls = memo(function TableControls({
   tableControls,
   shouldShowOutlineRail,
   editor,
@@ -87,4 +88,4 @@ export function TableControls({
       </div>
     </div>
   );
-}
+});

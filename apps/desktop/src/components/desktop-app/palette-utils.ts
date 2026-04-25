@@ -5,7 +5,8 @@ export function matchesPaletteQuery(query: string, ...values: Array<string | nul
     return true;
   }
 
-  return values.some((value) => value?.toLowerCase().includes(query));
+  const lowerQuery = query.toLowerCase();
+  return values.some((value) => value?.toLowerCase().includes(lowerQuery));
 }
 
 export function matchesSkillPaletteFallback(query: string, skill: SkillEntry) {
@@ -13,7 +14,8 @@ export function matchesSkillPaletteFallback(query: string, skill: SkillEntry) {
     return true;
   }
 
+  const lowerQuery = query.toLowerCase();
   return [skill.name, skill.description, skill.slug, skill.sourceName, skill.tags.join(" ")].some(
-    (value) => value?.toLowerCase().includes(query),
+    (value) => value?.toLowerCase().includes(lowerQuery),
   );
 }

@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { formatKeysForPlatform, splitShortcutTokens } from "@/core/shortcuts";
 
 import type {
@@ -34,16 +34,19 @@ export const SlashCommandList = forwardRef<SlashCommandListHandle, SlashCommandL
     const selectedRef = useRef<HTMLButtonElement | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
 
-    if (items.length !== prevItemsLengthRef.current) {
-      prevItemsLengthRef.current = items.length;
-      setSelectedIndex(0);
-    }
+    useEffect(() => {
+      if (items.length !== prevItemsLengthRef.current) {
+        prevItemsLengthRef.current = items.length;
+        setSelectedIndex(0);
+      }
+    }, [items.length]);
+
+    useEffect(() => {
+      selectedRef.current?.scrollIntoView({ block: "nearest" });
+    }, [selectedIndex]);
 
     const handleSelectionChange = useCallback((index: number) => {
       setSelectedIndex(index);
-      setTimeout(() => {
-        selectedRef.current?.scrollIntoView({ block: "nearest" });
-      }, 0);
     }, []);
 
     const selectItem = useCallback(

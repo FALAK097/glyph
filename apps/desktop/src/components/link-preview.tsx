@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { HoveredLinkState } from "../types/markdown-editor";
 
 type LinkPreviewProps = {
@@ -7,7 +8,7 @@ type LinkPreviewProps = {
   onMouseLeave: () => void;
 };
 
-export function LinkPreview({
+export const LinkPreview = memo(function LinkPreview({
   hoveredLink,
   linkOpenShortcutHint,
   onMouseEnter,
@@ -66,4 +67,4 @@ export function LinkPreview({
       )}
     </div>
   );
-}
+});

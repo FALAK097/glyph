@@ -17,8 +17,8 @@ function ShortcutBadge({ shortcut }: { shortcut: string }) {
   const tokens = splitShortcutTokens(display);
   return (
     <span className="slash-kbd-group" aria-label={display}>
-      {tokens.map((token, i) => (
-        <kbd key={i} className="slash-kbd">
+      {tokens.map((token, tokenIndex) => (
+        <kbd key={`${shortcut}-${tokenIndex}`} className="slash-kbd">
           {token}
         </kbd>
       ))}

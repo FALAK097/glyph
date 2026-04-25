@@ -35,25 +35,30 @@ import { EditorDialogs } from "./editor-dialogs";
 import { useUpdateStateFlags } from "./update-notification";
 import { SlashCommand } from "@/core/slash-command";
 import { TableOfContents } from "./table-of-contents";
+import { TableControls } from "./table-controls";
+import { FindPanel } from "./find-panel";
+import { LinkPreview } from "./link-preview";
+import { ImageControls } from "./image-controls";
 import { ArrowDownIcon, ArrowUpIcon, OutlineIcon, SearchIcon, TrashIcon, XIcon } from "./icons";
 
-import type { MarkdownEditorProps, MarkdownEditorToast } from "../types/markdown-editor";
+import type {
+  EditorActionDetail,
+  EditorActionType,
+  EditorOutlineItem,
+  FindPanelState,
+  HoveredLinkState,
+  ImageControlsState,
+  MarkdownEditorProps,
+  MarkdownEditorToast,
+  SelectionSnapshot,
+  TableControlsState,
+} from "../types/markdown-editor";
 import type { OutlineItem } from "@/types/navigation";
 import type { NoteLinkPreview, UpdateState } from "@/core/workspace";
 
 const LINK_IMAGE_PATTERN = /(!?)\[([^\]]+)\]\(([^)]+)\)$/;
 const MARKDOWN_FILE_SUFFIX_PATTERN = /\.(md|mdx|markdown)$/i;
 const WINDOWS_DRIVE_PATH_PATTERN = /^[a-z]:[\\/]/i;
-type EditorActionType = "insert-table" | "insert-link" | "insert-image";
-
-type EditorActionDetail = {
-  type: EditorActionType;
-};
-
-type ImageControlsState = {
-  left: number;
-  top: number;
-};
 
 const getDevPreviewUpdateState = (): UpdateState | null => {
   if (!import.meta.env.DEV || typeof window === "undefined") {
@@ -127,36 +132,6 @@ const getDevPreviewUpdateState = (): UpdateState | null => {
   }
 
   return null;
-};
-
-type HoveredLinkState = {
-  href: string;
-  placement: "above" | "below";
-  preview: NoteLinkPreview | null;
-  status: "hint" | "loading" | "preview";
-  tooltipLeft: number;
-  tooltipTop: number;
-};
-
-type TableControlsState = {
-  active: boolean;
-  canDeleteRow: boolean;
-  canDeleteColumn: boolean;
-  canDeleteTable: boolean;
-};
-
-type SelectionSnapshot = {
-  from: number;
-  to: number;
-};
-
-type FindPanelState = {
-  activeIndex: number;
-  matchCount: number;
-};
-
-type EditorOutlineItem = OutlineItem & {
-  pos: number;
 };
 
 const DEFAULT_SELECTION_SNAPSHOT: SelectionSnapshot = {
@@ -1487,100 +1462,16 @@ export const MarkdownEditor = ({
         <div className="border-b border-border/30">{subheaderContent}</div>
       ) : null}
       <div className="relative flex-1 min-h-0">
-        {isFindOpen ? (
-          <div
-            className={`pointer-events-none absolute top-2 right-0 z-30 flex justify-end px-4 ${
-              shouldShowOutlineRail ? "xl:pr-[324px]" : ""
-            }`}
-          >
-            <div className="pointer-events-auto flex items-center gap-1 rounded-lg border border-border/50 bg-card/95 px-2 py-1.5 shadow-sm ring-1 ring-black/[0.03] dark:ring-white/[0.04] supports-backdrop-filter:backdrop-blur-md">
-              <SearchIcon size={12} className="shrink-0 text-muted-foreground/70" />
-              <input
-                ref={findInputRef}
-                autoFocus
-                aria-label="Find in current note"
-                value={findQuery}
-                className="h-5 w-[160px] bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground/50"
-                onChange={(event) => {
-                  setFindQuery(event.target.value);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    navigateFindMatches(event.shiftKey ? -1 : 1);
-                    return;
-                  }
-
-                  if (event.key === "Escape") {
-                    event.preventDefault();
-                    closeFindPanel();
-                    return;
-                  }
-
-                  const primaryPressed =
-                    event.metaKey !== event.ctrlKey && (event.metaKey || event.ctrlKey);
-                  if (primaryPressed && event.key.toLowerCase() === "g") {
-                    event.preventDefault();
-                    navigateFindMatches(event.shiftKey ? -1 : 1);
-                  }
-                }}
-              />
-              {findQuery.trim() ? (
-                <span
-                  aria-live="polite"
-                  aria-label="Find results"
-                  className="min-w-[36px] text-right text-[11px] tabular-nums text-muted-foreground"
-                >
-                  {findPanelState.matchCount > 0
-                    ? `${findPanelState.activeIndex + 1}/${findPanelState.matchCount}`
-                    : "No matches"}
-                </span>
-              ) : null}
-              <div className="mx-0.5 h-3.5 w-px bg-border/40" />
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                type="button"
-                disabled={findPanelState.matchCount === 0}
-                aria-label="Previous match"
-                className="h-5 w-5"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  navigateFindMatches(-1);
-                }}
-              >
-                <ArrowUpIcon size={12} />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                type="button"
-                disabled={findPanelState.matchCount === 0}
-                aria-label="Next match"
-                className="h-5 w-5"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  navigateFindMatches(1);
-                }}
-              >
-                <ArrowDownIcon size={12} />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                type="button"
-                aria-label="Close find"
-                className="h-5 w-5"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  closeFindPanel();
-                }}
-              >
-                <XIcon size={12} />
-              </Button>
-            </div>
-          </div>
-        ) : null}
+        <FindPanel
+          isOpen={isFindOpen}
+          query={findQuery}
+          panelState={findPanelState}
+          inputRef={findInputRef}
+          shouldShowOutlineRail={shouldShowOutlineRail}
+          onQueryChange={setFindQuery}
+          onNavigate={navigateFindMatches}
+          onClose={closeFindPanel}
+        />
         <div
           ref={scrollContainerRef}
           className={`h-full overflow-y-auto relative [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${
@@ -1639,148 +1530,21 @@ export const MarkdownEditor = ({
           }}
         >
           {topContent ? <div className="mx-auto max-w-[800px] px-10 pt-5">{topContent}</div> : null}
-          {tableControls.active ? (
-            <div className="sticky top-4 z-20 h-0 overflow-visible">
-              <div
-                className={`pointer-events-none flex justify-center pl-52 pr-6 ${
-                  shouldShowOutlineRail ? "xl:pr-[316px]" : ""
-                }`}
-              >
-                <div className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-border/70 bg-card/95 px-2.5 py-1.5 shadow-lg supports-backdrop-filter:backdrop-blur-sm">
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    type="button"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => editor?.chain().focus().addRowAfter().run()}
-                  >
-                    Add Row
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    type="button"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => editor?.chain().focus().addColumnAfter().run()}
-                  >
-                    Add Column
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    type="button"
-                    disabled={!tableControls.canDeleteRow}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => editor?.chain().focus().deleteRow().run()}
-                  >
-                    Remove Row
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    type="button"
-                    disabled={!tableControls.canDeleteColumn}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => editor?.chain().focus().deleteColumn().run()}
-                  >
-                    Remove Column
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    type="button"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => editor?.chain().focus().toggleHeaderRow().run()}
-                  >
-                    Toggle Header
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="xs"
-                    type="button"
-                    disabled={!tableControls.canDeleteTable}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => editor?.chain().focus().deleteTable().run()}
-                  >
-                    Delete Table
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ) : null}
-          {hoveredLink ? (
-            <div
-              className={`fixed z-30 ${hoveredLink.status === "preview" && hoveredLink.preview ? "w-[min(320px,calc(100vw-2rem))]" : ""}`}
-              style={{
-                left: hoveredLink.tooltipLeft,
-                top: hoveredLink.tooltipTop,
-                transform:
-                  hoveredLink.placement === "above"
-                    ? "translate(-50%, calc(-100% - 4px))"
-                    : "translateX(-50%)",
-              }}
-              onMouseEnter={clearHoveredLinkHideTimeout}
-              onMouseLeave={scheduleHoveredLinkHide}
-            >
-              {hoveredLink.status === "preview" && hoveredLink.preview ? (
-                <div
-                  aria-label="Note link preview"
-                  className="rounded-2xl border border-border/70 bg-card/95 p-3 shadow-lg supports-backdrop-filter:backdrop-blur-sm"
-                >
-                  <div className="space-y-2">
-                    <div className="space-y-1">
-                      <p className="text-sm font-semibold text-foreground">
-                        {hoveredLink.preview.title}
-                      </p>
-                      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                        {hoveredLink.preview.displayPath}
-                      </p>
-                    </div>
-                    <p className="text-sm leading-6 text-muted-foreground">
-                      {hoveredLink.preview.excerpt || "This note does not have preview text yet."}
-                    </p>
-                    <p className="text-[11px] font-medium text-muted-foreground">
-                      {linkOpenShortcutHint}
-                    </p>
-                  </div>
-                </div>
-              ) : hoveredLink.status === "loading" ? (
-                <div
-                  aria-label="Loading preview"
-                  className="rounded-xl border border-border/60 bg-card/95 px-3 py-2 shadow-md supports-backdrop-filter:backdrop-blur-sm"
-                >
-                  <p className="text-xs text-muted-foreground">Loading&hellip;</p>
-                </div>
-              ) : (
-                <div
-                  aria-label="Link hint"
-                  className="rounded-xl border border-border/60 bg-card/95 px-3 py-1.5 shadow-md supports-backdrop-filter:backdrop-blur-sm"
-                >
-                  <p className="text-xs text-muted-foreground">{linkOpenShortcutHint}</p>
-                </div>
-              )}
-            </div>
-          ) : null}
-          {imageControls ? (
-            <div
-              className="fixed z-30"
-              style={{
-                left: imageControls.left,
-                top: imageControls.top,
-              }}
-            >
-              <Button
-                variant="destructive"
-                size="icon-xs"
-                type="button"
-                className="shadow-md"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={handleDeleteSelectedImage}
-              >
-                <TrashIcon size={12} />
-              </Button>
-            </div>
-          ) : null}
+          <TableControls
+            isActive={tableControls.active}
+            canDeleteRow={tableControls.canDeleteRow}
+            canDeleteColumn={tableControls.canDeleteColumn}
+            canDeleteTable={tableControls.canDeleteTable}
+            shouldShowOutlineRail={shouldShowOutlineRail}
+            editor={editor}
+          />
+          <LinkPreview
+            hoveredLink={hoveredLink!}
+            linkOpenShortcutHint={linkOpenShortcutHint}
+            onMouseEnter={clearHoveredLinkHideTimeout}
+            onMouseLeave={scheduleHoveredLinkHide}
+          />
+          <ImageControls controls={imageControls} onDelete={handleDeleteSelectedImage} />
           <div
             style={{
               zoom: editorScale !== 100 ? `${editorScale}%` : undefined,

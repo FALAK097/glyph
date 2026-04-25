@@ -11,6 +11,7 @@ import { useWorkspaceStore } from "@/store/workspace";
 import type { ThemeMode, TabMovePosition } from "@/core/workspace";
 import type { DesktopAppProps } from "@/types/app";
 import type { CommandPaletteItem } from "@/types/command-palette";
+import type { PendingNoteConfirm, PendingNoteRename, SkillCollection } from "@/types/desktop-app";
 
 import { useDesktopAppController } from "@/hooks/use-desktop-app-controller";
 import { useSkillLibraryController } from "@/hooks/use-skill-library-controller";
@@ -28,30 +29,6 @@ import { SplitViewActivePaneProvider, SplitViewProvider } from "./split-view-con
 import type { SplitViewActivePaneContextValue, SplitViewContextValue } from "./split-view-context";
 import { TooltipProvider } from "./ui/tooltip";
 import { useUpdateStateFlags } from "./update-notification";
-
-type SkillCollection = {
-  id: string;
-  fallbackLabel: string;
-  iconKind?: "all-agents" | "all-skills" | "global" | "project";
-  label: string;
-  sourceKind?: SkillSourceKind;
-  toolKind?: SkillToolKind;
-  count: number;
-  group: "scope" | "tool";
-  matches: (skill: SkillEntry) => boolean;
-};
-
-type PendingNoteRename = {
-  name: string;
-  path: string;
-  value: string;
-};
-
-type PendingNoteConfirm = {
-  kind: "delete" | "remove";
-  name: string;
-  path: string;
-};
 
 function matchesPaletteQuery(query: string, ...values: Array<string | null | undefined>) {
   if (!query) {

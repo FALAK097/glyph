@@ -5,8 +5,8 @@ import { CheckCircleIcon } from "@/components/icons";
 type EditorFooterProps = {
   wordCount: number;
   readingTime: number;
-  footerMetaLabel: string | undefined;
-  saveStateLabel: string;
+  footerMetaLabel?: string;
+  saveStateLabel?: string;
   toast: MarkdownEditorToast | null;
 };
 

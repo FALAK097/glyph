@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.9.0](https://github.com/FALAK097/glyph/compare/v0.8.0...v0.9.0) (2026-04-25)
+
+
+### Features
+
+* **desktop:** add split view for editing multiple files side-by-side ([#178](https://github.com/FALAK097/glyph/issues/178)) ([4b57b4a](https://github.com/FALAK097/glyph/commit/4b57b4a10c0f57b9dab964a79f20f6c01c62f1fd))
+
+
+### Bug Fixes
+
+* add dark mode hover visibility for action menu items ([909a874](https://github.com/FALAK097/glyph/commit/909a8743c978d18dedc36a2baa646f5a9de5bbef))
+* remove unused icon imports from sidebar ([45d125c](https://github.com/FALAK097/glyph/commit/45d125c34382383d3bc8f51f4e2cd5a565c61669))
+* resolve all PR review comments and e2e test fixes ([423bfb1](https://github.com/FALAK097/glyph/commit/423bfb12023d8bc0e99a7a8b36d18385f326a897))
+* resolve react-doctor error in slash-command-list and extract link utilities ([e2a1227](https://github.com/FALAK097/glyph/commit/e2a12274a9061666f8ce8e09906129781bdc61cc))
+* resolve remaining PR review comments ([cf722f6](https://github.com/FALAK097/glyph/commit/cf722f6453a981e8dc12efe1a4a35dd16cab3674))
+* use explicit RefObject import instead of React namespace ([122d16c](https://github.com/FALAK097/glyph/commit/122d16c68c52678e8752ba5579a79bde0271cb71))
+
 ## [0.8.0](https://github.com/FALAK097/glyph/compare/v0.7.0...v0.8.0) (2026-04-19)
 
 

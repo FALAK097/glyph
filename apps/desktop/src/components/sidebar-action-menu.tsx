@@ -65,7 +65,7 @@ export function SidebarActionMenu({
             className={`h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm ${
               item.variant === "destructive"
                 ? "hover:bg-destructive/10 hover:text-destructive"
-                : "hover:bg-accent"
+                : "hover:bg-accent dark:hover:bg-white/10"
             }`}
             onClick={(event) => {
               event.stopPropagation();

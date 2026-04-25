@@ -1,18 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { DirectoryNode, FileDocument, WorkspaceSnapshot } from "@/shared/workspace";
-import type { AppSettings } from "@/shared/workspace";
-import type { SidebarItemSetting } from "@/shared/workspace";
+import type {
+  AppSettings,
+  DirectoryNode,
+  FileDocument,
+  SidebarItemSetting,
+  WorkspaceSnapshot,
+} from "@/core/workspace";
 import type { DragPosition, SidebarTopLevelNode } from "@/types/sidebar";
 
-import { isPathInside, isSamePath, normalizePath } from "@/lib/paths";
+import { isPathInside, isSamePath, normalizePath } from "@/core/paths";
 import {
   filterSidebarNodes,
   removeSidebarPath,
   reorderSidebarNodes,
   toSidebarItemSetting,
   upsertSidebarFolder,
-} from "@/lib/sidebar-tree";
+} from "@/core/sidebar-tree";
 
 type UseSidebarControllerOptions = {
   glyph: NonNullable<Window["glyph"]>;

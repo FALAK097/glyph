@@ -19,9 +19,9 @@ import {
   isMacPlatform,
   mergeShortcutSettings,
   MODIFIER_TOKENS,
-} from "../shared/shortcuts";
+} from "@/core/shortcuts";
 
-import type { ThemeMode } from "../shared/workspace";
+import type { ThemeMode } from "@/core/workspace";
 import type { SettingsPanelProps } from "../types/settings-panel";
 import { GearIcon, SearchIcon, ShortcutIcon } from "./icons";
 

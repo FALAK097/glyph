@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/core/utils";
 import { Button } from "@/components/ui/button";
 import { XIcon } from "@/components/icons";
 

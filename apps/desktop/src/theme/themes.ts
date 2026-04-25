@@ -1,4 +1,4 @@
-import type { ThemeMode } from "../shared/workspace";
+import type { ThemeMode } from "@/core/workspace";
 
 export function applyTheme(mode: ThemeMode) {
   try {

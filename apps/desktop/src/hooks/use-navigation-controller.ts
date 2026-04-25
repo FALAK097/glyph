@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 
-import type { FileDocument } from "@/shared/workspace";
+import type { FileDocument } from "@/core/workspace";
 import { useWorkspaceStore } from "@/store/workspace";
 
 type UseNavigationControllerOptions = {

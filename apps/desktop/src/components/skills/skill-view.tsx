@@ -1,8 +1,8 @@
 import { useCallback } from "react";
 
-import { getShortcutDisplay } from "@/shared/shortcuts";
-import type { SkillDocument, SkillDocumentKind, SkillEntry } from "@/shared/skills";
-import type { ShortcutSetting } from "@/shared/workspace";
+import { getShortcutDisplay } from "@/core/shortcuts";
+import type { SkillDocument, SkillDocumentKind, SkillEntry } from "@/core/skills";
+import type { ShortcutSetting } from "@/core/workspace";
 
 import { SkillDocumentPane } from "./skill-document-pane";
 import { SkillEmptyPane } from "./skill-empty-pane";

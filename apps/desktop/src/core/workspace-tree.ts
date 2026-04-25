@@ -1,4 +1,4 @@
-import type { DirectoryNode } from "../shared/workspace";
+import type { DirectoryNode } from "./workspace";
 
 import type { FlatFile } from "../types/app";
 

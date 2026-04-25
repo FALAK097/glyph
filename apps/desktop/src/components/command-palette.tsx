@@ -10,7 +10,7 @@ import {
 } from "react";
 
 import type { CommandPaletteItem, CommandPaletteProps } from "../types/command-palette";
-import { splitShortcutTokens } from "../shared/shortcuts";
+import { splitShortcutTokens } from "@/core/shortcuts";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";

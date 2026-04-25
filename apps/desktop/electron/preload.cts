@@ -15,12 +15,12 @@ import type {
   WorkspaceChangeEvent,
   WorkspaceSnapshot,
   ExternalFileTarget,
-} from "../src/shared/workspace.js";
+} from "../src/core/workspace.js";
 import type {
   SkillDocument,
   SkillLibraryChangeEvent,
   SkillLibrarySnapshot,
-} from "../src/shared/skills.js";
+} from "../src/core/skills.js";
 
 /**
  * Retries an IPC invoke when the main process handler is not yet registered.

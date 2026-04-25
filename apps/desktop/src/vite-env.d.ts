@@ -15,8 +15,8 @@ import type {
   WorkspaceChangeEvent,
   WorkspaceSnapshot,
   ExternalFileTarget,
-} from "./shared/workspace";
-import type { SkillDocument, SkillLibraryChangeEvent, SkillLibrarySnapshot } from "./shared/skills";
+} from "@/core/workspace";
+import type { SkillDocument, SkillLibraryChangeEvent, SkillLibrarySnapshot } from "@/core/skills";
 
 declare global {
   interface Window {

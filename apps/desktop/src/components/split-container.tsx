@@ -2,7 +2,7 @@ import { memo } from "react";
 import { Group, Panel, Separator } from "react-resizable-panels";
 
 import { useLayoutStore } from "@/store/layout";
-import type { LayoutNode } from "@/shared/workspace";
+import type { LayoutNode } from "@/core/workspace";
 
 import { EditorPane } from "./editor-pane";
 

@@ -1,4 +1,4 @@
-import type { SkillEntry, SkillSourceKind } from "@/shared/skills";
+import type { SkillEntry, SkillSourceKind } from "@/core/skills";
 
 export type SkillBrowserItem = {
   description: string | null;

@@ -1,15 +1,19 @@
 import type { ReactNode } from "react";
-
-import type { AppInfo, UpdateState } from "../shared/workspace";
+import type { NoteLinkPreview, UpdateState } from "@/core/workspace";
 import type { OutlineItem } from "@/types/navigation";
+
+export type EditorFindRequest = {
+  nonce: number;
+};
 
 export type EditorFocusRequest = {
   mode: "start" | "end" | "preserve";
   nonce: number;
 };
 
-export type EditorFindRequest = {
-  nonce: number;
+export type MarkdownEditorToast = {
+  title: string;
+  description?: string;
 };
 
 export type MarkdownEditorProps = {
@@ -17,21 +21,16 @@ export type MarkdownEditorProps = {
   fileName: string | null;
   filePath: string | null;
   isEditable?: boolean;
-  initialScrollTop?: number | null;
+  initialScrollTop?: number;
   scrollRestorationKey?: string | null;
   editorFocusRequest?: EditorFocusRequest | null;
   findRequest?: EditorFindRequest | null;
   showToolbar?: boolean;
-  workspaceRootPath?: string | null;
-  saveStateLabel: string;
+  saveStateLabel?: string;
   footerMetaLabel?: string;
   wordCount: number;
   readingTime: number;
-  editorScale?: number;
-  zoomInShortcut?: string;
-  zoomOutShortcut?: string;
-  zoomResetShortcut?: string;
-  onChange: (value: string) => void;
+  onChange: (content: string) => void;
   onToggleSidebar?: () => void;
   isSidebarCollapsed?: boolean;
   headerAccessory?: ReactNode;
@@ -55,7 +54,7 @@ export type MarkdownEditorProps = {
   isActiveFilePinned?: boolean;
   onOutlineJumpHandled?: () => void;
   updateState?: UpdateState | null;
-  updatesMode?: AppInfo["updatesMode"];
+  updatesMode?: "automatic" | "manual" | "none";
   onUpdateAction?: () => void;
   onDismissUpdateAction?: () => void;
   dismissedUpdateVersion?: string | null;
@@ -63,18 +62,58 @@ export type MarkdownEditorProps = {
   showOutline?: boolean;
   onToggleFocusMode?: () => void;
   focusModeShortcut?: string;
-  onOpenNewWindow?: () => void;
-  onDeleteNote?: () => void;
+  zoomInShortcut?: string;
+  zoomOutShortcut?: string;
+  zoomResetShortcut?: string;
   onTogglePinnedFile?: () => void;
   onEditorScaleChange?: (scale: number) => void;
-  onScrollPositionChange?: (targetPath: string | null, scrollTop: number) => void;
+  onScrollPositionChange?: (key: string | null, scrollTop: number) => void;
   folderRevealLabel?: string;
   documentLabel?: string;
-  outlineItems?: OutlineItem[];
   outlineJumpRequest?: { id: string; nonce: number } | null;
+  editorScale?: number;
+  onDeleteNote?: () => void;
+  onOpenNewWindow?: () => void;
+  outlineItems?: OutlineItem[];
 };
 
-export type MarkdownEditorToast = {
-  title: string;
-  description: string;
+export type EditorActionType = "insert-table" | "insert-link" | "insert-image";
+
+export type EditorActionDetail = {
+  type: EditorActionType;
+};
+
+export type ImageControlsState = {
+  left: number;
+  top: number;
+};
+
+export type HoveredLinkState = {
+  href: string;
+  placement: "above" | "below";
+  preview: NoteLinkPreview | null;
+  status: "hint" | "loading" | "preview";
+  tooltipLeft: number;
+  tooltipTop: number;
+};
+
+export type TableControlsState = {
+  active: boolean;
+  canDeleteRow: boolean;
+  canDeleteColumn: boolean;
+  canDeleteTable: boolean;
+};
+
+export type SelectionSnapshot = {
+  from: number;
+  to: number;
+};
+
+export type FindPanelState = {
+  activeIndex: number;
+  matchCount: number;
+};
+
+export type EditorOutlineItem = OutlineItem & {
+  pos: number;
 };

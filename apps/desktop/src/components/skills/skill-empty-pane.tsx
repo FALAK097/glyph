@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-import { GearIcon, PanelLeftIcon, PanelRightIcon, SearchIcon } from "./icons";
+import { GearIcon, PanelLeftIcon, PanelRightIcon, SearchIcon } from "../icons";
 
 type SkillEmptyPaneProps = {
   commandPaletteShortcut?: string;

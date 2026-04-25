@@ -1,10 +1,11 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { formatKeysForPlatform, splitShortcutTokens } from "@/core/shortcuts";
+
 import type {
   SlashCommandItem,
   SlashCommandListHandle,
   SlashCommandListProps,
 } from "../types/slash-command";
-import { formatKeysForPlatform, splitShortcutTokens } from "../shared/shortcuts";
 
 /**
  * Render a shortcut string as individual `<kbd>` token spans.
@@ -17,8 +18,8 @@ function ShortcutBadge({ shortcut }: { shortcut: string }) {
   const tokens = splitShortcutTokens(display);
   return (
     <span className="slash-kbd-group" aria-label={display}>
-      {tokens.map((token, i) => (
-        <kbd key={i} className="slash-kbd">
+      {tokens.map((token, tokenIndex) => (
+        <kbd key={`${shortcut}-${tokenIndex}`} className="slash-kbd">
           {token}
         </kbd>
       ))}
@@ -29,16 +30,24 @@ function ShortcutBadge({ shortcut }: { shortcut: string }) {
 export const SlashCommandList = forwardRef<SlashCommandListHandle, SlashCommandListProps>(
   ({ items, onSelect }, ref) => {
     const [selectedIndex, setSelectedIndex] = useState(0);
+    const prevItemsLengthRef = useRef(items.length);
     const selectedRef = useRef<HTMLButtonElement | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
-      setSelectedIndex(0);
-    }, [items]);
+      if (items.length !== prevItemsLengthRef.current) {
+        prevItemsLengthRef.current = items.length;
+        setSelectedIndex(0);
+      }
+    }, [items.length]);
 
     useEffect(() => {
       selectedRef.current?.scrollIntoView({ block: "nearest" });
     }, [selectedIndex]);
+
+    const handleSelectionChange = useCallback((index: number) => {
+      setSelectedIndex(index);
+    }, []);
 
     const selectItem = useCallback(
       (index: number) => {
@@ -93,7 +102,7 @@ export const SlashCommandList = forwardRef<SlashCommandListHandle, SlashCommandL
               ref={isSelected ? selectedRef : null}
               className={`slash-row${isSelected ? " slash-row--selected" : ""}`}
               onClick={() => selectItem(index)}
-              onMouseEnter={() => setSelectedIndex(index)}
+              onMouseEnter={() => handleSelectionChange(index)}
             >
               <span className="slash-row-label">{item.title}</span>
               {item.shortcut ? <ShortcutBadge shortcut={item.shortcut} /> : null}

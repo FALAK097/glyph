@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { getDisplayFileName, isSamePath, normalizePath } from "@/lib/paths";
-import { countGroupedSkills, groupSkillsForBrowse } from "@/lib/skill-groups";
-import { getShortcutDisplay } from "@/shared/shortcuts";
-import { SKILL_AGENT_CATALOG } from "@/shared/skill-agent-catalog";
-import type { SkillEntry, SkillSourceKind, SkillToolKind } from "@/shared/skills";
+import { getDisplayFileName, isSamePath, normalizePath } from "@/core/paths";
+import { countGroupedSkills, groupSkillsForBrowse } from "@/core/skill-groups";
+import { getShortcutDisplay } from "@/core/shortcuts";
+import { SKILL_AGENT_CATALOG } from "@/core/skill-agent-catalog";
+import type { ThemeMode, TabMovePosition } from "@/core/workspace";
 import { useLayoutStore } from "@/store/layout";
 import { useSessionStore } from "@/store/session";
 import { useWorkspaceStore } from "@/store/workspace";
-import type { ThemeMode, TabMovePosition } from "@/shared/workspace";
 import type { DesktopAppProps } from "@/types/app";
 import type { CommandPaletteItem } from "@/types/command-palette";
+import type { PendingNoteConfirm, PendingNoteRename, SkillCollection } from "@/types/desktop-app";
 
 import { useDesktopAppController } from "@/hooks/use-desktop-app-controller";
 import { useSkillLibraryController } from "@/hooks/use-skill-library-controller";
@@ -21,55 +21,15 @@ import { EditorToolbar } from "./editor-toolbar";
 import { NoteConfirmDialog } from "./note-confirm-dialog";
 import { NoteRenameDialog } from "./note-rename-dialog";
 import { SettingsPanel } from "./settings-panel";
-import { SkillView } from "./skill-view";
-import { SkillsBrowserPane } from "./skills-browser-pane";
+import { SkillView } from "./skills/skill-view";
+import { SkillsBrowserPane } from "./skills/skills-browser-pane";
 import { SplitContainer } from "./split-container";
 import { SplitViewActivePaneProvider, SplitViewProvider } from "./split-view-context";
 import type { SplitViewActivePaneContextValue, SplitViewContextValue } from "./split-view-context";
 import { TooltipProvider } from "./ui/tooltip";
 import { useUpdateStateFlags } from "./update-notification";
 
-type SkillCollection = {
-  id: string;
-  fallbackLabel: string;
-  iconKind?: "all-agents" | "all-skills" | "global" | "project";
-  label: string;
-  sourceKind?: SkillSourceKind;
-  toolKind?: SkillToolKind;
-  count: number;
-  group: "scope" | "tool";
-  matches: (skill: SkillEntry) => boolean;
-};
-
-type PendingNoteRename = {
-  name: string;
-  path: string;
-  value: string;
-};
-
-type PendingNoteConfirm = {
-  kind: "delete" | "remove";
-  name: string;
-  path: string;
-};
-
-function matchesPaletteQuery(query: string, ...values: Array<string | null | undefined>) {
-  if (!query) {
-    return true;
-  }
-
-  return values.some((value) => value?.toLowerCase().includes(query));
-}
-
-function matchesSkillPaletteFallback(query: string, skill: SkillEntry) {
-  if (!query) {
-    return true;
-  }
-
-  return [skill.name, skill.description, skill.slug, skill.sourceName, skill.tags.join(" ")].some(
-    (value) => value?.toLowerCase().includes(query),
-  );
-}
+import { matchesPaletteQuery, matchesSkillPaletteFallback } from "./desktop-app/palette-utils";
 
 export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const sessionHasHydrated = useSessionStore((state) => state.hasHydrated);

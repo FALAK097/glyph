@@ -1,9 +1,9 @@
 import { useIsDarkMode } from "@/hooks/use-is-dark-mode";
 
-import { cn } from "@/lib/utils";
-import type { SkillSourceKind } from "@/shared/skills";
+import { cn } from "@/core/utils";
+import type { SkillSourceKind } from "@/core/skills";
 
-import { FileIcon, FolderIcon, OutlineIcon, ShortcutIcon } from "./icons";
+import { FileIcon, FolderIcon, OutlineIcon, ShortcutIcon } from "../icons";
 
 type SkillIconKind = "all-agents" | "all-skills" | "global" | "project";
 

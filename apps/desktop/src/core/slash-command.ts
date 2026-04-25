@@ -7,13 +7,13 @@ import Suggestion, {
 import { ReactRenderer } from "@tiptap/react";
 import tippy, { type Instance, type Props } from "tippy.js";
 import "tippy.js/dist/tippy.css";
-import { SlashCommandList } from "./slash-command-list";
+import { SlashCommandList } from "../components/slash-command-list";
 import type {
   SlashCommandItem,
   SlashCommandListHandle,
   SlashCommandWithKey,
 } from "../types/slash-command";
-import { MODIFIER_TOKENS } from "../shared/shortcuts";
+import { MODIFIER_TOKENS } from "./shortcuts";
 
 /**
  * Hardcoded TipTap/StarterKit default shortcuts displayed as hints in the

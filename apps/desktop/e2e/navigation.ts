@@ -126,7 +126,7 @@ export async function expectTabSelectedByTitle(window: Page, title: string | nul
     .toBe("true");
 }
 
-export function getExpectedBodyForTabTitle(title: string | null) {
+export function getExpectedBodyForTabTitle(title: string | null, fallback: string | null = null) {
   if (title?.endsWith("welcome.md")) {
     return "Smoke test note content.";
   }
@@ -138,6 +138,10 @@ export function getExpectedBodyForTabTitle(title: string | null) {
   const generatedTabMatch = title?.match(/tab-(\d+)\.md$/i);
   if (generatedTabMatch) {
     return `Body ${generatedTabMatch[1]}.`;
+  }
+
+  if (fallback !== null) {
+    return fallback;
   }
 
   throw new Error(`Unexpected tab title: ${title ?? "null"}`);

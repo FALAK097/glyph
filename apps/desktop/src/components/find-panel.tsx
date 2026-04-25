@@ -1,4 +1,5 @@
-import type { Editor } from "@tiptap/core";
+import type { RefObject } from "react";
+import type { FindPanelState } from "../types/markdown-editor";
 
 import { ArrowDownIcon, ArrowUpIcon, SearchIcon, XIcon } from "./icons";
 import { Button } from "@/components/ui/button";
@@ -6,11 +7,8 @@ import { Button } from "@/components/ui/button";
 type FindPanelProps = {
   isOpen: boolean;
   query: string;
-  panelState: {
-    activeIndex: number;
-    matchCount: number;
-  };
-  inputRef: React.RefObject<HTMLInputElement | null>;
+  panelState: FindPanelState;
+  inputRef: RefObject<HTMLInputElement | null>;
   shouldShowOutlineRail: boolean;
   onQueryChange: (query: string) => void;
   onNavigate: (direction: 1 | -1) => void;

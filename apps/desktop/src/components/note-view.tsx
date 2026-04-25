@@ -2,9 +2,14 @@ import { useCallback, useMemo } from "react";
 
 import { getDisplayFileName } from "@/core/paths";
 import { getDirectTabShortcutDisplay, getShortcutDisplay } from "@/core/shortcuts";
-import type { AppInfo, NoteTab, ShortcutSetting, TabMovePosition } from "@/core/workspace";
+import type {
+  AppInfo,
+  NoteTab,
+  ShortcutSetting,
+  TabMovePosition,
+  UpdateState,
+} from "@/core/workspace";
 import type { OutlineItem } from "@/types/navigation";
-import type { UpdateState } from "@/core/workspace";
 import type { EditorFindRequest, EditorFocusRequest } from "@/types/markdown-editor";
 
 import { MarkdownEditor } from "./markdown-editor";

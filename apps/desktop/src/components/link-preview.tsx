@@ -1,16 +1,7 @@
-import type { NoteLinkPreview } from "@/core/workspace";
-
-type HoveredLinkState = {
-  href: string;
-  placement: "above" | "below";
-  preview: NoteLinkPreview | null;
-  status: "hint" | "loading" | "preview";
-  tooltipLeft: number;
-  tooltipTop: number;
-};
+import type { HoveredLinkState } from "../types/markdown-editor";
 
 type LinkPreviewProps = {
-  hoveredLink: HoveredLinkState;
+  hoveredLink: HoveredLinkState | null;
   linkOpenShortcutHint: string;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
@@ -22,6 +13,10 @@ export function LinkPreview({
   onMouseEnter,
   onMouseLeave,
 }: LinkPreviewProps) {
+  if (!hoveredLink) {
+    return null;
+  }
+
   return (
     <div
       className={`fixed z-30 ${hoveredLink.status === "preview" && hoveredLink.preview ? "w-[min(320px,calc(100vw-2rem))]" : ""}`}

@@ -1,10 +1,7 @@
+import type { ImageControlsState } from "../types/markdown-editor";
+
 import { TrashIcon } from "./icons";
 import { Button } from "@/components/ui/button";
-
-type ImageControlsState = {
-  left: number;
-  top: number;
-};
 
 type ImageControlsProps = {
   controls: ImageControlsState | null;

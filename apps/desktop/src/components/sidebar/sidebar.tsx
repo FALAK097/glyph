@@ -21,16 +21,22 @@ import type {
   SidebarProps,
   SidebarRemoveTarget,
   SidebarSkillCollectionItem,
-} from "../../types/sidebar";
+} from "@/types/sidebar";
 
-import { LogoComponent } from "../logo-component";
-import { SkillSourceLogo } from "../skills/skill-source-logo";
+import { LogoComponent } from "@/components/logo-component";
+import { SkillSourceLogo } from "@/components/skills/skill-source-logo";
 import {
   SidebarActionMenu,
   buildFileMenuItems,
   type SidebarActionMenuCoords,
 } from "./sidebar-action-menu";
-import { ChevronRightIcon, MoreVerticalIcon, PinIcon, PlusIcon, FolderPlusIcon } from "../icons";
+import {
+  ChevronRightIcon,
+  MoreVerticalIcon,
+  PinIcon,
+  PlusIcon,
+  FolderPlusIcon,
+} from "@/components/icons";
 import { SidebarTreeNode } from "./sidebar-tree-node";
 
 const normalizePathKey = (path: string) => normalizePath(path).toLowerCase();

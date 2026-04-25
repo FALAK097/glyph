@@ -1,7 +1,7 @@
-import { test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import { launchGlyph } from "../helpers";
-import { expectAppShell, openCommandPalette, selectPaletteItem } from "../navigation";
+import { expectAppShell, openCommandPalette, openWorkspace } from "../navigation";
 
 test("command palette closes on Escape key", async ({}, testInfo) => {
   const glyph = await launchGlyph();
@@ -21,12 +21,7 @@ test("command palette search filters results to matching file names", async ({},
   const glyph = await launchGlyph();
   try {
     await expectAppShell(glyph.window);
-    await glyph.window.evaluate(async (ws) => {
-      const glyphApi = (
-        window as Window & { glyph: { openFolder: (p: string) => Promise<{ rootPath: string }> } }
-      ).glyph;
-      await glyphApi.openFolder(ws);
-    }, glyph.sandbox.workspaceRoot);
+    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
 
     const paletteInput = await openCommandPalette(glyph.window);
     await paletteInput.fill("nested");

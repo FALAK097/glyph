@@ -39,7 +39,7 @@ import { TableControls } from "./table-controls";
 import { FindPanel } from "./find-panel";
 import { LinkPreview } from "./link-preview";
 import { ImageControls } from "./image-controls";
-import { ArrowDownIcon, ArrowUpIcon, OutlineIcon, SearchIcon, TrashIcon, XIcon } from "./icons";
+import { ArrowUpIcon, OutlineIcon } from "./icons";
 
 import type {
   EditorActionDetail,
@@ -53,8 +53,7 @@ import type {
   SelectionSnapshot,
   TableControlsState,
 } from "../types/markdown-editor";
-import type { OutlineItem } from "@/types/navigation";
-import type { NoteLinkPreview, UpdateState } from "@/core/workspace";
+import type { UpdateState } from "@/core/workspace";
 
 const LINK_IMAGE_PATTERN = /(!?)\[([^\]]+)\]\(([^)]+)\)$/;
 const MARKDOWN_FILE_SUFFIX_PATTERN = /\.(md|mdx|markdown)$/i;
@@ -1531,15 +1530,12 @@ export const MarkdownEditor = ({
         >
           {topContent ? <div className="mx-auto max-w-[800px] px-10 pt-5">{topContent}</div> : null}
           <TableControls
-            isActive={tableControls.active}
-            canDeleteRow={tableControls.canDeleteRow}
-            canDeleteColumn={tableControls.canDeleteColumn}
-            canDeleteTable={tableControls.canDeleteTable}
+            tableControls={tableControls}
             shouldShowOutlineRail={shouldShowOutlineRail}
             editor={editor}
           />
           <LinkPreview
-            hoveredLink={hoveredLink!}
+            hoveredLink={hoveredLink}
             linkOpenShortcutHint={linkOpenShortcutHint}
             onMouseEnter={clearHoveredLinkHideTimeout}
             onMouseLeave={scheduleHoveredLinkHide}

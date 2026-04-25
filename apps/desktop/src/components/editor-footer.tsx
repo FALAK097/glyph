@@ -31,8 +31,12 @@ export function EditorFooter({
             <span className="text-xs text-muted-foreground">{footerMetaLabel}</span>
           </>
         ) : null}
-        <div className="w-[1px] h-3 bg-border" />
-        <p className="text-xs font-medium text-foreground m-0">{saveStateLabel}</p>
+        {saveStateLabel ? (
+          <>
+            <div className="w-[1px] h-3 bg-border" />
+            <p className="text-xs font-medium text-foreground m-0">{saveStateLabel}</p>
+          </>
+        ) : null}
       </div>
       {toast ? (
         <div

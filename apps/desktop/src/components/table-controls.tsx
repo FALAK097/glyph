@@ -1,25 +1,20 @@
 import type { Editor } from "@tiptap/core";
+import type { TableControlsState } from "../types/markdown-editor";
 
 import { Button } from "@/components/ui/button";
 
 type TableControlsProps = {
-  isActive: boolean;
-  canDeleteRow: boolean;
-  canDeleteColumn: boolean;
-  canDeleteTable: boolean;
+  tableControls: TableControlsState;
   shouldShowOutlineRail: boolean;
   editor: Editor | null;
 };
 
 export function TableControls({
-  isActive,
-  canDeleteRow,
-  canDeleteColumn,
-  canDeleteTable,
+  tableControls,
   shouldShowOutlineRail,
   editor,
 }: TableControlsProps) {
-  if (!isActive) {
+  if (!tableControls.active) {
     return null;
   }
 
@@ -53,7 +48,7 @@ export function TableControls({
             variant="outline"
             size="xs"
             type="button"
-            disabled={!canDeleteRow}
+            disabled={!tableControls.canDeleteRow}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => editor?.chain().focus().deleteRow().run()}
           >
@@ -63,7 +58,7 @@ export function TableControls({
             variant="outline"
             size="xs"
             type="button"
-            disabled={!canDeleteColumn}
+            disabled={!tableControls.canDeleteColumn}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => editor?.chain().focus().deleteColumn().run()}
           >
@@ -82,7 +77,7 @@ export function TableControls({
             variant="destructive"
             size="xs"
             type="button"
-            disabled={!canDeleteTable}
+            disabled={!tableControls.canDeleteTable}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => editor?.chain().focus().deleteTable().run()}
           >

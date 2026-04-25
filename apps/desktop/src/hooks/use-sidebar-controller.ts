@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { DirectoryNode, FileDocument, WorkspaceSnapshot } from "@/core/workspace";
-import type { AppSettings } from "@/core/workspace";
-import type { SidebarItemSetting } from "@/core/workspace";
+import type {
+  AppSettings,
+  DirectoryNode,
+  FileDocument,
+  SidebarItemSetting,
+  WorkspaceSnapshot,
+} from "@/core/workspace";
 import type { DragPosition, SidebarTopLevelNode } from "@/types/sidebar";
 
 import { isPathInside, isSamePath, normalizePath } from "@/core/paths";

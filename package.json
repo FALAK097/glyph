@@ -28,9 +28,6 @@
     "typecheck:web": "pnpm --filter @glyph/web typecheck",
     "hooks:install": "git config core.hooksPath .githooks"
   },
-  "dependencies": {
-    "react-scan": "^0.5.3"
-  },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
     "oxfmt": "0.41.0",

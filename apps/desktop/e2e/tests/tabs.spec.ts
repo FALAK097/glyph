@@ -12,6 +12,7 @@ import {
   getTabFileName,
   getTabState,
   openCommandPalette,
+  openWorkspace,
   readPersistedSession,
   selectPaletteItem,
   triggerCloseOtherTabsShortcut,
@@ -24,12 +25,7 @@ test("opens notes in multiple tabs and switches between them with keyboard short
   const glyph = await launchGlyph();
   try {
     await expectAppShell(glyph.window);
-    await glyph.window.evaluate(async (ws) => {
-      const glyphApi = (
-        window as Window & { glyph: { openFolder: (p: string) => Promise<{ rootPath: string }> } }
-      ).glyph;
-      await glyphApi.openFolder(ws);
-    }, glyph.sandbox.workspaceRoot);
+    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
 
     await selectPaletteItem(glyph.window, "welcome", /welcome/i);
     await expect(glyph.window.getByText("Smoke test note content.")).toBeVisible();
@@ -157,12 +153,7 @@ test("supports last-tab and adjacent tab keyboard shortcuts across long tab rail
 
   try {
     await expectAppShell(glyph.window);
-    await glyph.window.evaluate(async (ws) => {
-      const glyphApi = (
-        window as Window & { glyph: { openFolder: (p: string) => Promise<{ rootPath: string }> } }
-      ).glyph;
-      await glyphApi.openFolder(ws);
-    }, sandbox.workspaceRoot);
+    await openWorkspace(glyph.window, sandbox.workspaceRoot);
 
     await selectPaletteItem(glyph.window, "welcome", /welcome\.md/i);
     await selectPaletteItem(glyph.window, "nested", /nested-note\.md/i);
@@ -208,18 +199,13 @@ test("supports last-tab and adjacent tab keyboard shortcuts across long tab rail
 
 test("creates and closes tabs from shortcuts and restores tab sessions after relaunch", async ({}, testInfo) => {
   const sandbox = await createGlyphSandbox();
-  let firstRun: ReturnType<typeof launchGlyph> | null = null;
-  let secondRun: ReturnType<typeof launchGlyph> | null = null;
+  let firstRun: Awaited<ReturnType<typeof launchGlyph>> | null = null;
+  let secondRun: Awaited<ReturnType<typeof launchGlyph>> | null = null;
 
   try {
     firstRun = await launchGlyph(sandbox);
     await expectAppShell(firstRun.window);
-    await firstRun.window.evaluate(async (ws) => {
-      const glyphApi = (
-        window as Window & { glyph: { openFolder: (p: string) => Promise<{ rootPath: string }> } }
-      ).glyph;
-      await glyphApi.openFolder(ws);
-    }, sandbox.workspaceRoot);
+    await openWorkspace(firstRun.window, sandbox.workspaceRoot);
     await selectPaletteItem(firstRun.window, "welcome", /welcome/i);
     await expect(firstRun.window.getByRole("tab", { name: /welcome/i })).toBeVisible();
 

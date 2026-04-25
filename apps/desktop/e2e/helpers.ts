@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 
-import type { ElectronApplication, Page, TestInfo } from "@playwright/test";
+import type { TestInfo } from "@playwright/test";
 import { _electron as electron } from "playwright";
 
 import type { GlyphHarness, GlyphSandbox } from "./types";
@@ -81,58 +81,66 @@ export async function launchGlyph(existingSandbox?: GlyphSandbox): Promise<Glyph
     timeout: 60_000,
   });
 
-  const window = await app.firstWindow();
-  const consoleMessages: string[] = [];
+  try {
+    const window = await app.firstWindow();
+    const consoleMessages: string[] = [];
 
-  window.on("console", (message) => {
-    const type = message.type();
-    if (type === "error" || type === "warning") {
-      consoleMessages.push(`[${type}] ${message.text()}`);
-    }
-  });
+    window.on("console", (message) => {
+      const type = message.type();
+      if (type === "error" || type === "warning") {
+        consoleMessages.push(`[${type}] ${message.text()}`);
+      }
+    });
 
-  window.on("pageerror", (error) => {
-    consoleMessages.push(`[pageerror] ${error.message}`);
-  });
+    window.on("pageerror", (error) => {
+      consoleMessages.push(`[pageerror] ${error.message}`);
+    });
 
-  await window.context().tracing.start({
-    screenshots: true,
-    snapshots: true,
-  });
+    await window.context().tracing.start({
+      screenshots: true,
+      snapshots: true,
+    });
 
-  const stop = async (testInfo: TestInfo) => {
-    try {
-      if (testInfo.status !== testInfo.expectedStatus) {
-        await window.screenshot({
-          animations: "disabled",
-          path: testInfo.outputPath("failure.png"),
-        });
-        await window.context().tracing.stop({
-          path: testInfo.outputPath("trace.zip"),
-        });
+    const stop = async (testInfo: TestInfo) => {
+      try {
+        if (testInfo.status !== testInfo.expectedStatus) {
+          await window.screenshot({
+            animations: "disabled",
+            path: testInfo.outputPath("failure.png"),
+          });
+          await window.context().tracing.stop({
+            path: testInfo.outputPath("trace.zip"),
+          });
 
-        if (consoleMessages.length > 0) {
-          await fs.writeFile(
-            testInfo.outputPath("renderer-console.txt"),
-            consoleMessages.join("\n"),
-          );
+          if (consoleMessages.length > 0) {
+            await fs.writeFile(
+              testInfo.outputPath("renderer-console.txt"),
+              consoleMessages.join("\n"),
+            );
+          }
+        } else {
+          await window.context().tracing.stop();
         }
-      } else {
-        await window.context().tracing.stop();
-      }
-    } finally {
-      await app.close();
+      } finally {
+        await app.close();
 
-      if (ownsSandbox) {
-        await sandbox.cleanup();
+        if (ownsSandbox) {
+          await sandbox.cleanup();
+        }
       }
+    };
+
+    return {
+      app,
+      sandbox,
+      stop,
+      window,
+    };
+  } catch (error) {
+    await app.close();
+    if (ownsSandbox) {
+      await sandbox.cleanup();
     }
-  };
-
-  return {
-    app,
-    sandbox,
-    stop,
-    window,
-  };
+    throw error;
+  }
 }

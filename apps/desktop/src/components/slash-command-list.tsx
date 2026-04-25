@@ -1,10 +1,11 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { formatKeysForPlatform, splitShortcutTokens } from "@/core/shortcuts";
+
 import type {
   SlashCommandItem,
   SlashCommandListHandle,
   SlashCommandListProps,
 } from "../types/slash-command";
-import { formatKeysForPlatform, splitShortcutTokens } from "@/core/shortcuts";
 
 /**
  * Render a shortcut string as individual `<kbd>` token spans.

@@ -1,29 +1,19 @@
-import { createPortal } from "react-dom";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { DragEvent, MouseEvent, ReactNode } from "react";
+import type { DragEvent, MouseEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getDisplayFileName, isSamePath } from "@/lib/paths";
 
-import { FileManagerLogo } from "./file-manager-logo";
 import {
-  ChevronRightIcon,
-  FileIcon,
-  FolderIcon,
-  MoreVerticalIcon,
-  PinIcon,
-  PencilIcon,
-  TrashIcon,
-  XIcon,
-} from "./icons";
-import type {
-  DragPosition,
-  SidebarRemoveTarget,
-  SidebarTreeNodeMenuCoords,
-  SidebarTreeNodeProps,
-} from "../types/sidebar";
+  SidebarActionMenu,
+  buildFileMenuItems,
+  buildFolderMenuItems,
+  type SidebarActionMenuCoords,
+} from "./sidebar-action-menu";
+import { ChevronRightIcon, FileIcon, FolderIcon, MoreVerticalIcon, PinIcon } from "./icons";
+import type { DragPosition, SidebarRemoveTarget, SidebarTreeNodeProps } from "../types/sidebar";
 
 let globalDraggedSidebarPath: string | null = null;
 
@@ -53,7 +43,7 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const [dropPosition, setDropPosition] = useState<DragPosition | null>(null);
-  const [menuCoords, setMenuCoords] = useState<SidebarTreeNodeMenuCoords | null>(null);
+  const [menuCoords, setMenuCoords] = useState<SidebarActionMenuCoords | null>(null);
   const renameInputRef = useRef<HTMLInputElement | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const displayFileName = useMemo(() => getDisplayFileName(node.name), [node.name]);
@@ -62,11 +52,6 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
   const pinnedPathList = pinnedPaths ?? [];
   const isPinned = pinnedPathList.some((path) => isSamePath(path, node.path));
   const isActive = isSamePath(activePath, node.path);
-  const focusMenuButton = useCallback(() => {
-    window.requestAnimationFrame(() => {
-      menuButtonRef.current?.focus();
-    });
-  }, []);
 
   const containerClassName = useMemo(() => {
     if (dropPosition === "before") {
@@ -236,34 +221,44 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
       }
     : {};
 
-  const renderMenu = (content: ReactNode, ariaLabel: string) => {
-    if (!showMenu || !menuCoords) {
-      return null;
-    }
+  const fileMenuItems = buildFileMenuItems({
+    displayFileName,
+    onRename: () => {
+      setRenameValue(displayFileName);
+      setIsRenaming(true);
+    },
+    onRevealInFinder: () => {
+      onRevealInFinder(node.path);
+    },
+    onRemove: () => {
+      onRequestRemoveFile?.({ path: node.path, name: node.name });
+    },
+    onDelete: () => {
+      onRequestDelete({ path: node.path, name: node.name });
+    },
+    revealLabel: revealLabel ?? "Reveal in Finder",
+  });
 
-    return createPortal(
-      <>
-        <button
-          aria-label={ariaLabel}
-          className="fixed inset-0 z-40 cursor-default bg-transparent outline-none"
-          onClick={(event) => {
-            event.stopPropagation();
-            setShowMenu(false);
-            focusMenuButton();
-          }}
-          type="button"
-          tabIndex={-1}
-        />
-        <div
-          className="fixed z-50 w-[142px] rounded-md border border-border bg-popover py-1 shadow-lg"
-          style={{ top: menuCoords.top, left: menuCoords.left }}
-        >
-          {content}
-        </div>
-      </>,
-      document.body,
-    );
-  };
+  const folderMenuItems = buildFolderMenuItems({
+    folderName: node.name,
+    onRename: () => {
+      setRenameValue(node.name);
+      setIsRenaming(true);
+    },
+    onRevealInFinder: () => {
+      onRevealInFinder(node.path);
+    },
+    onRemove: () => {
+      const folder: SidebarRemoveTarget = { path: node.path, name: node.name };
+      onRequestRemoveFolder(folder);
+    },
+    onDelete: onRequestDeleteFolder
+      ? () => {
+          onRequestDeleteFolder({ path: node.path, name: node.name });
+        }
+      : undefined,
+    revealLabel: revealLabel ?? "Reveal in Finder",
+  });
 
   if (node.type === "directory") {
     return (
@@ -387,75 +382,14 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
           </div>
         ) : null}
 
-        {renderMenu(
-          <>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-white/10 dark:hover:bg-white/10"
-              onClick={(event) => {
-                event.stopPropagation();
-                setRenameValue(node.name);
-                setIsRenaming(true);
-                setShowMenu(false);
-              }}
-              type="button"
-            >
-              <PencilIcon size={14} className="opacity-70" />
-              Rename
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-white/10 dark:hover:bg-white/10"
-              onClick={(event) => {
-                event.stopPropagation();
-                onRevealInFinder(node.path);
-                setShowMenu(false);
-                focusMenuButton();
-              }}
-              type="button"
-            >
-              <FileManagerLogo label={revealLabel} size={14} className="opacity-70" />
-              {revealLabel}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-white/10 dark:hover:bg-white/10"
-              onClick={(event) => {
-                event.stopPropagation();
-                const folder: SidebarRemoveTarget = {
-                  path: node.path,
-                  name: node.name,
-                };
-                onRequestRemoveFolder(folder);
-                setShowMenu(false);
-              }}
-              type="button"
-            >
-              <XIcon size={14} className="opacity-70" />
-              Remove
-            </Button>
-            {onRequestDeleteFolder ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-destructive/10 hover:text-destructive"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onRequestDeleteFolder({ path: node.path, name: node.name });
-                  setShowMenu(false);
-                }}
-                type="button"
-              >
-                <TrashIcon size={14} className="opacity-70" />
-                Delete
-              </Button>
-            ) : null}
-          </>,
-          "Close folder menu",
-        )}
+        <SidebarActionMenu
+          open={showMenu && node.type === "directory"}
+          coords={menuCoords}
+          onClose={() => setShowMenu(false)}
+          onCloseFocusRef={menuButtonRef}
+          items={folderMenuItems}
+          ariaLabel="Close folder menu"
+        />
       </div>
     );
   }
@@ -560,69 +494,14 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
         ) : null}
       </div>
 
-      {renderMenu(
-        <>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-white/10 dark:hover:bg-white/10"
-            onClick={(event) => {
-              event.stopPropagation();
-              setRenameValue(displayFileName);
-              setIsRenaming(true);
-              setShowMenu(false);
-            }}
-            type="button"
-          >
-            <PencilIcon size={14} className="opacity-70" />
-            Rename
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-white/10 dark:hover:bg-white/10"
-            onClick={(event) => {
-              event.stopPropagation();
-              onRevealInFinder(node.path);
-              setShowMenu(false);
-              focusMenuButton();
-            }}
-            type="button"
-          >
-            <FileManagerLogo label={revealLabel} size={14} className="opacity-70" />
-            {revealLabel}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-white/10 dark:hover:bg-white/10"
-            onClick={(event) => {
-              event.stopPropagation();
-              onRequestRemoveFile?.({ path: node.path, name: node.name });
-              setShowMenu(false);
-            }}
-            type="button"
-          >
-            <XIcon size={14} className="opacity-70" />
-            Remove
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-destructive/10 hover:text-destructive"
-            onClick={(event) => {
-              event.stopPropagation();
-              onRequestDelete({ path: node.path, name: node.name });
-              setShowMenu(false);
-            }}
-            type="button"
-          >
-            <TrashIcon size={14} className="opacity-70" />
-            Delete
-          </Button>
-        </>,
-        "Close note menu",
-      )}
+      <SidebarActionMenu
+        open={showMenu && node.type === "file"}
+        coords={menuCoords}
+        onClose={() => setShowMenu(false)}
+        onCloseFocusRef={menuButtonRef}
+        items={fileMenuItems}
+        ariaLabel="Close note menu"
+      />
     </div>
   );
 });

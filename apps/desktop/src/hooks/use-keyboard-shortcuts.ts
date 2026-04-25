@@ -19,8 +19,6 @@ type UseKeyboardShortcutsOptions = {
   syncOpenedFile: (file: FileDocument, options?: { recordHistory?: boolean }) => Promise<void>;
   syncWorkspace: (workspace: WorkspaceSnapshot) => void;
   setIsWorkspaceMode: React.Dispatch<React.SetStateAction<boolean>>;
-  navigateBack: () => Promise<void>;
-  navigateForward: () => Promise<void>;
   requestFindInNote: () => void;
   triggerUpdateAction: () => Promise<void>;
   splitRight: () => void;
@@ -54,8 +52,6 @@ export function useKeyboardShortcuts({
   syncOpenedFile,
   syncWorkspace,
   setIsWorkspaceMode,
-  navigateBack,
-  navigateForward,
   requestFindInNote,
   triggerUpdateAction,
   splitRight,
@@ -112,13 +108,19 @@ export function useKeyboardShortcuts({
         return;
       }
 
+      const isPreviousTabBracket =
+        primaryPressed && !event.altKey && !event.shiftKey && event.key === "[";
+      const isNextTabBracket =
+        primaryPressed && !event.altKey && !event.shiftKey && event.key === "]";
       const isPreviousBracketShortcut =
         primaryPressed &&
         !event.altKey &&
+        event.shiftKey &&
         matchShortcut(event, `${MODIFIER_TOKENS.shift} ${MODIFIER_TOKENS.cmdOrCtrl} [`, platform);
       const isNextBracketShortcut =
         primaryPressed &&
         !event.altKey &&
+        event.shiftKey &&
         matchShortcut(event, `${MODIFIER_TOKENS.shift} ${MODIFIER_TOKENS.cmdOrCtrl} ]`, platform);
       const isPreviousCtrlTabShortcut =
         !hasConfiguredShortcutMatch &&
@@ -137,13 +139,19 @@ export function useKeyboardShortcuts({
         !event.repeat &&
         event.key === "Tab";
 
-      if (!hasConfiguredShortcutMatch && (isPreviousBracketShortcut || isPreviousCtrlTabShortcut)) {
+      if (
+        !hasConfiguredShortcutMatch &&
+        (isPreviousTabBracket || isPreviousBracketShortcut || isPreviousCtrlTabShortcut)
+      ) {
         event.preventDefault();
         void activatePreviousTab();
         return;
       }
 
-      if (!hasConfiguredShortcutMatch && (isNextBracketShortcut || isNextCtrlTabShortcut)) {
+      if (
+        !hasConfiguredShortcutMatch &&
+        (isNextTabBracket || isNextBracketShortcut || isNextCtrlTabShortcut)
+      ) {
         event.preventDefault();
         void activateNextTab();
         return;
@@ -154,8 +162,6 @@ export function useKeyboardShortcuts({
         "command-palette",
         "find-in-note",
         "settings",
-        "navigate-back",
-        "navigate-forward",
         "focus-mode",
         "check-updates",
         "new-note",
@@ -188,12 +194,6 @@ export function useKeyboardShortcuts({
             break;
           case "settings":
             setIsSettingsOpen((value) => !value);
-            break;
-          case "navigate-back":
-            void navigateBack();
-            break;
-          case "navigate-forward":
-            void navigateForward();
             break;
           case "focus-mode":
             void toggleFocusMode();
@@ -313,8 +313,6 @@ export function useKeyboardShortcuts({
     syncOpenedFile,
     syncWorkspace,
     setIsWorkspaceMode,
-    navigateBack,
-    navigateForward,
     requestFindInNote,
     triggerUpdateAction,
     splitRight,

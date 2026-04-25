@@ -53,11 +53,6 @@ export type SidebarProps = {
   onCreateFolder?: () => void;
 };
 
-export type SidebarTreeNodeMenuCoords = {
-  top: number;
-  left: number;
-};
-
 export type SidebarDeleteTarget = {
   path: string;
   name: string;

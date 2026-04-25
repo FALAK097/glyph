@@ -4,7 +4,6 @@ import { getDisplayFileName, isSamePath, normalizePath } from "@/core/paths";
 import { countGroupedSkills, groupSkillsForBrowse } from "@/core/skill-groups";
 import { getShortcutDisplay } from "@/core/shortcuts";
 import { SKILL_AGENT_CATALOG } from "@/core/skill-agent-catalog";
-import type { SkillEntry } from "@/core/skills";
 import type { ThemeMode, TabMovePosition } from "@/core/workspace";
 import { useLayoutStore } from "@/store/layout";
 import { useSessionStore } from "@/store/session";
@@ -30,23 +29,7 @@ import type { SplitViewActivePaneContextValue, SplitViewContextValue } from "./s
 import { TooltipProvider } from "./ui/tooltip";
 import { useUpdateStateFlags } from "./update-notification";
 
-function matchesPaletteQuery(query: string, ...values: Array<string | null | undefined>) {
-  if (!query) {
-    return true;
-  }
-
-  return values.some((value) => value?.toLowerCase().includes(query));
-}
-
-function matchesSkillPaletteFallback(query: string, skill: SkillEntry) {
-  if (!query) {
-    return true;
-  }
-
-  return [skill.name, skill.description, skill.slug, skill.sourceName, skill.tags.join(" ")].some(
-    (value) => value?.toLowerCase().includes(query),
-  );
-}
+import { matchesPaletteQuery, matchesSkillPaletteFallback } from "./desktop-app/palette-utils";
 
 export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const sessionHasHydrated = useSessionStore((state) => state.hasHydrated);

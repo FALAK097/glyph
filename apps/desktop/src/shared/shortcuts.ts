@@ -126,8 +126,6 @@ export const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
   { id: "save", label: "Save", keys: `${MODIFIER_TOKENS.cmdOrCtrl} S` },
   { id: "settings", label: "Settings", keys: `${MODIFIER_TOKENS.cmdOrCtrl} ,` },
   { id: "toggle-sidebar", label: "Toggle Sidebar", keys: `${MODIFIER_TOKENS.cmdOrCtrl} \\` },
-  { id: "navigate-back", label: "Navigate Back", keys: `${MODIFIER_TOKENS.cmdOrCtrl} [` },
-  { id: "navigate-forward", label: "Navigate Forward", keys: `${MODIFIER_TOKENS.cmdOrCtrl} ]` },
   {
     id: "focus-mode",
     label: "Toggle Focus Mode",
@@ -219,7 +217,7 @@ export function getAdjacentTabShortcutDisplay(
   platform?: string,
 ): string {
   if (isMacPlatform(platform)) {
-    return direction === "next" ? "⇧⌘]" : "⇧⌘[";
+    return direction === "next" ? "⌘]" : "⌘[";
   }
 
   return direction === "next" ? "Ctrl+Tab" : "Ctrl+Shift+Tab";
@@ -230,13 +228,14 @@ export function matchAdjacentTabShortcut(
   direction: "next" | "previous",
   platform?: string,
 ): boolean {
-  return matchShortcut(
-    event,
-    isMacPlatform(platform)
-      ? `⇧ ⌘ ${direction === "next" ? "]" : "["}`
-      : `${direction === "next" ? "⌘ Tab" : "⇧ ⌘ Tab"}`,
-    platform,
-  );
+  if (isMacPlatform(platform)) {
+    const key = direction === "next" ? "]" : "[";
+    return (
+      matchShortcut(event, `⌘ ${key}`, platform) || matchShortcut(event, `⇧ ⌘ ${key}`, platform)
+    );
+  }
+
+  return matchShortcut(event, direction === "next" ? "⌘ Tab" : "⇧ ⌘ Tab", platform);
 }
 
 const MODIFIER_TOKENS_SET = new Set(Object.values(MODIFIER_TOKENS));

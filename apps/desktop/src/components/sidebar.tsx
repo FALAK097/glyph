@@ -1,4 +1,3 @@
-import { createPortal } from "react-dom";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, MouseEvent } from "react";
 
@@ -27,15 +26,11 @@ import type {
 import { LogoComponent } from "./logo-component";
 import { SkillSourceLogo } from "./skill-source-logo";
 import {
-  ChevronRightIcon,
-  MoreVerticalIcon,
-  PencilIcon,
-  PinIcon,
-  PlusIcon,
-  TrashIcon,
-  XIcon,
-  FolderPlusIcon,
-} from "./icons";
+  SidebarActionMenu,
+  buildFileMenuItems,
+  type SidebarActionMenuCoords,
+} from "./sidebar-action-menu";
+import { ChevronRightIcon, MoreVerticalIcon, PinIcon, PlusIcon, FolderPlusIcon } from "./icons";
 import { SidebarTreeNode } from "./sidebar-tree-node";
 
 const normalizePathKey = (path: string) => normalizePath(path).toLowerCase();
@@ -48,6 +43,8 @@ type SidebarShortcutRowProps = {
   onDeleteFile: (filePath: string) => void;
   onRequestRemoveFile?: (file: SidebarRemoveTarget) => void;
   onRenameFile: (filePath: string, newName: string) => void;
+  onRevealInFinder?: (filePath: string) => void;
+  revealLabel?: string;
 };
 
 const SidebarShortcutRow = memo(function SidebarShortcutRow({
@@ -58,9 +55,11 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
   onDeleteFile,
   onRequestRemoveFile,
   onRenameFile,
+  onRevealInFinder,
+  revealLabel = "Reveal in Finder",
 }: SidebarShortcutRowProps) {
   const [showMenu, setShowMenu] = useState(false);
-  const [menuCoords, setMenuCoords] = useState<{ top: number; left: number } | null>(null);
+  const [menuCoords, setMenuCoords] = useState<SidebarActionMenuCoords | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -71,17 +70,6 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
     const fileName = segments.pop() ?? item.title;
     return getDisplayFileName(fileName);
   }, [item.path, item.title]);
-
-  const focusMenuButton = useCallback(() => {
-    window.requestAnimationFrame(() => {
-      if (menuButtonRef.current?.isConnected) {
-        menuButtonRef.current.focus();
-        return;
-      }
-
-      document.querySelector<HTMLElement>("[data-glyph-editor='true']")?.focus();
-    });
-  }, []);
 
   const focusEditorSurface = useCallback(() => {
     window.requestAnimationFrame(() => {
@@ -117,84 +105,31 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
   const openMenu = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
 
-    if (!showMenu) {
-      const rect = event.currentTarget.getBoundingClientRect();
+    if (!showMenu && menuButtonRef.current) {
+      const rect = menuButtonRef.current.getBoundingClientRect();
       setMenuCoords({ top: rect.bottom + 4, left: rect.right + 4 });
     }
 
     setShowMenu((value) => !value);
   };
 
-  const renderMenu = () => {
-    if (!showMenu || !menuCoords) {
-      return null;
-    }
-
-    return createPortal(
-      <>
-        <button
-          aria-label="Close note actions"
-          className="fixed inset-0 z-40 cursor-default bg-transparent outline-none"
-          onClick={(event) => {
-            event.stopPropagation();
-            setShowMenu(false);
-            focusMenuButton();
-          }}
-          type="button"
-          tabIndex={-1}
-        />
-        <div
-          className="fixed z-50 w-[142px] rounded-md border border-border bg-white dark:bg-popover py-1 shadow-lg"
-          style={{ top: menuCoords.top, left: menuCoords.left }}
-        >
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
-            onClick={(event) => {
-              event.stopPropagation();
-              setRenameValue(displayFileName);
-              setIsRenaming(true);
-              setShowMenu(false);
-            }}
-            type="button"
-          >
-            <PencilIcon size={14} className="opacity-70" />
-            Rename
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm"
-            onClick={(event) => {
-              event.stopPropagation();
-              onRequestRemoveFile?.({ path: item.path, name: item.title });
-              setShowMenu(false);
-            }}
-            type="button"
-          >
-            <XIcon size={14} className="opacity-70" />
-            Remove
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-auto w-full justify-start gap-2 rounded-none px-2.5 py-1.5 text-sm hover:bg-destructive/10 hover:text-destructive"
-            onClick={(event) => {
-              event.stopPropagation();
-              onDeleteFile(item.path);
-              setShowMenu(false);
-            }}
-            type="button"
-          >
-            <TrashIcon size={14} className="opacity-70" />
-            Delete
-          </Button>
-        </div>
-      </>,
-      document.body,
-    );
-  };
+  const menuItems = buildFileMenuItems({
+    displayFileName,
+    onRename: () => {
+      setRenameValue(displayFileName);
+      setIsRenaming(true);
+    },
+    onRevealInFinder: () => {
+      onRevealInFinder?.(item.path);
+    },
+    onRemove: () => {
+      onRequestRemoveFile?.({ path: item.path, name: item.title });
+    },
+    onDelete: () => {
+      onDeleteFile(item.path);
+    },
+    revealLabel: revealLabel ?? "Reveal in Finder",
+  });
 
   return (
     <div
@@ -277,7 +212,14 @@ const SidebarShortcutRow = memo(function SidebarShortcutRow({
           </div>
         ) : null}
       </div>
-      {renderMenu()}
+      <SidebarActionMenu
+        open={showMenu}
+        coords={menuCoords}
+        onClose={() => setShowMenu(false)}
+        onCloseFocusRef={menuButtonRef}
+        items={menuItems}
+        ariaLabel="Close note actions"
+      />
     </div>
   );
 });
@@ -290,6 +232,8 @@ type SidebarShortcutListProps = {
   onDeleteFile: (filePath: string) => void;
   onRequestRemoveFile?: (file: SidebarRemoveTarget) => void;
   onRenameFile: (filePath: string, newName: string) => void;
+  onRevealInFinder?: (filePath: string) => void;
+  revealLabel?: string;
 };
 
 const SidebarShortcutList = memo(function SidebarShortcutList({
@@ -300,6 +244,8 @@ const SidebarShortcutList = memo(function SidebarShortcutList({
   onDeleteFile,
   onRequestRemoveFile,
   onRenameFile,
+  onRevealInFinder,
+  revealLabel,
 }: SidebarShortcutListProps) {
   if (items.length === 0) {
     return null;
@@ -317,6 +263,8 @@ const SidebarShortcutList = memo(function SidebarShortcutList({
           onDeleteFile={onDeleteFile}
           onRequestRemoveFile={onRequestRemoveFile}
           onRenameFile={onRenameFile}
+          onRevealInFinder={onRevealInFinder}
+          revealLabel={revealLabel}
         />
       ))}
     </div>
@@ -582,6 +530,8 @@ export const Sidebar = ({
                       setNodeToDelete({ path: filePath, name });
                     }}
                     onRenameFile={onRenameFile}
+                    onRevealInFinder={onRevealInFinder}
+                    revealLabel={revealLabel}
                   />
                 </div>
               ) : null}

@@ -2147,8 +2147,6 @@ export const useDesktopAppController = (
     syncOpenedFile,
     syncWorkspace,
     setIsWorkspaceMode,
-    navigateBack,
-    navigateForward,
     requestFindInNote,
     triggerUpdateAction,
     splitRight,

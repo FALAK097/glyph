@@ -1,13 +1,13 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
-import { getErrorMessage } from "@/lib/errors";
-import { isSamePath } from "@/lib/paths";
+import { getErrorMessage } from "@/core/errors";
+import { isSamePath } from "@/core/paths";
 import {
   parseSkillDocument,
   type SkillDocument,
   type SkillDocumentKind,
   type SkillLibrarySnapshot,
-} from "@/shared/skills";
+} from "@/core/skills";
 import { useSessionStore } from "@/store/session";
 
 export const ALL_SKILL_SOURCES_ID = "all-skills";

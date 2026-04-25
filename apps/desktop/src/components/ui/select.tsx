@@ -1,7 +1,7 @@
 import type { ComponentProps } from "react";
 import { Select as SelectPrimitive } from "@base-ui/react/select";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/core/utils";
 import { UnfoldMoreIcon, TickIcon, ArrowUpIcon, ArrowDownIcon } from "@/components/icons";
 
 const Select = SelectPrimitive.Root;

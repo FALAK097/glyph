@@ -4,7 +4,7 @@ import type { DragEvent, MouseEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { getDisplayFileName, isSamePath } from "@/lib/paths";
+import { getDisplayFileName, isSamePath } from "@/core/paths";
 
 import {
   SidebarActionMenu,
@@ -12,8 +12,8 @@ import {
   buildFolderMenuItems,
   type SidebarActionMenuCoords,
 } from "./sidebar-action-menu";
-import { ChevronRightIcon, FileIcon, FolderIcon, MoreVerticalIcon, PinIcon } from "./icons";
-import type { DragPosition, SidebarRemoveTarget, SidebarTreeNodeProps } from "../types/sidebar";
+import { ChevronRightIcon, FileIcon, FolderIcon, MoreVerticalIcon, PinIcon } from "../icons";
+import type { DragPosition, SidebarRemoveTarget, SidebarTreeNodeProps } from "../../types/sidebar";
 
 let globalDraggedSidebarPath: string | null = null;
 

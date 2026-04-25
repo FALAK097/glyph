@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
 
-import { isSamePath } from "@/lib/paths";
-import { cn } from "@/lib/utils";
-import type { TabMovePosition } from "@/shared/workspace";
+import { isSamePath } from "@/core/paths";
+import { cn } from "@/core/utils";
+import type { TabMovePosition } from "@/core/workspace";
 
 import { XIcon } from "./icons";
 

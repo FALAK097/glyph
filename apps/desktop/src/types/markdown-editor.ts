@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import type { AppInfo, UpdateState } from "../shared/workspace";
+import type { AppInfo, UpdateState } from "@/core/workspace";
 import type { OutlineItem } from "@/types/navigation";
 
 export type EditorFocusRequest = {

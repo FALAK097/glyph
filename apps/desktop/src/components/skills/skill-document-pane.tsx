@@ -1,15 +1,15 @@
 import { useCallback, useMemo } from "react";
 
-import { formatByteSize } from "@/lib/format-byte-size";
+import { formatByteSize } from "@/core/format-byte-size";
 import {
   parseSkillDocument,
   serializeSkillDocument,
   type SkillDocument,
   type SkillDocumentKind,
-} from "@/shared/skills";
+} from "@/core/skills";
 
-import { MarkdownEditor } from "./markdown-editor";
-import { Button } from "./ui/button";
+import { MarkdownEditor } from "../markdown-editor";
+import { Button } from "../ui/button";
 
 const OUTLINE_HEADING_PATTERN = /^#{1,4}\s+\S/;
 

@@ -29,13 +29,13 @@ import type {
   SearchResult,
   UpdateState,
   WorkspaceSnapshot,
-} from "../src/shared/workspace.js";
+} from "../src/core/workspace.js";
 import {
   DEFAULT_SHORTCUTS,
   canonicalizeShortcut,
   mergeShortcutSettings,
   toElectronAccelerator,
-} from "../src/shared/shortcuts.js";
+} from "../src/core/shortcuts.js";
 
 const { autoUpdater } = electronUpdater;
 

@@ -15,8 +15,8 @@ import { TextSelection } from "@tiptap/pm/state";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { Markdown } from "tiptap-markdown";
 
-import { createHeadingId } from "@/lib/note-navigation";
-import { getFolderRevealLabel } from "@/lib/platform";
+import { createHeadingId } from "@/core/note-navigation";
+import { getFolderRevealLabel } from "@/core/platform";
 
 import { CustomCodeBlockLowlight } from "./tiptap-extension/code-block-lowlight";
 import {
@@ -33,13 +33,13 @@ import { EditorToolbar } from "./editor-toolbar";
 import { EditorFooter } from "./editor-footer";
 import { EditorDialogs } from "./editor-dialogs";
 import { useUpdateStateFlags } from "./update-notification";
-import { SlashCommand } from "./slash-command";
+import { SlashCommand } from "@/core/slash-command";
 import { TableOfContents } from "./table-of-contents";
 import { ArrowDownIcon, ArrowUpIcon, OutlineIcon, SearchIcon, TrashIcon, XIcon } from "./icons";
 
 import type { MarkdownEditorProps, MarkdownEditorToast } from "../types/markdown-editor";
 import type { OutlineItem } from "@/types/navigation";
-import type { NoteLinkPreview, UpdateState } from "../shared/workspace";
+import type { NoteLinkPreview, UpdateState } from "@/core/workspace";
 
 const LINK_IMAGE_PATTERN = /(!?)\[([^\]]+)\]\(([^)]+)\)$/;
 const MARKDOWN_FILE_SUFFIX_PATTERN = /\.(md|mdx|markdown)$/i;

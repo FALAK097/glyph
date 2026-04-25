@@ -4,7 +4,7 @@ import type {
   FileDocument,
   SidebarItemSetting,
   WorkspaceSnapshot,
-} from "../shared/workspace";
+} from "./workspace";
 
 import { getBaseName, isFileInsideWorkspace, isSamePath, normalizePath } from "./paths";
 

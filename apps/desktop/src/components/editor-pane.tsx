@@ -1,13 +1,13 @@
 import { memo, useCallback, useLayoutEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import { getDisplayFileName, isSamePath } from "@/lib/paths";
+import { getDisplayFileName, isSamePath } from "@/core/paths";
 import {
   getDirectTabShortcutDisplay,
   getPrimaryShortcutPrefix,
   getShortcutDisplay,
-} from "@/shared/shortcuts";
-import type { NoteTab, TabMovePosition } from "@/shared/workspace";
+} from "@/core/shortcuts";
+import type { NoteTab, TabMovePosition } from "@/core/workspace";
 import { useLayoutStore } from "@/store/layout";
 import { useSessionStore } from "@/store/session";
 import { useWorkspaceStore } from "@/store/workspace";

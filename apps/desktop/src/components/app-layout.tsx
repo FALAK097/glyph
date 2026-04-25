@@ -5,7 +5,7 @@ import type {
   SidebarTopLevelNode,
 } from "@/types/sidebar";
 
-import { Sidebar } from "./sidebar";
+import { Sidebar } from "./sidebar/sidebar";
 
 type AppLayoutProps = {
   shouldCollapseSidebar: boolean;

@@ -1,9 +1,9 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { normalizePath } from "@/lib/paths";
-import type { SkillDocumentKind } from "@/shared/skills";
-import type { LayoutNode, PaneState } from "@/shared/workspace";
+import { normalizePath } from "@/core/paths";
+import type { SkillDocumentKind } from "@/core/skills";
+import type { LayoutNode, PaneState } from "@/core/workspace";
 
 const SESSION_STORAGE_KEY = "glyph.editor-session";
 const MAX_SCROLL_ENTRIES = 160;

@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
-import { getDisplayFileName, isSamePath, normalizePath } from "@/lib/paths";
-import { countGroupedSkills, groupSkillsForBrowse } from "@/lib/skill-groups";
-import { getShortcutDisplay } from "@/shared/shortcuts";
-import { SKILL_AGENT_CATALOG } from "@/shared/skill-agent-catalog";
-import type { SkillEntry, SkillSourceKind, SkillToolKind } from "@/shared/skills";
+import { getDisplayFileName, isSamePath, normalizePath } from "@/core/paths";
+import { countGroupedSkills, groupSkillsForBrowse } from "@/core/skill-groups";
+import { getShortcutDisplay } from "@/core/shortcuts";
+import { SKILL_AGENT_CATALOG } from "@/core/skill-agent-catalog";
+import type { SkillEntry, SkillSourceKind, SkillToolKind } from "@/core/skills";
 import { useLayoutStore } from "@/store/layout";
 import { useSessionStore } from "@/store/session";
 import { useWorkspaceStore } from "@/store/workspace";
-import type { ThemeMode, TabMovePosition } from "@/shared/workspace";
+import type { ThemeMode, TabMovePosition } from "@/core/workspace";
 import type { DesktopAppProps } from "@/types/app";
 import type { CommandPaletteItem } from "@/types/command-palette";
 
@@ -21,8 +21,8 @@ import { EditorToolbar } from "./editor-toolbar";
 import { NoteConfirmDialog } from "./note-confirm-dialog";
 import { NoteRenameDialog } from "./note-rename-dialog";
 import { SettingsPanel } from "./settings-panel";
-import { SkillView } from "./skill-view";
-import { SkillsBrowserPane } from "./skills-browser-pane";
+import { SkillView } from "./skills/skill-view";
+import { SkillsBrowserPane } from "./skills/skills-browser-pane";
 import { SplitContainer } from "./split-container";
 import { SplitViewActivePaneProvider, SplitViewProvider } from "./split-view-context";
 import type { SplitViewActivePaneContextValue, SplitViewContextValue } from "./split-view-context";

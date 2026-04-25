@@ -1,8 +1,8 @@
-import type { SkillBrowserItem } from "@/lib/skill-groups";
-import { cn } from "@/lib/utils";
-import { Input } from "./ui/input";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
-import { SearchIcon } from "./icons";
+import type { SkillBrowserItem } from "@/core/skill-groups";
+import { cn } from "@/core/utils";
+import { Input } from "../ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { SearchIcon } from "../icons";
 import { SkillSourceLogo, SkillSourceLogoStack } from "./skill-source-logo";
 
 const SKELETON_COUNT = 4;

@@ -4,7 +4,7 @@ import type {
   SlashCommandListHandle,
   SlashCommandListProps,
 } from "../types/slash-command";
-import { formatKeysForPlatform, splitShortcutTokens } from "../shared/shortcuts";
+import { formatKeysForPlatform, splitShortcutTokens } from "@/core/shortcuts";
 
 /**
  * Render a shortcut string as individual `<kbd>` token spans.

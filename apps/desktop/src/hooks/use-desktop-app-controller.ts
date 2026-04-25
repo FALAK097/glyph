@@ -16,15 +16,15 @@ import {
   getDirectTabShortcutDisplay,
   getDirectTabTargetIndex,
   getShortcutDisplay,
-} from "@/core/shortcuts";
-import type { DirectoryNode, FileDocument, LayoutNode, TabMovePosition } from "@/core/workspace";
+} from "@/shared/shortcuts";
+import type { DirectoryNode, FileDocument, LayoutNode, TabMovePosition } from "@/shared/workspace";
 import { useLayoutStore } from "@/store/layout";
 import { useSessionStore } from "@/store/session";
 import { useWorkspaceStore } from "@/store/workspace";
 import { applyTheme } from "@/theme/themes";
 
-import { getErrorMessage } from "@/core/errors";
-import { buildBreadcrumbs, extractMarkdownOutline } from "@/core/note-navigation";
+import { getErrorMessage } from "@/lib/errors";
+import { buildBreadcrumbs, extractMarkdownOutline } from "@/lib/note-navigation";
 import {
   getBaseName,
   getDirName,
@@ -32,8 +32,8 @@ import {
   isFileInsideWorkspace,
   isSamePath,
   normalizePath,
-} from "@/core/paths";
-import { getFolderRevealLabel } from "@/core/platform";
+} from "@/lib/paths";
+import { getFolderRevealLabel } from "@/lib/platform";
 import {
   orderSidebarNodes,
   removeSidebarPath,
@@ -41,8 +41,8 @@ import {
   renameSidebarFolder,
   upsertSidebarFile,
   upsertSidebarFolder,
-} from "@/core/sidebar-tree";
-import { flattenFiles } from "@/core/workspace-tree";
+} from "@/lib/sidebar-tree";
+import { flattenFiles } from "@/lib/workspace-tree";
 
 import type { CommandPaletteItem } from "@/types/command-palette";
 

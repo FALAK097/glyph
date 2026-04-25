@@ -43,6 +43,7 @@ async function createGlyphSandbox(): Promise<GlyphSandbox> {
   const welcomeNotePath = path.join(workspaceRoot, "welcome.md");
   const findSamplePath = path.join(workspaceRoot, "find-sample.md");
   const nestedNotePath = path.join(workspaceRoot, "notes", "nested-note.md");
+  const ignoredTextFilePath = path.join(workspaceRoot, "ignore-me.txt");
 
   await fs.mkdir(path.join(workspaceRoot, "notes"), { recursive: true });
   await fs.mkdir(userDataRoot, { recursive: true });
@@ -68,6 +69,7 @@ async function createGlyphSandbox(): Promise<GlyphSandbox> {
     ].join("\n"),
   );
   await fs.writeFile(nestedNotePath, ["# Nested Note", "", "Nested note body."].join("\n"));
+  await fs.writeFile(ignoredTextFilePath, "This file should not be indexed as markdown.");
 
   return {
     cleanup: async () => {
@@ -344,6 +346,100 @@ test("opens a seeded markdown note from the workspace", async ({}, testInfo) => 
 
     await expect(glyph.window.getByText("Smoke test note content.")).toBeVisible();
     await expect(glyph.window.getByRole("heading", { name: "Welcome to Glyph" })).toBeVisible();
+  } finally {
+    await glyph.stop(testInfo);
+  }
+});
+
+test("builds a hidden local context index for workspace search", async ({}, testInfo) => {
+  const glyph = await launchGlyph();
+
+  try {
+    await expectAppShell(glyph.window);
+    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
+
+    await expect
+      .poll(async () => {
+        return await glyph.window.evaluate(async () => {
+          const glyphApi = (
+            window as Window & {
+              glyph: {
+                getContextIndexStatus: () => Promise<{
+                  noteCount: number;
+                  state: string;
+                }>;
+              };
+            }
+          ).glyph;
+
+          return await glyphApi.getContextIndexStatus();
+        });
+      })
+      .toMatchObject({
+        noteCount: 3,
+        state: "ready",
+      });
+
+    const indexPath = path.join(glyph.sandbox.workspaceRoot, ".glyph", "index.json");
+    const index = await readJson<{
+      notes?: Array<{
+        backlinks?: Array<{ sourceRelativePath: string }>;
+        headings?: Array<{ text: string }>;
+        relativePath: string;
+      }>;
+    }>(indexPath);
+
+    expect(index?.notes?.map((note) => note.relativePath).sort()).toEqual([
+      "find-sample.md",
+      "notes/nested-note.md",
+      "welcome.md",
+    ]);
+    expect(index?.notes?.some((note) => note.relativePath === "ignore-me.txt")).toBe(false);
+    expect(
+      index?.notes?.some((note) =>
+        note.headings?.some((heading) => heading.text === "Welcome to Glyph"),
+      ),
+    ).toBe(true);
+    expect(
+      index?.notes
+        ?.find((note) => note.relativePath === "notes/nested-note.md")
+        ?.backlinks?.some((backlink) => backlink.sourceRelativePath === "welcome.md"),
+    ).toBe(true);
+    await expect(glyph.window.getByText(".glyph")).toHaveCount(0);
+
+    const welcomeMetadata = await glyph.window.evaluate(
+      async (welcomeNotePath) => {
+        const glyphApi = (
+          window as Window & {
+            glyph: {
+              getContextIndexEntry: (filePath: string) => Promise<{
+                backlinks: Array<{ sourceRelativePath: string }>;
+                frontmatter: Record<string, unknown>;
+                headings: Array<{ text: string }>;
+                kind: string;
+                relativePath: string;
+                tags: string[];
+              } | null>;
+            };
+          }
+        ).glyph;
+
+        return glyphApi.getContextIndexEntry(welcomeNotePath);
+      },
+      path.join(glyph.sandbox.workspaceRoot, "welcome.md"),
+    );
+
+    expect(welcomeMetadata).toMatchObject({
+      backlinks: [],
+      frontmatter: {},
+      headings: [{ text: "Welcome to Glyph" }],
+      kind: "note",
+      relativePath: "welcome.md",
+      tags: [],
+    });
+
+    await selectPaletteItem(glyph.window, "nested body", /nested-note/i);
+    await expect(glyph.window.getByText("Nested note body.")).toBeVisible();
   } finally {
     await glyph.stop(testInfo);
   }

@@ -5,6 +5,8 @@ import type {
   AppInfo,
   AssetSelection,
   AppSettings,
+  ContextIndexEntry,
+  ContextIndexStatus,
   DialogKind,
   UpdateState,
   FileDocument,
@@ -15,8 +17,8 @@ import type {
   WorkspaceChangeEvent,
   WorkspaceSnapshot,
   ExternalFileTarget,
-} from "@/core/workspace";
-import type { SkillDocument, SkillLibraryChangeEvent, SkillLibrarySnapshot } from "@/core/skills";
+} from "./shared/workspace";
+import type { SkillDocument, SkillLibraryChangeEvent, SkillLibrarySnapshot } from "./shared/skills";
 
 declare global {
   interface Window {
@@ -55,6 +57,8 @@ declare global {
         folderName: string,
       ) => Promise<WorkspaceSnapshot["tree"] | null>;
       searchWorkspace: (query: string) => Promise<SearchResult[]>;
+      getContextIndexStatus: () => Promise<ContextIndexStatus>;
+      getContextIndexEntry: (filePath: string) => Promise<ContextIndexEntry | null>;
       getSidebarNode: (
         kind: "file" | "directory",
         targetPath: string,
@@ -73,6 +77,7 @@ declare global {
       revealInFinder: (targetPath: string) => Promise<boolean>;
       onExternalFile: (listener: (target: ExternalFileTarget) => void) => () => void;
       onUpdateStateChange: (listener: (state: UpdateState) => void) => () => void;
+      onContextIndexStatusChange: (listener: (status: ContextIndexStatus) => void) => () => void;
       openExternal: (path: string) => Promise<void>;
 
       exportMarkdownToPDF: (markdown: string, filename: string) => Promise<string>;

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { mergeShortcutSettings } from "@/core/shortcuts";
-import type { AppInfo, AppSettings, ThemeMode, UpdateState } from "@/core/workspace";
+import { mergeShortcutSettings } from "@/shared/shortcuts";
+import type { AppInfo, AppSettings, ThemeMode, UpdateState } from "@/shared/workspace";
 import { applyTheme } from "@/theme/themes";
 
 type UseSettingsControllerOptions = {

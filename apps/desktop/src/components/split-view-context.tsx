@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 
-import type { AppInfo, ShortcutSetting, TabMovePosition, UpdateState } from "@/core/workspace";
+import type { AppInfo, ShortcutSetting, TabMovePosition, UpdateState } from "@/shared/workspace";
 import type { EditorFindRequest, EditorFocusRequest } from "@/types/markdown-editor";
 import type { OutlineItem } from "@/types/navigation";
 

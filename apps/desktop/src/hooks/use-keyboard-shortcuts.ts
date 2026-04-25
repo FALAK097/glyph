@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 
-import { matchShortcut, isPrimaryModifierPressed, MODIFIER_TOKENS } from "@/core/shortcuts";
-import type { FileDocument, ShortcutSetting, WorkspaceSnapshot } from "@/core/workspace";
+import { matchShortcut, isPrimaryModifierPressed, MODIFIER_TOKENS } from "@/shared/shortcuts";
+import type { FileDocument, ShortcutSetting, WorkspaceSnapshot } from "@/shared/workspace";
 
 type UseKeyboardShortcutsOptions = {
   glyph: NonNullable<Window["glyph"]>;

@@ -1,8 +1,8 @@
 import { create } from "zustand";
 
-import { getBaseName, isPathInside, isSamePath, normalizePath } from "@/core/paths";
+import { getBaseName, isPathInside, isSamePath, normalizePath } from "@/lib/paths";
 
-import type { DirectoryNode, FileDocument, NoteTab, TabMovePosition } from "@/core/workspace";
+import type { DirectoryNode, FileDocument, NoteTab, TabMovePosition } from "../shared/workspace";
 
 const getClosestHistoryIndex = (history: string[], currentIndex: number, filePath: string) => {
   let closestIndex = -1;

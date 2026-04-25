@@ -9,9 +9,9 @@ import type {
   FileDocument,
   SearchResult,
   ShortcutSetting,
-} from "@/core/workspace";
+} from "@/shared/workspace";
 
-import { normalizePath } from "@/core/paths";
+import { normalizePath } from "@/lib/paths";
 
 const toPathKey = (path: string) => normalizePath(path).toLowerCase();
 

@@ -16,12 +16,12 @@ import {
   type SkillSource,
   type SkillSourceKind,
   type SkillToolKind,
-} from "../src/core/skills.js";
+} from "../src/shared/skills.js";
 import {
   SKILL_AGENT_CATALOG,
   SKILL_SOURCE_CATALOG,
   type SkillSourceRootTemplate,
-} from "../src/core/skill-agent-catalog.js";
+} from "../src/shared/skill-agent-catalog.js";
 
 type ResolvedSkillSourceDefinition = {
   id: string;

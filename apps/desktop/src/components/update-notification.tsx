@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import type { AppInfo, UpdateState } from "@/core/workspace";
+import type { AppInfo, UpdateState } from "@/shared/workspace";
 
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";

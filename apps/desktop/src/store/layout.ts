@@ -7,7 +7,7 @@ import type {
   SplitDirection,
   SplitNode,
   TabMovePosition,
-} from "@/core/workspace";
+} from "../shared/workspace";
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 

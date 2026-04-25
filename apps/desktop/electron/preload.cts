@@ -5,6 +5,8 @@ import type {
   AppInfo,
   AssetSelection,
   AppSettings,
+  ContextIndexEntry,
+  ContextIndexStatus,
   DialogKind,
   UpdateState,
   FileDocument,
@@ -15,12 +17,12 @@ import type {
   WorkspaceChangeEvent,
   WorkspaceSnapshot,
   ExternalFileTarget,
-} from "../src/core/workspace.js";
+} from "../src/shared/workspace.js";
 import type {
   SkillDocument,
   SkillLibraryChangeEvent,
   SkillLibrarySnapshot,
-} from "../src/core/skills.js";
+} from "../src/shared/skills.js";
 
 /**
  * Retries an IPC invoke when the main process handler is not yet registered.
@@ -126,6 +128,15 @@ const api = {
   searchWorkspace(query: string) {
     return ipcRenderer.invoke("workspace:search", query) as Promise<SearchResult[]>;
   },
+  getContextIndexStatus() {
+    return ipcRenderer.invoke("context-index:getStatus") as Promise<ContextIndexStatus>;
+  },
+  getContextIndexEntry(filePath: string) {
+    return ipcRenderer.invoke(
+      "context-index:getEntry",
+      filePath,
+    ) as Promise<ContextIndexEntry | null>;
+  },
   getSidebarNode(kind: "file" | "directory", targetPath: string) {
     return ipcRenderer.invoke("sidebar:getNode", kind, targetPath) as Promise<
       WorkspaceSnapshot["tree"][number] | null
@@ -211,6 +222,17 @@ const api = {
 
     return () => {
       ipcRenderer.removeListener("app:updateState", wrapped);
+    };
+  },
+  onContextIndexStatusChange(listener: (status: ContextIndexStatus) => void) {
+    const wrapped = (_event: Electron.IpcRendererEvent, status: ContextIndexStatus) => {
+      listener(status);
+    };
+
+    ipcRenderer.on("context-index:status", wrapped);
+
+    return () => {
+      ipcRenderer.removeListener("context-index:status", wrapped);
     };
   },
   openExternal(path: string) {

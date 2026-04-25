@@ -1,13 +1,13 @@
-import { memo, useCallback, useLayoutEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import { getDisplayFileName, isSamePath } from "@/core/paths";
+import { getDisplayFileName, isSamePath } from "@/lib/paths";
 import {
   getDirectTabShortcutDisplay,
   getPrimaryShortcutPrefix,
   getShortcutDisplay,
-} from "@/core/shortcuts";
-import type { NoteTab, TabMovePosition } from "@/core/workspace";
+} from "@/shared/shortcuts";
+import type { ContextIndexStatus, NoteTab, TabMovePosition } from "@/shared/workspace";
 import { useLayoutStore } from "@/store/layout";
 import { useSessionStore } from "@/store/session";
 import { useWorkspaceStore } from "@/store/workspace";
@@ -84,10 +84,41 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
 
   // ── Scroll position restoration ────────────────────────────────────
   const [initialScrollTop, setInitialScrollTop] = useState(0);
+  const [contextIndexStatus, setContextIndexStatus] = useState<ContextIndexStatus | null>(null);
 
   useLayoutEffect(() => {
     setInitialScrollTop(filePath ? useSessionStore.getState().getDocumentScroll(filePath) : 0);
   }, [filePath]);
+
+  useEffect(() => {
+    const glyph = window.glyph;
+    if (!glyph) {
+      return;
+    }
+
+    let isMounted = true;
+    void glyph
+      .getContextIndexStatus()
+      .then((nextStatus) => {
+        if (isMounted) {
+          setContextIndexStatus(nextStatus);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setContextIndexStatus(null);
+        }
+      });
+
+    const cleanup = glyph.onContextIndexStatusChange((nextStatus) => {
+      setContextIndexStatus(nextStatus);
+    });
+
+    return () => {
+      isMounted = false;
+      cleanup();
+    };
+  }, []);
 
   const handleTogglePinnedFile = useCallback(() => {
     if (filePath) {
@@ -192,6 +223,7 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
         footerMetaLabel={footerMetaLabel}
         wordCount={wordCount}
         readingTime={readingTime}
+        contextIndexStatus={contextIndexStatus}
         subheaderContent={
           noteTabItems.length > 0 ? (
             <NoteTabsBar

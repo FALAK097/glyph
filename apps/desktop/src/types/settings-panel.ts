@@ -1,4 +1,4 @@
-import type { AppInfo, AppSettings, ShortcutSetting, ThemeMode } from "@/core/workspace";
+import type { AppInfo, AppSettings, ShortcutSetting, ThemeMode } from "../shared/workspace";
 
 export type SettingsPanelProps = {
   isOpen: boolean;

@@ -1,5 +1,5 @@
-import type { SkillSourceKind } from "@/core/skills";
-import type { DirectoryNode } from "@/core/workspace";
+import type { SkillSourceKind } from "../shared/skills";
+import type { DirectoryNode } from "../shared/workspace";
 import type { NoteShortcutItem } from "./navigation";
 
 export type DragPosition = "before" | "after" | "inside";

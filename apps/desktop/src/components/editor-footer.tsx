@@ -1,12 +1,14 @@
 import type { MarkdownEditorToast } from "../types/markdown-editor";
+import type { ContextIndexStatus } from "@/shared/workspace";
 
 import { CheckCircleIcon } from "@/components/icons";
 
 type EditorFooterProps = {
   wordCount: number;
   readingTime: number;
-  footerMetaLabel?: string;
-  saveStateLabel?: string;
+  footerMetaLabel: string | undefined;
+  saveStateLabel: string;
+  contextIndexStatus: ContextIndexStatus | null | undefined;
   toast: MarkdownEditorToast | null;
 };
 
@@ -15,8 +17,18 @@ export function EditorFooter({
   readingTime,
   footerMetaLabel,
   saveStateLabel,
+  contextIndexStatus,
   toast,
 }: EditorFooterProps) {
+  const indexStatusLabel =
+    contextIndexStatus?.state === "building"
+      ? "Indexing..."
+      : contextIndexStatus?.state === "error"
+        ? "Index error"
+        : contextIndexStatus?.state === "ready"
+          ? `Indexed ${contextIndexStatus.noteCount}`
+          : null;
+
   return (
     <>
       <div className="absolute bottom-6 right-10 flex items-center gap-3 rounded-full border border-border bg-card/80 px-3 py-1.5 shadow-sm z-30 pointer-events-none">
@@ -31,10 +43,20 @@ export function EditorFooter({
             <span className="text-xs text-muted-foreground">{footerMetaLabel}</span>
           </>
         ) : null}
-        {saveStateLabel ? (
+        <div className="w-[1px] h-3 bg-border" />
+        <p className="text-xs font-medium text-foreground m-0">{saveStateLabel}</p>
+        {indexStatusLabel ? (
           <>
             <div className="w-[1px] h-3 bg-border" />
-            <p className="text-xs font-medium text-foreground m-0">{saveStateLabel}</p>
+            <p
+              className={
+                contextIndexStatus?.state === "error"
+                  ? "text-xs font-medium text-destructive m-0"
+                  : "text-xs text-muted-foreground m-0"
+              }
+            >
+              {indexStatusLabel}
+            </p>
           </>
         ) : null}
       </div>

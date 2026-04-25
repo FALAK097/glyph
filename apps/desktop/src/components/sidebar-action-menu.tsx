@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import type { ReactNode } from "react";
+import type { ReactNode, RefObject } from "react";
 
 import { Button } from "@/components/ui/button";
 import { PencilIcon, TrashIcon, XIcon } from "@/components/icons";
@@ -21,7 +21,7 @@ type SidebarActionMenuProps = {
   open: boolean;
   coords: SidebarActionMenuCoords | null;
   onClose: () => void;
-  onCloseFocusRef?: React.RefObject<HTMLButtonElement | null>;
+  onCloseFocusRef?: RefObject<HTMLButtonElement | null>;
   items: SidebarActionMenuItem[];
   ariaLabel: string;
 };

@@ -23,13 +23,7 @@ import type {
 
 import { LogoComponent } from "@/components/logo-component";
 import { SkillSourceLogo } from "@/components/skills/skill-source-logo";
-import {
-  ChevronRightIcon,
-  MoreVerticalIcon,
-  PinIcon,
-  PlusIcon,
-  FolderPlusIcon,
-} from "@/components/icons";
+import { ChevronRightIcon, PlusIcon, FolderPlusIcon } from "@/components/icons";
 import { SidebarTreeNode } from "./sidebar-tree-node";
 import { SidebarShortcutList } from "./sidebar-shortcut-row";
 

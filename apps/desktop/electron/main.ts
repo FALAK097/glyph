@@ -1856,7 +1856,7 @@ async function openWorkspace(
   // redundant directory tree rebuilds. Coalesce into a single rebuild
   // after 100ms of quiet.
   activeWatcher.on("all", (_eventName, changedPath) => {
-    if (!mainWindow || !isMarkdownFile(changedPath)) {
+    if (!mainWindow) {
       return;
     }
 
@@ -1884,16 +1884,24 @@ async function openWorkspace(
 
       const nextTree = await buildDirectoryTree(dirPath);
       searchableFilesCache = await collectMarkdownFiles(nextTree);
-      await contextIndexService.refresh(changedPaths);
       mainWindow.webContents.send("workspace:changed", {
         rootPath: dirPath,
         tree: nextTree,
         changedPaths,
       });
+
+      const markdownChangedPaths = changedPaths.filter(isMarkdownFile);
+      if (markdownChangedPaths.length > 0) {
+        void contextIndexService.refresh(markdownChangedPaths).catch((err) => {
+          console.error("[context-index] refresh failed", err);
+        });
+      }
     }, 100);
   });
 
-  await contextIndexService.rebuild(dirPath, tree);
+  void contextIndexService.rebuild(dirPath, tree).catch((err) => {
+    console.error("[context-index] rebuild failed", err);
+  });
 
   return {
     rootPath: dirPath,

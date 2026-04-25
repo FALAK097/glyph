@@ -1,6 +1,11 @@
 import type { ReactNode } from "react";
 
-import type { AppInfo, ContextIndexStatus, UpdateState } from "../shared/workspace";
+import type {
+  AppInfo,
+  ContextIndexStatus,
+  NoteLinkPreview,
+  UpdateState,
+} from "../shared/workspace";
 import type { OutlineItem } from "@/types/navigation";
 
 export type EditorFocusRequest = {
@@ -77,5 +82,46 @@ export type MarkdownEditorProps = {
 
 export type MarkdownEditorToast = {
   title: string;
-  description: string;
+  description?: string;
+};
+
+export type EditorActionType = "insert-table" | "insert-link" | "insert-image";
+
+export type EditorActionDetail = {
+  type: EditorActionType;
+};
+
+export type ImageControlsState = {
+  left: number;
+  top: number;
+};
+
+export type HoveredLinkState = {
+  href: string;
+  placement: "above" | "below";
+  preview: NoteLinkPreview | null;
+  status: "hint" | "loading" | "preview";
+  tooltipLeft: number;
+  tooltipTop: number;
+};
+
+export type TableControlsState = {
+  active: boolean;
+  canDeleteRow: boolean;
+  canDeleteColumn: boolean;
+  canDeleteTable: boolean;
+};
+
+export type SelectionSnapshot = {
+  from: number;
+  to: number;
+};
+
+export type FindPanelState = {
+  activeIndex: number;
+  matchCount: number;
+};
+
+export type EditorOutlineItem = OutlineItem & {
+  pos: number;
 };

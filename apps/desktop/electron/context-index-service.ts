@@ -214,29 +214,48 @@ function normalizeTags(frontmatter: FrontmatterRecord) {
 }
 
 function extractHeadings(body: string, lineOffset: number): IndexedHeading[] {
-  return body
-    .split("\n")
-    .map((line, index) => {
-      const match = line.match(HEADING_PATTERN);
-      if (!match) {
-        return null;
-      }
+  const headings: IndexedHeading[] = [];
+  const lines = body.split("\n");
+  let inFence = false;
 
-      return {
-        level: match[1].length,
-        text: match[2].trim(),
-        line: lineOffset + index + 1,
-      };
-    })
-    .filter((heading): heading is IndexedHeading => heading !== null);
+  for (const [index, line] of lines.entries()) {
+    if (/^(```|~~~)/.test(line.trim())) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+
+    const match = line.match(HEADING_PATTERN);
+    if (!match) {
+      continue;
+    }
+
+    headings.push({
+      level: match[1].length,
+      text: match[2].trim(),
+      line: lineOffset + index + 1,
+    });
+  }
+
+  return headings;
 }
 
 function extractLinks(body: string, lineOffset: number): IndexedLink[] {
   const links: IndexedLink[] = [];
   const lines = body.split("\n");
+  let inFence = false;
 
   for (const [index, line] of lines.entries()) {
+    if (/^(```|~~~)/.test(line.trim())) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+
     for (const match of line.matchAll(MARKDOWN_LINK_PATTERN)) {
+      if (match[0].startsWith("!")) {
+        continue; // image reference, not an outbound note link
+      }
       const target = match[2]?.trim();
       if (!target) {
         continue;
@@ -289,7 +308,7 @@ function stripMarkdownExtension(target: string) {
 function getRecordLookupKeys(record: IndexedNoteRecord) {
   const relativePath = record.relativePath.toLowerCase();
   const relativePathWithoutExtension = stripMarkdownExtension(relativePath);
-  const baseName = stripMarkdownExtension(path.basename(record.name).toLowerCase());
+  const baseName = stripMarkdownExtension(record.name.toLowerCase());
 
   return [relativePath, relativePathWithoutExtension, baseName];
 }
@@ -489,22 +508,27 @@ export function createContextIndexService({ onStatusChanged }: CreateContextInde
     try {
       const nextRecords = new Map<string, IndexedNoteRecord>();
       const filePaths = collectMarkdownFiles(tree);
-      const indexedRecords = await Promise.all(
-        filePaths.map(async (filePath) => {
-          try {
-            return await indexFile(filePath);
-          } catch {
-            return null;
+
+      const CHUNK_SIZE = 20;
+      for (let i = 0; i < filePaths.length; i += CHUNK_SIZE) {
+        const chunk = filePaths.slice(i, i + CHUNK_SIZE);
+        const indexedRecords = await Promise.all(
+          chunk.map(async (filePath) => {
+            try {
+              return await indexFile(filePath);
+            } catch {
+              return null;
+            }
+          }),
+        );
+
+        for (const record of indexedRecords) {
+          if (!record) {
+            continue;
           }
-        }),
-      );
 
-      for (const record of indexedRecords) {
-        if (!record) {
-          continue;
+          nextRecords.set(toPathKey(record.path), record);
         }
-
-        nextRecords.set(toPathKey(record.path), record);
       }
 
       records = nextRecords;
@@ -536,6 +560,11 @@ export function createContextIndexService({ onStatusChanged }: CreateContextInde
     for (const changedPath of changedPaths) {
       const normalizedPath = path.normalize(changedPath);
       const key = toPathKey(normalizedPath);
+
+      if (!isMarkdownFile(normalizedPath)) {
+        records.delete(key);
+        continue;
+      }
 
       try {
         const stats = await fs.stat(normalizedPath);
@@ -577,10 +606,6 @@ export function createContextIndexService({ onStatusChanged }: CreateContextInde
     const results: Array<SearchResult & { score: number }> = [];
 
     for (const record of records.values()) {
-      if (results.length >= 100) {
-        break;
-      }
-
       const metadataText = normalizeSearchText(
         [
           record.name,

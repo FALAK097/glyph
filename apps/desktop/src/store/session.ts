@@ -8,7 +8,7 @@ import type { LayoutNode, PaneState } from "@/core/workspace";
 const SESSION_STORAGE_KEY = "glyph.editor-session";
 const MAX_SCROLL_ENTRIES = 160;
 
-type ViewerMode = "note" | "skill";
+type ViewerMode = "note" | "skill" | "tasks";
 
 type ScrollEntry = {
   top: number;

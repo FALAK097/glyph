@@ -41,6 +41,7 @@ type EditorToolbarProps = {
   onNavigateForward: (() => void) | undefined;
   onCreateNote: (() => void) | undefined;
   newNoteShortcut: string | undefined;
+  surfaceTitle?: string;
   fileName: string | null;
   filePath: string | null;
   shouldShowCommandPalette: boolean;
@@ -51,6 +52,7 @@ type EditorToolbarProps = {
   onToggleFocusMode: (() => void) | undefined;
   focusModeShortcut: string | undefined;
   shouldShowUpdateActionButton: boolean;
+  shouldShowMoreOptions?: boolean;
   updateButtonVariant: "default" | "outline";
   isUpdateButtonDisabled: boolean | undefined;
   updateButtonLabel: string;
@@ -90,6 +92,7 @@ export function EditorToolbar({
   onNavigateForward,
   onCreateNote,
   newNoteShortcut,
+  surfaceTitle,
   fileName,
   shouldShowCommandPalette,
   onOpenCommandPalette,
@@ -99,6 +102,7 @@ export function EditorToolbar({
   onToggleFocusMode,
   focusModeShortcut,
   shouldShowUpdateActionButton,
+  shouldShowMoreOptions = true,
   updateButtonVariant,
   isUpdateButtonDisabled,
   updateButtonLabel,
@@ -238,6 +242,11 @@ export function EditorToolbar({
             </TooltipTrigger>
             <TooltipContent side="bottom">{`New Note${newNoteShortcut ? ` (${newNoteShortcut})` : ""}`}</TooltipContent>
           </Tooltip>
+        ) : null}
+        {surfaceTitle ? (
+          <span className="max-w-[220px] truncate pl-1 text-sm font-medium text-foreground">
+            {surfaceTitle}
+          </span>
         ) : null}
       </div>
 
@@ -387,56 +396,58 @@ export function EditorToolbar({
           </div>
         ) : null}
         {headerAccessory ? <div className="mr-1 flex items-center">{headerAccessory}</div> : null}
-        <DropdownMenu>
-          <Tooltip>
-            <DropdownMenuTrigger
-              render={
-                <TooltipTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="text-muted-foreground hover:text-foreground hover:bg-muted"
-                      aria-label="More options"
-                      type="button"
-                    />
-                  }
-                />
-              }
-            >
-              <DotsHorizontalIcon size={16} />
-            </DropdownMenuTrigger>
-            <TooltipContent side="bottom">More options</TooltipContent>
-          </Tooltip>
-          <DropdownMenuContent align="end" side="bottom" sideOffset={4} className="w-48">
-            <DropdownMenuItem disabled={!content} onClick={handleCopy}>
-              <LinkIcon size={14} className="opacity-70" />
-              Copy as Markdown
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled={!fileName} onClick={handleCopyPath}>
-              <LinkIcon size={14} className="opacity-70" />
-              {`Copy ${documentLabel} path`}
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled={!fileName} onClick={handleOpenExternal}>
-              <FileManagerLogo label={revealInFolderLabel} size={14} className="opacity-70" />
-              {revealInFolderLabel}
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled={!fileName} onClick={handleExportPDF}>
-              <FileDownIcon size={14} className="opacity-70" />
-              Export as PDF
-            </DropdownMenuItem>
-            {onTogglePinnedFile ? (
-              <DropdownMenuItem onClick={handleTogglePinnedFile}>
-                {isActiveFilePinned ? (
-                  <PinOffIcon size={14} className="opacity-70" />
-                ) : (
-                  <PinIcon size={14} className="opacity-70" />
-                )}
-                {isActiveFilePinned ? "Unpin note" : "Pin note"}
+        {shouldShowMoreOptions ? (
+          <DropdownMenu>
+            <Tooltip>
+              <DropdownMenuTrigger
+                render={
+                  <TooltipTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-muted-foreground hover:bg-transparent hover:text-foreground"
+                        aria-label="More options"
+                        type="button"
+                      />
+                    }
+                  />
+                }
+              >
+                <DotsHorizontalIcon size={16} />
+              </DropdownMenuTrigger>
+              <TooltipContent side="bottom">More options</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end" side="bottom" sideOffset={4} className="w-48">
+              <DropdownMenuItem disabled={!content} onClick={handleCopy}>
+                <LinkIcon size={14} className="opacity-70" />
+                Copy as Markdown
               </DropdownMenuItem>
-            ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <DropdownMenuItem disabled={!fileName} onClick={handleCopyPath}>
+                <LinkIcon size={14} className="opacity-70" />
+                {`Copy ${documentLabel} path`}
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={!fileName} onClick={handleOpenExternal}>
+                <FileManagerLogo label={revealInFolderLabel} size={14} className="opacity-70" />
+                {revealInFolderLabel}
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled={!fileName} onClick={handleExportPDF}>
+                <FileDownIcon size={14} className="opacity-70" />
+                Export as PDF
+              </DropdownMenuItem>
+              {onTogglePinnedFile ? (
+                <DropdownMenuItem onClick={handleTogglePinnedFile}>
+                  {isActiveFilePinned ? (
+                    <PinOffIcon size={14} className="opacity-70" />
+                  ) : (
+                    <PinIcon size={14} className="opacity-70" />
+                  )}
+                  {isActiveFilePinned ? "Unpin note" : "Pin note"}
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
         {onOpenSettings && (
           <Tooltip>
             <TooltipTrigger asChild>

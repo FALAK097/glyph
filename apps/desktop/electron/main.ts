@@ -16,6 +16,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createSkillsService } from "./skills-service.js";
+import { createTasksService } from "./tasks-service.js";
 import type {
   AppCommand,
   AppInfo,
@@ -30,6 +31,16 @@ import type {
   UpdateState,
   WorkspaceSnapshot,
 } from "../src/core/workspace.js";
+import type {
+  TaskColumnCreateInput,
+  TaskColumnDeleteInput,
+  TaskColumnMoveInput,
+  TaskColumnUpdateInput,
+  TaskCreateInput,
+  TaskDeleteInput,
+  TaskMoveInput,
+  TaskUpdateInput,
+} from "../src/core/tasks.js";
 import {
   DEFAULT_SHORTCUTS,
   canonicalizeShortcut,
@@ -106,6 +117,7 @@ const skillsService = createSkillsService({
     mainWindow.webContents.send("skills:changed", event);
   },
 });
+const tasksService = createTasksService();
 
 function createDefaultPersistedUpdateState(): PersistedUpdateState {
   return {
@@ -1857,13 +1869,19 @@ async function openWorkspace(
 
       const nextTree = await buildDirectoryTree(dirPath);
       searchableFilesCache = await collectMarkdownFiles(nextTree);
+      tasksService.setWorkspace(activeWorkspaceRoot);
+      const taskSnapshot = await tasksService.refreshChanged();
       mainWindow.webContents.send("workspace:changed", {
         rootPath: dirPath,
         tree: nextTree,
         changedPaths,
       });
+      mainWindow.webContents.send("tasks:changed", taskSnapshot);
     }, 100);
   });
+
+  tasksService.setWorkspace(activeWorkspaceRoot);
+  await tasksService.rebuild();
 
   return {
     rootPath: dirPath,
@@ -2178,6 +2196,51 @@ ipcMain.handle("workspace:createFolder", async (_event, parentDir: string, folde
 });
 
 ipcMain.handle("workspace:search", async (_event, query: string) => searchWorkspace(query));
+
+ipcMain.handle("tasks:list", async () => {
+  if (!activeWorkspaceRoot) {
+    return tasksService.getSnapshot();
+  }
+
+  const snapshot = tasksService.getSnapshot();
+  if (!snapshot.indexedAt || snapshot.workspaceRoot !== activeWorkspaceRoot) {
+    return tasksService.rebuild();
+  }
+
+  return snapshot;
+});
+
+ipcMain.handle("tasks:refresh", async () => tasksService.rebuild());
+
+ipcMain.handle("tasks:update", async (_event, input: TaskUpdateInput) =>
+  tasksService.updateTask(input),
+);
+
+ipcMain.handle("tasks:move", async (_event, input: TaskMoveInput) => tasksService.moveTask(input));
+
+ipcMain.handle("tasks:delete", async (_event, input: TaskDeleteInput) =>
+  tasksService.deleteTask(input),
+);
+
+ipcMain.handle("tasks:create", async (_event, input: TaskCreateInput) =>
+  tasksService.createTask(input),
+);
+
+ipcMain.handle("tasks:columns:create", async (_event, input: TaskColumnCreateInput) =>
+  tasksService.createColumn(input),
+);
+
+ipcMain.handle("tasks:columns:update", async (_event, input: TaskColumnUpdateInput) =>
+  tasksService.updateColumn(input),
+);
+
+ipcMain.handle("tasks:columns:move", async (_event, input: TaskColumnMoveInput) =>
+  tasksService.moveColumn(input),
+);
+
+ipcMain.handle("tasks:columns:delete", async (_event, input: TaskColumnDeleteInput) =>
+  tasksService.deleteColumn(input),
+);
 
 ipcMain.handle("sidebar:getNode", async (_event, kind: "file" | "directory", targetPath: string) =>
   getSidebarNode(kind, targetPath),

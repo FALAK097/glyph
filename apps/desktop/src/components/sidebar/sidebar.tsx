@@ -61,12 +61,14 @@ export const Sidebar = ({
   isCollapsed,
   isNotesExpanded = true,
   isSkillsExpanded = false,
+  isTasksActive = false,
   folderRevealLabel,
   openInFolderLabel,
   pinnedNotes,
   skillCollections,
   onToggleNotesSection,
   onToggleSkillsSection,
+  onOpenTasks,
   onSelectSkillCollection,
   onOpenFile,
   onDeleteFile,
@@ -153,6 +155,20 @@ export const Sidebar = ({
       </div>
 
       <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-3">
+        <div className="mb-3">
+          <div className="flex items-center justify-between px-4 py-1.5">
+            <button type="button" onClick={onOpenTasks} className="flex items-center text-left">
+              <p
+                className={`text-[11px] font-semibold uppercase tracking-[0.18em] ${
+                  isTasksActive ? "text-sidebar-foreground" : "text-muted-foreground"
+                }`}
+              >
+                TASKS
+              </p>
+            </button>
+          </div>
+        </div>
+
         {skillCollections && skillCollections.length > 0 ? (
           <div className="mb-3">
             <div className="flex items-center justify-between px-4 py-1.5">

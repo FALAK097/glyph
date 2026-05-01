@@ -25,6 +25,7 @@ import { SkillView } from "./skills/skill-view";
 import { SkillsBrowserPane } from "./skills/skills-browser-pane";
 import { SplitContainer } from "./split-container";
 import { SplitViewActivePaneProvider, SplitViewProvider } from "./split-view-context";
+import { TasksView } from "./tasks/tasks-view";
 import type { SplitViewActivePaneContextValue, SplitViewContextValue } from "./split-view-context";
 import { TooltipProvider } from "./ui/tooltip";
 import { useUpdateStateFlags } from "./update-notification";
@@ -65,7 +66,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const initialSkillSessionRef = useRef<{
     collectionId: string | null;
     documentPath: string | null;
-    viewerMode: "note" | "skill";
+    viewerMode: "note" | "skill" | "tasks";
   }>({
     collectionId: null,
     documentPath: null,
@@ -438,6 +439,19 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     [controller, setSelectedSkillCollectionId, setViewerMode],
   );
 
+  const handleOpenTasks = useCallback(() => {
+    setSelectedSkillCollectionId(null);
+    setViewerMode("tasks");
+  }, [setSelectedSkillCollectionId, setViewerMode]);
+
+  const handleOpenTaskSource = useCallback(
+    (_task?: unknown) => {
+      setSelectedSkillCollectionId(null);
+      setViewerMode("tasks");
+    },
+    [setSelectedSkillCollectionId, setViewerMode],
+  );
+
   const handleOpenSkillLink = useCallback(
     async (targetPath: string) => {
       const matchingSkill = allSkills.find(
@@ -597,6 +611,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   ]);
 
   const isSkillSurfaceVisible = viewerMode === "skill";
+  const isTasksSurfaceVisible = viewerMode === "tasks";
   const isAppBootstrapping = !sessionHasHydrated || !controller.hasBooted;
   const isSkillSurfaceLoading =
     isSkillSurfaceVisible &&
@@ -709,7 +724,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     ]);
 
     const filteredItems = controller.paletteItems.filter((item) => {
-      if (viewerMode === "skill") {
+      if (viewerMode === "skill" || viewerMode === "tasks") {
         if (item.section === "Pinned Notes") {
           return false;
         }
@@ -722,7 +737,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       return true;
     });
 
-    if (viewerMode !== "skill") {
+    if (viewerMode !== "skill" && viewerMode !== "tasks") {
       return filteredItems;
     }
 
@@ -740,7 +755,25 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         },
       };
     });
-  }, [controller.paletteItems, viewerMode]);
+  }, [controller.paletteItems, setSelectedSkillCollectionId, setViewerMode, viewerMode]);
+
+  const taskPaletteItems = useMemo<CommandPaletteItem[]>(() => {
+    const items: CommandPaletteItem[] = [
+      {
+        id: "open-tasks",
+        title: "Open Tasks",
+        subtitle: "Review workspace tasks and kanban board",
+        section: "Tasks",
+        kind: "command",
+        onSelect: () => {
+          handleOpenTasks();
+          closePalette();
+        },
+      },
+    ];
+
+    return items.filter((item) => matchesPaletteQuery(item.title, paletteFilterQuery));
+  }, [closePalette, handleOpenTasks, paletteFilterQuery]);
 
   const currentNotePaletteItems = useMemo<CommandPaletteItem[]>(() => {
     if (viewerMode !== "note" || !controller.activeFile) {
@@ -1045,7 +1078,11 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
 
   const paletteItems = useMemo(() => {
     if (viewerMode === "skill") {
-      return [...skillPaletteItems, ...visibleNotePaletteItems];
+      return [...taskPaletteItems, ...skillPaletteItems, ...visibleNotePaletteItems];
+    }
+
+    if (viewerMode === "tasks") {
+      return [...visibleNotePaletteItems, ...skillPaletteItems];
     }
 
     const noteItems = visibleNotePaletteItems.filter((item) => item.section === "Note");
@@ -1056,12 +1093,19 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
 
     return [
       ...otherItems,
+      ...taskPaletteItems,
       ...noteItems,
       ...currentNotePaletteItems,
       ...themeItems,
       ...skillPaletteItems,
     ];
-  }, [currentNotePaletteItems, skillPaletteItems, viewerMode, visibleNotePaletteItems]);
+  }, [
+    currentNotePaletteItems,
+    skillPaletteItems,
+    taskPaletteItems,
+    viewerMode,
+    visibleNotePaletteItems,
+  ]);
 
   const handleNoteRenameValueChange = useCallback(
     (value: string) => {
@@ -1122,6 +1166,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const handleDismissUpdateAction = useCallback(() => {
     void controller.dismissUpdateNotification();
   }, [controller.dismissUpdateNotification]);
+  const handleDisabledToolbarAction = useCallback(async () => {}, []);
   const handleTogglePinnedPath = useCallback(
     (filePath: string) => {
       void controller.togglePinnedFile(filePath);
@@ -1306,11 +1351,13 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         isSidebarCollapsed={controller.isSidebarCollapsed}
         isNotesExpanded={isNotesExpanded}
         isSkillsExpanded={isSkillsExpanded}
+        isTasksActive={viewerMode === "tasks"}
         openInFolderLabel={controller.folderRevealLabel}
         pinnedNotes={controller.pinnedNotes}
         skillCollections={sidebarSkillCollections}
         onToggleNotesSection={handleToggleNotesSection}
         onToggleSkillsSection={handleToggleSkillsSection}
+        onOpenTasks={handleOpenTasks}
         onSelectSkillCollection={handleSelectSkillCollection}
         onOpenFile={(filePath) => void handleOpenNoteFile(filePath)}
         onOpenCommandPalette={handleOpenCommandPalette}
@@ -1381,6 +1428,81 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                   <div className="h-4 w-4/5 rounded-md bg-muted/30 motion-safe:animate-pulse" />
                   <div className="h-4 w-3/5 rounded-md bg-muted/30 motion-safe:animate-pulse" />
                 </div>
+              </div>
+            ) : isTasksSurfaceVisible ? (
+              <div className="flex h-full min-h-0 flex-col bg-background">
+                <div className="sticky top-0 z-20 shrink-0 bg-background/95 supports-backdrop-filter:backdrop-blur-md">
+                  <EditorToolbar
+                    _isMacLike={isMacLike}
+                    isSidebarCollapsed={controller.isSidebarCollapsed}
+                    toggleSidebarShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "toggle-sidebar",
+                      navigator.platform,
+                    )}
+                    onToggleSidebar={handleToggleSidebar}
+                    canGoBack={controller.canGoBack}
+                    canGoForward={controller.canGoForward}
+                    navigateBackShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "navigate-back",
+                      navigator.platform,
+                    )}
+                    navigateForwardShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "navigate-forward",
+                      navigator.platform,
+                    )}
+                    onNavigateBack={handleNavigateBack}
+                    onNavigateForward={handleNavigateForward}
+                    onCreateNote={undefined}
+                    newNoteShortcut={undefined}
+                    surfaceTitle="Tasks"
+                    fileName={null}
+                    filePath={null}
+                    shouldShowCommandPalette={true}
+                    onOpenCommandPalette={handleOpenCommandPalette}
+                    commandPaletteShortcut={getShortcutDisplay(
+                      controller.shortcuts,
+                      "command-palette",
+                      navigator.platform,
+                    )}
+                    commandPaletteLabel="Search notes and skills"
+                    isFocusMode={undefined}
+                    onToggleFocusMode={undefined}
+                    focusModeShortcut={undefined}
+                    shouldShowUpdateActionButton={false}
+                    shouldShowMoreOptions={false}
+                    updateButtonVariant="outline"
+                    isUpdateButtonDisabled={true}
+                    updateButtonLabel=""
+                    updateButtonTooltip=""
+                    onUpdateAction={undefined}
+                    onDismissUpdateAction={undefined}
+                    isManualReleaseButton={false}
+                    headerPaddingClass={noteHeaderPaddingClass}
+                    onOpenSettings={handleOpenSettings}
+                    headerAccessory={null}
+                    content=""
+                    documentLabel="task"
+                    revealInFolderLabel={controller.folderRevealLabel}
+                    onCopy={handleDisabledToolbarAction}
+                    onCopyPath={handleDisabledToolbarAction}
+                    onOpenExternal={handleDisabledToolbarAction}
+                    onExportPDF={handleDisabledToolbarAction}
+                    onTogglePinnedFile={undefined}
+                    isActiveFilePinned={false}
+                    editorScale={controller.editorScale}
+                    onEditorScaleChange={undefined}
+                    zoomInShortcut={undefined}
+                    zoomOutShortcut={undefined}
+                    zoomResetShortcut={undefined}
+                  />
+                </div>
+                <TasksView
+                  glyph={glyph}
+                  onOpenTaskSource={(task) => void handleOpenTaskSource(task)}
+                />
               </div>
             ) : isSkillSurfaceVisible ? (
               <SkillView
@@ -1461,6 +1583,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                       navigator.platform,
                     )}
                     shouldShowUpdateActionButton={noteUpdateStateFlags.shouldShowUpdateActionButton}
+                    shouldShowMoreOptions={true}
                     updateButtonVariant={noteUpdateStateFlags.updateButtonVariant}
                     isUpdateButtonDisabled={noteUpdateStateFlags.isUpdateButtonDisabled}
                     updateButtonLabel={noteUpdateStateFlags.updateButtonLabel}

@@ -33,6 +33,20 @@ const COLOR_INPUT_FOCUS: Record<TaskColumnColor, string> = {
   violet: "focus-visible:border-chart-4/60 focus-visible:ring-chart-4/25",
 };
 
+// Overrides the Button's default bg-primary so it matches the column color
+const COLOR_BUTTON: Record<TaskColumnColor, string> = {
+  amber: "bg-chart-2 hover:bg-chart-2/80",
+  blue: "bg-primary hover:bg-primary/80",
+  cyan: "bg-chart-3 hover:bg-chart-3/80",
+  emerald: "bg-chart-5 hover:bg-chart-5/80",
+  lime: "bg-chart-5 hover:bg-chart-5/80",
+  orange: "bg-chart-2 hover:bg-chart-2/80",
+  pink: "bg-chart-4 hover:bg-chart-4/80",
+  rose: "bg-destructive hover:bg-destructive/80",
+  slate: "bg-muted-foreground hover:bg-muted-foreground/80",
+  violet: "bg-chart-4 hover:bg-chart-4/80",
+};
+
 const DATE_PATTERN = /\b\d{4}-\d{2}-\d{2}\b/;
 const TAG_PATTERN = /#[A-Za-z][\w/-]*/g;
 
@@ -269,7 +283,12 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
           <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit" size="sm" disabled={!parseTaskText(value).title}>
+          <Button
+            type="submit"
+            size="sm"
+            disabled={!parseTaskText(value).title}
+            className={cn(color && COLOR_BUTTON[color])}
+          >
             {submitLabel}
           </Button>
         </div>

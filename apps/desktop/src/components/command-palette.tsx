@@ -187,7 +187,7 @@ export const CommandPalette = memo(
                             itemRefs.current[index] = element;
                           }}
                           className={`
-                          h-auto w-full px-3 py-2.5 rounded-sm text-sm
+                          h-auto w-full px-3 py-2.5 rounded-sm text-sm overflow-hidden
                           transition-[background-color,color,transform] duration-100 ease-out flex items-center justify-between
                           ${
                             selectedIndex === index
@@ -207,7 +207,7 @@ export const CommandPalette = memo(
                           onClick={item.onSelect}
                         >
                           <div className="flex flex-col text-left min-w-0 flex-1">
-                            <span className="font-medium text-sm">{item.title}</span>
+                            <span className="font-medium text-sm truncate">{item.title}</span>
                             {item.subtitle ? (
                               <span
                                 className={`text-xs mt-0.5 truncate ${

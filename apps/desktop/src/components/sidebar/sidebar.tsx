@@ -23,13 +23,7 @@ import type {
 
 import { LogoComponent } from "@/components/logo-component";
 import { SkillSourceLogo } from "@/components/skills/skill-source-logo";
-import {
-  ChevronRightIcon,
-  PinIcon,
-  PinOffIcon,
-  PlusIcon,
-  FolderPlusIcon,
-} from "@/components/icons";
+import { ChevronRightIcon, PlusIcon, FolderPlusIcon } from "@/components/icons";
 import { SidebarTreeNode } from "./sidebar-tree-node";
 import { SidebarShortcutList } from "./sidebar-shortcut-row";
 
@@ -94,7 +88,6 @@ export const Sidebar = ({
   const [folderToDelete, setFolderToDelete] = useState<SidebarDeleteTarget | null>(null);
   const [fileToRemove, setFileToRemove] = useState<SidebarRemoveTarget | null>(null);
   const [folderToRemove, setFolderToRemove] = useState<SidebarRemoveTarget | null>(null);
-  const [isTasksPinnedLocal, setIsTasksPinnedLocal] = useState(false);
   const pinnedList = pinnedNotes ?? [];
   const revealLabel = folderRevealLabel ?? openInFolderLabel ?? "Open in Finder";
   const pinnedPaths = useMemo(() => pinnedList.map((note) => note.path), [pinnedList]);
@@ -182,24 +175,6 @@ export const Sidebar = ({
             >
               TASKS
             </p>
-            <span
-              role="button"
-              tabIndex={0}
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsTasksPinnedLocal((v) => !v);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.stopPropagation();
-                  setIsTasksPinnedLocal((v) => !v);
-                }
-              }}
-              className="rounded p-1 text-muted-foreground transition-colors hover:text-sidebar-accent-foreground"
-              aria-label={isTasksPinnedLocal ? "Unpin Tasks" : "Pin Tasks"}
-            >
-              {isTasksPinnedLocal ? <PinOffIcon size={14} /> : <PinIcon size={14} />}
-            </span>
           </button>
         </div>
 

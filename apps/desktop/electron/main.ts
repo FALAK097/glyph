@@ -986,6 +986,8 @@ function getDefaultSettings(): AppSettings {
       showOutline: true,
       editorScale: 100,
     },
+    isTasksPinned: false,
+    defaultTaskView: "board",
     autoOpenPDF: true,
     dismissedUpdateVersion: null,
   };
@@ -1339,6 +1341,15 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
       expandedFolders: Array.from(new Set(validExpandedFolders)),
     },
     editorPreferences: normalizeEditorPreferences(candidate.editorPreferences),
+    isTasksPinned:
+      typeof candidate.isTasksPinned === "boolean"
+        ? candidate.isTasksPinned
+        : defaults.isTasksPinned,
+    defaultTaskView:
+      typeof candidate.defaultTaskView === "string" &&
+      ["board", "table"].includes(candidate.defaultTaskView)
+        ? candidate.defaultTaskView
+        : defaults.defaultTaskView,
     autoOpenPDF:
       typeof candidate.autoOpenPDF === "boolean" ? candidate.autoOpenPDF : defaults.autoOpenPDF,
     dismissedUpdateVersion:

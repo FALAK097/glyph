@@ -90,14 +90,12 @@ export function AppLayout({
           isNotesExpanded={isNotesExpanded}
           isSkillsExpanded={isSkillsExpanded}
           isTasksActive={isTasksActive}
-          isTasksPinned={isTasksPinned}
           openInFolderLabel={openInFolderLabel}
           pinnedNotes={pinnedNotes}
           skillCollections={skillCollections}
           onToggleNotesSection={onToggleNotesSection}
           onToggleSkillsSection={onToggleSkillsSection}
           onOpenTasks={onOpenTasks}
-          onToggleTasksPinned={onToggleTasksPinned}
           onSelectSkillCollection={onSelectSkillCollection}
           onOpenFile={onOpenFile}
           onOpenCommandPalette={onOpenCommandPalette}

@@ -1402,12 +1402,14 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         isNotesExpanded={isNotesExpanded}
         isSkillsExpanded={isSkillsExpanded}
         isTasksActive={viewerMode === "tasks"}
+        isTasksPinned={false}
         openInFolderLabel={controller.folderRevealLabel}
         pinnedNotes={controller.pinnedNotes}
         skillCollections={sidebarSkillCollections}
         onToggleNotesSection={handleToggleNotesSection}
         onToggleSkillsSection={handleToggleSkillsSection}
         onOpenTasks={handleOpenTasks}
+        onToggleTasksPinned={() => {}}
         onSelectSkillCollection={handleSelectSkillCollection}
         onOpenFile={(filePath) => void handleOpenNoteFile(filePath)}
         onOpenCommandPalette={handleOpenCommandPalette}

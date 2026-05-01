@@ -23,7 +23,13 @@ import type {
 
 import { LogoComponent } from "@/components/logo-component";
 import { SkillSourceLogo } from "@/components/skills/skill-source-logo";
-import { ChevronRightIcon, PlusIcon, FolderPlusIcon } from "@/components/icons";
+import {
+  ChevronRightIcon,
+  PinIcon,
+  PinOffIcon,
+  PlusIcon,
+  FolderPlusIcon,
+} from "@/components/icons";
 import { SidebarTreeNode } from "./sidebar-tree-node";
 import { SidebarShortcutList } from "./sidebar-shortcut-row";
 
@@ -62,6 +68,7 @@ export const Sidebar = ({
   isNotesExpanded = true,
   isSkillsExpanded = false,
   isTasksActive = false,
+  isTasksPinned = false,
   folderRevealLabel,
   openInFolderLabel,
   pinnedNotes,
@@ -69,6 +76,7 @@ export const Sidebar = ({
   onToggleNotesSection,
   onToggleSkillsSection,
   onOpenTasks,
+  onToggleTasksPinned,
   onSelectSkillCollection,
   onOpenFile,
   onDeleteFile,
@@ -155,18 +163,46 @@ export const Sidebar = ({
       </div>
 
       <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-3">
-        <div className="mb-3">
-          <div className="flex items-center justify-between px-4 py-1.5">
-            <button type="button" onClick={onOpenTasks} className="flex items-center text-left">
-              <p
-                className={`text-[11px] font-semibold uppercase tracking-[0.18em] ${
-                  isTasksActive ? "text-sidebar-foreground" : "text-muted-foreground"
-                }`}
+        <div className="mb-3 px-2">
+          <button
+            type="button"
+            onClick={onOpenTasks}
+            className={`group flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.99] ${
+              isTasksActive
+                ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-accent/30"
+                : "text-sidebar-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
+            }`}
+          >
+            <p
+              className={`text-[11px] font-semibold uppercase tracking-[0.18em] ${
+                isTasksActive
+                  ? "text-sidebar-foreground"
+                  : "text-muted-foreground group-hover:text-sidebar-accent-foreground"
+              }`}
+            >
+              TASKS
+            </p>
+            {onToggleTasksPinned ? (
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleTasksPinned();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.stopPropagation();
+                    onToggleTasksPinned();
+                  }
+                }}
+                className="rounded p-1 text-muted-foreground transition-colors hover:text-sidebar-accent-foreground"
+                aria-label={isTasksPinned ? "Unpin Tasks" : "Pin Tasks"}
               >
-                TASKS
-              </p>
-            </button>
-          </div>
+                {isTasksPinned ? <PinOffIcon size={14} /> : <PinIcon size={14} />}
+              </span>
+            ) : null}
+          </button>
         </div>
 
         {skillCollections && skillCollections.length > 0 ? (

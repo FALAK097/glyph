@@ -988,6 +988,8 @@ function getDefaultSettings(): AppSettings {
     },
     autoOpenPDF: true,
     dismissedUpdateVersion: null,
+    isTasksPinned: false,
+    defaultTaskView: "board",
   };
 }
 
@@ -1015,6 +1017,10 @@ function normalizeSidebarState(sidebar: Partial<AppSettings["sidebar"]> | undefi
 
 function isThemeMode(value: unknown): value is AppSettings["themeMode"] {
   return value === "light" || value === "dark" || value === "system";
+}
+
+function isTaskViewMode(value: unknown): value is AppSettings["defaultTaskView"] {
+  return value === "board" || value === "table";
 }
 
 function normalizeShortcutSettings(shortcuts: AppSettings["shortcuts"] | undefined) {
@@ -1347,6 +1353,13 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
         : candidate.dismissedUpdateVersion === null
           ? null
           : defaults.dismissedUpdateVersion,
+    isTasksPinned:
+      typeof candidate.isTasksPinned === "boolean"
+        ? candidate.isTasksPinned
+        : defaults.isTasksPinned,
+    defaultTaskView: isTaskViewMode(candidate.defaultTaskView)
+      ? candidate.defaultTaskView
+      : defaults.defaultTaskView,
   };
 }
 
@@ -1466,6 +1479,22 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
         : null;
   }
 
+  if ("isTasksPinned" in candidate) {
+    if (typeof candidate.isTasksPinned !== "boolean") {
+      throw new Error("isTasksPinned must be a boolean.");
+    }
+
+    nextPatch.isTasksPinned = candidate.isTasksPinned;
+  }
+
+  if ("defaultTaskView" in candidate) {
+    if (!isTaskViewMode(candidate.defaultTaskView)) {
+      throw new Error("defaultTaskView must be 'board' or 'table'.");
+    }
+
+    nextPatch.defaultTaskView = candidate.defaultTaskView;
+  }
+
   const invalidKeys = Object.keys(candidate).filter(
     (key) =>
       ![
@@ -1479,6 +1508,8 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
         "editorPreferences",
         "autoOpenPDF",
         "dismissedUpdateVersion",
+        "isTasksPinned",
+        "defaultTaskView",
       ].includes(key),
   );
 

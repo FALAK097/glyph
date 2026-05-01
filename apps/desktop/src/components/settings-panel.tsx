@@ -23,7 +23,7 @@ import {
 
 import type { ThemeMode } from "@/core/workspace";
 import type { SettingsPanelProps } from "../types/settings-panel";
-import { GearIcon, SearchIcon, ShortcutIcon } from "./icons";
+import { GearIcon, OutlineIcon, SearchIcon, ShortcutIcon } from "./icons";
 
 export const SettingsPanel = ({
   isOpen,
@@ -34,6 +34,8 @@ export const SettingsPanel = ({
   onChangeMode,
   onChangeShortcuts,
   onChangeAutoOpenPDF,
+  onChangeTasksPinned,
+  onChangeDefaultTaskView,
 }: SettingsPanelProps) => {
   const [activeTab, setActiveTab] = useState("general");
   const [shortcuts, setShortcuts] = useState(DEFAULT_SHORTCUTS);
@@ -207,6 +209,15 @@ export const SettingsPanel = ({
                   <ShortcutIcon size={16} />
                   Shortcuts
                 </Button>
+                <Button
+                  variant={activeTab === "tasks" ? "secondary" : "ghost"}
+                  className="h-9 w-full justify-start gap-2 px-3 text-sm"
+                  type="button"
+                  onClick={() => setActiveTab("tasks")}
+                >
+                  <OutlineIcon size={16} />
+                  Tasks
+                </Button>
               </div>
             </div>
           </div>
@@ -378,6 +389,59 @@ export const SettingsPanel = ({
               {shortcutError ? (
                 <p className="mt-3 text-sm text-destructive">{shortcutError}</p>
               ) : null}
+            </div>
+          ) : null}
+
+          {activeTab === "tasks" ? (
+            <div className="max-w-3xl space-y-12">
+              <div>
+                <h2 className="mb-6 text-lg font-medium">Tasks</h2>
+
+                <div className="space-y-6">
+                  <div className="flex flex-col justify-between gap-4 border-b border-border/40 py-4 sm:flex-row sm:items-center sm:gap-8">
+                    <div className="shrink-0 space-y-1">
+                      <p className="text-sm font-medium">Startup</p>
+                      <p className="text-xs text-muted-foreground">
+                        Automatically open Tasks when you launch Glyph
+                      </p>
+                    </div>
+                    <label className="flex items-center space-x-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={settings?.isTasksPinned ?? false}
+                        onChange={(e) => {
+                          onChangeTasksPinned?.(e.target.checked);
+                        }}
+                        className="h-4 w-4 rounded border-border bg-background text-primary shadow-sm focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      />
+                      <span className="text-sm font-medium">Open Tasks on startup</span>
+                    </label>
+                  </div>
+
+                  <div className="flex flex-col justify-between gap-4 border-b border-border/40 py-4 sm:flex-row sm:items-center sm:gap-8">
+                    <div className="shrink-0 space-y-1">
+                      <p className="text-sm font-medium">Default View</p>
+                      <p className="text-xs text-muted-foreground">
+                        Choose how tasks are displayed by default
+                      </p>
+                    </div>
+                    <Select
+                      value={settings?.defaultTaskView ?? "board"}
+                      onValueChange={(value) =>
+                        onChangeDefaultTaskView?.(value as "board" | "table")
+                      }
+                    >
+                      <SelectTrigger className="w-[140px]" aria-label="Default task view">
+                        <SelectValue placeholder="View" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="board">Board</SelectItem>
+                        <SelectItem value="table">Table</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : null}
         </div>

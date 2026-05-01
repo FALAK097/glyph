@@ -42,6 +42,7 @@ import { getErrorMessage } from "./task-view-model";
 type TasksViewProps = {
   glyph: NonNullable<Window["glyph"]>;
   onOpenTaskSource: (task: WorkspaceTask) => void;
+  defaultTaskView?: "board" | "table";
 };
 
 type TasksViewMode = "board" | "table";
@@ -93,9 +94,9 @@ const LIST_BG_COLORS: Record<TaskColumnColor, string> = {
 const isTasksViewMode = (value: string | null): value is TasksViewMode =>
   value === "board" || value === "table";
 
-const getInitialViewMode = (): TasksViewMode => {
+const getInitialViewMode = (defaultView: TasksViewMode = "board"): TasksViewMode => {
   const stored = window.localStorage.getItem(TASK_VIEW_STORAGE_KEY);
-  return isTasksViewMode(stored) ? stored : "board";
+  return isTasksViewMode(stored) ? stored : defaultView;
 };
 
 function getTaskColumn(task: WorkspaceTask, columns: TaskColumnModel[]) {
@@ -329,7 +330,7 @@ const TableRow = memo(function TableRow({
   );
 });
 
-export function TasksView({ glyph }: TasksViewProps) {
+export function TasksView({ glyph, defaultTaskView }: TasksViewProps) {
   const columns = useTasksStore((state) => state.columns);
   const tasks = useTasksStore((state) => state.tasks);
   const tagSuggestions = useTasksStore((state) => state.tagSuggestions);
@@ -345,7 +346,9 @@ export function TasksView({ glyph }: TasksViewProps) {
   const [newColumnColor, setNewColumnColor] = useState<TaskColumnColor>("blue");
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState<TasksViewMode>(getInitialViewMode);
+  const [viewMode, setViewMode] = useState<TasksViewMode>(() =>
+    getInitialViewMode(defaultTaskView),
+  );
   const [sortColumn, setSortColumn] = useState<SortColumn>("task");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const isDraggingRef = useRef(false);
@@ -358,6 +361,12 @@ export function TasksView({ glyph }: TasksViewProps) {
   useEffect(() => {
     isDraggingRef.current = Boolean(activeDragId);
   }, [activeDragId]);
+
+  useEffect(() => {
+    const handleAddColumn = () => setIsAddingColumn(true);
+    window.addEventListener("glyph:tasks-add-column", handleAddColumn);
+    return () => window.removeEventListener("glyph:tasks-add-column", handleAddColumn);
+  }, []);
 
   useEffect(() => {
     setLoading(true);

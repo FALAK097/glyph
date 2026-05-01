@@ -444,6 +444,27 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     setViewerMode("tasks");
   }, [setSelectedSkillCollectionId, setViewerMode]);
 
+  const handleToggleTasksPinned = useCallback(() => {
+    void controller.saveSettings({
+      isTasksPinned: !controller.settings?.isTasksPinned,
+    });
+  }, [controller.saveSettings, controller.settings?.isTasksPinned]);
+
+  useEffect(() => {
+    if (!sessionHasHydrated || !controller.hasBooted) {
+      return;
+    }
+    if (controller.settings?.isTasksPinned && viewerMode !== "tasks") {
+      setViewerMode("tasks");
+    }
+  }, [
+    sessionHasHydrated,
+    controller.hasBooted,
+    controller.settings?.isTasksPinned,
+    setViewerMode,
+    viewerMode,
+  ]);
+
   const handleOpenTaskSource = useCallback(
     (_task?: unknown) => {
       setSelectedSkillCollectionId(null);
@@ -768,6 +789,43 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         onSelect: () => {
           handleOpenTasks();
           closePalette();
+        },
+      },
+      {
+        id: "tasks-board-view",
+        title: "Tasks: Switch to Board View",
+        subtitle: "Display tasks as a kanban board",
+        section: "Tasks",
+        kind: "command",
+        onSelect: () => {
+          handleOpenTasks();
+          window.localStorage.setItem("glyph.tasks.viewMode", "board");
+          closePalette();
+        },
+      },
+      {
+        id: "tasks-table-view",
+        title: "Tasks: Switch to Table View",
+        subtitle: "Display tasks as a sortable table",
+        section: "Tasks",
+        kind: "command",
+        onSelect: () => {
+          handleOpenTasks();
+          window.localStorage.setItem("glyph.tasks.viewMode", "table");
+          closePalette();
+        },
+      },
+      {
+        id: "tasks-add-list",
+        title: "Tasks: Add New List",
+        subtitle: "Create a new column on the board",
+        section: "Tasks",
+        kind: "command",
+        onSelect: () => {
+          handleOpenTasks();
+          closePalette();
+          // Dispatch a custom event that TasksView can listen for
+          window.dispatchEvent(new CustomEvent("glyph:tasks-add-column"));
         },
       },
     ];
@@ -1352,12 +1410,14 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         isNotesExpanded={isNotesExpanded}
         isSkillsExpanded={isSkillsExpanded}
         isTasksActive={viewerMode === "tasks"}
+        isTasksPinned={controller.settings?.isTasksPinned ?? false}
         openInFolderLabel={controller.folderRevealLabel}
         pinnedNotes={controller.pinnedNotes}
         skillCollections={sidebarSkillCollections}
         onToggleNotesSection={handleToggleNotesSection}
         onToggleSkillsSection={handleToggleSkillsSection}
         onOpenTasks={handleOpenTasks}
+        onToggleTasksPinned={handleToggleTasksPinned}
         onSelectSkillCollection={handleSelectSkillCollection}
         onOpenFile={(filePath) => void handleOpenNoteFile(filePath)}
         onOpenCommandPalette={handleOpenCommandPalette}
@@ -1501,6 +1561,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                 </div>
                 <TasksView
                   glyph={glyph}
+                  defaultTaskView={controller.settings?.defaultTaskView}
                   onOpenTaskSource={(task) => void handleOpenTaskSource(task)}
                 />
               </div>
@@ -1667,6 +1728,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         onChangeMode={(mode: ThemeMode) => void controller.changeThemeMode(mode)}
         onChangeShortcuts={(shortcuts) => void controller.changeShortcuts(shortcuts)}
         onChangeAutoOpenPDF={(enabled) => void controller.saveSettings({ autoOpenPDF: enabled })}
+        onChangeTasksPinned={(enabled) => void controller.saveSettings({ isTasksPinned: enabled })}
+        onChangeDefaultTaskView={(view) => void controller.saveSettings({ defaultTaskView: view })}
       />
       <NoteRenameDialog
         pending={pendingNoteRename}

@@ -19,6 +19,20 @@ const COLOR_BORDER: Record<TaskColumnColor, string> = {
   violet: "border-chart-4/35",
 };
 
+// Overrides the Input's default purple --ring focus styles to match column color
+const COLOR_INPUT_FOCUS: Record<TaskColumnColor, string> = {
+  amber: "focus-visible:border-chart-2/60 focus-visible:ring-chart-2/25",
+  blue: "focus-visible:border-primary/60 focus-visible:ring-primary/25",
+  cyan: "focus-visible:border-chart-3/60 focus-visible:ring-chart-3/25",
+  emerald: "focus-visible:border-chart-5/60 focus-visible:ring-chart-5/25",
+  lime: "focus-visible:border-chart-5/60 focus-visible:ring-chart-5/25",
+  orange: "focus-visible:border-chart-2/60 focus-visible:ring-chart-2/25",
+  pink: "focus-visible:border-chart-4/60 focus-visible:ring-chart-4/25",
+  rose: "focus-visible:border-destructive/60 focus-visible:ring-destructive/25",
+  slate: "focus-visible:border-muted-foreground/40 focus-visible:ring-muted-foreground/15",
+  violet: "focus-visible:border-chart-4/60 focus-visible:ring-chart-4/25",
+};
+
 const DATE_PATTERN = /\b\d{4}-\d{2}-\d{2}\b/;
 const TAG_PATTERN = /#[A-Za-z][\w/-]*/g;
 
@@ -249,7 +263,7 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
             if (e.key === "Escape") onCancel();
           }}
           placeholder="Task title #project @date"
-          className="h-9"
+          className={cn("h-9", color && COLOR_INPUT_FOCUS[color])}
         />
         <div className="mt-2 flex justify-end gap-1.5">
           <Button type="button" size="sm" variant="ghost" onClick={onCancel}>

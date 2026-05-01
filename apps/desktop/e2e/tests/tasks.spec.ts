@@ -92,13 +92,13 @@ test("tasks board creates standalone persisted tasks and columns", async ({}, te
       await window.glyph?.updateTaskColumn({ id: column.id, collapsed: true });
     });
 
-    const boardPath = path.join(glyph.sandbox.workspaceRoot, ".glyph", "tasks.md");
+    const boardPath = path.join(glyph.sandbox.workspaceRoot, "Tasks.md");
     const board = parseBoardMarkdown(await fs.readFile(boardPath, "utf8"));
     expect(board.tasks.find((task) => task.title === "Ship board")?.labels).toContain("glyph");
     expect(board.tasks.find((task) => task.title === "Ship board")?.sourcePath).toBeUndefined();
     expect(board.columns.find((column) => column.title === "In Progress")?.collapsed).toBe(true);
     await expect(
-      fs.readFile(path.join(glyph.sandbox.workspaceRoot, "Tasks.md"), "utf8"),
+      fs.readFile(path.join(glyph.sandbox.workspaceRoot, ".glyph", "tasks.md"), "utf8"),
     ).rejects.toThrow();
   } finally {
     await glyph.stop(testInfo);

@@ -121,6 +121,7 @@ export const TaskCard = memo(function TaskCard({
       <div ref={setNodeRef}>
         <TaskInlineEditor
           autoFocus
+          color={column?.color}
           initialValue={initialValue}
           submitLabel="Save"
           tagSuggestions={tagSuggestions}

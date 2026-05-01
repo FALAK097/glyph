@@ -343,6 +343,7 @@ export const TaskColumn = memo(function TaskColumn({
           <div className="mb-2">
             <TaskInlineEditor
               autoFocus
+              color={column.color}
               submitLabel="Add"
               tagSuggestions={tagSuggestions}
               onCancel={onCancelCreate}

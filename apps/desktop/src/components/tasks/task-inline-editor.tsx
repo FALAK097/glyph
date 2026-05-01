@@ -1,9 +1,23 @@
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import type { TaskColumnColor } from "@/core/tasks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/core/utils";
+
+const COLOR_BORDER: Record<TaskColumnColor, string> = {
+  amber: "border-chart-2/35",
+  blue: "border-primary/35",
+  cyan: "border-chart-3/35",
+  emerald: "border-chart-5/35",
+  lime: "border-chart-5/35",
+  orange: "border-chart-2/35",
+  pink: "border-chart-4/35",
+  rose: "border-destructive/35",
+  slate: "border-muted-foreground/25",
+  violet: "border-chart-4/35",
+};
 
 const DATE_PATTERN = /\b\d{4}-\d{2}-\d{2}\b/;
 const TAG_PATTERN = /#[A-Za-z][\w/-]*/g;
@@ -36,6 +50,7 @@ type PopoverAnchor = {
 
 type TaskInlineEditorProps = {
   autoFocus?: boolean;
+  color?: TaskColumnColor;
   initialValue?: string;
   submitLabel: string;
   tagSuggestions: string[];
@@ -45,6 +60,7 @@ type TaskInlineEditorProps = {
 
 export const TaskInlineEditor = memo(function TaskInlineEditor({
   autoFocus = false,
+  color,
   initialValue = "",
   submitLabel,
   tagSuggestions,
@@ -219,7 +235,10 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
       <form
         ref={formRef}
         onSubmit={handleSubmit}
-        className="rounded-md border border-border bg-card p-2 shadow-xs"
+        className={cn(
+          "rounded-md border bg-card p-2 shadow-xs",
+          color ? COLOR_BORDER[color] : "border-border",
+        )}
       >
         <Input
           ref={inputRef}

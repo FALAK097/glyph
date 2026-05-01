@@ -4,6 +4,7 @@ import {
   KeyboardSensor,
   PointerSensor,
   closestCorners,
+  pointerWithin,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -30,7 +31,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { TaskColumn as TaskColumnModel, TaskColumnColor, WorkspaceTask } from "@/core/tasks";
-import { TASK_COLUMN_COLORS } from "@/core/tasks";
+import { TASK_COLUMN_COLORS_PICKER } from "@/core/tasks";
 import { cn } from "@/core/utils";
 import { applyTaskMutation, groupTasksByColumn, useTasksStore } from "@/store/tasks";
 
@@ -101,14 +102,14 @@ function getTaskColumn(task: WorkspaceTask, columns: TaskColumnModel[]) {
   return columns.find((column) => column.id === task.columnId) ?? null;
 }
 
-function useHorizontalScrollRef<T extends HTMLElement>() {
+function useHorizontalScrollRef<T extends HTMLElement>(isDraggingRef: React.RefObject<boolean>) {
   const ref = useRef<T>(null);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
+      if (isDraggingRef.current) return;
       if (e.deltaY === 0) return;
-      // If the element can scroll horizontally, intercept vertical wheel
       const canScrollLeft = el.scrollLeft > 0;
       const canScrollRight = el.scrollLeft < el.scrollWidth - el.clientWidth;
       if ((e.deltaY < 0 && canScrollLeft) || (e.deltaY > 0 && canScrollRight)) {
@@ -118,7 +119,7 @@ function useHorizontalScrollRef<T extends HTMLElement>() {
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, []);
+  }, [isDraggingRef]);
   return ref;
 }
 
@@ -200,7 +201,7 @@ const TableRow = memo(function TableRow({
     <tr
       className={cn(
         "group border-b border-border/40 transition-colors hover:bg-muted/30",
-        index % 2 === 0 ? "bg-white" : "bg-muted/15",
+        index % 2 === 0 ? "bg-background" : "bg-muted/15",
       )}
     >
       {/* Task */}
@@ -287,7 +288,7 @@ const TableRow = memo(function TableRow({
           />
           <DropdownMenuContent
             align="start"
-            className="w-48 !bg-white text-popover-foreground shadow-lg ring-1 ring-border"
+            className="w-48 text-popover-foreground shadow-lg ring-1 ring-border"
           >
             {allColumns.map((col) => (
               <DropdownMenuItem
@@ -347,11 +348,16 @@ export function TasksView({ glyph }: TasksViewProps) {
   const [viewMode, setViewMode] = useState<TasksViewMode>(getInitialViewMode);
   const [sortColumn, setSortColumn] = useState<SortColumn>("task");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const boardScrollRef = useHorizontalScrollRef<HTMLDivElement>();
+  const isDraggingRef = useRef(false);
+  const boardScrollRef = useHorizontalScrollRef<HTMLDivElement>(isDraggingRef);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor),
   );
+
+  useEffect(() => {
+    isDraggingRef.current = Boolean(activeDragId);
+  }, [activeDragId]);
 
   useEffect(() => {
     setLoading(true);
@@ -473,12 +479,19 @@ export function TasksView({ glyph }: TasksViewProps) {
         }
         const targetTasks = groupedTasks[targetColumnId] ?? [];
         const overTaskIndex = targetTasks.findIndex((task) => task.id === overId);
-        const index = overType === "task" ? overTaskIndex : targetTasks.length;
+        const index = overType === "task" ? Math.max(0, overTaskIndex) : targetTasks.length;
         void runMutation(glyph.moveTask({ id: activeId, columnId: targetColumnId, index }));
       }
     },
     [columns, glyph, groupedTasks, runMutation, tasks],
   );
+
+  const collisionDetection = useCallback((args: Parameters<typeof closestCorners>[0]) => {
+    if (args.active.data.current?.type === "column") {
+      return closestCorners(args);
+    }
+    return pointerWithin(args);
+  }, []);
 
   const handleCreateTask = useCallback(
     async (title: string, columnId: string, labels: string[], dueDate: string | null) => {
@@ -510,7 +523,7 @@ export function TasksView({ glyph }: TasksViewProps) {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-white">
+    <div className="flex h-full min-h-0 flex-col bg-background">
       {error ? (
         <div className="mx-4 mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
@@ -537,7 +550,7 @@ export function TasksView({ glyph }: TasksViewProps) {
                     }
                   }}
                   placeholder="Search tasks"
-                  className="h-8 w-52 bg-white"
+                  className="h-8 w-52 bg-background"
                 />
               ) : null}
               <Tooltip>
@@ -602,14 +615,14 @@ export function TasksView({ glyph }: TasksViewProps) {
             {viewMode === "board" ? (
               <DndContext
                 sensors={sensors}
-                collisionDetection={closestCorners}
+                collisionDetection={collisionDetection}
                 onDragStart={handleDragStart}
                 onDragCancel={() => setActiveDragId(null)}
                 onDragEnd={handleDragEnd}
               >
                 <div
                   ref={boardScrollRef}
-                  className="scrollbar-hide flex h-full items-start gap-5 overflow-x-auto bg-white px-5 pt-16 pb-5"
+                  className="scrollbar-hide flex h-full items-start gap-5 overflow-x-auto bg-background px-5 pt-16 pb-5"
                 >
                   <SortableContext
                     items={columns.map((column) => column.id)}
@@ -736,19 +749,25 @@ export function TasksView({ glyph }: TasksViewProps) {
                   placeholder="List name"
                   className="h-9"
                 />
-                <div className="mt-3 grid grid-cols-10 gap-1">
-                  {TASK_COLUMN_COLORS.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setNewColumnColor(color)}
-                      className={cn(
-                        "h-6 w-6 rounded-full border-2 bg-background",
-                        COLOR_DOTS[color],
-                        newColumnColor === color ? "ring-2 ring-ring/35" : "",
-                      )}
-                      aria-label={`Use ${color}`}
-                    />
+                <div className="mt-3 grid grid-cols-7 gap-2">
+                  {TASK_COLUMN_COLORS_PICKER.map((color) => (
+                    <Tooltip key={color}>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => setNewColumnColor(color)}
+                          className={cn(
+                            "h-7 w-7 rounded-full border-2 bg-background transition-transform hover:scale-110",
+                            COLOR_DOTS[color],
+                            newColumnColor === color ? "ring-2 ring-ring/40" : "",
+                          )}
+                          aria-label={`Use ${color}`}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">
+                        {color[0].toUpperCase() + color.slice(1)}
+                      </TooltipContent>
+                    </Tooltip>
                   ))}
                 </div>
                 <div className="mt-3 flex justify-end gap-1.5">

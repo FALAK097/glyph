@@ -14,8 +14,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { TaskColumn as TaskColumnModel, TaskColumnColor, WorkspaceTask } from "@/core/tasks";
-import { TASK_COLUMN_COLORS } from "@/core/tasks";
+import { TASK_COLUMN_COLORS_PICKER } from "@/core/tasks";
 import { cn } from "@/core/utils";
 
 import { TaskCard } from "./task-card";
@@ -278,25 +279,31 @@ export const TaskColumn = memo(function TaskColumn({
                 />
                 Color
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="grid w-48 grid-cols-5 gap-1 p-2">
-                {TASK_COLUMN_COLORS.map((nextColor) => (
-                  <button
-                    key={nextColor}
-                    type="button"
-                    onClick={() => onUpdateColumn(column.id, { color: nextColor })}
-                    className={cn(
-                      "grid h-8 w-8 place-items-center rounded-md border border-transparent hover:border-border",
-                      column.color === nextColor ? "bg-muted" : "",
-                    )}
-                    aria-label={`Use ${nextColor}`}
-                  >
-                    <span
-                      className={cn(
-                        "h-4 w-4 rounded-full border-2 bg-background",
-                        COLOR_STYLES[nextColor].dot,
-                      )}
-                    />
-                  </button>
+              <DropdownMenuSubContent className="grid w-auto grid-cols-7 gap-2 p-2">
+                {TASK_COLUMN_COLORS_PICKER.map((nextColor) => (
+                  <Tooltip key={nextColor}>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() => onUpdateColumn(column.id, { color: nextColor })}
+                        className={cn(
+                          "grid h-8 w-8 place-items-center rounded-md border border-transparent transition-transform hover:border-border hover:scale-110",
+                          column.color === nextColor ? "bg-muted" : "",
+                        )}
+                        aria-label={`Use ${nextColor}`}
+                      >
+                        <span
+                          className={cn(
+                            "h-4 w-4 rounded-full border-2 bg-background",
+                            COLOR_STYLES[nextColor].dot,
+                          )}
+                        />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      {nextColor[0].toUpperCase() + nextColor.slice(1)}
+                    </TooltipContent>
+                  </Tooltip>
                 ))}
               </DropdownMenuSubContent>
             </DropdownMenuSub>

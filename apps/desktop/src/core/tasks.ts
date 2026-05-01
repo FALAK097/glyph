@@ -13,6 +13,18 @@ export const TASK_COLUMN_COLORS = [
 
 export type TaskColumnColor = (typeof TASK_COLUMN_COLORS)[number];
 
+/** Curated subset of visually-distinct colors shown in UI pickers.
+ *  Backwards-compatible: removed colors still exist in data. */
+export const TASK_COLUMN_COLORS_PICKER: TaskColumnColor[] = [
+  "blue",
+  "rose",
+  "emerald",
+  "amber",
+  "cyan",
+  "violet",
+  "slate",
+];
+
 export type TaskColumn = {
   id: string;
   title: string;

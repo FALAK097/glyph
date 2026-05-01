@@ -779,46 +779,10 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const taskPaletteItems = useMemo<CommandPaletteItem[]>(() => {
     const items: CommandPaletteItem[] = [];
 
-    if (viewerMode === "tasks") {
-      items.push(
-        {
-          id: "tasks-board-view",
-          title: "Switch to Board View",
-          subtitle: "Display tasks as a kanban board",
-          section: "Tasks",
-          kind: "command",
-          onSelect: () => {
-            window.localStorage.setItem("glyph.tasks.viewMode", "board");
-            closePalette();
-            window.dispatchEvent(new Event("glyph:tasks-view-changed"));
-          },
-        },
-        {
-          id: "tasks-table-view",
-          title: "Switch to Table View",
-          subtitle: "Display tasks as a sortable table",
-          section: "Tasks",
-          kind: "command",
-          onSelect: () => {
-            window.localStorage.setItem("glyph.tasks.viewMode", "table");
-            closePalette();
-            window.dispatchEvent(new Event("glyph:tasks-view-changed"));
-          },
-        },
-        {
-          id: "tasks-add-list",
-          title: "Add New List",
-          subtitle: "Create a new column on the board",
-          section: "Tasks",
-          kind: "command",
-          onSelect: () => {
-            closePalette();
-            window.dispatchEvent(new CustomEvent("glyph:tasks-add-column"));
-          },
-        },
-      );
-    } else {
-      items.push({
+    const query = paletteFilterQuery;
+
+    items.push(
+      {
         id: "open-tasks",
         title: "Open Tasks",
         subtitle: "Review workspace tasks and kanban board",
@@ -828,23 +792,60 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
           handleOpenTasks();
           closePalette();
         },
-      });
-    }
-
-    items.push({
-      id: "open-tasks-markdown",
-      title: "Open Tasks as Markdown",
-      subtitle: "Edit Tasks.md directly in the note editor",
-      section: "Tasks",
-      kind: "command",
-      onSelect: () => {
-        void handleOpenTasksMarkdown();
-        closePalette();
       },
-    });
+      {
+        id: "open-tasks-markdown",
+        title: "Open Tasks as Markdown",
+        subtitle: "Edit Tasks.md directly in the note editor",
+        section: "Tasks",
+        kind: "command",
+        onSelect: () => {
+          void handleOpenTasksMarkdown();
+          closePalette();
+        },
+      },
+      {
+        id: "tasks-board-view",
+        title: "Switch to Board View",
+        subtitle: "Display tasks as a kanban board",
+        section: "Tasks",
+        kind: "command",
+        onSelect: () => {
+          handleOpenTasks();
+          window.localStorage.setItem("glyph.tasks.viewMode", "board");
+          closePalette();
+          window.dispatchEvent(new Event("glyph:tasks-view-changed"));
+        },
+      },
+      {
+        id: "tasks-table-view",
+        title: "Switch to Table View",
+        subtitle: "Display tasks as a sortable table",
+        section: "Tasks",
+        kind: "command",
+        onSelect: () => {
+          handleOpenTasks();
+          window.localStorage.setItem("glyph.tasks.viewMode", "table");
+          closePalette();
+          window.dispatchEvent(new Event("glyph:tasks-view-changed"));
+        },
+      },
+      {
+        id: "tasks-add-list",
+        title: "Add New List",
+        subtitle: "Create a new column on the tasks board",
+        section: "Tasks",
+        kind: "command",
+        onSelect: () => {
+          handleOpenTasks();
+          closePalette();
+          window.dispatchEvent(new CustomEvent("glyph:tasks-add-column"));
+        },
+      },
+    );
 
-    return items.filter((item) => matchesPaletteQuery(item.title, paletteFilterQuery));
-  }, [closePalette, handleOpenTasks, handleOpenTasksMarkdown, paletteFilterQuery, viewerMode]);
+    return items.filter((item) => matchesPaletteQuery(query, item.title, item.subtitle));
+  }, [closePalette, handleOpenTasks, handleOpenTasksMarkdown, paletteFilterQuery]);
 
   const currentNotePaletteItems = useMemo<CommandPaletteItem[]>(() => {
     if (viewerMode !== "note" || !controller.activeFile) {

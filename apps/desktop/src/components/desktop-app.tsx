@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, {
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { getDisplayFileName, isSamePath, normalizePath } from "@/core/paths";
 import { countGroupedSkills, groupSkillsForBrowse } from "@/core/skill-groups";
@@ -25,7 +33,9 @@ import { SkillView } from "./skills/skill-view";
 import { SkillsBrowserPane } from "./skills/skills-browser-pane";
 import { SplitContainer } from "./split-container";
 import { SplitViewActivePaneProvider, SplitViewProvider } from "./split-view-context";
-import { TasksView } from "./tasks/tasks-view";
+const LazyTasksView = React.lazy(() =>
+  import("./tasks/tasks-view").then((module) => ({ default: module.TasksView })),
+);
 import type { SplitViewActivePaneContextValue, SplitViewContextValue } from "./split-view-context";
 import { TooltipProvider } from "./ui/tooltip";
 import { useUpdateStateFlags } from "./update-notification";
@@ -444,27 +454,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     setViewerMode("tasks");
   }, [setSelectedSkillCollectionId, setViewerMode]);
 
-  const handleToggleTasksPinned = useCallback(() => {
-    void controller.saveSettings({
-      isTasksPinned: !controller.settings?.isTasksPinned,
-    });
-  }, [controller.saveSettings, controller.settings?.isTasksPinned]);
-
-  useEffect(() => {
-    if (!sessionHasHydrated || !controller.hasBooted) {
-      return;
-    }
-    if (controller.settings?.isTasksPinned && viewerMode !== "tasks") {
-      setViewerMode("tasks");
-    }
-  }, [
-    sessionHasHydrated,
-    controller.hasBooted,
-    controller.settings?.isTasksPinned,
-    setViewerMode,
-    viewerMode,
-  ]);
-
   const handleOpenTaskSource = useCallback(
     (_task?: unknown) => {
       setSelectedSkillCollectionId(null);
@@ -779,8 +768,48 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   }, [controller.paletteItems, setSelectedSkillCollectionId, setViewerMode, viewerMode]);
 
   const taskPaletteItems = useMemo<CommandPaletteItem[]>(() => {
-    const items: CommandPaletteItem[] = [
-      {
+    const items: CommandPaletteItem[] = [];
+
+    if (viewerMode === "tasks") {
+      items.push(
+        {
+          id: "tasks-board-view",
+          title: "Switch to Board View",
+          subtitle: "Display tasks as a kanban board",
+          section: "Tasks",
+          kind: "command",
+          onSelect: () => {
+            window.localStorage.setItem("glyph.tasks.viewMode", "board");
+            closePalette();
+            window.dispatchEvent(new Event("glyph:tasks-view-changed"));
+          },
+        },
+        {
+          id: "tasks-table-view",
+          title: "Switch to Table View",
+          subtitle: "Display tasks as a sortable table",
+          section: "Tasks",
+          kind: "command",
+          onSelect: () => {
+            window.localStorage.setItem("glyph.tasks.viewMode", "table");
+            closePalette();
+            window.dispatchEvent(new Event("glyph:tasks-view-changed"));
+          },
+        },
+        {
+          id: "tasks-add-list",
+          title: "Add New List",
+          subtitle: "Create a new column on the board",
+          section: "Tasks",
+          kind: "command",
+          onSelect: () => {
+            closePalette();
+            window.dispatchEvent(new CustomEvent("glyph:tasks-add-column"));
+          },
+        },
+      );
+    } else {
+      items.push({
         id: "open-tasks",
         title: "Open Tasks",
         subtitle: "Review workspace tasks and kanban board",
@@ -790,48 +819,11 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
           handleOpenTasks();
           closePalette();
         },
-      },
-      {
-        id: "tasks-board-view",
-        title: "Tasks: Switch to Board View",
-        subtitle: "Display tasks as a kanban board",
-        section: "Tasks",
-        kind: "command",
-        onSelect: () => {
-          handleOpenTasks();
-          window.localStorage.setItem("glyph.tasks.viewMode", "board");
-          closePalette();
-        },
-      },
-      {
-        id: "tasks-table-view",
-        title: "Tasks: Switch to Table View",
-        subtitle: "Display tasks as a sortable table",
-        section: "Tasks",
-        kind: "command",
-        onSelect: () => {
-          handleOpenTasks();
-          window.localStorage.setItem("glyph.tasks.viewMode", "table");
-          closePalette();
-        },
-      },
-      {
-        id: "tasks-add-list",
-        title: "Tasks: Add New List",
-        subtitle: "Create a new column on the board",
-        section: "Tasks",
-        kind: "command",
-        onSelect: () => {
-          handleOpenTasks();
-          closePalette();
-          // Dispatch a custom event that TasksView can listen for
-          window.dispatchEvent(new CustomEvent("glyph:tasks-add-column"));
-        },
-      },
-    ];
+      });
+    }
 
     return items.filter((item) => matchesPaletteQuery(item.title, paletteFilterQuery));
-  }, [closePalette, handleOpenTasks, paletteFilterQuery]);
+  }, [closePalette, handleOpenTasks, paletteFilterQuery, viewerMode]);
 
   const currentNotePaletteItems = useMemo<CommandPaletteItem[]>(() => {
     if (viewerMode !== "note" || !controller.activeFile) {
@@ -1410,14 +1402,12 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         isNotesExpanded={isNotesExpanded}
         isSkillsExpanded={isSkillsExpanded}
         isTasksActive={viewerMode === "tasks"}
-        isTasksPinned={controller.settings?.isTasksPinned ?? false}
         openInFolderLabel={controller.folderRevealLabel}
         pinnedNotes={controller.pinnedNotes}
         skillCollections={sidebarSkillCollections}
         onToggleNotesSection={handleToggleNotesSection}
         onToggleSkillsSection={handleToggleSkillsSection}
         onOpenTasks={handleOpenTasks}
-        onToggleTasksPinned={handleToggleTasksPinned}
         onSelectSkillCollection={handleSelectSkillCollection}
         onOpenFile={(filePath) => void handleOpenNoteFile(filePath)}
         onOpenCommandPalette={handleOpenCommandPalette}
@@ -1559,11 +1549,18 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                     zoomResetShortcut={undefined}
                   />
                 </div>
-                <TasksView
-                  glyph={glyph}
-                  defaultTaskView={controller.settings?.defaultTaskView}
-                  onOpenTaskSource={(task) => void handleOpenTaskSource(task)}
-                />
+                <Suspense
+                  fallback={
+                    <div className="grid h-full place-items-center text-sm text-muted-foreground">
+                      Loading tasks...
+                    </div>
+                  }
+                >
+                  <LazyTasksView
+                    glyph={glyph}
+                    onOpenTaskSource={(task) => void handleOpenTaskSource(task)}
+                  />
+                </Suspense>
               </div>
             ) : isSkillSurfaceVisible ? (
               <SkillView
@@ -1728,8 +1725,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         onChangeMode={(mode: ThemeMode) => void controller.changeThemeMode(mode)}
         onChangeShortcuts={(shortcuts) => void controller.changeShortcuts(shortcuts)}
         onChangeAutoOpenPDF={(enabled) => void controller.saveSettings({ autoOpenPDF: enabled })}
-        onChangeTasksPinned={(enabled) => void controller.saveSettings({ isTasksPinned: enabled })}
-        onChangeDefaultTaskView={(view) => void controller.saveSettings({ defaultTaskView: view })}
       />
       <NoteRenameDialog
         pending={pendingNoteRename}

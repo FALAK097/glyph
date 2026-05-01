@@ -68,7 +68,6 @@ export const Sidebar = ({
   isNotesExpanded = true,
   isSkillsExpanded = false,
   isTasksActive = false,
-  isTasksPinned = false,
   folderRevealLabel,
   openInFolderLabel,
   pinnedNotes,
@@ -76,7 +75,6 @@ export const Sidebar = ({
   onToggleNotesSection,
   onToggleSkillsSection,
   onOpenTasks,
-  onToggleTasksPinned,
   onSelectSkillCollection,
   onOpenFile,
   onDeleteFile,
@@ -96,6 +94,7 @@ export const Sidebar = ({
   const [folderToDelete, setFolderToDelete] = useState<SidebarDeleteTarget | null>(null);
   const [fileToRemove, setFileToRemove] = useState<SidebarRemoveTarget | null>(null);
   const [folderToRemove, setFolderToRemove] = useState<SidebarRemoveTarget | null>(null);
+  const [isTasksPinnedLocal, setIsTasksPinnedLocal] = useState(false);
   const pinnedList = pinnedNotes ?? [];
   const revealLabel = folderRevealLabel ?? openInFolderLabel ?? "Open in Finder";
   const pinnedPaths = useMemo(() => pinnedList.map((note) => note.path), [pinnedList]);
@@ -166,6 +165,7 @@ export const Sidebar = ({
         <div className="mb-3 px-2">
           <button
             type="button"
+            aria-label="TASKS"
             onClick={onOpenTasks}
             className={`group flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.99] ${
               isTasksActive
@@ -182,26 +182,24 @@ export const Sidebar = ({
             >
               TASKS
             </p>
-            {onToggleTasksPinned ? (
-              <span
-                role="button"
-                tabIndex={0}
-                onClick={(e) => {
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsTasksPinnedLocal((v) => !v);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
                   e.stopPropagation();
-                  onToggleTasksPinned();
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.stopPropagation();
-                    onToggleTasksPinned();
-                  }
-                }}
-                className="rounded p-1 text-muted-foreground transition-colors hover:text-sidebar-accent-foreground"
-                aria-label={isTasksPinned ? "Unpin Tasks" : "Pin Tasks"}
-              >
-                {isTasksPinned ? <PinOffIcon size={14} /> : <PinIcon size={14} />}
-              </span>
-            ) : null}
+                  setIsTasksPinnedLocal((v) => !v);
+                }
+              }}
+              className="rounded p-1 text-muted-foreground transition-colors hover:text-sidebar-accent-foreground"
+              aria-label={isTasksPinnedLocal ? "Unpin Tasks" : "Pin Tasks"}
+            >
+              {isTasksPinnedLocal ? <PinOffIcon size={14} /> : <PinIcon size={14} />}
+            </span>
           </button>
         </div>
 

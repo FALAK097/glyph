@@ -988,8 +988,6 @@ function getDefaultSettings(): AppSettings {
     },
     autoOpenPDF: true,
     dismissedUpdateVersion: null,
-    isTasksPinned: false,
-    defaultTaskView: "board",
   };
 }
 
@@ -1017,10 +1015,6 @@ function normalizeSidebarState(sidebar: Partial<AppSettings["sidebar"]> | undefi
 
 function isThemeMode(value: unknown): value is AppSettings["themeMode"] {
   return value === "light" || value === "dark" || value === "system";
-}
-
-function isTaskViewMode(value: unknown): value is AppSettings["defaultTaskView"] {
-  return value === "board" || value === "table";
 }
 
 function normalizeShortcutSettings(shortcuts: AppSettings["shortcuts"] | undefined) {
@@ -1353,13 +1347,6 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
         : candidate.dismissedUpdateVersion === null
           ? null
           : defaults.dismissedUpdateVersion,
-    isTasksPinned:
-      typeof candidate.isTasksPinned === "boolean"
-        ? candidate.isTasksPinned
-        : defaults.isTasksPinned,
-    defaultTaskView: isTaskViewMode(candidate.defaultTaskView)
-      ? candidate.defaultTaskView
-      : defaults.defaultTaskView,
   };
 }
 
@@ -1479,22 +1466,6 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
         : null;
   }
 
-  if ("isTasksPinned" in candidate) {
-    if (typeof candidate.isTasksPinned !== "boolean") {
-      throw new Error("isTasksPinned must be a boolean.");
-    }
-
-    nextPatch.isTasksPinned = candidate.isTasksPinned;
-  }
-
-  if ("defaultTaskView" in candidate) {
-    if (!isTaskViewMode(candidate.defaultTaskView)) {
-      throw new Error("defaultTaskView must be 'board' or 'table'.");
-    }
-
-    nextPatch.defaultTaskView = candidate.defaultTaskView;
-  }
-
   const invalidKeys = Object.keys(candidate).filter(
     (key) =>
       ![
@@ -1508,8 +1479,6 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
         "editorPreferences",
         "autoOpenPDF",
         "dismissedUpdateVersion",
-        "isTasksPinned",
-        "defaultTaskView",
       ].includes(key),
   );
 
@@ -2243,35 +2212,99 @@ ipcMain.handle("tasks:list", async () => {
 
 ipcMain.handle("tasks:refresh", async () => tasksService.rebuild());
 
-ipcMain.handle("tasks:update", async (_event, input: TaskUpdateInput) =>
-  tasksService.updateTask(input),
-);
+ipcMain.handle("tasks:update", async (_event, input: unknown) => {
+  if (!input || typeof input !== "object") {
+    throw new Error("Invalid task update input.");
+  }
+  const { id, ..._rest } = input as Record<string, unknown>;
+  if (typeof id !== "string" || !id.trim()) {
+    throw new Error("Task id must be a non-empty string.");
+  }
+  return tasksService.updateTask(input as TaskUpdateInput);
+});
 
-ipcMain.handle("tasks:move", async (_event, input: TaskMoveInput) => tasksService.moveTask(input));
+ipcMain.handle("tasks:move", async (_event, input: unknown) => {
+  if (!input || typeof input !== "object") {
+    throw new Error("Invalid task move input.");
+  }
+  const { id, columnId } = input as Record<string, unknown>;
+  if (typeof id !== "string" || !id.trim()) {
+    throw new Error("Task id must be a non-empty string.");
+  }
+  if (typeof columnId !== "string" || !columnId.trim()) {
+    throw new Error("columnId must be a non-empty string.");
+  }
+  return tasksService.moveTask(input as TaskMoveInput);
+});
 
-ipcMain.handle("tasks:delete", async (_event, input: TaskDeleteInput) =>
-  tasksService.deleteTask(input),
-);
+ipcMain.handle("tasks:delete", async (_event, input: unknown) => {
+  if (!input || typeof input !== "object") {
+    throw new Error("Invalid task delete input.");
+  }
+  const { id } = input as Record<string, unknown>;
+  if (typeof id !== "string" || !id.trim()) {
+    throw new Error("Task id must be a non-empty string.");
+  }
+  return tasksService.deleteTask(input as TaskDeleteInput);
+});
 
-ipcMain.handle("tasks:create", async (_event, input: TaskCreateInput) =>
-  tasksService.createTask(input),
-);
+ipcMain.handle("tasks:create", async (_event, input: unknown) => {
+  if (!input || typeof input !== "object") {
+    throw new Error("Invalid task create input.");
+  }
+  const { title, columnId } = input as Record<string, unknown>;
+  if (typeof title !== "string" || !title.trim()) {
+    throw new Error("Task title must be a non-empty string.");
+  }
+  if (typeof columnId !== "string" || !columnId.trim()) {
+    throw new Error("columnId must be a non-empty string.");
+  }
+  return tasksService.createTask(input as TaskCreateInput);
+});
 
-ipcMain.handle("tasks:columns:create", async (_event, input: TaskColumnCreateInput) =>
-  tasksService.createColumn(input),
-);
+ipcMain.handle("tasks:columns:create", async (_event, input: unknown) => {
+  if (!input || typeof input !== "object") {
+    throw new Error("Invalid column create input.");
+  }
+  const { title } = input as Record<string, unknown>;
+  if (typeof title !== "string" || !title.trim()) {
+    throw new Error("Column title must be a non-empty string.");
+  }
+  return tasksService.createColumn(input as TaskColumnCreateInput);
+});
 
-ipcMain.handle("tasks:columns:update", async (_event, input: TaskColumnUpdateInput) =>
-  tasksService.updateColumn(input),
-);
+ipcMain.handle("tasks:columns:update", async (_event, input: unknown) => {
+  if (!input || typeof input !== "object") {
+    throw new Error("Invalid column update input.");
+  }
+  const { id } = input as Record<string, unknown>;
+  if (typeof id !== "string" || !id.trim()) {
+    throw new Error("Column id must be a non-empty string.");
+  }
+  return tasksService.updateColumn(input as TaskColumnUpdateInput);
+});
 
-ipcMain.handle("tasks:columns:move", async (_event, input: TaskColumnMoveInput) =>
-  tasksService.moveColumn(input),
-);
+ipcMain.handle("tasks:columns:move", async (_event, input: unknown) => {
+  if (!input || typeof input !== "object") {
+    throw new Error("Invalid column move input.");
+  }
+  const { id } = input as Record<string, unknown>;
+  if (typeof id !== "string" || !id.trim()) {
+    throw new Error("Column id must be a non-empty string.");
+  }
+  return tasksService.moveColumn(input as TaskColumnMoveInput);
+});
 
-ipcMain.handle("tasks:columns:delete", async (_event, input: TaskColumnDeleteInput) =>
-  tasksService.deleteColumn(input),
-);
+ipcMain.handle("tasks:columns:delete", async (_event, input: unknown) => {
+  if (!input || typeof input !== "object") {
+    throw new Error("Invalid column delete input.");
+  }
+  const { id } = input as Record<string, unknown>;
+  if (typeof id !== "string" || !id.trim()) {
+    throw new Error("Column id must be a non-empty string.");
+  }
+  return tasksService.deleteColumn(input as TaskColumnDeleteInput);
+});
 
 ipcMain.handle("sidebar:getNode", async (_event, kind: "file" | "directory", targetPath: string) =>
   getSidebarNode(kind, targetPath),

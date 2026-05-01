@@ -1,6 +1,6 @@
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 
 import { ArrowDownIcon, DotsHorizontalIcon, PlusIcon } from "@/components/icons";
 import {
@@ -137,6 +137,12 @@ export const TaskColumn = memo(function TaskColumn({
 }: TaskColumnProps) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [draftTitle, setDraftTitle] = useState(column.title);
+
+  useEffect(() => {
+    if (!isRenaming) {
+      setDraftTitle(column.title);
+    }
+  }, [column.title, isRenaming]);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: column.id,
     data: { columnId: column.id, type: "column" },

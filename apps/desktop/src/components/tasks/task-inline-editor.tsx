@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useDeferredValue, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,12 +48,13 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
   const activeToken = value.split(/\s/).at(-1) ?? "";
   const showDatePicker = activeToken.startsWith("@");
   const tagQuery = activeToken.startsWith("#") ? activeToken.slice(1).toLowerCase() : "";
+  const deferredTagQuery = useDeferredValue(tagQuery);
   const matchingTags = useMemo(
     () =>
       activeToken.startsWith("#")
-        ? tagSuggestions.filter((tag) => tag.toLowerCase().includes(tagQuery)).slice(0, 8)
+        ? tagSuggestions.filter((tag) => tag.toLowerCase().includes(deferredTagQuery)).slice(0, 8)
         : [],
-    [activeToken, tagQuery, tagSuggestions],
+    [activeToken, deferredTagQuery, tagSuggestions],
   );
 
   const replaceActiveToken = useCallback((nextToken: string) => {

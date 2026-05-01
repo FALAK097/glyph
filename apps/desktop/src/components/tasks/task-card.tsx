@@ -1,5 +1,5 @@
 import { CSS } from "@dnd-kit/utilities";
-import { memo, useCallback, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 
 import { DotsHorizontalIcon } from "@/components/icons";
@@ -111,6 +111,11 @@ export const TaskCard = memo(function TaskCard({
     [onUpdate, task.id],
   );
 
+  const sortableStyle = useMemo(
+    () => ({ transform: CSS.Transform.toString(transform), transition }),
+    [transform, transition],
+  );
+
   if (isEditing) {
     return (
       <div ref={setNodeRef}>
@@ -131,7 +136,7 @@ export const TaskCard = memo(function TaskCard({
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
+      style={sortableStyle}
       className={cn(
         "group/card relative w-full rounded-md outline-none",
         isDragging ? "z-20 opacity-50" : "",

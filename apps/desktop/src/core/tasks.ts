@@ -131,7 +131,9 @@ export const DEFAULT_TASK_COLUMNS: Array<Pick<TaskColumn, "id" | "title" | "colo
 
 export function buildTaskSummary(columns: TaskColumn[], tasks: WorkspaceTask[]): TaskSummary {
   const byColumn = Object.fromEntries(columns.map((column) => [column.id, column.taskIds.length]));
-  const doneColumn = columns.find((column) => column.title.toLowerCase().includes("done"));
+  const doneColumn =
+    columns.find((column) => column.id === "done") ??
+    columns.find((column) => column.title.toLowerCase().includes("done"));
   const done = doneColumn ? doneColumn.taskIds.length : 0;
 
   return {

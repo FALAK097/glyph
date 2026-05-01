@@ -9,5 +9,10 @@ export function matchesTaskQuery(task: WorkspaceTask, query: string) {
     return true;
   }
 
-  return [task.title, task.dueDate ?? "", ...task.labels].join(" ").toLowerCase().includes(query);
+  const normalizedQuery = query.toLowerCase().trim();
+
+  return [task.title, task.dueDate ?? "", ...task.labels]
+    .join(" ")
+    .toLowerCase()
+    .includes(normalizedQuery);
 }

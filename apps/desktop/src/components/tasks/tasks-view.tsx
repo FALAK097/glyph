@@ -10,8 +10,12 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { SortableContext, horizontalListSortingStrategy } from "@dnd-kit/sortable";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ArrowDownIcon,
@@ -42,7 +46,6 @@ import { getErrorMessage } from "./task-view-model";
 type TasksViewProps = {
   glyph: NonNullable<Window["glyph"]>;
   onOpenTaskSource: (task: WorkspaceTask) => void;
-  defaultTaskView?: "board" | "table";
 };
 
 type TasksViewMode = "board" | "table";
@@ -94,9 +97,9 @@ const LIST_BG_COLORS: Record<TaskColumnColor, string> = {
 const isTasksViewMode = (value: string | null): value is TasksViewMode =>
   value === "board" || value === "table";
 
-const getInitialViewMode = (defaultView: TasksViewMode = "board"): TasksViewMode => {
+const getInitialViewMode = (): TasksViewMode => {
   const stored = window.localStorage.getItem(TASK_VIEW_STORAGE_KEY);
-  return isTasksViewMode(stored) ? stored : defaultView;
+  return isTasksViewMode(stored) ? stored : "board";
 };
 
 function getTaskColumn(task: WorkspaceTask, columns: TaskColumnModel[]) {
@@ -330,7 +333,7 @@ const TableRow = memo(function TableRow({
   );
 });
 
-export function TasksView({ glyph, defaultTaskView }: TasksViewProps) {
+export function TasksView({ glyph }: TasksViewProps) {
   const columns = useTasksStore((state) => state.columns);
   const tasks = useTasksStore((state) => state.tasks);
   const tagSuggestions = useTasksStore((state) => state.tagSuggestions);
@@ -346,16 +349,15 @@ export function TasksView({ glyph, defaultTaskView }: TasksViewProps) {
   const [newColumnColor, setNewColumnColor] = useState<TaskColumnColor>("blue");
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState<TasksViewMode>(() =>
-    getInitialViewMode(defaultTaskView),
-  );
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const [viewMode, setViewMode] = useState<TasksViewMode>(getInitialViewMode);
   const [sortColumn, setSortColumn] = useState<SortColumn>("task");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const isDraggingRef = useRef(false);
   const boardScrollRef = useHorizontalScrollRef<HTMLDivElement>(isDraggingRef);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   useEffect(() => {
@@ -364,8 +366,18 @@ export function TasksView({ glyph, defaultTaskView }: TasksViewProps) {
 
   useEffect(() => {
     const handleAddColumn = () => setIsAddingColumn(true);
+    const handleViewChanged = () => {
+      const stored = window.localStorage.getItem(TASK_VIEW_STORAGE_KEY);
+      if (isTasksViewMode(stored)) {
+        setViewMode(stored);
+      }
+    };
     window.addEventListener("glyph:tasks-add-column", handleAddColumn);
-    return () => window.removeEventListener("glyph:tasks-add-column", handleAddColumn);
+    window.addEventListener("glyph:tasks-view-changed", handleViewChanged);
+    return () => {
+      window.removeEventListener("glyph:tasks-add-column", handleAddColumn);
+      window.removeEventListener("glyph:tasks-view-changed", handleViewChanged);
+    };
   }, []);
 
   useEffect(() => {
@@ -380,14 +392,14 @@ export function TasksView({ glyph, defaultTaskView }: TasksViewProps) {
 
   const groupedTasks = useMemo(() => groupTasksByColumn(columns, tasks), [columns, tasks]);
   const filteredTasks = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
+    const query = deferredSearchQuery.trim().toLowerCase();
     if (!query) {
       return tasks;
     }
     return tasks.filter((task) =>
       [task.title, task.dueDate ?? "", ...task.labels].join(" ").toLowerCase().includes(query),
     );
-  }, [searchQuery, tasks]);
+  }, [deferredSearchQuery, tasks]);
   const filteredTaskIds = useMemo(
     () => new Set(filteredTasks.map((task) => task.id)),
     [filteredTasks],
@@ -579,7 +591,15 @@ export function TasksView({ glyph, defaultTaskView }: TasksViewProps) {
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    onClick={() => setIsSearching((value) => !value)}
+                    onClick={() =>
+                      setIsSearching((value) => {
+                        const next = !value;
+                        if (!next) {
+                          setSearchQuery("");
+                        }
+                        return next;
+                      })
+                    }
                     className="grid h-8 w-8 place-items-center rounded text-muted-foreground hover:text-foreground"
                     aria-label="Search tasks"
                   >

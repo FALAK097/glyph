@@ -110,6 +110,8 @@ export type AppSettings = {
   shortcuts: ShortcutSetting[];
   sidebar: SidebarState;
   editorPreferences: EditorPreferences;
+  isTasksPinned: boolean;
+  defaultTaskView: TaskViewMode;
   autoOpenPDF: boolean;
   dismissedUpdateVersion: string | null;
 };

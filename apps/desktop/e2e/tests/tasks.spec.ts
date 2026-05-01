@@ -15,15 +15,18 @@ const parseBoardMarkdown = (markdown: string) => {
 
   let currentColumn: (typeof columns)[number] | null = null;
 
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     const trimmed = line.trim();
 
     if (trimmed.startsWith("## ")) {
       const title = trimmed.slice(3).trim();
       let collapsed = false;
-      const metaMatch = trimmed.match(/<!--\s*column-meta:.*?collapsed=(true|false)/);
-      if (metaMatch) {
-        collapsed = metaMatch[1] === "true";
+      if (i + 1 < lines.length) {
+        const nextMeta = lines[i + 1].match(/<!--\s*column-meta:.*?collapsed=(true|false)/);
+        if (nextMeta) {
+          collapsed = nextMeta[1] === "true";
+        }
       }
       currentColumn = { title, collapsed, taskIds: [] };
       columns.push(currentColumn);

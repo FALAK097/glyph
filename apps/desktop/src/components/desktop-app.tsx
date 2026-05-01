@@ -804,44 +804,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
           closePalette();
         },
       },
-      {
-        id: "tasks-board-view",
-        title: "Switch to Board View",
-        subtitle: "Display tasks as a kanban board",
-        section: "Tasks",
-        kind: "command",
-        onSelect: () => {
-          handleOpenTasks();
-          window.localStorage.setItem("glyph.tasks.viewMode", "board");
-          closePalette();
-          window.dispatchEvent(new Event("glyph:tasks-view-changed"));
-        },
-      },
-      {
-        id: "tasks-table-view",
-        title: "Switch to Table View",
-        subtitle: "Display tasks as a sortable table",
-        section: "Tasks",
-        kind: "command",
-        onSelect: () => {
-          handleOpenTasks();
-          window.localStorage.setItem("glyph.tasks.viewMode", "table");
-          closePalette();
-          window.dispatchEvent(new Event("glyph:tasks-view-changed"));
-        },
-      },
-      {
-        id: "tasks-add-list",
-        title: "Add New List",
-        subtitle: "Create a new column on the tasks board",
-        section: "Tasks",
-        kind: "command",
-        onSelect: () => {
-          handleOpenTasks();
-          closePalette();
-          window.dispatchEvent(new CustomEvent("glyph:tasks-add-column"));
-        },
-      },
     );
 
     return items.filter((item) => matchesPaletteQuery(query, item.title, item.subtitle));
@@ -1154,7 +1116,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     }
 
     if (viewerMode === "tasks") {
-      return [...visibleNotePaletteItems, ...skillPaletteItems];
+      return [...taskPaletteItems, ...visibleNotePaletteItems, ...skillPaletteItems];
     }
 
     const noteItems = visibleNotePaletteItems.filter((item) => item.section === "Note");

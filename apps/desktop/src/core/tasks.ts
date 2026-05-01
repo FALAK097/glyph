@@ -41,6 +41,7 @@ export type WorkspaceTask = {
   columnId: string;
   labels: string[];
   dueDate: string | null;
+  completed: boolean;
   createdAt: number;
   updatedAt: number;
 };

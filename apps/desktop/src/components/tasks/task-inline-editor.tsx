@@ -62,7 +62,6 @@ export function parseTaskText(value: string) {
   const title = value
     .replace(TAG_PATTERN, "")
     .replace(DATE_PATTERN, "")
-    .replace(/@/g, "")
     .replace(/\s+/g, " ")
     .trim();
   return { title, labels, dueDate };

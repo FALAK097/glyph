@@ -191,6 +191,10 @@ const TableRow = memo(function TableRow({
   const [draftDate, setDraftDate] = useState(task.dueDate ?? "");
 
   const commitEdit = useCallback(() => {
+    const normalizedDate = draftDate.trim();
+    if (normalizedDate && !/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
+      return;
+    }
     const labels = draftLabels
       .split(/[,\s]+/)
       .map((l) => l.trim().replace(/^#/, ""))
@@ -198,7 +202,7 @@ const TableRow = memo(function TableRow({
     onUpdateTask(task.id, {
       title: draftTitle.trim() || task.title,
       labels,
-      dueDate: draftDate.trim() || null,
+      dueDate: normalizedDate || null,
     });
     setIsEditing(false);
   }, [draftTitle, draftLabels, draftDate, onUpdateTask, task.id, task.title]);
@@ -469,6 +473,43 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
     [setError, setSnapshot],
   );
 
+  const handleDeleteColumn = useCallback(
+    (columnId: string) => {
+      if (window.confirm("Delete this list and all tasks inside it?")) {
+        void runMutation(glyph.deleteTaskColumn({ id: columnId }));
+      }
+    },
+    [glyph, runMutation],
+  );
+
+  const handleDeleteTask = useCallback(
+    (taskId: string) => {
+      void runMutation(glyph.deleteTask({ id: taskId }));
+    },
+    [glyph, runMutation],
+  );
+
+  const handleMoveTask = useCallback(
+    (taskId: string, columnId: string, index: number) => {
+      void runMutation(glyph.moveTask({ id: taskId, columnId, index }));
+    },
+    [glyph, runMutation],
+  );
+
+  const handleUpdateColumn = useCallback(
+    (columnId: string, patch: { title?: string; color?: TaskColumnColor; collapsed?: boolean }) => {
+      void runMutation(glyph.updateTaskColumn({ id: columnId, ...patch }));
+    },
+    [glyph, runMutation],
+  );
+
+  const handleUpdateTask = useCallback(
+    (taskId: string, value: { title: string; labels: string[]; dueDate: string | null }) => {
+      void runMutation(glyph.updateTask({ id: taskId, ...value }));
+    },
+    [glyph, runMutation],
+  );
+
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveDragId(String(event.active.id));
   }, []);
@@ -683,23 +724,11 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
                         onCreate={setCreatingColumnId}
                         onCreateTask={handleCreateTask}
                         onCancelCreate={() => setCreatingColumnId(null)}
-                        onDeleteColumn={(columnId) => {
-                          if (window.confirm("Delete this list and all tasks inside it?")) {
-                            void runMutation(glyph.deleteTaskColumn({ id: columnId }));
-                          }
-                        }}
-                        onDeleteTask={(taskId) =>
-                          void runMutation(glyph.deleteTask({ id: taskId }))
-                        }
-                        onMoveTask={(taskId, columnId, index) =>
-                          void runMutation(glyph.moveTask({ id: taskId, columnId, index }))
-                        }
-                        onUpdateColumn={(columnId, patch) =>
-                          void runMutation(glyph.updateTaskColumn({ id: columnId, ...patch }))
-                        }
-                        onUpdateTask={(taskId, value) =>
-                          void runMutation(glyph.updateTask({ id: taskId, ...value }))
-                        }
+                        onDeleteColumn={handleDeleteColumn}
+                        onDeleteTask={handleDeleteTask}
+                        onMoveTask={handleMoveTask}
+                        onUpdateColumn={handleUpdateColumn}
+                        onUpdateTask={handleUpdateTask}
                       />
                     ))}
                   </SortableContext>
@@ -762,12 +791,8 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
                             column={getTaskColumn(task, columns)}
                             allColumns={columns}
                             index={index}
-                            onUpdateTask={(taskId, value) =>
-                              void runMutation(glyph.updateTask({ id: taskId, ...value }))
-                            }
-                            onMoveTask={(taskId, columnId, index) =>
-                              void runMutation(glyph.moveTask({ id: taskId, columnId, index }))
-                            }
+                            onUpdateTask={handleUpdateTask}
+                            onMoveTask={handleMoveTask}
                           />
                         ))
                       )}

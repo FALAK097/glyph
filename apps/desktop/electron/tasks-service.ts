@@ -51,10 +51,12 @@ const parseTaskLine = (
   title: string;
   labels: string[];
   dueDate: string | null;
+  completed: boolean;
   meta: Record<string, string>;
 } | null => {
   const trimmed = line.trim();
-  if (!trimmed.startsWith("- [ ]") && !trimmed.startsWith("- [x]")) {
+  const isChecked = trimmed.startsWith("- [x]");
+  if (!isChecked && !trimmed.startsWith("- [ ]")) {
     return null;
   }
 
@@ -85,14 +87,14 @@ const parseTaskLine = (
     .trim()
     .replace(/\s+/g, " ");
 
-  return { title, labels, dueDate, meta };
+  return { title, labels, dueDate, completed: isChecked, meta };
 };
 
-const serializeTask = (task: WorkspaceTask, isDone = false): string => {
+const serializeTask = (task: WorkspaceTask): string => {
   const meta = `<!-- task-meta: id=${task.id} created=${task.createdAt} updated=${task.updatedAt} -->`;
   const labelStr = task.labels.map((l) => `#${l}`).join(" ");
   const dueStr = task.dueDate ? ` due:${task.dueDate}` : "";
-  const checkbox = isDone ? "- [x]" : "- [ ]";
+  const checkbox = task.completed ? "- [x]" : "- [ ]";
   return `${checkbox} ${task.title}${labelStr ? ` ${labelStr}` : ""}${dueStr} ${meta}`;
 };
 
@@ -165,6 +167,7 @@ const parseBoardMarkdown = (
         columnId: columns[currentColumnIndex].id,
         labels: normalizeTaskLabels(taskData.labels),
         dueDate: taskData.dueDate,
+        completed: taskData.completed,
         createdAt: taskData.meta.created ? Number(taskData.meta.created) : now,
         updatedAt: taskData.meta.updated ? Number(taskData.meta.updated) : now,
       };
@@ -185,13 +188,12 @@ const serializeBoardMarkdown = (columns: TaskColumn[], tasks: WorkspaceTask[]): 
   const lines: string[] = ["# Tasks", ""];
 
   for (const column of columns) {
-    const isDone = column.id === "done" || column.title.toLowerCase().includes("done");
     lines.push(serializeColumn(column));
     lines.push("");
     for (const taskId of column.taskIds) {
       const task = taskById.get(taskId);
       if (task) {
-        lines.push(serializeTask(task, isDone));
+        lines.push(serializeTask(task));
       }
     }
     lines.push("");
@@ -241,15 +243,13 @@ export function createTasksService() {
     const data = serializeBoardMarkdown(columns, tasks);
     const nextSnapshot = createSnapshot();
 
-    pendingSave = (pendingSave ?? Promise.resolve()).then(async () => {
-      try {
-        await fs.mkdir(path.dirname(filePath), { recursive: true });
-        await fs.writeFile(filePath, data, "utf8");
-      } catch (writeError) {
-        console.error("Failed to save tasks board:", writeError);
-      }
-    });
-    snapshot = nextSnapshot;
+    const write = async () => {
+      await fs.mkdir(path.dirname(filePath), { recursive: true });
+      await fs.writeFile(filePath, data, "utf8");
+      snapshot = nextSnapshot;
+    };
+
+    pendingSave = (pendingSave ?? Promise.resolve()).then(write, write);
     await pendingSave;
   };
 
@@ -341,6 +341,7 @@ export function createTasksService() {
       labels: normalizeTaskLabels(input.labels),
       dueDate:
         typeof input.dueDate === "string" && input.dueDate.trim() ? input.dueDate.trim() : null,
+      completed: false,
       createdAt: now,
       updatedAt: now,
     };
@@ -483,7 +484,7 @@ export function createTasksService() {
     moveColumn,
     moveTask,
     rebuild,
-    refreshChanged: async () => snapshot,
+    refreshChanged: async () => (workspaceRoot ? rebuild() : snapshot),
     setWorkspace(nextWorkspaceRoot: string | null) {
       workspaceRoot = nextWorkspaceRoot;
     },

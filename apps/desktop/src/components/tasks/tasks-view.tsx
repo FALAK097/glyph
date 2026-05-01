@@ -10,9 +10,16 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { SortableContext, horizontalListSortingStrategy } from "@dnd-kit/sortable";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { OutlineIcon, PlusIcon, SearchIcon, TickIcon } from "@/components/icons";
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  OutlineIcon,
+  PlusIcon,
+  SearchIcon,
+  TickIcon,
+} from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -36,7 +43,10 @@ type TasksViewProps = {
   onOpenTaskSource: (task: WorkspaceTask) => void;
 };
 
-type TasksViewMode = "board" | "list" | "table";
+type TasksViewMode = "board" | "table";
+
+type SortColumn = "task" | "list" | "date";
+type SortDirection = "asc" | "desc";
 
 const TASK_VIEW_STORAGE_KEY = "glyph.tasks.viewMode";
 
@@ -53,8 +63,34 @@ const COLOR_DOTS: Record<TaskColumnColor, string> = {
   violet: "border-chart-4",
 };
 
+const LIST_TEXT_COLORS: Record<TaskColumnColor, string> = {
+  amber: "text-chart-2",
+  blue: "text-primary",
+  cyan: "text-chart-3",
+  emerald: "text-chart-5",
+  lime: "text-chart-5",
+  orange: "text-chart-2",
+  pink: "text-chart-4",
+  rose: "text-destructive",
+  slate: "text-muted-foreground",
+  violet: "text-chart-4",
+};
+
+const LIST_BG_COLORS: Record<TaskColumnColor, string> = {
+  amber: "bg-chart-2/10",
+  blue: "bg-primary/10",
+  cyan: "bg-chart-3/10",
+  emerald: "bg-chart-5/10",
+  lime: "bg-chart-5/10",
+  orange: "bg-chart-2/10",
+  pink: "bg-chart-4/10",
+  rose: "bg-destructive/10",
+  slate: "bg-muted",
+  violet: "bg-chart-4/10",
+};
+
 const isTasksViewMode = (value: string | null): value is TasksViewMode =>
-  value === "board" || value === "list" || value === "table";
+  value === "board" || value === "table";
 
 const getInitialViewMode = (): TasksViewMode => {
   const stored = window.localStorage.getItem(TASK_VIEW_STORAGE_KEY);
@@ -64,6 +100,233 @@ const getInitialViewMode = (): TasksViewMode => {
 function getTaskColumn(task: WorkspaceTask, columns: TaskColumnModel[]) {
   return columns.find((column) => column.id === task.columnId) ?? null;
 }
+
+function useHorizontalScrollRef<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (e.deltaY === 0) return;
+      // If the element can scroll horizontally, intercept vertical wheel
+      const canScrollLeft = el.scrollLeft > 0;
+      const canScrollRight = el.scrollLeft < el.scrollWidth - el.clientWidth;
+      if ((e.deltaY < 0 && canScrollLeft) || (e.deltaY > 0 && canScrollRight)) {
+        e.preventDefault();
+        el.scrollLeft += e.deltaY;
+      }
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+  return ref;
+}
+
+function SortHeader({
+  label,
+  active,
+  direction,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  direction: SortDirection;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-1 font-medium hover:text-foreground"
+    >
+      {label}
+      <span className="inline-flex flex-col items-center justify-center">
+        <ArrowUpIcon
+          size={10}
+          className={cn(
+            "-mb-0.5 transition-colors",
+            active && direction === "asc" ? "text-foreground" : "text-muted-foreground/40",
+          )}
+        />
+        <ArrowDownIcon
+          size={10}
+          className={cn(
+            "-mt-0.5 transition-colors",
+            active && direction === "desc" ? "text-foreground" : "text-muted-foreground/40",
+          )}
+        />
+      </span>
+    </button>
+  );
+}
+
+const TableRow = memo(function TableRow({
+  task,
+  column,
+  allColumns,
+  index,
+  onUpdateTask,
+  onMoveTask,
+}: {
+  task: WorkspaceTask;
+  column: TaskColumnModel | null;
+  allColumns: TaskColumnModel[];
+  index: number;
+  onUpdateTask: (
+    taskId: string,
+    value: { title: string; labels: string[]; dueDate: string | null },
+  ) => void;
+  onMoveTask: (taskId: string, columnId: string, index: number) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftTitle, setDraftTitle] = useState(task.title);
+  const [draftLabels, setDraftLabels] = useState(task.labels.join(", "));
+  const [draftDate, setDraftDate] = useState(task.dueDate ?? "");
+
+  const commitEdit = useCallback(() => {
+    const labels = draftLabels
+      .split(/[,\s]+/)
+      .map((l) => l.trim().replace(/^#/, ""))
+      .filter(Boolean);
+    onUpdateTask(task.id, {
+      title: draftTitle.trim() || task.title,
+      labels,
+      dueDate: draftDate.trim() || null,
+    });
+    setIsEditing(false);
+  }, [draftTitle, draftLabels, draftDate, onUpdateTask, task.id, task.title]);
+
+  return (
+    <tr
+      className={cn(
+        "group border-b border-border/40 transition-colors hover:bg-muted/30",
+        index % 2 === 0 ? "bg-white" : "bg-muted/15",
+      )}
+    >
+      {/* Task */}
+      <td className="px-4 py-3">
+        {isEditing ? (
+          <div className="space-y-2">
+            <Input
+              autoFocus
+              value={draftTitle}
+              onChange={(e) => setDraftTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitEdit();
+                if (e.key === "Escape") setIsEditing(false);
+              }}
+              className="h-8"
+              placeholder="Task title"
+            />
+            <div className="flex gap-2">
+              <Input
+                value={draftLabels}
+                onChange={(e) => setDraftLabels(e.target.value)}
+                className="h-7 text-xs"
+                placeholder="Tags (comma separated)"
+              />
+              <Input
+                value={draftDate}
+                onChange={(e) => setDraftDate(e.target.value)}
+                className="h-7 w-32 text-xs"
+                placeholder="YYYY-MM-DD"
+              />
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              setDraftTitle(task.title);
+              setDraftLabels(task.labels.join(", "));
+              setDraftDate(task.dueDate ?? "");
+              setIsEditing(true);
+            }}
+            className="block w-full text-left"
+          >
+            <span className="block text-sm font-medium text-foreground">{task.title}</span>
+            {task.labels.length > 0 && (
+              <span className="mt-1.5 flex flex-wrap gap-1">
+                {task.labels.map((label) => (
+                  <span
+                    key={label}
+                    className="inline-flex items-center rounded-full bg-primary/8 px-2 py-0.5 text-xs font-medium text-primary"
+                  >
+                    #{label}
+                  </span>
+                ))}
+              </span>
+            )}
+          </button>
+        )}
+      </td>
+
+      {/* List */}
+      <td className="px-4 py-3">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <button
+                type="button"
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium transition-colors",
+                  column ? LIST_BG_COLORS[column.color] : "bg-muted",
+                  column ? LIST_TEXT_COLORS[column.color] : "text-muted-foreground",
+                  "hover:opacity-80",
+                )}
+              >
+                <span
+                  className={cn(
+                    "h-2 w-2 rounded-full border-2 bg-background",
+                    column ? COLOR_DOTS[column.color] : "border-muted-foreground",
+                  )}
+                />
+                {column?.title ?? "—"}
+              </button>
+            }
+          />
+          <DropdownMenuContent
+            align="start"
+            className="w-48 !bg-white text-popover-foreground shadow-lg ring-1 ring-border"
+          >
+            {allColumns.map((col) => (
+              <DropdownMenuItem
+                key={col.id}
+                onClick={() => onMoveTask(task.id, col.id, Number.MAX_SAFE_INTEGER)}
+                className={cn("flex items-center gap-2", col.id === task.columnId && "bg-muted/50")}
+              >
+                <span
+                  className={cn(
+                    "h-2 w-2 rounded-full border-2 bg-background",
+                    COLOR_DOTS[col.color],
+                  )}
+                />
+                <span className={cn("text-sm", LIST_TEXT_COLORS[col.color])}>{col.title}</span>
+                {col.id === task.columnId && (
+                  <TickIcon size={14} className="ml-auto text-foreground" />
+                )}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </td>
+
+      {/* Date */}
+      <td className="px-4 py-3">
+        <span className="text-sm text-muted-foreground">
+          {task.dueDate ? (
+            <span className="inline-flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60" />
+              {task.dueDate}
+            </span>
+          ) : (
+            <span className="text-muted-foreground/30">—</span>
+          )}
+        </span>
+      </td>
+    </tr>
+  );
+});
 
 export function TasksView({ glyph }: TasksViewProps) {
   const columns = useTasksStore((state) => state.columns);
@@ -82,6 +345,9 @@ export function TasksView({ glyph }: TasksViewProps) {
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<TasksViewMode>(getInitialViewMode);
+  const [sortColumn, setSortColumn] = useState<SortColumn>("task");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const boardScrollRef = useHorizontalScrollRef<HTMLDivElement>();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor),
@@ -130,6 +396,38 @@ export function TasksView({ glyph }: TasksViewProps) {
     setViewMode(nextMode);
     window.localStorage.setItem(TASK_VIEW_STORAGE_KEY, nextMode);
   }, []);
+
+  const handleSort = useCallback(
+    (column: SortColumn) => {
+      if (sortColumn === column) {
+        setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+      } else {
+        setSortColumn(column);
+        setSortDirection("asc");
+      }
+    },
+    [sortColumn],
+  );
+
+  const sortedFilteredTasks = useMemo(() => {
+    const list = [...filteredTasks];
+    list.sort((a, b) => {
+      const colA = getTaskColumn(a, columns);
+      const colB = getTaskColumn(b, columns);
+      let cmp = 0;
+      if (sortColumn === "task") {
+        cmp = a.title.localeCompare(b.title);
+      } else if (sortColumn === "list") {
+        cmp = (colA?.title ?? "").localeCompare(colB?.title ?? "");
+      } else if (sortColumn === "date") {
+        const dateA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+        const dateB = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+        cmp = dateA - dateB;
+      }
+      return sortDirection === "asc" ? cmp : -cmp;
+    });
+    return list;
+  }, [filteredTasks, columns, sortColumn, sortDirection]);
 
   const runMutation = useCallback(
     async (mutation: Promise<Awaited<ReturnType<typeof glyph.createTask>>>) => {
@@ -212,7 +510,7 @@ export function TasksView({ glyph }: TasksViewProps) {
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-background">
+    <div className="flex h-full min-h-0 flex-col bg-white">
       {error ? (
         <div className="mx-4 mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
@@ -239,7 +537,7 @@ export function TasksView({ glyph }: TasksViewProps) {
                     }
                   }}
                   placeholder="Search tasks"
-                  className="h-8 w-52 bg-background"
+                  className="h-8 w-52 bg-white"
                 />
               ) : null}
               <Tooltip>
@@ -289,7 +587,7 @@ export function TasksView({ glyph }: TasksViewProps) {
                   align="end"
                   className="w-44 bg-popover text-popover-foreground"
                 >
-                  {(["board", "list", "table"] as TasksViewMode[]).map((mode) => (
+                  {(["board", "table"] as TasksViewMode[]).map((mode) => (
                     <DropdownMenuItem key={mode} onClick={() => handleChangeViewMode(mode)}>
                       <span className="mr-2 grid h-4 w-4 place-items-center">
                         {viewMode === mode ? <TickIcon size={14} /> : null}
@@ -309,7 +607,10 @@ export function TasksView({ glyph }: TasksViewProps) {
                 onDragCancel={() => setActiveDragId(null)}
                 onDragEnd={handleDragEnd}
               >
-                <div className="scrollbar-hide flex h-full items-start gap-5 overflow-x-auto bg-background px-5 pt-16 pb-5">
+                <div
+                  ref={boardScrollRef}
+                  className="scrollbar-hide flex h-full items-start gap-5 overflow-x-auto bg-white px-5 pt-16 pb-5"
+                >
                   <SortableContext
                     items={columns.map((column) => column.id)}
                     strategy={horizontalListSortingStrategy}
@@ -356,55 +657,66 @@ export function TasksView({ glyph }: TasksViewProps) {
               </DndContext>
             ) : (
               <div className="h-full overflow-auto px-5 pt-16 pb-5">
-                {viewMode === "list" ? (
-                  <div className="mx-auto max-w-4xl overflow-hidden rounded-lg border border-border bg-card">
-                    {filteredTasks.map((task) => {
-                      const column = getTaskColumn(task, columns);
-                      return (
-                        <div
-                          key={task.id}
-                          className="flex min-h-12 items-center gap-3 border-b border-border/60 px-3 py-2 text-sm last:border-b-0"
-                        >
-                          <span
-                            className={cn(
-                              "h-2.5 w-2.5 rounded-full border-2 bg-background",
-                              column ? COLOR_DOTS[column.color] : "border-muted-foreground",
-                            )}
+                <div className="mx-auto max-w-5xl overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
+                  <table className="w-full text-left">
+                    <thead className="border-b border-border/60 bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
+                      <tr>
+                        <th className="px-4 py-3">
+                          <SortHeader
+                            label="Tasks"
+                            active={sortColumn === "task"}
+                            direction={sortDirection}
+                            onClick={() => handleSort("task")}
                           />
-                          <span className="min-w-0 flex-1 truncate font-medium">{task.title}</span>
-                          <span className="text-xs text-muted-foreground">{column?.title}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="mx-auto max-w-5xl overflow-hidden rounded-lg border border-border bg-card">
-                    <table className="w-full text-left text-sm">
-                      <thead className="border-b border-border bg-muted/35 text-xs text-muted-foreground">
+                        </th>
+                        <th className="px-4 py-3">
+                          <SortHeader
+                            label="List"
+                            active={sortColumn === "list"}
+                            direction={sortDirection}
+                            onClick={() => handleSort("list")}
+                          />
+                        </th>
+                        <th className="px-4 py-3">
+                          <SortHeader
+                            label="Date"
+                            active={sortColumn === "date"}
+                            direction={sortDirection}
+                            onClick={() => handleSort("date")}
+                          />
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedFilteredTasks.length === 0 ? (
                         <tr>
-                          <th className="px-3 py-2 font-medium">Task</th>
-                          <th className="px-3 py-2 font-medium">List</th>
-                          <th className="px-3 py-2 font-medium">Tags</th>
-                          <th className="px-3 py-2 font-medium">Date</th>
+                          <td
+                            colSpan={3}
+                            className="px-4 py-12 text-center text-sm text-muted-foreground"
+                          >
+                            No tasks match current filters.
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {filteredTasks.map((task) => (
-                          <tr key={task.id} className="border-b border-border/60 last:border-b-0">
-                            <td className="px-3 py-2 font-medium">{task.title}</td>
-                            <td className="px-3 py-2 text-muted-foreground">
-                              {getTaskColumn(task, columns)?.title}
-                            </td>
-                            <td className="px-3 py-2 text-muted-foreground">
-                              {task.labels.map((label) => `#${label}`).join(" ")}
-                            </td>
-                            <td className="px-3 py-2 text-muted-foreground">{task.dueDate}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                      ) : (
+                        sortedFilteredTasks.map((task, index) => (
+                          <TableRow
+                            key={task.id}
+                            task={task}
+                            column={getTaskColumn(task, columns)}
+                            allColumns={columns}
+                            index={index}
+                            onUpdateTask={(taskId, value) =>
+                              void runMutation(glyph.updateTask({ id: taskId, ...value }))
+                            }
+                            onMoveTask={(taskId, columnId, index) =>
+                              void runMutation(glyph.moveTask({ id: taskId, columnId, index }))
+                            }
+                          />
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
             {isAddingColumn ? (

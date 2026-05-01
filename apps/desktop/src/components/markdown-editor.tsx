@@ -25,6 +25,7 @@ import {
   setFindHighlightQuery,
 } from "./tiptap-extension/find-highlight";
 import { MarkdownShortcuts } from "./tiptap-extension/markdown-shortcuts";
+import { TaskTokenHighlight } from "./tiptap-extension/task-token-highlight";
 
 import { Button } from "@/components/ui/button";
 
@@ -496,6 +497,10 @@ export const MarkdownEditor = ({
         "[&>ul[data-type='taskList']_li>label]:inline-flex [&>ul[data-type='taskList']_li>label]:items-center [&>ul[data-type='taskList']_li>label]:mt-0.5 [&>ul[data-type='taskList']_li>label]:shrink-0 [&>ul[data-type='taskList']_li>label]:cursor-pointer",
         "[&>ul[data-type='taskList']_li>label>input]:mt-0.5 [&>ul[data-type='taskList']_li>label>input]:cursor-pointer",
         "[&>ul[data-type='taskList']_li>div]:flex-1",
+        "[&>ul[data-type='taskList']_li[data-checked='true']>div]:line-through [&>ul[data-type='taskList']_li[data-checked='true']>div]:text-muted-foreground/60",
+        "[&_.task-tag]:rounded-full [&_.task-tag]:bg-primary/10 [&_.task-tag]:px-1.5 [&_.task-tag]:py-0.5 [&_.task-tag]:text-primary [&_.task-tag]:text-[0.85em] [&_.task-tag]:font-medium",
+        "[&_.task-due]:rounded [&_.task-due]:bg-muted [&_.task-due]:px-1.5 [&_.task-due]:py-0.5 [&_.task-due]:text-muted-foreground [&_.task-due]:text-[0.85em] [&_.task-due]:font-medium",
+        "[&_.task-due-prefix]:hidden",
         "[&>blockquote]:pl-4 [&>blockquote]:border-l-2 [&>blockquote]:border-border [&>blockquote]:text-muted-foreground",
         "[&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded-md [&_code]:bg-muted [&_code]:font-mono [&_code]:text-[0.875em]",
         "[&>pre]:mb-4 [&>pre]:rounded-lg [&>pre]:overflow-auto",
@@ -759,6 +764,7 @@ export const MarkdownEditor = ({
         TableCell,
         SlashCommand,
         FindHighlightExtension,
+        TaskTokenHighlight,
         Placeholder.configure({
           placeholder: "Start with a title, then let markdown shortcuts shape the page.",
         }),

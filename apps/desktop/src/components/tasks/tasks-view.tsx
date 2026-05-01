@@ -20,6 +20,7 @@ import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useSta
 import {
   ArrowDownIcon,
   ArrowUpIcon,
+  FileIcon,
   OutlineIcon,
   PlusIcon,
   SearchIcon,
@@ -46,6 +47,7 @@ import { getErrorMessage } from "./task-view-model";
 type TasksViewProps = {
   glyph: NonNullable<Window["glyph"]>;
   onOpenTaskSource: (task: WorkspaceTask) => void;
+  onOpenMarkdown: () => void;
 };
 
 type TasksViewMode = "board" | "table";
@@ -333,7 +335,7 @@ const TableRow = memo(function TableRow({
   );
 });
 
-export function TasksView({ glyph }: TasksViewProps) {
+export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
   const columns = useTasksStore((state) => state.columns);
   const tasks = useTasksStore((state) => state.tasks);
   const tagSuggestions = useTasksStore((state) => state.tagSuggestions);
@@ -574,6 +576,19 @@ export function TasksView({ glyph }: TasksViewProps) {
                   className="h-8 w-52 bg-background"
                 />
               ) : null}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={onOpenMarkdown}
+                    className="grid h-8 w-8 place-items-center rounded text-muted-foreground hover:text-foreground"
+                    aria-label="Open as Markdown"
+                  >
+                    <FileIcon size={16} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Open as Markdown</TooltipContent>
+              </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button

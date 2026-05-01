@@ -462,6 +462,15 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     [setSelectedSkillCollectionId, setViewerMode],
   );
 
+  const handleOpenTasksMarkdown = useCallback(async () => {
+    const rootPath = useWorkspaceStore.getState().rootPath;
+    if (!rootPath) return;
+    const tasksPath = normalizePath(`${rootPath}/Tasks.md`);
+    setSelectedSkillCollectionId(null);
+    setViewerMode("note");
+    await controller.openFile(tasksPath);
+  }, [controller, setSelectedSkillCollectionId, setViewerMode]);
+
   const handleOpenSkillLink = useCallback(
     async (targetPath: string) => {
       const matchingSkill = allSkills.find(
@@ -822,8 +831,20 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       });
     }
 
+    items.push({
+      id: "open-tasks-markdown",
+      title: "Open Tasks as Markdown",
+      subtitle: "Edit Tasks.md directly in the note editor",
+      section: "Tasks",
+      kind: "command",
+      onSelect: () => {
+        void handleOpenTasksMarkdown();
+        closePalette();
+      },
+    });
+
     return items.filter((item) => matchesPaletteQuery(item.title, paletteFilterQuery));
-  }, [closePalette, handleOpenTasks, paletteFilterQuery, viewerMode]);
+  }, [closePalette, handleOpenTasks, handleOpenTasksMarkdown, paletteFilterQuery, viewerMode]);
 
   const currentNotePaletteItems = useMemo<CommandPaletteItem[]>(() => {
     if (viewerMode !== "note" || !controller.activeFile) {
@@ -1561,6 +1582,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                   <LazyTasksView
                     glyph={glyph}
                     onOpenTaskSource={(task) => void handleOpenTaskSource(task)}
+                    onOpenMarkdown={() => void handleOpenTasksMarkdown()}
                   />
                 </Suspense>
               </div>

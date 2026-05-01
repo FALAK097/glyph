@@ -22,7 +22,7 @@ import type {
   WorkspaceTask,
 } from "../src/core/tasks.js";
 
-const getBoardPath = (workspaceRoot: string) => path.join(workspaceRoot, ".glyph", "tasks.md");
+const getBoardPath = (workspaceRoot: string) => path.join(workspaceRoot, "Tasks.md");
 
 const createId = (prefix: string) =>
   `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -88,11 +88,12 @@ const parseTaskLine = (
   return { title, labels, dueDate, meta };
 };
 
-const serializeTask = (task: WorkspaceTask): string => {
+const serializeTask = (task: WorkspaceTask, isDone = false): string => {
   const meta = `<!-- task-meta: id=${task.id} created=${task.createdAt} updated=${task.updatedAt} -->`;
   const labelStr = task.labels.map((l) => `#${l}`).join(" ");
   const dueStr = task.dueDate ? ` due:${task.dueDate}` : "";
-  return `- [ ] ${task.title}${labelStr ? ` ${labelStr}` : ""}${dueStr} ${meta}`;
+  const checkbox = isDone ? "- [x]" : "- [ ]";
+  return `${checkbox} ${task.title}${labelStr ? ` ${labelStr}` : ""}${dueStr} ${meta}`;
 };
 
 const serializeColumn = (column: TaskColumn): string => {
@@ -184,12 +185,13 @@ const serializeBoardMarkdown = (columns: TaskColumn[], tasks: WorkspaceTask[]): 
   const lines: string[] = ["# Tasks", ""];
 
   for (const column of columns) {
+    const isDone = column.id === "done" || column.title.toLowerCase().includes("done");
     lines.push(serializeColumn(column));
     lines.push("");
     for (const taskId of column.taskIds) {
       const task = taskById.get(taskId);
       if (task) {
-        lines.push(serializeTask(task));
+        lines.push(serializeTask(task, isDone));
       }
     }
     lines.push("");

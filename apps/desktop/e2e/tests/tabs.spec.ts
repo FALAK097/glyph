@@ -21,7 +21,7 @@ import {
   triggerTabSwitchShortcut,
 } from "../navigation";
 
-test("opens notes in multiple tabs and switches between them with keyboard shortcuts", async ({}, testInfo) => {
+test("opens notes in multiple tabs and switches between them with keyboard shortcuts", async (_, testInfo) => {
   const glyph = await launchGlyph();
   try {
     await expectAppShell(glyph.window);
@@ -128,7 +128,7 @@ test("opens notes in multiple tabs and switches between them with keyboard short
   }
 });
 
-test("supports last-tab and adjacent tab keyboard shortcuts across long tab rails", async ({}, testInfo) => {
+test("supports last-tab and adjacent tab keyboard shortcuts across long tab rails", async (_, testInfo) => {
   const sandbox = await createGlyphSandbox();
   const generatedTabs = Array.from({ length: 8 }, (_, index) => {
     const label = String(index + 1).padStart(2, "0");
@@ -197,7 +197,7 @@ test("supports last-tab and adjacent tab keyboard shortcuts across long tab rail
   }
 });
 
-test("creates and closes tabs from shortcuts and restores tab sessions after relaunch", async ({}, testInfo) => {
+test("creates and closes tabs from shortcuts and restores tab sessions after relaunch", async (_, testInfo) => {
   const sandbox = await createGlyphSandbox();
   let firstRun: Awaited<ReturnType<typeof launchGlyph>> | null = null;
   let secondRun: Awaited<ReturnType<typeof launchGlyph>> | null = null;

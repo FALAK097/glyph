@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { launchGlyph } from "../helpers";
 import { expectAppShell, openWorkspace, selectPaletteItem } from "../navigation";
 
-test("launches Glyph and opens settings from the command palette", async ({}, testInfo) => {
+test("launches Glyph and opens settings from the command palette", async (_, testInfo) => {
   const glyph = await launchGlyph();
 
   try {
@@ -17,7 +17,7 @@ test("launches Glyph and opens settings from the command palette", async ({}, te
   }
 });
 
-test("opens a seeded markdown note from the workspace", async ({}, testInfo) => {
+test("opens a seeded markdown note from the workspace", async (_, testInfo) => {
   const glyph = await launchGlyph();
 
   try {

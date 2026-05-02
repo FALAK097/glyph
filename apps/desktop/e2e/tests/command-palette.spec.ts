@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { launchGlyph } from "../helpers";
 import { expectAppShell, openCommandPalette, openWorkspace } from "../navigation";
 
-test("command palette closes on Escape key", async ({}, testInfo) => {
+test("command palette closes on Escape key", async (_, testInfo) => {
   const glyph = await launchGlyph();
   try {
     await expectAppShell(glyph.window);
@@ -17,7 +17,7 @@ test("command palette closes on Escape key", async ({}, testInfo) => {
   }
 });
 
-test("command palette search filters results to matching file names", async ({}, testInfo) => {
+test("command palette search filters results to matching file names", async (_, testInfo) => {
   const glyph = await launchGlyph();
   try {
     await expectAppShell(glyph.window);
@@ -32,7 +32,7 @@ test("command palette search filters results to matching file names", async ({},
   }
 });
 
-test("command palette shows settings option", async ({}, testInfo) => {
+test("command palette shows settings option", async (_, testInfo) => {
   const glyph = await launchGlyph();
   try {
     await expectAppShell(glyph.window);

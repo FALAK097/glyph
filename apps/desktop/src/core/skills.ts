@@ -1,5 +1,7 @@
 import { parseDocument } from "yaml";
 
+import { parseMarkdownFrontmatter, serializeMarkdownFrontmatter } from "./frontmatter.js";
+
 export const SKILL_FILE_NAME = "SKILL.md";
 export const AGENTS_FILE_NAME = "AGENTS.md";
 
@@ -171,18 +173,7 @@ export function serializeSkillDocument({
   frontmatterText: string | null;
   body: string;
 }) {
-  const normalizedFrontmatter = (frontmatterText ?? "").replace(/\r\n?/g, "\n").trim();
-  const normalizedBody = body.replace(/\r\n?/g, "\n").replace(/^\n+/, "");
-
-  if (!normalizedFrontmatter) {
-    return normalizedBody;
-  }
-
-  if (!normalizedBody) {
-    return `---\n${normalizedFrontmatter}\n---\n`;
-  }
-
-  return `---\n${normalizedFrontmatter}\n---\n\n${normalizedBody}`;
+  return serializeMarkdownFrontmatter({ frontmatterText, body });
 }
 
 function normalizeFrontmatterValue(value: unknown): SkillMetadataValue {
@@ -334,25 +325,12 @@ function extractBodyDescription(body: string) {
 }
 
 export function parseSkillDocument(content: string): ParsedSkillDocument {
-  const normalizedContent = content.replace(/\r\n?/g, "\n");
-  const lines = normalizedContent.split("\n");
+  const parsedDocument = parseMarkdownFrontmatter(content);
   let frontmatter: Record<string, SkillMetadataValue> = {};
-  let body = normalizedContent;
-  let frontmatterText: string | null = null;
+  const { frontmatterText, body } = parsedDocument;
 
-  if (lines[0] === "---") {
-    const endIndex = lines.findIndex((line, index) => index > 0 && line.trim() === "---");
-
-    if (endIndex > 0) {
-      const frontmatterLines = lines.slice(1, endIndex);
-      frontmatterText = frontmatterLines.join("\n").trim() || null;
-      frontmatter = frontmatterText ? parseFrontmatter(frontmatterText) : {};
-
-      body = lines
-        .slice(endIndex + 1)
-        .join("\n")
-        .trimStart();
-    }
+  if (frontmatterText) {
+    frontmatter = parseFrontmatter(frontmatterText);
   }
 
   const titleFromFrontmatter = getSkillMetadataString(

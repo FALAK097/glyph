@@ -9,6 +9,7 @@ import {
 } from "@/core/skills";
 
 import { MarkdownEditor } from "../markdown-editor";
+import { FrontmatterBlock } from "../frontmatter-block";
 import { Button } from "../ui/button";
 
 const OUTLINE_HEADING_PATTERN = /^#{1,4}\s+\S/;
@@ -82,8 +83,7 @@ export function SkillDocumentPane({
     return text ? text.split(/\s+/).length : 0;
   }, [parsed.body]);
   const readingTime = Math.max(1, Math.round(wordCount / 200));
-  const frontmatterRows = Math.max(2, parsed.frontmatterText?.split("\n").length ?? 0);
-  const handleBodyChange = useCallback(
+  const handleContentChange = useCallback(
     (nextBody: string) => {
       onChange(
         serializeSkillDocument({
@@ -134,65 +134,44 @@ export function SkillDocumentPane({
         })}
       </div>
     ) : null;
-  const topContent =
-    pendingExternalChange || parsed.frontmatterText ? (
-      <div className="space-y-4">
-        {pendingExternalChange ? (
-          <div className="rounded-xl border border-border/70 bg-muted/45 px-4 py-3 transition-opacity duration-150 ease-out">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground">External change detected</p>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {pendingExternalChange.name} changed on disk while you were editing.
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    onReloadAfterExternalChange?.();
-                  }}
-                >
-                  Reload
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    onKeepMineAfterExternalChange?.();
-                  }}
-                >
-                  Keep mine
-                </Button>
-              </div>
+  const externalChangeContent = pendingExternalChange ? (
+    <div className="space-y-4">
+      {pendingExternalChange ? (
+        <div className="rounded-xl border border-border/70 bg-muted/45 px-4 py-3 transition-opacity duration-150 ease-out">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">External change detected</p>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                {pendingExternalChange.name} changed on disk while you were editing.
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  onReloadAfterExternalChange?.();
+                }}
+              >
+                Reload
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  onKeepMineAfterExternalChange?.();
+                }}
+              >
+                Keep mine
+              </Button>
             </div>
           </div>
-        ) : null}
-        {parsed.frontmatterText ? (
-          <div className="rounded-xl border border-border/70 bg-muted/20 px-4 py-3 font-mono text-[13px] leading-6 text-muted-foreground transition-opacity duration-150 ease-out">
-            <div className="text-muted-foreground/70">---</div>
-            {activeDocument.isEditable ? (
-              <textarea
-                aria-label="Skill frontmatter"
-                className="mt-1 block w-full resize-none overflow-hidden border-0 bg-transparent p-0 font-mono text-[13px] leading-6 text-muted-foreground outline-none"
-                spellCheck={false}
-                rows={frontmatterRows}
-                value={parsed.frontmatterText}
-                onChange={(event) => handleFrontmatterChange(event.target.value)}
-              />
-            ) : (
-              <pre className="mt-1 overflow-x-auto whitespace-pre-wrap font-mono text-[13px] leading-6 text-muted-foreground">
-                {parsed.frontmatterText}
-              </pre>
-            )}
-            <div className="mt-1 text-muted-foreground/70">---</div>
-          </div>
-        ) : null}
-      </div>
-    ) : null;
+        </div>
+      ) : null}
+    </div>
+  ) : null;
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-background">
@@ -207,7 +186,19 @@ export function SkillDocumentPane({
         wordCount={wordCount}
         readingTime={readingTime}
         headerAccessory={headerAccessory}
-        onChange={handleBodyChange}
+        topContent={
+          <>
+            {externalChangeContent}
+            {parsed.frontmatterText ? (
+              <FrontmatterBlock
+                value={parsed.frontmatterText}
+                isEditable={activeDocument.isEditable}
+                onChange={handleFrontmatterChange}
+              />
+            ) : null}
+          </>
+        }
+        onChange={handleContentChange}
         onOpenCommandPalette={onOpenCommandPalette}
         commandPaletteLabel="Search notes and skills"
         commandPaletteShortcut={commandPaletteShortcut}
@@ -221,7 +212,6 @@ export function SkillDocumentPane({
         folderRevealLabel={folderRevealLabel}
         onOpenLinkedFile={onOpenLinkedFile}
         showOutline={shouldShowOutline}
-        topContent={topContent}
       />
     </section>
   );

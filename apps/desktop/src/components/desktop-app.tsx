@@ -33,6 +33,7 @@ import { SkillView } from "./skills/skill-view";
 import { SkillsBrowserPane } from "./skills/skills-browser-pane";
 import { SplitContainer } from "./split-container";
 import { SplitViewActivePaneProvider, SplitViewProvider } from "./split-view-context";
+import { TasksHeaderActions } from "./tasks/tasks-header-actions";
 const LazyTasksView = React.lazy(() =>
   import("./tasks/tasks-view").then((module) => ({ default: module.TasksView })),
 );
@@ -97,15 +98,48 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     hasCapturedInitialSessionRef.current = true;
   }
 
+  // Stable refs for cross-surface navigation callbacks — populated after
+  // skillsController and setViewerMode are in scope.
+  const onRestoreSkillRef = useRef<(path: string) => Promise<void>>(async () => {});
+  const onRestoreTasksRef = useRef<() => void>(() => {});
+
   const controller = useDesktopAppController(glyph, {
     initialFilePath: initialNoteSessionRef.current.filePath,
     initialTabPaths: initialNoteSessionRef.current.tabPaths,
     initialWorkspacePath: initialNoteSessionRef.current.workspacePath,
     sessionReady: sessionHasHydrated,
+    onRestoreSkill: useCallback((path: string) => onRestoreSkillRef.current(path), []),
+    onRestoreTasks: useCallback(() => onRestoreTasksRef.current(), []),
   });
   const skillsController = useSkillLibraryController(glyph, {
     enabled: true,
   });
+
+  // Wire cross-surface navigation restore callbacks (populated each render so
+  // the stable refs always call the latest closures).
+  onRestoreSkillRef.current = async (path: string) => {
+    const matchingSkill = (skillsController.snapshot?.skills ?? []).find(
+      (skill) => isSamePath(skill.skillFilePath, path) || isSamePath(skill.agentsFilePath, path),
+    );
+    const opened = await skillsController.openSkillByPath(path);
+    if (!opened) {
+      return;
+    }
+    const nextCollectionId = matchingSkill
+      ? matchingSkill.sourceId === "agents-global"
+        ? "global-skills"
+        : matchingSkill.sourceId === "project-skills"
+          ? "project-skills"
+          : `${matchingSkill.sourceKind}-tool`
+      : "all-skills";
+    setSkillsExpanded(true);
+    setSelectedSkillCollectionId(nextCollectionId);
+    setViewerMode("skill");
+  };
+  onRestoreTasksRef.current = () => {
+    setSelectedSkillCollectionId(null);
+    setViewerMode("tasks");
+  };
   const [pendingNoteRename, setPendingNoteRename] = useState<PendingNoteRename | null>(null);
   const [pendingNoteConfirm, setPendingNoteConfirm] = useState<PendingNoteConfirm | null>(null);
   const [paletteSkillResultIds, setPaletteSkillResultIds] = useState<string[] | null>(null);
@@ -281,6 +315,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         await skillsController.openSkill(skillId);
       }
 
+      useWorkspaceStore.getState().pushHistory({ kind: "skill", path: targetPath });
       setViewerMode("skill");
     },
     [allSkills, getPreferredSkillDocumentKind, setViewerMode, skillsController],
@@ -451,6 +486,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
 
   const handleOpenTasks = useCallback(() => {
     setSelectedSkillCollectionId(null);
+    useWorkspaceStore.getState().pushHistory({ kind: "tasks" });
     setViewerMode("tasks");
   }, [setSelectedSkillCollectionId, setViewerMode]);
 
@@ -492,6 +528,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
           activateSkillCollection("all-skills");
         }
 
+        useWorkspaceStore.getState().pushHistory({ kind: "skill", path: targetPath });
         setViewerMode("skill");
         return;
       }
@@ -1182,8 +1219,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
 
   const toPathKey = useCallback((path: string) => normalizePath(path).toLowerCase(), []);
   const isMacLike = useMemo(() => navigator.platform.includes("Mac"), []);
-  const noteHeaderPaddingClass =
-    (controller.isSidebarCollapsed || controller.isFocusMode) && isMacLike ? "pl-20 pr-4" : "px-4";
+  const noteHeaderPaddingClass = isMacLike ? "pl-20 pr-4" : "px-4";
   const noteUpdateStateFlags = useUpdateStateFlags(
     controller.updateState,
     controller.appInfo?.updatesMode,
@@ -1389,9 +1425,240 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       isSamePath(filePath, activeNoteFile.path),
     );
 
+  const toolbarNode: React.ReactNode = isAppBootstrapping ? (
+    <div
+      className={`flex items-center gap-2 border-b border-border/40 py-2 ${noteHeaderPaddingClass}`}
+    >
+      <div className="h-8 w-8 rounded-md bg-muted/70 motion-safe:animate-pulse" />
+      <div className="mx-auto h-8 w-full max-w-sm rounded-full bg-muted/60 motion-safe:animate-pulse" />
+      <div className="h-8 w-8 rounded-md bg-muted/70 motion-safe:animate-pulse" />
+    </div>
+  ) : isTasksSurfaceVisible ? (
+    <EditorToolbar
+      _isMacLike={isMacLike}
+      isSidebarCollapsed={controller.isSidebarCollapsed}
+      toggleSidebarShortcut={getShortcutDisplay(
+        controller.shortcuts,
+        "toggle-sidebar",
+        navigator.platform,
+      )}
+      onToggleSidebar={handleToggleSidebar}
+      canGoBack={controller.canGoBack}
+      canGoForward={controller.canGoForward}
+      navigateBackShortcut={getShortcutDisplay(
+        controller.shortcuts,
+        "navigate-back",
+        navigator.platform,
+      )}
+      navigateForwardShortcut={getShortcutDisplay(
+        controller.shortcuts,
+        "navigate-forward",
+        navigator.platform,
+      )}
+      onNavigateBack={handleNavigateBack}
+      onNavigateForward={handleNavigateForward}
+      onCreateNote={undefined}
+      newNoteShortcut={undefined}
+      fileName={null}
+      filePath={null}
+      shouldShowCommandPalette={true}
+      onOpenCommandPalette={handleOpenCommandPalette}
+      commandPaletteShortcut={getShortcutDisplay(
+        controller.shortcuts,
+        "command-palette",
+        navigator.platform,
+      )}
+      commandPaletteLabel="Search notes and skills"
+      isFocusMode={undefined}
+      onToggleFocusMode={undefined}
+      focusModeShortcut={undefined}
+      shouldShowUpdateActionButton={false}
+      shouldShowMoreOptions={false}
+      updateButtonVariant="outline"
+      isUpdateButtonDisabled={true}
+      updateButtonLabel=""
+      updateButtonTooltip=""
+      onUpdateAction={undefined}
+      onDismissUpdateAction={undefined}
+      isManualReleaseButton={false}
+      headerPaddingClass={noteHeaderPaddingClass}
+      onOpenSettings={handleOpenSettings}
+      headerAccessory={
+        <TasksHeaderActions glyph={glyph} onOpenMarkdown={() => void handleOpenTasksMarkdown()} />
+      }
+      content=""
+      documentLabel="task"
+      revealInFolderLabel={controller.folderRevealLabel}
+      onCopy={handleDisabledToolbarAction}
+      onCopyPath={handleDisabledToolbarAction}
+      onOpenExternal={handleDisabledToolbarAction}
+      onExportPDF={handleDisabledToolbarAction}
+      onTogglePinnedFile={undefined}
+      isActiveFilePinned={false}
+      editorScale={controller.editorScale}
+      onEditorScaleChange={undefined}
+      zoomInShortcut={undefined}
+      zoomOutShortcut={undefined}
+      zoomResetShortcut={undefined}
+    />
+  ) : isSkillSurfaceVisible ? (
+    <EditorToolbar
+      _isMacLike={isMacLike}
+      isSidebarCollapsed={controller.isSidebarCollapsed}
+      toggleSidebarShortcut={getShortcutDisplay(
+        controller.shortcuts,
+        "toggle-sidebar",
+        navigator.platform,
+      )}
+      onToggleSidebar={handleToggleSidebar}
+      canGoBack={controller.canGoBack}
+      canGoForward={controller.canGoForward}
+      navigateBackShortcut={getShortcutDisplay(
+        controller.shortcuts,
+        "navigate-back",
+        navigator.platform,
+      )}
+      navigateForwardShortcut={getShortcutDisplay(
+        controller.shortcuts,
+        "navigate-forward",
+        navigator.platform,
+      )}
+      onNavigateBack={handleNavigateBack}
+      onNavigateForward={handleNavigateForward}
+      onCreateNote={undefined}
+      newNoteShortcut={undefined}
+      fileName={skillsController.activeDocument?.name ?? null}
+      filePath={null}
+      shouldShowCommandPalette={true}
+      onOpenCommandPalette={handleOpenCommandPalette}
+      commandPaletteShortcut={getShortcutDisplay(
+        controller.shortcuts,
+        "command-palette",
+        navigator.platform,
+      )}
+      commandPaletteLabel="Search notes and skills"
+      isFocusMode={undefined}
+      onToggleFocusMode={undefined}
+      focusModeShortcut={undefined}
+      shouldShowUpdateActionButton={false}
+      shouldShowMoreOptions={Boolean(skillsController.activeDocument)}
+      updateButtonVariant="outline"
+      isUpdateButtonDisabled={true}
+      updateButtonLabel=""
+      updateButtonTooltip=""
+      onUpdateAction={undefined}
+      onDismissUpdateAction={undefined}
+      isManualReleaseButton={false}
+      headerPaddingClass={noteHeaderPaddingClass}
+      onOpenSettings={handleOpenSettings}
+      headerAccessory={null}
+      content={skillsController.draftContent}
+      documentLabel="skill"
+      revealInFolderLabel={controller.folderRevealLabel}
+      onCopy={() => copyText(skillsController.draftContent)}
+      onCopyPath={() =>
+        skillsController.activeDocument
+          ? copyText(skillsController.activeDocument.path)
+          : Promise.resolve()
+      }
+      onOpenExternal={() =>
+        skillsController.activeDocument
+          ? skillsController.revealInFinder(skillsController.activeDocument.path)
+          : Promise.resolve()
+      }
+      onExportPDF={() =>
+        skillsController.activeDocument
+          ? exportDocumentToPdf(skillsController.draftContent, skillsController.activeDocument.name)
+          : Promise.resolve()
+      }
+      onTogglePinnedFile={undefined}
+      isActiveFilePinned={false}
+      editorScale={controller.editorScale}
+      onEditorScaleChange={undefined}
+      zoomInShortcut={undefined}
+      zoomOutShortcut={undefined}
+      zoomResetShortcut={undefined}
+    />
+  ) : (
+    <EditorToolbar
+      _isMacLike={isMacLike}
+      isSidebarCollapsed={controller.isSidebarCollapsed}
+      toggleSidebarShortcut={getShortcutDisplay(
+        controller.shortcuts,
+        "toggle-sidebar",
+        navigator.platform,
+      )}
+      onToggleSidebar={handleToggleSidebar}
+      canGoBack={controller.canGoBack}
+      canGoForward={controller.canGoForward}
+      navigateBackShortcut={getShortcutDisplay(
+        controller.shortcuts,
+        "navigate-back",
+        navigator.platform,
+      )}
+      navigateForwardShortcut={getShortcutDisplay(
+        controller.shortcuts,
+        "navigate-forward",
+        navigator.platform,
+      )}
+      onNavigateBack={() => void controller.navigateBack()}
+      onNavigateForward={() => void controller.navigateForward()}
+      onCreateNote={() => void controller.createNote()}
+      newNoteShortcut={getShortcutDisplay(controller.shortcuts, "new-note", navigator.platform)}
+      fileName={activeNoteFile?.name ?? null}
+      filePath={activeNoteFile?.path ?? null}
+      shouldShowCommandPalette={true}
+      onOpenCommandPalette={handleOpenCommandPalette}
+      commandPaletteShortcut={getShortcutDisplay(
+        controller.shortcuts,
+        "command-palette",
+        navigator.platform,
+      )}
+      commandPaletteLabel="Search notes and skills"
+      isFocusMode={controller.isFocusMode}
+      onToggleFocusMode={() => void controller.toggleFocusMode()}
+      focusModeShortcut={getShortcutDisplay(controller.shortcuts, "focus-mode", navigator.platform)}
+      shouldShowUpdateActionButton={noteUpdateStateFlags.shouldShowUpdateActionButton}
+      shouldShowMoreOptions={true}
+      updateButtonVariant={noteUpdateStateFlags.updateButtonVariant}
+      isUpdateButtonDisabled={noteUpdateStateFlags.isUpdateButtonDisabled}
+      updateButtonLabel={noteUpdateStateFlags.updateButtonLabel}
+      updateButtonTooltip={noteUpdateStateFlags.updateButtonTooltip}
+      onUpdateAction={() => void controller.triggerUpdateAction()}
+      onDismissUpdateAction={() => void controller.dismissUpdateNotification()}
+      isManualReleaseButton={noteUpdateStateFlags.isManualReleaseButton}
+      headerPaddingClass={noteHeaderPaddingClass}
+      onOpenSettings={handleOpenSettings}
+      headerAccessory={null}
+      content={controller.draftContent}
+      documentLabel="note"
+      revealInFolderLabel={controller.folderRevealLabel}
+      onCopy={() => copyText(controller.draftContent)}
+      onCopyPath={() => (activeNoteFile ? copyText(activeNoteFile.path) : Promise.resolve())}
+      onOpenExternal={() =>
+        activeNoteFile ? controller.revealInFinder(activeNoteFile.path) : Promise.resolve()
+      }
+      onExportPDF={() =>
+        activeNoteFile
+          ? exportDocumentToPdf(controller.draftContent, activeNoteFile.name)
+          : Promise.resolve()
+      }
+      onTogglePinnedFile={
+        activeNoteFile ? () => void controller.togglePinnedFile(activeNoteFile.path) : undefined
+      }
+      isActiveFilePinned={Boolean(isActiveNotePinned)}
+      editorScale={controller.editorScale}
+      onEditorScaleChange={(scale) => void controller.setEditorScale(scale)}
+      zoomInShortcut={getShortcutDisplay(controller.shortcuts, "zoom-in", navigator.platform)}
+      zoomOutShortcut={getShortcutDisplay(controller.shortcuts, "zoom-out", navigator.platform)}
+      zoomResetShortcut={getShortcutDisplay(controller.shortcuts, "zoom-reset", navigator.platform)}
+    />
+  );
+
   return (
     <TooltipProvider>
       <AppLayout
+        toolbar={toolbarNode}
         shouldCollapseSidebar={shouldCollapseSidebar}
         tree={controller.visibleSidebarNodes}
         activePath={viewerMode === "note" ? (controller.activeFile?.path ?? null) : null}
@@ -1457,17 +1724,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
           <div className="min-h-0 min-w-0">
             {isAppBootstrapping ? (
               <div className="flex h-full min-h-0 flex-col bg-background">
-                <div
-                  className={`flex items-center gap-2 border-b border-border/40 py-2 ${
-                    controller.isSidebarCollapsed && navigator.platform.includes("Mac")
-                      ? "pl-20 pr-4"
-                      : "px-4"
-                  }`}
-                >
-                  <div className="h-8 w-8 rounded-md bg-muted/70 motion-safe:animate-pulse" />
-                  <div className="mx-auto h-8 w-full max-w-sm rounded-full bg-muted/60 motion-safe:animate-pulse" />
-                  <div className="h-8 w-8 rounded-md bg-muted/70 motion-safe:animate-pulse" />
-                </div>
                 <div className="flex min-h-0 flex-1 flex-col gap-4 px-8 py-8">
                   <div className="h-6 w-40 rounded-md bg-muted/60 motion-safe:animate-pulse" />
                   <div className="h-4 w-72 rounded-md bg-muted/40 motion-safe:animate-pulse" />
@@ -1478,74 +1734,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
               </div>
             ) : isTasksSurfaceVisible ? (
               <div className="flex h-full min-h-0 flex-col bg-background">
-                <div className="sticky top-0 z-20 shrink-0 bg-background/95 supports-backdrop-filter:backdrop-blur-md">
-                  <EditorToolbar
-                    _isMacLike={isMacLike}
-                    isSidebarCollapsed={controller.isSidebarCollapsed}
-                    toggleSidebarShortcut={getShortcutDisplay(
-                      controller.shortcuts,
-                      "toggle-sidebar",
-                      navigator.platform,
-                    )}
-                    onToggleSidebar={handleToggleSidebar}
-                    canGoBack={controller.canGoBack}
-                    canGoForward={controller.canGoForward}
-                    navigateBackShortcut={getShortcutDisplay(
-                      controller.shortcuts,
-                      "navigate-back",
-                      navigator.platform,
-                    )}
-                    navigateForwardShortcut={getShortcutDisplay(
-                      controller.shortcuts,
-                      "navigate-forward",
-                      navigator.platform,
-                    )}
-                    onNavigateBack={handleNavigateBack}
-                    onNavigateForward={handleNavigateForward}
-                    onCreateNote={undefined}
-                    newNoteShortcut={undefined}
-                    surfaceTitle="Tasks"
-                    fileName={null}
-                    filePath={null}
-                    shouldShowCommandPalette={true}
-                    onOpenCommandPalette={handleOpenCommandPalette}
-                    commandPaletteShortcut={getShortcutDisplay(
-                      controller.shortcuts,
-                      "command-palette",
-                      navigator.platform,
-                    )}
-                    commandPaletteLabel="Search notes and skills"
-                    isFocusMode={undefined}
-                    onToggleFocusMode={undefined}
-                    focusModeShortcut={undefined}
-                    shouldShowUpdateActionButton={false}
-                    shouldShowMoreOptions={false}
-                    updateButtonVariant="outline"
-                    isUpdateButtonDisabled={true}
-                    updateButtonLabel=""
-                    updateButtonTooltip=""
-                    onUpdateAction={undefined}
-                    onDismissUpdateAction={undefined}
-                    isManualReleaseButton={false}
-                    headerPaddingClass={noteHeaderPaddingClass}
-                    onOpenSettings={handleOpenSettings}
-                    headerAccessory={null}
-                    content=""
-                    documentLabel="task"
-                    revealInFolderLabel={controller.folderRevealLabel}
-                    onCopy={handleDisabledToolbarAction}
-                    onCopyPath={handleDisabledToolbarAction}
-                    onOpenExternal={handleDisabledToolbarAction}
-                    onExportPDF={handleDisabledToolbarAction}
-                    onTogglePinnedFile={undefined}
-                    isActiveFilePinned={false}
-                    editorScale={controller.editorScale}
-                    onEditorScaleChange={undefined}
-                    zoomInShortcut={undefined}
-                    zoomOutShortcut={undefined}
-                    zoomResetShortcut={undefined}
-                  />
-                </div>
                 <Suspense
                   fallback={
                     <div className="grid h-full place-items-center text-sm text-muted-foreground">
@@ -1556,7 +1744,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                   <LazyTasksView
                     glyph={glyph}
                     onOpenTaskSource={(task) => void handleOpenTaskSource(task)}
-                    onOpenMarkdown={() => void handleOpenTasksMarkdown()}
                   />
                 </Suspense>
               </div>
@@ -1575,13 +1762,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                 saveStateLabel={skillsController.saveStateLabel}
                 skillInitialScrollTop={skillInitialScrollTop}
                 skillEmptyState={skillEmptyState}
-                isSidebarCollapsed={controller.isSidebarCollapsed}
-                shortcuts={controller.shortcuts}
                 folderRevealLabel={controller.folderRevealLabel}
                 showOutline={controller.showOutline}
-                onSetIsPaletteOpen={controller.setIsPaletteOpen}
-                onSetIsSettingsOpen={controller.setIsSettingsOpen}
-                onToggleSidebar={handleToggleSidebar}
                 onOpenLinkedFile={handleOpenSkillLink}
                 onScrollPositionChange={handleDocumentScrollPositionChange}
                 onDraftContentChange={skillsController.setDraftContent}
@@ -1591,107 +1773,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
               />
             ) : (
               <div className="flex h-full min-h-0 flex-col bg-background">
-                <div className="sticky top-0 z-20 shrink-0 bg-background/95 supports-backdrop-filter:backdrop-blur-md">
-                  <EditorToolbar
-                    _isMacLike={isMacLike}
-                    isSidebarCollapsed={controller.isSidebarCollapsed}
-                    toggleSidebarShortcut={getShortcutDisplay(
-                      controller.shortcuts,
-                      "toggle-sidebar",
-                      navigator.platform,
-                    )}
-                    onToggleSidebar={handleToggleSidebar}
-                    canGoBack={controller.canGoBack}
-                    canGoForward={controller.canGoForward}
-                    navigateBackShortcut={getShortcutDisplay(
-                      controller.shortcuts,
-                      "navigate-back",
-                      navigator.platform,
-                    )}
-                    navigateForwardShortcut={getShortcutDisplay(
-                      controller.shortcuts,
-                      "navigate-forward",
-                      navigator.platform,
-                    )}
-                    onNavigateBack={() => void controller.navigateBack()}
-                    onNavigateForward={() => void controller.navigateForward()}
-                    onCreateNote={() => void controller.createNote()}
-                    newNoteShortcut={getShortcutDisplay(
-                      controller.shortcuts,
-                      "new-note",
-                      navigator.platform,
-                    )}
-                    fileName={activeNoteFile?.name ?? null}
-                    filePath={activeNoteFile?.path ?? null}
-                    shouldShowCommandPalette={true}
-                    onOpenCommandPalette={handleOpenCommandPalette}
-                    commandPaletteShortcut={getShortcutDisplay(
-                      controller.shortcuts,
-                      "command-palette",
-                      navigator.platform,
-                    )}
-                    commandPaletteLabel="Search notes and skills"
-                    isFocusMode={controller.isFocusMode}
-                    onToggleFocusMode={() => void controller.toggleFocusMode()}
-                    focusModeShortcut={getShortcutDisplay(
-                      controller.shortcuts,
-                      "focus-mode",
-                      navigator.platform,
-                    )}
-                    shouldShowUpdateActionButton={noteUpdateStateFlags.shouldShowUpdateActionButton}
-                    shouldShowMoreOptions={true}
-                    updateButtonVariant={noteUpdateStateFlags.updateButtonVariant}
-                    isUpdateButtonDisabled={noteUpdateStateFlags.isUpdateButtonDisabled}
-                    updateButtonLabel={noteUpdateStateFlags.updateButtonLabel}
-                    updateButtonTooltip={noteUpdateStateFlags.updateButtonTooltip}
-                    onUpdateAction={() => void controller.triggerUpdateAction()}
-                    onDismissUpdateAction={() => void controller.dismissUpdateNotification()}
-                    isManualReleaseButton={noteUpdateStateFlags.isManualReleaseButton}
-                    headerPaddingClass={noteHeaderPaddingClass}
-                    onOpenSettings={handleOpenSettings}
-                    headerAccessory={null}
-                    content={controller.draftContent}
-                    documentLabel="note"
-                    revealInFolderLabel={controller.folderRevealLabel}
-                    onCopy={() => copyText(controller.draftContent)}
-                    onCopyPath={() =>
-                      activeNoteFile ? copyText(activeNoteFile.path) : Promise.resolve()
-                    }
-                    onOpenExternal={() =>
-                      activeNoteFile
-                        ? controller.revealInFinder(activeNoteFile.path)
-                        : Promise.resolve()
-                    }
-                    onExportPDF={() =>
-                      activeNoteFile
-                        ? exportDocumentToPdf(controller.draftContent, activeNoteFile.name)
-                        : Promise.resolve()
-                    }
-                    onTogglePinnedFile={
-                      activeNoteFile
-                        ? () => void controller.togglePinnedFile(activeNoteFile.path)
-                        : undefined
-                    }
-                    isActiveFilePinned={Boolean(isActiveNotePinned)}
-                    editorScale={controller.editorScale}
-                    onEditorScaleChange={(scale) => void controller.setEditorScale(scale)}
-                    zoomInShortcut={getShortcutDisplay(
-                      controller.shortcuts,
-                      "zoom-in",
-                      navigator.platform,
-                    )}
-                    zoomOutShortcut={getShortcutDisplay(
-                      controller.shortcuts,
-                      "zoom-out",
-                      navigator.platform,
-                    )}
-                    zoomResetShortcut={getShortcutDisplay(
-                      controller.shortcuts,
-                      "zoom-reset",
-                      navigator.platform,
-                    )}
-                  />
-                </div>
                 <div className="min-h-0 flex-1">
                   <SplitViewProvider value={splitViewContextValue}>
                     <SplitViewActivePaneProvider value={splitViewActivePaneContextValue}>

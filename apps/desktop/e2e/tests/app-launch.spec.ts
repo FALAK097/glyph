@@ -1,3 +1,4 @@
+/* eslint-disable no-empty-pattern */
 import { expect, test } from "@playwright/test";
 
 import { launchGlyph } from "../helpers";

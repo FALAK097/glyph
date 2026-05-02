@@ -4,12 +4,27 @@ import { getBaseName, isPathInside, isSamePath, normalizePath } from "@/core/pat
 
 import type { DirectoryNode, FileDocument, NoteTab, TabMovePosition } from "@/core/workspace";
 
-const getClosestHistoryIndex = (history: string[], currentIndex: number, filePath: string) => {
+export type NavigationEntry =
+  | { kind: "note"; path: string }
+  | { kind: "skill"; path: string }
+  | { kind: "tasks" };
+
+const isSameEntry = (a: NavigationEntry, b: NavigationEntry): boolean => {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === "tasks") return true;
+  return isSamePath((a as { path: string }).path, (b as { path: string }).path);
+};
+
+const getClosestHistoryIndex = (
+  history: NavigationEntry[],
+  currentIndex: number,
+  entry: NavigationEntry,
+) => {
   let closestIndex = -1;
   let closestDistance = Number.POSITIVE_INFINITY;
 
-  history.forEach((entry, index) => {
-    if (!isSamePath(entry, filePath)) {
+  history.forEach((h, index) => {
+    if (!isSameEntry(h, entry)) {
       return;
     }
 
@@ -90,7 +105,7 @@ type WorkspaceState = {
   isSaving: boolean;
   lastSavedAt: number | null;
   error: string | null;
-  navigationHistory: string[];
+  navigationHistory: NavigationEntry[];
   navigationIndex: number;
   setWorkspace: (payload: {
     rootPath: string;
@@ -118,13 +133,13 @@ type WorkspaceState = {
   remapTabsForFolderRename: (oldFolderPath: string, newFolderPath: string) => void;
   getActiveTab: () => NoteTab | null;
   getTabByPath: (filePath: string) => NoteTab | null;
-  pushHistory: (filePath: string) => void;
+  pushHistory: (entry: NavigationEntry) => void;
   replaceHistoryPath: (oldPath: string, newPath: string) => void;
   removeHistoryPath: (targetPath: string) => void;
   canGoBack: () => boolean;
   canGoForward: () => boolean;
-  goBack: () => string | null;
-  goForward: () => string | null;
+  goBack: () => NavigationEntry | null;
+  goForward: () => NavigationEntry | null;
 };
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
@@ -635,21 +650,21 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const state = get();
     return state.noteTabs.find((tab) => isSamePath(tab.file.path, filePath)) ?? null;
   },
-  pushHistory: (filePath) => {
+  pushHistory: (entry) => {
     set((state) => {
-      const currentPath =
+      const currentEntry =
         state.navigationIndex >= 0
           ? (state.navigationHistory[state.navigationIndex] ?? null)
           : null;
 
-      if (currentPath && isSamePath(currentPath, filePath)) {
+      if (currentEntry && isSameEntry(currentEntry, entry)) {
         return state;
       }
 
       const existingIndex = getClosestHistoryIndex(
         state.navigationHistory,
         state.navigationIndex,
-        filePath,
+        entry,
       );
       if (existingIndex >= 0) {
         return {
@@ -659,11 +674,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       }
 
       const newHistory = state.navigationHistory.slice(0, state.navigationIndex + 1);
-      if (isSamePath(newHistory[newHistory.length - 1], filePath)) {
+      if (newHistory.length > 0 && isSameEntry(newHistory[newHistory.length - 1]!, entry)) {
         return state;
       }
 
-      newHistory.push(filePath);
+      newHistory.push(entry);
 
       if (newHistory.length > 50) {
         newHistory.shift();
@@ -677,20 +692,21 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   replaceHistoryPath: (oldPath, newPath) => {
     set((state) => ({
-      navigationHistory: state.navigationHistory.map((entry) =>
-        isSamePath(entry, oldPath) ? newPath : entry,
-      ),
+      navigationHistory: state.navigationHistory.map((entry) => {
+        if (entry.kind === "tasks") return entry;
+        return isSamePath(entry.path, oldPath) ? { ...entry, path: newPath } : entry;
+      }),
     }));
   },
   removeHistoryPath: (targetPath) => {
     set((state) => {
       const removedIndices: number[] = [];
       const nextHistory = state.navigationHistory.filter((entry, index) => {
-        if (isSamePath(entry, targetPath)) {
+        if (entry.kind === "tasks") return true;
+        if (isSamePath(entry.path, targetPath)) {
           removedIndices.push(index);
           return false;
         }
-
         return true;
       });
 
@@ -732,7 +748,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (state.navigationIndex > 0) {
       const newIndex = state.navigationIndex - 1;
       set({ navigationIndex: newIndex });
-      return state.navigationHistory[newIndex];
+      return state.navigationHistory[newIndex] ?? null;
     }
     return null;
   },
@@ -741,7 +757,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (state.navigationIndex < state.navigationHistory.length - 1) {
       const newIndex = state.navigationIndex + 1;
       set({ navigationIndex: newIndex });
-      return state.navigationHistory[newIndex];
+      return state.navigationHistory[newIndex] ?? null;
     }
     return null;
   },

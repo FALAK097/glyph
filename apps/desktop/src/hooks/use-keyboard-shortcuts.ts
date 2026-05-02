@@ -34,6 +34,8 @@ type UseKeyboardShortcutsOptions = {
   toggleFocusMode: () => Promise<void>;
   setEditorScale: (scale: number) => Promise<void>;
   editorScale: number;
+  navigateBack: () => Promise<void>;
+  navigateForward: () => Promise<void>;
 };
 
 export function useKeyboardShortcuts({
@@ -67,6 +69,8 @@ export function useKeyboardShortcuts({
   toggleFocusMode,
   setEditorScale,
   editorScale,
+  navigateBack,
+  navigateForward,
 }: UseKeyboardShortcutsOptions) {
   useEffect(() => {
     const onKeyDown = async (event: KeyboardEvent) => {
@@ -176,6 +180,8 @@ export function useKeyboardShortcuts({
         "close-pane",
         "focus-next-pane",
         "focus-previous-pane",
+        "navigate-back",
+        "navigate-forward",
       ]);
       const globalShortcut = shortcuts.find(
         (entry) => globalShortcutIds.has(entry.id) && matchShortcut(event, entry.keys, platform),
@@ -236,6 +242,12 @@ export function useKeyboardShortcuts({
             break;
           case "focus-previous-pane":
             focusPreviousPane();
+            break;
+          case "navigate-back":
+            void navigateBack();
+            break;
+          case "navigate-forward":
+            void navigateForward();
             break;
         }
         return;
@@ -328,5 +340,7 @@ export function useKeyboardShortcuts({
     toggleFocusMode,
     setEditorScale,
     editorScale,
+    navigateBack,
+    navigateForward,
   ]);
 }

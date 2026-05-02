@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.9.0](https://github.com/FALAK097/glyph/compare/v0.8.0...v0.9.0) (2026-05-02)
+
+
+### Features
+
+* **desktop:** add split view for editing multiple files side-by-side ([#178](https://github.com/FALAK097/glyph/issues/178)) ([4b57b4a](https://github.com/FALAK097/glyph/commit/4b57b4a10c0f57b9dab964a79f20f6c01c62f1fd))
+* **desktop:** add standalone tasks kanban board ([9b99cd0](https://github.com/FALAK097/glyph/commit/9b99cd0b16cc6c896b01743fbfe1b069fc74c639))
+* **tasks:** keyboard UX fixes, archive completed tasks, virtualized table ([da92a4a](https://github.com/FALAK097/glyph/commit/da92a4ac29c2e385a3fcde82008d302cd3b1ee79))
+* **tasks:** redesign table view, remove list view, white bg, mouse horizontal scroll ([7e5874c](https://github.com/FALAK097/glyph/commit/7e5874c39b9c18e99feb410003cde481b86ebe5f))
+* **tasks:** sidebar pin, startup behavior, command palette, settings ([796268f](https://github.com/FALAK097/glyph/commit/796268f20f4ba100fcb6223ac9a8aba38b214907))
+
+
+### Bug Fixes
+
+* add dark mode hover visibility for action menu items ([909a874](https://github.com/FALAK097/glyph/commit/909a8743c978d18dedc36a2baa646f5a9de5bbef))
+* add missing isTasksPinned and defaultTaskView to AppSettings type ([98e248f](https://github.com/FALAK097/glyph/commit/98e248f35da8858d716d50a09e32b474759e1261))
+* address PR review comments and fix failing CI ([a9ade0c](https://github.com/FALAK097/glyph/commit/a9ade0cc4c4f9b2e7b576a27ce6c08a0ab80d76f))
+* **desktop:** address all PR review comments from CodeRabbit ([8ccfff7](https://github.com/FALAK097/glyph/commit/8ccfff7c698f638aefe9ca1ce8fa50f1f15c0635))
+* **desktop:** address PR review comments on task board ([7889730](https://github.com/FALAK097/glyph/commit/78897301ee9bd945e9323ae109c39e91ec217c84))
+* **desktop:** clean up tasks board settings ([f9f6700](https://github.com/FALAK097/glyph/commit/f9f6700041f17f85de9c8a79e1750d38cc3ce566))
+* parse column meta from next line in e2e test parser ([e84af2d](https://github.com/FALAK097/glyph/commit/e84af2d590b0ef0e8d5f318c225d9e31028b7fc3))
+* remove unused icon imports from sidebar ([45d125c](https://github.com/FALAK097/glyph/commit/45d125c34382383d3bc8f51f4e2cd5a565c61669))
+* resolve all PR review comments and e2e test fixes ([423bfb1](https://github.com/FALAK097/glyph/commit/423bfb12023d8bc0e99a7a8b36d18385f326a897))
+* resolve react-doctor error in slash-command-list and extract link utilities ([e2a1227](https://github.com/FALAK097/glyph/commit/e2a12274a9061666f8ce8e09906129781bdc61cc))
+* resolve remaining PR review comments ([cf722f6](https://github.com/FALAK097/glyph/commit/cf722f6453a981e8dc12efe1a4a35dd16cab3674))
+* **tasks:** Add button background matches column color ([ae803ac](https://github.com/FALAK097/glyph/commit/ae803ace53f5be21b330c406c79e316a8a8f8db7))
+* **tasks:** all 5 palette commands always visible with correct fuzzy filter ([04b1942](https://github.com/FALAK097/glyph/commit/04b194271f0be9986ff247841e9f78afa4389ca8))
+* **tasks:** dark mode, drag-and-drop, curated color picker ([8c43217](https://github.com/FALAK097/glyph/commit/8c43217fcefd28a891c6f1f96d4e9bd927cccb18))
+* **tasks:** inline editor border follows column color; fix e2e path for Tasks.md ([07f97ff](https://github.com/FALAK097/glyph/commit/07f97ff00f17c2f2ead0eb7c5c9e439a72c9aa56))
+* **tasks:** inline editor input focus ring matches column color ([71455a0](https://github.com/FALAK097/glyph/commit/71455a0b553342c2e3cccd9a15ac46ed4ab5e521))
+* **tasks:** popover below input, done-column [x], due-badge, markdown palette command ([d3e3663](https://github.com/FALAK097/glyph/commit/d3e3663cc9ddaa6980dc5bf125be5585237bcfbc))
+* truncate long note names in command palette ([afdd93d](https://github.com/FALAK097/glyph/commit/afdd93dff0dd09b03c4e11858c2bb0763923bf00))
+* use explicit RefObject import instead of React namespace ([122d16c](https://github.com/FALAK097/glyph/commit/122d16c68c52678e8752ba5579a79bde0271cb71))
+
 ## [0.8.0](https://github.com/FALAK097/glyph/compare/v0.7.0...v0.8.0) (2026-04-19)
 
 

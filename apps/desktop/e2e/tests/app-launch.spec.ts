@@ -1,9 +1,10 @@
+/* eslint-disable no-empty-pattern */
 import { expect, test } from "@playwright/test";
 
 import { launchGlyph } from "../helpers";
 import { expectAppShell, openWorkspace, selectPaletteItem } from "../navigation";
 
-test("launches Glyph and opens settings from the command palette", async (_, testInfo) => {
+test("launches Glyph and opens settings from the command palette", async ({}, testInfo) => {
   const glyph = await launchGlyph();
 
   try {
@@ -17,7 +18,7 @@ test("launches Glyph and opens settings from the command palette", async (_, tes
   }
 });
 
-test("opens a seeded markdown note from the workspace", async (_, testInfo) => {
+test("opens a seeded markdown note from the workspace", async ({}, testInfo) => {
   const glyph = await launchGlyph();
 
   try {

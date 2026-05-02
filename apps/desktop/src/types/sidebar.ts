@@ -27,7 +27,6 @@ export type SidebarProps = {
   isNotesExpanded?: boolean;
   isSkillsExpanded?: boolean;
   isTasksActive?: boolean;
-  isTasksPinned?: boolean;
   pinnedNotes?: NoteShortcutItem[];
   folderRevealLabel?: string;
   openInFolderLabel?: string;
@@ -35,7 +34,6 @@ export type SidebarProps = {
   onToggleNotesSection?: () => void;
   onToggleSkillsSection?: () => void;
   onOpenTasks?: () => void;
-  onToggleTasksPinned?: () => void;
   onSelectSkillCollection?: (collectionId: string) => void;
   onOpenCommandPalette?: () => void;
   onOpenFile: (filePath: string) => void;

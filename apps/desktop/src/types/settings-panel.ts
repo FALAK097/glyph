@@ -1,10 +1,4 @@
-import type {
-  AppInfo,
-  AppSettings,
-  ShortcutSetting,
-  ThemeMode,
-  TaskViewMode,
-} from "@/core/workspace";
+import type { AppInfo, AppSettings, ShortcutSetting, ThemeMode } from "@/core/workspace";
 
 export type SettingsPanelProps = {
   isOpen: boolean;
@@ -15,6 +9,4 @@ export type SettingsPanelProps = {
   onChangeMode: (mode: ThemeMode) => void;
   onChangeShortcuts: (shortcuts: ShortcutSetting[]) => void;
   onChangeAutoOpenPDF?: (enabled: boolean) => void;
-  onChangeTasksPinned?: (enabled: boolean) => void;
-  onChangeDefaultTaskView?: (view: TaskViewMode) => void;
 };

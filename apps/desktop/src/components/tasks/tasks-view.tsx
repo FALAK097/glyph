@@ -187,7 +187,7 @@ const TableRow = memo(function TableRow({
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState(task.title);
-  const [draftLabels, setDraftLabels] = useState(task.labels.join(", "));
+  const [draftLabels, setDraftLabels] = useState(() => task.labels.join(", "));
   const [draftDate, setDraftDate] = useState(task.dueDate ?? "");
 
   const commitEdit = useCallback(() => {
@@ -195,10 +195,10 @@ const TableRow = memo(function TableRow({
     if (normalizedDate && !/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
       return;
     }
-    const labels = draftLabels
-      .split(/[,\s]+/)
-      .map((l) => l.trim().replace(/^#/, ""))
-      .filter(Boolean);
+    const labels = draftLabels.split(/[,\s]+/).flatMap((label) => {
+      const nextLabel = label.trim().replace(/^#/, "");
+      return nextLabel ? [nextLabel] : [];
+    });
     onUpdateTask(task.id, {
       title: draftTitle.trim() || task.title,
       labels,

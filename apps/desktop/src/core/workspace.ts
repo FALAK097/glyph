@@ -97,8 +97,6 @@ export type EditorPreferences = {
   editorScale: number;
 };
 
-export type TaskViewMode = "board" | "table";
-
 export type AppSettings = {
   defaultWorkspacePath: string;
   hasSeenWelcomeNote: boolean;
@@ -110,8 +108,6 @@ export type AppSettings = {
   shortcuts: ShortcutSetting[];
   sidebar: SidebarState;
   editorPreferences: EditorPreferences;
-  isTasksPinned: boolean;
-  defaultTaskView: TaskViewMode;
   autoOpenPDF: boolean;
   dismissedUpdateVersion: string | null;
 };

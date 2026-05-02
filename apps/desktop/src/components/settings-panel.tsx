@@ -23,7 +23,7 @@ import {
 
 import type { ThemeMode } from "@/core/workspace";
 import type { SettingsPanelProps } from "../types/settings-panel";
-import { GearIcon, OutlineIcon, SearchIcon, ShortcutIcon } from "./icons";
+import { GearIcon, SearchIcon, ShortcutIcon } from "./icons";
 
 export const SettingsPanel = ({
   isOpen,
@@ -34,8 +34,6 @@ export const SettingsPanel = ({
   onChangeMode,
   onChangeShortcuts,
   onChangeAutoOpenPDF,
-  onChangeTasksPinned,
-  onChangeDefaultTaskView,
 }: SettingsPanelProps) => {
   const [activeTab, setActiveTab] = useState("general");
   const [shortcuts, setShortcuts] = useState(DEFAULT_SHORTCUTS);
@@ -208,15 +206,6 @@ export const SettingsPanel = ({
                 >
                   <ShortcutIcon size={16} />
                   Shortcuts
-                </Button>
-                <Button
-                  variant={activeTab === "tasks" ? "secondary" : "ghost"}
-                  className="h-9 w-full justify-start gap-2 px-3 text-sm"
-                  type="button"
-                  onClick={() => setActiveTab("tasks")}
-                >
-                  <OutlineIcon size={16} />
-                  Tasks
                 </Button>
               </div>
             </div>

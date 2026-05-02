@@ -25,8 +25,8 @@ import { TaskInlineEditor } from "./task-inline-editor";
 function DragGripIcon() {
   return (
     <span className="grid grid-cols-2 gap-0.5" aria-hidden="true">
-      {Array.from({ length: 6 }, (_, index) => (
-        <span key={index} className="h-1 w-1 rounded-full bg-current" />
+      {["tl", "tr", "ml", "mr", "bl", "br"].map((dot) => (
+        <span key={dot} className="h-1 w-1 rounded-full bg-current" />
       ))}
     </span>
   );

@@ -49,12 +49,13 @@ const COLOR_BUTTON: Record<TaskColumnColor, string> = {
 
 const DATE_PATTERN = /\b\d{4}-\d{2}-\d{2}\b/;
 const TAG_PATTERN = /#[A-Za-z][\w/-]*/g;
+const MONTH_FORMATTER = new Intl.DateTimeFormat("en", { month: "long" });
 
 function formatDate(day: number, month: number, year: number) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-export function parseTaskText(value: string) {
+function parseTaskText(value: string) {
   const labels = Array.from(
     new Set(value.match(TAG_PATTERN)?.map((label) => label.slice(1)) ?? []),
   );
@@ -96,6 +97,14 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
 }: TaskInlineEditorProps) {
   const [value, setValue] = useState(initialValue);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [today] = useState(() => {
+    const current = new Date();
+    return {
+      day: current.getDate(),
+      month: current.getMonth(),
+      year: current.getFullYear(),
+    };
+  });
   const inputRef = useRef<HTMLInputElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const [anchor, setAnchor] = useState<PopoverAnchor | null>(null);
@@ -151,7 +160,18 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
   const month = calendarMonth.getMonth();
   const firstWeekday = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const monthLabel = new Intl.DateTimeFormat("en", { month: "long" }).format(calendarMonth);
+  const monthLabel = MONTH_FORMATTER.format(calendarMonth);
+  const emptyDayKeys = useMemo(
+    () => Array.from({ length: firstWeekday }, (_, index) => `empty-${year}-${month}-${index + 1}`),
+    [firstWeekday, month, year],
+  );
+  const shiftCalendarMonth = useCallback((offset: number) => {
+    setCalendarMonth((current) => {
+      const next = new Date(current);
+      next.setMonth(current.getMonth() + offset, 1);
+      return next;
+    });
+  }, []);
 
   // Decide whether to show above or below based on available space
   const CALENDAR_H = 300;
@@ -196,9 +216,7 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
                 <div className="mb-2 flex items-center justify-between text-sm font-semibold text-popover-foreground">
                   <button
                     type="button"
-                    onClick={() =>
-                      setCalendarMonth((c) => new Date(c.getFullYear(), c.getMonth() - 1, 1))
-                    }
+                    onClick={() => shiftCalendarMonth(-1)}
                     className="rounded px-2 py-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                   >
                     ‹
@@ -208,9 +226,7 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
                   </span>
                   <button
                     type="button"
-                    onClick={() =>
-                      setCalendarMonth((c) => new Date(c.getFullYear(), c.getMonth() + 1, 1))
-                    }
+                    onClick={() => shiftCalendarMonth(1)}
                     className="rounded px-2 py-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                   >
                     ›
@@ -224,14 +240,12 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
                   ))}
                 </div>
                 <div className="grid grid-cols-7 gap-0.5 text-center">
-                  {Array.from({ length: firstWeekday }, (_, i) => (
-                    <span key={`e-${i}`} />
+                  {emptyDayKeys.map((key) => (
+                    <span key={key} />
                   ))}
                   {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
                     const isToday =
-                      new Date().getDate() === day &&
-                      new Date().getMonth() === month &&
-                      new Date().getFullYear() === year;
+                      today.day === day && today.month === month && today.year === year;
                     return (
                       <button
                         key={day}

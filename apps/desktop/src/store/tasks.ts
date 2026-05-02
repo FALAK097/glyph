@@ -17,11 +17,9 @@ type TasksState = {
   indexedAt: number | null;
   isLoading: boolean;
   error: string | null;
-  selectedTaskId: string | null;
   setSnapshot: (snapshot: TaskIndexSnapshot) => void;
   setLoading: (isLoading: boolean) => void;
   setError: (error: string | null) => void;
-  setSelectedTaskId: (taskId: string | null) => void;
 };
 
 const emptySummary = buildTaskSummary([], []);
@@ -35,7 +33,6 @@ export const useTasksStore = create<TasksState>()((set) => ({
   indexedAt: null,
   isLoading: false,
   error: null,
-  selectedTaskId: null,
   setSnapshot: (snapshot) => {
     set({
       columns: snapshot.columns,
@@ -53,9 +50,6 @@ export const useTasksStore = create<TasksState>()((set) => ({
   },
   setError: (error) => {
     set({ error, isLoading: false });
-  },
-  setSelectedTaskId: (selectedTaskId) => {
-    set({ selectedTaskId });
   },
 }));
 

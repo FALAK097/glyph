@@ -15,14 +15,12 @@ type AppLayoutProps = {
   isNotesExpanded: boolean;
   isSkillsExpanded: boolean;
   isTasksActive: boolean;
-  isTasksPinned: boolean;
   openInFolderLabel: string;
   pinnedNotes: NoteShortcutItem[];
   skillCollections: SidebarSkillCollectionItem[];
   onToggleNotesSection: () => void;
   onToggleSkillsSection: () => void;
   onOpenTasks: () => void;
-  onToggleTasksPinned: () => void;
   onSelectSkillCollection: (collectionId: string) => void;
   onOpenFile: (filePath: string) => void;
   onOpenCommandPalette: () => void;
@@ -49,14 +47,12 @@ export function AppLayout({
   isNotesExpanded,
   isSkillsExpanded,
   isTasksActive,
-  isTasksPinned,
   openInFolderLabel,
   pinnedNotes,
   skillCollections,
   onToggleNotesSection,
   onToggleSkillsSection,
   onOpenTasks,
-  onToggleTasksPinned,
   onSelectSkillCollection,
   onOpenFile,
   onOpenCommandPalette,

@@ -155,6 +155,8 @@ type UseDesktopAppControllerOptions = {
   initialTabPaths?: string[];
   initialWorkspacePath?: string | null;
   sessionReady?: boolean;
+  onRestoreSkill?: (path: string) => Promise<void>;
+  onRestoreTasks?: () => void;
 };
 
 export const useDesktopAppController = (
@@ -164,6 +166,8 @@ export const useDesktopAppController = (
     initialTabPaths = [],
     initialWorkspacePath = null,
     sessionReady = true,
+    onRestoreSkill,
+    onRestoreTasks,
   }: UseDesktopAppControllerOptions = {},
 ) => {
   const {
@@ -484,7 +488,7 @@ export const useDesktopAppController = (
       setIsWorkspaceMode(isFileInsideWorkspace(file.path, currentRootPath));
       setSidebarNodes((prev) => upsertSidebarFile(prev, file));
       if (options?.recordHistory) {
-        pushHistory(file.path);
+        pushHistory({ kind: "note", path: file.path });
       }
       requestEditorFocus(shouldPreserveFocus ? "preserve" : "end");
       setIsPaletteOpen(false);
@@ -534,7 +538,7 @@ export const useDesktopAppController = (
       }
       setIsWorkspaceMode(isFileInsideWorkspace(filePath, currentRootPath));
       if (options?.recordHistory) {
-        pushHistory(filePath);
+        pushHistory({ kind: "note", path: filePath });
       }
       requestEditorFocus(shouldPreserveFocus ? "preserve" : "end");
       setIsPaletteOpen(false);
@@ -986,7 +990,7 @@ export const useDesktopAppController = (
       setSidebarNodes((prev) => upsertSidebarFile(prev, file));
     }
 
-    pushHistory(file.path);
+    pushHistory({ kind: "note", path: file.path });
     requestEditorFocus("start");
   }, [
     activeFile,
@@ -1104,7 +1108,7 @@ export const useDesktopAppController = (
         attachActiveFile(file);
         setIsWorkspaceMode(true);
         setSidebarNodes((prev) => upsertSidebarFile(prev, file));
-        pushHistory(file.path);
+        pushHistory({ kind: "note", path: file.path });
         return file;
       })();
 
@@ -1176,9 +1180,16 @@ export const useDesktopAppController = (
           .noteTabs.filter((tab) => isFileInsideWorkspace(tab.file.path, folderPath))
           .map((tab) => tab.id);
         Array.from(
-          new Set(navigationHistory.filter((entry) => isFileInsideWorkspace(entry, folderPath))),
-        ).forEach((entry) => {
-          removeHistoryPath(entry);
+          new Set(
+            navigationHistory
+              .filter(
+                (entry): entry is Extract<typeof entry, { path: string }> =>
+                  entry.kind !== "tasks" && isFileInsideWorkspace(entry.path, folderPath),
+              )
+              .map((entry) => entry.path),
+          ),
+        ).forEach((path) => {
+          removeHistoryPath(path);
         });
         removeTabsInFolder(folderPath);
         for (const tabId of removedLayoutTabIds) {
@@ -1313,9 +1324,16 @@ export const useDesktopAppController = (
               ] as const,
           );
         Array.from(
-          new Set(navigationHistory.filter((entry) => isFileInsideWorkspace(entry, oldPath))),
-        ).forEach((entry) => {
-          replaceHistoryPath(entry, getRenamedFolderFilePath(oldPath, newPath, entry));
+          new Set(
+            navigationHistory
+              .filter(
+                (entry): entry is Extract<typeof entry, { path: string }> =>
+                  entry.kind !== "tasks" && isFileInsideWorkspace(entry.path, oldPath),
+              )
+              .map((entry) => entry.path),
+          ),
+        ).forEach((path) => {
+          replaceHistoryPath(path, getRenamedFolderFilePath(oldPath, newPath, path));
         });
         remapTabsForFolderRename(oldPath, newPath);
         for (const [oldTabId, nextTabId] of layoutTabRemaps) {
@@ -1698,6 +1716,9 @@ export const useDesktopAppController = (
   const navigationController = useNavigationController({
     glyph,
     syncOpenedFile,
+    activateNoteTab,
+    onRestoreSkill: onRestoreSkill ?? (() => Promise.resolve()),
+    onRestoreTasks: onRestoreTasks ?? (() => {}),
   });
   const { canGoBack, canGoForward, navigateBack, navigateForward } = navigationController;
 
@@ -2162,6 +2183,8 @@ export const useDesktopAppController = (
     toggleFocusMode,
     setEditorScale,
     editorScale,
+    navigateBack,
+    navigateForward,
   });
 
   // Boot sequence
@@ -2267,7 +2290,7 @@ export const useDesktopAppController = (
           try {
             const file = await glyph.readFile(target.path);
             setActiveFile(file);
-            pushHistory(file.path);
+            pushHistory({ kind: "note", path: file.path });
             const refreshedSettings = await glyph.getSettings();
             setSettings(refreshedSettings);
             setIsWorkspaceMode(
@@ -2292,7 +2315,7 @@ export const useDesktopAppController = (
           nextSidebarNodes = upsertSidebarFolder(nextSidebarNodes, workspace);
           if (restoredTabPaths.length === 0 && workspace.activeFile) {
             nextSidebarNodes = upsertSidebarFile(nextSidebarNodes, workspace.activeFile);
-            pushHistory(workspace.activeFile.path);
+            pushHistory({ kind: "note", path: workspace.activeFile.path });
             bootFocusMode = "end";
           }
           nextExpandedFolders.add(workspace.rootPath);
@@ -2332,7 +2355,7 @@ export const useDesktopAppController = (
                 workspace && isFileInsideWorkspace(nextActiveRestoredFile.path, workspace.rootPath),
               ),
             );
-            pushHistory(nextActiveRestoredFile.path);
+            pushHistory({ kind: "note", path: nextActiveRestoredFile.path });
             bootFocusMode = "preserve";
           } else if (workspace?.activeFile) {
             setActiveFile(workspace.activeFile);
@@ -2340,7 +2363,7 @@ export const useDesktopAppController = (
               isFileInsideWorkspace(workspace.activeFile.path, workspace.rootPath),
             );
             nextSidebarNodes = upsertSidebarFile(nextSidebarNodes, workspace.activeFile);
-            pushHistory(workspace.activeFile.path);
+            pushHistory({ kind: "note", path: workspace.activeFile.path });
             bootFocusMode = "end";
           }
         }

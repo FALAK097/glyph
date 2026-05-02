@@ -127,6 +127,16 @@ export const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
   { id: "settings", label: "Settings", keys: `${MODIFIER_TOKENS.cmdOrCtrl} ,` },
   { id: "toggle-sidebar", label: "Toggle Sidebar", keys: `${MODIFIER_TOKENS.cmdOrCtrl} \\` },
   {
+    id: "navigate-back",
+    label: "Navigate Back",
+    keys: `${MODIFIER_TOKENS.alt} ${MODIFIER_TOKENS.cmdOrCtrl} ←`,
+  },
+  {
+    id: "navigate-forward",
+    label: "Navigate Forward",
+    keys: `${MODIFIER_TOKENS.alt} ${MODIFIER_TOKENS.cmdOrCtrl} →`,
+  },
+  {
     id: "focus-mode",
     label: "Toggle Focus Mode",
     keys: `${MODIFIER_TOKENS.shift} ${MODIFIER_TOKENS.cmdOrCtrl} F`,

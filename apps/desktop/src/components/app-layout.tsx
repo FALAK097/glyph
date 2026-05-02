@@ -8,6 +8,7 @@ import type {
 import { Sidebar } from "./sidebar/sidebar";
 
 type AppLayoutProps = {
+  toolbar?: React.ReactNode;
   shouldCollapseSidebar: boolean;
   tree: SidebarTopLevelNode[];
   activePath: string | null;
@@ -40,6 +41,7 @@ type AppLayoutProps = {
 };
 
 export function AppLayout({
+  toolbar,
   shouldCollapseSidebar,
   tree,
   activePath,
@@ -71,46 +73,49 @@ export function AppLayout({
   children,
 }: AppLayoutProps) {
   return (
-    <div
-      className={`grid h-screen min-h-0 overflow-hidden transition-[grid-template-columns] duration-200 ${
-        shouldCollapseSidebar ? "grid-cols-[0_minmax(0,1fr)]" : "grid-cols-[280px_minmax(0,1fr)]"
-      }`}
-    >
-      {shouldCollapseSidebar ? (
-        <div aria-hidden="true" className="w-0 min-w-0 overflow-hidden" />
-      ) : (
-        <Sidebar
-          tree={tree}
-          activePath={activePath}
-          isCollapsed={isSidebarCollapsed}
-          isNotesExpanded={isNotesExpanded}
-          isSkillsExpanded={isSkillsExpanded}
-          isTasksActive={isTasksActive}
-          openInFolderLabel={openInFolderLabel}
-          pinnedNotes={pinnedNotes}
-          skillCollections={skillCollections}
-          onToggleNotesSection={onToggleNotesSection}
-          onToggleSkillsSection={onToggleSkillsSection}
-          onOpenTasks={onOpenTasks}
-          onSelectSkillCollection={onSelectSkillCollection}
-          onOpenFile={onOpenFile}
-          onOpenCommandPalette={onOpenCommandPalette}
-          onDeleteFile={onDeleteFile}
-          onDeleteFolder={onDeleteFolder}
-          onRemoveFileFromGlyph={onRemoveFileFromGlyph}
-          onTogglePinnedFile={onTogglePinnedFile}
-          onRemoveFolder={onRemoveFolder}
-          onRenameFile={onRenameFile}
-          onRenameFolder={onRenameFolder}
-          onRevealInFinder={onRevealInFinder}
-          onToggleFolder={onToggleFolder}
-          onReorderNodes={onReorderNodes}
-          onCreateNote={onCreateNote}
-          onCreateFolder={onCreateFolder}
-        />
-      )}
+    <div className="flex h-screen flex-col overflow-hidden">
+      {toolbar ? <div className="shrink-0 bg-sidebar">{toolbar}</div> : null}
+      <div
+        className={`grid flex-1 min-h-0 overflow-hidden transition-[grid-template-columns] duration-200 ${
+          shouldCollapseSidebar ? "grid-cols-[0_minmax(0,1fr)]" : "grid-cols-[280px_minmax(0,1fr)]"
+        }`}
+      >
+        {shouldCollapseSidebar ? (
+          <div aria-hidden="true" className="w-0 min-w-0 overflow-hidden" />
+        ) : (
+          <Sidebar
+            tree={tree}
+            activePath={activePath}
+            isCollapsed={isSidebarCollapsed}
+            isNotesExpanded={isNotesExpanded}
+            isSkillsExpanded={isSkillsExpanded}
+            isTasksActive={isTasksActive}
+            openInFolderLabel={openInFolderLabel}
+            pinnedNotes={pinnedNotes}
+            skillCollections={skillCollections}
+            onToggleNotesSection={onToggleNotesSection}
+            onToggleSkillsSection={onToggleSkillsSection}
+            onOpenTasks={onOpenTasks}
+            onSelectSkillCollection={onSelectSkillCollection}
+            onOpenFile={onOpenFile}
+            onOpenCommandPalette={onOpenCommandPalette}
+            onDeleteFile={onDeleteFile}
+            onDeleteFolder={onDeleteFolder}
+            onRemoveFileFromGlyph={onRemoveFileFromGlyph}
+            onTogglePinnedFile={onTogglePinnedFile}
+            onRemoveFolder={onRemoveFolder}
+            onRenameFile={onRenameFile}
+            onRenameFolder={onRenameFolder}
+            onRevealInFinder={onRevealInFinder}
+            onToggleFolder={onToggleFolder}
+            onReorderNodes={onReorderNodes}
+            onCreateNote={onCreateNote}
+            onCreateFolder={onCreateFolder}
+          />
+        )}
 
-      <main className="relative h-full min-h-0 overflow-hidden bg-background">{children}</main>
+        <main className="relative h-full min-h-0 overflow-hidden bg-background">{children}</main>
+      </div>
     </div>
   );
 }

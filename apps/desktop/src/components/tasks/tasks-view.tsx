@@ -18,16 +18,7 @@ import {
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  ArchiveIcon,
-  FileIcon,
-  OutlineIcon,
-  PlusIcon,
-  SearchIcon,
-  TickIcon,
-} from "@/components/icons";
+import { ArrowDownIcon, ArrowUpIcon, TickIcon } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -46,6 +37,7 @@ import type {
 import { TASK_COLUMN_COLORS_PICKER } from "@/core/tasks";
 import { cn } from "@/core/utils";
 import { applyTaskMutation, groupTasksByColumn, useTasksStore } from "@/store/tasks";
+import { useTasksUIStore } from "@/store/tasks-ui";
 
 import { TaskCardSurface } from "./task-card";
 import { TaskColumn } from "./task-column";
@@ -54,15 +46,10 @@ import { getErrorMessage } from "./task-view-model";
 type TasksViewProps = {
   glyph: NonNullable<Window["glyph"]>;
   onOpenTaskSource: (task: WorkspaceTask) => void;
-  onOpenMarkdown: () => void;
 };
-
-type TasksViewMode = "board" | "table";
 
 type SortColumn = "task" | "list" | "date";
 type SortDirection = "asc" | "desc";
-
-const TASK_VIEW_STORAGE_KEY = "glyph.tasks.viewMode";
 
 const COLOR_DOTS: Record<TaskColumnColor, string> = {
   amber: "border-chart-2",
@@ -101,14 +88,6 @@ const LIST_BG_COLORS: Record<TaskColumnColor, string> = {
   rose: "bg-destructive/10",
   slate: "bg-muted",
   violet: "bg-chart-4/10",
-};
-
-const isTasksViewMode = (value: string | null): value is TasksViewMode =>
-  value === "board" || value === "table";
-
-const getInitialViewMode = (): TasksViewMode => {
-  const stored = window.localStorage.getItem(TASK_VIEW_STORAGE_KEY);
-  return isTasksViewMode(stored) ? stored : "board";
 };
 
 function getTaskColumn(task: WorkspaceTask, columns: TaskColumnModel[]) {
@@ -346,7 +325,7 @@ const TableRow = memo(function TableRow({
   );
 });
 
-export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
+export function TasksView({ glyph, onOpenTaskSource: _onOpenTaskSource }: TasksViewProps) {
   const columns = useTasksStore((state) => state.columns);
   const tasks = useTasksStore((state) => state.tasks);
   const tagSuggestions = useTasksStore((state) => state.tagSuggestions);
@@ -355,16 +334,16 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
   const setSnapshot = useTasksStore((state) => state.setSnapshot);
   const setLoading = useTasksStore((state) => state.setLoading);
   const setError = useTasksStore((state) => state.setError);
+  const isAddingColumn = useTasksUIStore((s) => s.isAddingColumn);
+  const setIsAddingColumn = useTasksUIStore((s) => s.setIsAddingColumn);
+  const searchQuery = useTasksUIStore((s) => s.searchQuery);
+  const viewMode = useTasksUIStore((s) => s.viewMode);
+  const deferredSearchQuery = useDeferredValue(searchQuery);
   const [creatingColumnId, setCreatingColumnId] = useState<string | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const [isAddingColumn, setIsAddingColumn] = useState(false);
   const [newColumnTitle, setNewColumnTitle] = useState("");
   const [newColumnColor, setNewColumnColor] = useState<TaskColumnColor>("blue");
   const [newColumnIsDone, setNewColumnIsDone] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const deferredSearchQuery = useDeferredValue(searchQuery);
-  const [viewMode, setViewMode] = useState<TasksViewMode>(getInitialViewMode);
   const [sortColumn, setSortColumn] = useState<SortColumn>("task");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const isDraggingRef = useRef(false);
@@ -381,19 +360,11 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
 
   useEffect(() => {
     const handleAddColumn = () => setIsAddingColumn(true);
-    const handleViewChanged = () => {
-      const stored = window.localStorage.getItem(TASK_VIEW_STORAGE_KEY);
-      if (isTasksViewMode(stored)) {
-        setViewMode(stored);
-      }
-    };
     window.addEventListener("glyph:tasks-add-column", handleAddColumn);
-    window.addEventListener("glyph:tasks-view-changed", handleViewChanged);
     return () => {
       window.removeEventListener("glyph:tasks-add-column", handleAddColumn);
-      window.removeEventListener("glyph:tasks-view-changed", handleViewChanged);
     };
-  }, []);
+  }, [setIsAddingColumn]);
 
   useEffect(() => {
     setLoading(true);
@@ -433,11 +404,6 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
     () => tasks.find((task) => task.id === activeDragId) ?? null,
     [activeDragId, tasks],
   );
-
-  const handleChangeViewMode = useCallback((nextMode: TasksViewMode) => {
-    setViewMode(nextMode);
-    window.localStorage.setItem(TASK_VIEW_STORAGE_KEY, nextMode);
-  }, []);
 
   const handleSort = useCallback(
     (column: SortColumn) => {
@@ -528,22 +494,6 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
     },
     [glyph, runMutation],
   );
-
-  const handleArchiveCompleted = useCallback(async () => {
-    const doneColumns = columns.filter((c) => c.isDone);
-    const doneTaskCount = tasks.filter((t) => doneColumns.some((c) => c.id === t.columnId)).length;
-    if (doneTaskCount === 0) {
-      return;
-    }
-    if (
-      !window.confirm(
-        `Archive ${doneTaskCount} task${doneTaskCount === 1 ? "" : "s"} from done list${doneColumns.length === 1 ? "" : "s"}? They will be stored in the Tasks.md archive section.`,
-      )
-    ) {
-      return;
-    }
-    await runMutation(glyph.archiveCompletedTasks());
-  }, [columns, glyph, runMutation, tasks]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveDragId(String(event.active.id));
@@ -642,115 +592,6 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
           </div>
         ) : (
           <div className="relative h-full min-h-0">
-            <div className="absolute top-3 right-5 z-30 flex items-center gap-1.5">
-              {isSearching ? (
-                <Input
-                  autoFocus
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Escape") {
-                      setIsSearching(false);
-                      setSearchQuery("");
-                    }
-                  }}
-                  placeholder="Search tasks"
-                  className="h-8 w-52 bg-background"
-                />
-              ) : null}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={onOpenMarkdown}
-                    className="grid h-8 w-8 place-items-center rounded text-muted-foreground hover:text-foreground"
-                    aria-label="Open as Markdown"
-                  >
-                    <FileIcon size={16} />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Open as Markdown</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => setIsAddingColumn(true)}
-                    className="grid h-8 w-8 place-items-center rounded text-muted-foreground hover:text-foreground"
-                    aria-label="Add a list"
-                  >
-                    <PlusIcon size={16} />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Add a list</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setIsSearching((value) => {
-                        const next = !value;
-                        if (!next) {
-                          setSearchQuery("");
-                        }
-                        return next;
-                      })
-                    }
-                    className="grid h-8 w-8 place-items-center rounded text-muted-foreground hover:text-foreground"
-                    aria-label="Search tasks"
-                  >
-                    <SearchIcon size={16} />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Search tasks</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    onClick={() => void handleArchiveCompleted()}
-                    className="grid h-8 w-8 place-items-center rounded text-muted-foreground hover:text-foreground"
-                    aria-label="Archive done tasks"
-                  >
-                    <ArchiveIcon size={16} />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Archive done tasks</TooltipContent>
-              </Tooltip>
-              <DropdownMenu>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <DropdownMenuTrigger
-                      render={
-                        <button
-                          type="button"
-                          className="grid h-8 w-8 place-items-center rounded text-muted-foreground hover:text-foreground"
-                          aria-label="Change tasks view"
-                        />
-                      }
-                    >
-                      <OutlineIcon size={16} />
-                    </DropdownMenuTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">View options</TooltipContent>
-                </Tooltip>
-                <DropdownMenuContent
-                  align="end"
-                  className="w-44 bg-popover text-popover-foreground"
-                >
-                  {(["board", "table"] as TasksViewMode[]).map((mode) => (
-                    <DropdownMenuItem key={mode} onClick={() => handleChangeViewMode(mode)}>
-                      <span className="mr-2 grid h-4 w-4 place-items-center">
-                        {viewMode === mode ? <TickIcon size={14} /> : null}
-                      </span>
-                      View as {mode[0].toUpperCase()}
-                      {mode.slice(1)}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
             {viewMode === "board" ? (
               <DndContext
                 sensors={sensors}
@@ -761,7 +602,7 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
               >
                 <div
                   ref={boardScrollRef}
-                  className="scrollbar-hide flex h-full items-start gap-5 overflow-x-auto bg-background px-5 pt-16 pb-5"
+                  className="scrollbar-hide flex h-full items-start gap-5 overflow-x-auto bg-background px-5 pt-4 pb-5"
                 >
                   <SortableContext
                     items={columns.map((column) => column.id)}
@@ -796,7 +637,7 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
                 </DragOverlay>
               </DndContext>
             ) : (
-              <div ref={tableContainerRef} className="h-full overflow-auto px-5 pt-16 pb-5">
+              <div ref={tableContainerRef} className="h-full overflow-auto px-5 pt-4 pb-5">
                 <div className="mx-auto max-w-5xl overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
                   <table className="w-full text-left">
                     <thead className="border-b border-border/60 bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
@@ -889,7 +730,7 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
             {isAddingColumn ? (
               <form
                 onSubmit={handleCreateColumn}
-                className="absolute top-14 right-5 z-40 w-[280px] rounded-lg border border-border bg-popover p-3 shadow-xl"
+                className="absolute top-3 right-5 z-40 w-[280px] rounded-lg border border-border bg-popover p-3 shadow-xl"
               >
                 <Input
                   autoFocus

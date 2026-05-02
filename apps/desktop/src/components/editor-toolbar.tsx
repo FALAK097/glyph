@@ -41,7 +41,6 @@ type EditorToolbarProps = {
   onNavigateForward: (() => void) | undefined;
   onCreateNote: (() => void) | undefined;
   newNoteShortcut: string | undefined;
-  surfaceTitle?: string;
   fileName: string | null;
   filePath: string | null;
   shouldShowCommandPalette: boolean;
@@ -92,7 +91,6 @@ export function EditorToolbar({
   onNavigateForward,
   onCreateNote,
   newNoteShortcut,
-  surfaceTitle,
   fileName,
   shouldShowCommandPalette,
   onOpenCommandPalette,
@@ -166,7 +164,9 @@ export function EditorToolbar({
   const searchButtonLabel = commandPaletteLabel ?? "Search notes";
 
   return (
-    <div className={`flex items-center py-2 border-b border-border/40 gap-2 ${headerPaddingClass}`}>
+    <div
+      className={`app-drag-region flex items-center py-2 border-b border-border/40 gap-2 ${headerPaddingClass}`}
+    >
       {/* Left: toolbar + title */}
       <div className="flex items-center gap-1 flex-shrink-0 min-w-0">
         {onToggleSidebar && (
@@ -242,11 +242,6 @@ export function EditorToolbar({
             </TooltipTrigger>
             <TooltipContent side="bottom">{`New Note${newNoteShortcut ? ` (${newNoteShortcut})` : ""}`}</TooltipContent>
           </Tooltip>
-        ) : null}
-        {surfaceTitle ? (
-          <span className="max-w-[220px] truncate pl-1 text-sm font-medium text-foreground">
-            {surfaceTitle}
-          </span>
         ) : null}
       </div>
 

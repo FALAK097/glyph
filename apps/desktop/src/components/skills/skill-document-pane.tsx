@@ -25,22 +25,16 @@ type SkillDocumentPaneProps = {
     name: string;
     path: string;
   } | null;
-  isSidebarCollapsed: boolean;
   isSwitchingDocuments?: boolean;
   saveStateLabel: string;
-  commandPaletteShortcut?: string;
   onChange: (value: string) => void;
   onKeepMineAfterExternalChange?: () => void;
   onOpenLinkedFile?: (path: string) => void;
-  onOpenCommandPalette?: () => void;
-  onOpenSettings?: () => void;
   onReloadAfterExternalChange?: () => void;
   onScrollPositionChange?: (targetPath: string | null, scrollTop: number) => void;
   onSelectDocumentTab: (kind: SkillDocumentKind) => void;
-  onToggleSidebar?: () => void;
   scrollRestorationKey?: string | null;
   showOutline?: boolean;
-  toggleSidebarShortcut?: string;
 };
 
 export function SkillDocumentPane({
@@ -51,22 +45,16 @@ export function SkillDocumentPane({
   folderRevealLabel,
   initialScrollTop = 0,
   pendingExternalChange,
-  isSidebarCollapsed,
   isSwitchingDocuments = false,
   saveStateLabel,
-  commandPaletteShortcut,
   onChange,
   onKeepMineAfterExternalChange,
   onOpenLinkedFile,
-  onOpenCommandPalette,
-  onOpenSettings,
   onReloadAfterExternalChange,
   onScrollPositionChange,
   onSelectDocumentTab,
-  onToggleSidebar,
   scrollRestorationKey = null,
   showOutline = true,
-  toggleSidebarShortcut,
 }: SkillDocumentPaneProps) {
   const parsed = useMemo(() => parseSkillDocument(draftContent), [draftContent]);
   const outlineHeadingCount = useMemo(
@@ -199,19 +187,13 @@ export function SkillDocumentPane({
           </>
         }
         onChange={handleContentChange}
-        onOpenCommandPalette={onOpenCommandPalette}
-        commandPaletteLabel="Search notes and skills"
-        commandPaletteShortcut={commandPaletteShortcut}
-        onOpenSettings={onOpenSettings}
         onScrollPositionChange={onScrollPositionChange}
-        onToggleSidebar={onToggleSidebar}
-        isSidebarCollapsed={isSidebarCollapsed}
         initialScrollTop={initialScrollTop}
         scrollRestorationKey={scrollRestorationKey}
-        toggleSidebarShortcut={toggleSidebarShortcut}
         folderRevealLabel={folderRevealLabel}
         onOpenLinkedFile={onOpenLinkedFile}
         showOutline={shouldShowOutline}
+        showToolbar={false}
       />
     </section>
   );

@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState } from "react";
-import type { CSSProperties } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +20,6 @@ import type {
   SidebarSkillCollectionItem,
 } from "@/types/sidebar";
 
-import { LogoComponent } from "@/components/logo-component";
 import { SkillSourceLogo } from "@/components/skills/skill-source-logo";
 import { ChevronRightIcon, PlusIcon, FolderPlusIcon } from "@/components/icons";
 import { SidebarTreeNode } from "./sidebar-tree-node";
@@ -145,15 +143,6 @@ export const Sidebar = ({
 
   return (
     <aside className="flex h-full min-h-0 w-[280px] flex-col border-r border-border bg-sidebar">
-      <div
-        className="flex items-center justify-center flex-shrink-0 bg-sidebar"
-        style={{ WebkitAppRegion: "drag" } as CSSProperties}
-      >
-        <div style={{ WebkitAppRegion: "no-drag" } as CSSProperties}>
-          <LogoComponent size={120} />
-        </div>
-      </div>
-
       <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-3">
         <div className="mb-3 px-2">
           <button

@@ -146,7 +146,15 @@ export function usePaletteController({
 
     const items: CommandPaletteItem[] = [];
 
-    const matchedCommands = baseCommands.filter((cmd) => cmd.title.toLowerCase().includes(query));
+    // Match query words against both title and subtitle (word-tokenised, order-insensitive)
+    const words = query.split(/\s+/).filter(Boolean);
+    const matchedCommands = baseCommands.filter((cmd) => {
+      const text = [cmd.title, cmd.subtitle]
+        .filter((v): v is string => typeof v === "string" && v.length > 0)
+        .join(" ")
+        .toLowerCase();
+      return words.every((word) => text.includes(word));
+    });
     items.push(...matchedCommands);
     items.push(
       ...pinnedPaletteItems.filter(

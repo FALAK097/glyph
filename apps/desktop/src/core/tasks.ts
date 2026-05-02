@@ -30,6 +30,8 @@ export type TaskColumn = {
   title: string;
   color: TaskColumnColor;
   collapsed: boolean;
+  /** When true, tasks in this column are considered "done" for archiving and visual dimming. */
+  isDone: boolean;
   taskIds: string[];
   createdAt: number;
   updatedAt: number;
@@ -44,6 +46,20 @@ export type WorkspaceTask = {
   completed: boolean;
   createdAt: number;
   updatedAt: number;
+};
+
+export type ArchivedTaskEntry = {
+  id: string;
+  title: string;
+  labels: string[];
+  dueDate: string | null;
+  completed: boolean;
+  createdAt: number;
+  updatedAt: number;
+  /** ISO date string YYYY-MM-DD when this entry was archived. */
+  archivedAt: string;
+  /** Title of the column this task was in when it was archived. */
+  sourceColumnTitle: string;
 };
 
 export type TaskSummary = {
@@ -90,6 +106,7 @@ export type TaskUpdateInput = {
   columnId?: string;
   labels?: string[];
   dueDate?: string | null;
+  completed?: boolean;
 };
 
 export type TaskMoveInput = {
@@ -105,6 +122,7 @@ export type TaskDeleteInput = {
 export type TaskColumnCreateInput = {
   title: string;
   color?: TaskColumnColor;
+  isDone?: boolean;
   index?: number;
 };
 
@@ -113,6 +131,7 @@ export type TaskColumnUpdateInput = {
   title?: string;
   color?: TaskColumnColor;
   collapsed?: boolean;
+  isDone?: boolean;
 };
 
 export type TaskColumnMoveInput = {
@@ -124,23 +143,27 @@ export type TaskColumnDeleteInput = {
   id: string;
 };
 
-export const DEFAULT_TASK_COLUMNS: Array<Pick<TaskColumn, "id" | "title" | "color">> = [
-  { id: "todo", title: "Todo", color: "blue" },
-  { id: "in-progress", title: "In Progress", color: "amber" },
-  { id: "done", title: "Done", color: "violet" },
+export type TaskUnarchiveInput = {
+  taskId: string;
+  columnId: string;
+};
+
+export const DEFAULT_TASK_COLUMNS: Array<Pick<TaskColumn, "id" | "title" | "color" | "isDone">> = [
+  { id: "todo", title: "Todo", color: "blue", isDone: false },
+  { id: "in-progress", title: "In Progress", color: "amber", isDone: false },
+  { id: "done", title: "Done", color: "violet", isDone: true },
 ];
 
 export function buildTaskSummary(columns: TaskColumn[], tasks: WorkspaceTask[]): TaskSummary {
   const byColumn = Object.fromEntries(columns.map((column) => [column.id, column.taskIds.length]));
-  const doneColumn =
-    columns.find((column) => column.id === "done") ??
-    columns.find((column) => column.title.toLowerCase().includes("done"));
-  const done = doneColumn ? doneColumn.taskIds.length : 0;
+  const doneCount = columns
+    .filter((column) => column.isDone)
+    .reduce((sum, column) => sum + column.taskIds.length, 0);
 
   return {
     total: tasks.length,
-    open: Math.max(0, tasks.length - done),
-    done,
+    open: Math.max(0, tasks.length - doneCount),
+    done: doneCount,
     byColumn,
   };
 }

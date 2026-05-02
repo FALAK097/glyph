@@ -47,10 +47,12 @@ export function TaskCardSurface({
   task,
   color = "slate",
   isDragging = false,
+  isCompleted = false,
 }: {
   task: WorkspaceTask;
   color?: TaskColumn["color"];
   isDragging?: boolean;
+  isCompleted?: boolean;
 }) {
   return (
     <div
@@ -58,9 +60,15 @@ export function TaskCardSurface({
         "group/task relative w-full rounded-md border bg-card px-3.5 py-3 text-left shadow-xs transition-[border-color,box-shadow] duration-100 ease-out hover:shadow-sm",
         cardColorClass[color],
         isDragging ? "opacity-60 shadow-md" : "",
+        isCompleted ? "opacity-60" : "",
       )}
     >
-      <p className="line-clamp-4 min-w-0 pr-6 text-[15px] font-medium leading-5.5 text-card-foreground">
+      <p
+        className={cn(
+          "line-clamp-4 min-w-0 pr-6 text-[15px] font-medium leading-5.5 text-card-foreground",
+          isCompleted ? "line-through text-muted-foreground" : "",
+        )}
+      >
         {task.title}
       </p>
       {task.labels.length > 0 || task.dueDate ? (
@@ -94,6 +102,9 @@ export const TaskCard = memo(function TaskCard({
 }: TaskCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const column = columns.find((entry) => entry.id === task.columnId);
+  // Mirror serializeTask: a task is completed when its column is a done-list
+  // OR when task.completed is explicitly true (e.g., loaded from a - [x] line).
+  const isCompleted = (column?.isDone ?? false) || task.completed;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
     data: { columnId: task.columnId, taskId: task.id, type: "task" },
@@ -148,7 +159,12 @@ export const TaskCard = memo(function TaskCard({
         onClick={() => setIsEditing(true)}
         className="w-full cursor-grab rounded-md text-left outline-none active:cursor-grabbing focus-visible:ring-3 focus-visible:ring-ring/30"
       >
-        <TaskCardSurface task={task} color={column?.color} isDragging={isDragging} />
+        <TaskCardSurface
+          task={task}
+          color={column?.color}
+          isDragging={isDragging}
+          isCompleted={isCompleted}
+        />
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger

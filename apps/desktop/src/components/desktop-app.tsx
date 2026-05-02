@@ -804,6 +804,19 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
           closePalette();
         },
       },
+      {
+        id: "add-task-list",
+        title: "Add Task List",
+        subtitle: "Create a new column in the task board",
+        section: "Tasks",
+        kind: "command",
+        onSelect: () => {
+          handleOpenTasks();
+          closePalette();
+          // Dispatch after the tasks view has had a chance to mount
+          window.setTimeout(() => window.dispatchEvent(new Event("glyph:tasks-add-column")), 0);
+        },
+      },
     );
 
     return items.filter((item) => matchesPaletteQuery(query, item.title, item.subtitle));

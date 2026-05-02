@@ -15,11 +15,13 @@ import {
   horizontalListSortingStrategy,
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ArrowDownIcon,
   ArrowUpIcon,
+  ArchiveIcon,
   FileIcon,
   OutlineIcon,
   PlusIcon,
@@ -353,6 +355,7 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
   const [isAddingColumn, setIsAddingColumn] = useState(false);
   const [newColumnTitle, setNewColumnTitle] = useState("");
   const [newColumnColor, setNewColumnColor] = useState<TaskColumnColor>("blue");
+  const [newColumnIsDone, setNewColumnIsDone] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const deferredSearchQuery = useDeferredValue(searchQuery);
@@ -361,6 +364,7 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const isDraggingRef = useRef(false);
   const boardScrollRef = useHorizontalScrollRef<HTMLDivElement>(isDraggingRef);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -462,6 +466,16 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
     return list;
   }, [filteredTasks, columns, sortColumn, sortDirection]);
 
+  // Virtualizer for the table view — keeps rendering fast with hundreds of tasks
+  const tableVirtualizer = useVirtualizer({
+    count: sortedFilteredTasks.length,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => 56,
+    overscan: 8,
+  });
+  const virtualTableItems = tableVirtualizer.getVirtualItems();
+  const virtualTableTotalSize = tableVirtualizer.getTotalSize();
+
   const runMutation = useCallback(
     async (mutation: Promise<Awaited<ReturnType<typeof glyph.createTask>>>) => {
       const result = await applyTaskMutation(mutation, setSnapshot);
@@ -497,7 +511,10 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
   );
 
   const handleUpdateColumn = useCallback(
-    (columnId: string, patch: { title?: string; color?: TaskColumnColor; collapsed?: boolean }) => {
+    (
+      columnId: string,
+      patch: { title?: string; color?: TaskColumnColor; collapsed?: boolean; isDone?: boolean },
+    ) => {
       void runMutation(glyph.updateTaskColumn({ id: columnId, ...patch }));
     },
     [glyph, runMutation],
@@ -509,6 +526,22 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
     },
     [glyph, runMutation],
   );
+
+  const handleArchiveCompleted = useCallback(async () => {
+    const doneColumns = columns.filter((c) => c.isDone);
+    const doneTaskCount = tasks.filter((t) => doneColumns.some((c) => c.id === t.columnId)).length;
+    if (doneTaskCount === 0) {
+      return;
+    }
+    if (
+      !window.confirm(
+        `Archive ${doneTaskCount} task${doneTaskCount === 1 ? "" : "s"} from done list${doneColumns.length === 1 ? "" : "s"}? They will be stored in the Tasks.md archive section.`,
+      )
+    ) {
+      return;
+    }
+    await runMutation(glyph.archiveCompletedTasks());
+  }, [columns, glyph, runMutation, tasks]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveDragId(String(event.active.id));
@@ -575,15 +608,21 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
         return;
       }
       const result = await runMutation(
-        glyph.createTaskColumn({ title, color: newColumnColor, index: columns.length }),
+        glyph.createTaskColumn({
+          title,
+          color: newColumnColor,
+          isDone: newColumnIsDone,
+          index: columns.length,
+        }),
       );
       if (result.ok) {
         setIsAddingColumn(false);
         setNewColumnTitle("");
         setNewColumnColor("blue");
+        setNewColumnIsDone(false);
       }
     },
-    [columns.length, glyph, newColumnColor, newColumnTitle, runMutation],
+    [columns.length, glyph, newColumnColor, newColumnIsDone, newColumnTitle, runMutation],
   );
 
   return (
@@ -664,6 +703,19 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
                 </TooltipTrigger>
                 <TooltipContent side="bottom">Search tasks</TooltipContent>
               </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => void handleArchiveCompleted()}
+                    className="grid h-8 w-8 place-items-center rounded text-muted-foreground hover:text-foreground"
+                    aria-label="Archive done tasks"
+                  >
+                    <ArchiveIcon size={16} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Archive done tasks</TooltipContent>
+              </Tooltip>
               <DropdownMenu>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -742,7 +794,7 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
                 </DragOverlay>
               </DndContext>
             ) : (
-              <div className="h-full overflow-auto px-5 pt-16 pb-5">
+              <div ref={tableContainerRef} className="h-full overflow-auto px-5 pt-16 pb-5">
                 <div className="mx-auto max-w-5xl overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
                   <table className="w-full text-left">
                     <thead className="border-b border-border/60 bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
@@ -784,17 +836,48 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
                           </td>
                         </tr>
                       ) : (
-                        sortedFilteredTasks.map((task, index) => (
-                          <TableRow
-                            key={task.id}
-                            task={task}
-                            column={getTaskColumn(task, columns)}
-                            allColumns={columns}
-                            index={index}
-                            onUpdateTask={handleUpdateTask}
-                            onMoveTask={handleMoveTask}
-                          />
-                        ))
+                        <>
+                          {/* Top spacer for virtual rows above viewport */}
+                          {virtualTableItems[0]?.start > 0 && (
+                            <tr aria-hidden="true">
+                              <td
+                                style={{ height: virtualTableItems[0].start, padding: 0 }}
+                                colSpan={3}
+                              />
+                            </tr>
+                          )}
+                          {virtualTableItems.map((virtualItem) => {
+                            const task = sortedFilteredTasks[virtualItem.index];
+                            if (!task) return null;
+                            return (
+                              <TableRow
+                                key={task.id}
+                                task={task}
+                                column={getTaskColumn(task, columns)}
+                                allColumns={columns}
+                                index={virtualItem.index}
+                                onUpdateTask={handleUpdateTask}
+                                onMoveTask={handleMoveTask}
+                              />
+                            );
+                          })}
+                          {/* Bottom spacer for virtual rows below viewport */}
+                          {virtualTableItems.length > 0 &&
+                            (virtualTableItems[virtualTableItems.length - 1]?.end ?? 0) <
+                              virtualTableTotalSize && (
+                              <tr aria-hidden="true">
+                                <td
+                                  style={{
+                                    height:
+                                      virtualTableTotalSize -
+                                      (virtualTableItems[virtualTableItems.length - 1]?.end ?? 0),
+                                    padding: 0,
+                                  }}
+                                  colSpan={3}
+                                />
+                              </tr>
+                            )}
+                        </>
                       )}
                     </tbody>
                   </table>
@@ -839,6 +922,15 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
                     </Tooltip>
                   ))}
                 </div>
+                <label className="mt-3 flex cursor-pointer items-center gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={newColumnIsDone}
+                    onChange={(e) => setNewColumnIsDone(e.target.checked)}
+                    className="h-4 w-4 rounded border-border accent-primary"
+                  />
+                  <span className="text-sm text-foreground">Mark as done list</span>
+                </label>
                 <div className="mt-3 flex justify-end gap-1.5">
                   <Button
                     type="button"

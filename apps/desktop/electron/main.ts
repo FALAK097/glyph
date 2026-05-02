@@ -39,6 +39,7 @@ import type {
   TaskCreateInput,
   TaskDeleteInput,
   TaskMoveInput,
+  TaskUnarchiveInput,
   TaskUpdateInput,
 } from "../src/core/tasks.js";
 import {
@@ -2304,6 +2305,28 @@ ipcMain.handle("tasks:columns:delete", async (_event, input: unknown) => {
     throw new Error("Column id must be a non-empty string.");
   }
   return tasksService.deleteColumn(input as TaskColumnDeleteInput);
+});
+
+ipcMain.handle("tasks:archive-completed", async () => {
+  return tasksService.archiveCompletedTasks();
+});
+
+ipcMain.handle("tasks:get-archived", async () => {
+  return tasksService.getArchivedTasks();
+});
+
+ipcMain.handle("tasks:unarchive", async (_event, input: unknown) => {
+  if (!input || typeof input !== "object") {
+    throw new Error("Invalid unarchive input.");
+  }
+  const { taskId, columnId } = input as Record<string, unknown>;
+  if (typeof taskId !== "string" || !taskId.trim()) {
+    throw new Error("taskId must be a non-empty string.");
+  }
+  if (typeof columnId !== "string" || !columnId.trim()) {
+    throw new Error("columnId must be a non-empty string.");
+  }
+  return tasksService.unarchiveTask(input as TaskUnarchiveInput);
 });
 
 ipcMain.handle("sidebar:getNode", async (_event, kind: "file" | "directory", targetPath: string) =>

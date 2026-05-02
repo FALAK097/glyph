@@ -129,10 +129,11 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
     [activeToken, deferredTagQuery, tagSuggestions],
   );
 
-  // Reset selected tag index when suggestions change
+  // Reset selected tag index when suggestions change (dep on matchingTags, not .length,
+  // so same-size result swaps after the query changes also reset the highlight).
   useEffect(() => {
     setSelectedTagIndex(0);
-  }, [matchingTags.length]);
+  }, [matchingTags]);
 
   // Reset calendar selected day when date picker closes
   useEffect(() => {
@@ -160,13 +161,27 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
     });
   }, [showPopover]);
 
-  // Auto-grow textarea height to fit content
+  // Auto-grow textarea height to fit content.
+  // If a popover is currently open, re-measure the form's bounding rect so the
+  // portal stays pinned to the correct position after the height changes.
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
-  }, [value]);
+    if (showPopover) {
+      const rect = formRef.current?.getBoundingClientRect();
+      if (rect) {
+        setAnchor({
+          top: rect.top,
+          bottom: rect.bottom,
+          left: rect.left,
+          width: rect.width,
+          viewportHeight: window.innerHeight,
+        });
+      }
+    }
+  }, [showPopover, value]);
 
   const replaceActiveToken = useCallback((nextToken: string) => {
     setValue((current) => `${current.replace(/\S*$/, "").trimEnd()} ${nextToken} `.trimStart());

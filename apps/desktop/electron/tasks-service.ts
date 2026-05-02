@@ -362,7 +362,10 @@ export function createTasksService() {
 
     const filePath = getBoardPath(workspaceRoot);
     try {
-      const parsed = parseBoardMarkdown(await fs.readFile(filePath, "utf8"));
+      // Normalize CRLF → LF before parsing so Windows-edited files don't break
+      // the line-by-line parser (per coding guidelines: normalize \r\n when reading).
+      const raw = (await fs.readFile(filePath, "utf8")).replace(/\r\n?/g, "\n");
+      const parsed = parseBoardMarkdown(raw);
       columns = parsed.columns;
       tasks = parsed.tasks;
       archiveSections = parsed.archiveSections;
@@ -592,10 +595,10 @@ export function createTasksService() {
       return mutationError("missing-workspace", "Open a workspace before archiving tasks.");
     }
 
-    const doneColumns = columns.filter((column) => column.isDone);
-    const tasksToArchive = tasks.filter((task) =>
-      doneColumns.some((column) => column.id === task.columnId),
+    const doneColumnIds = new Set(
+      columns.filter((column) => column.isDone).map((column) => column.id),
     );
+    const tasksToArchive = tasks.filter((task) => doneColumnIds.has(task.columnId));
 
     if (tasksToArchive.length === 0) {
       return { ok: true, snapshot };

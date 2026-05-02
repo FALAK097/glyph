@@ -102,7 +102,9 @@ export const TaskCard = memo(function TaskCard({
 }: TaskCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const column = columns.find((entry) => entry.id === task.columnId);
-  const isCompleted = column?.isDone ?? false;
+  // Mirror serializeTask: a task is completed when its column is a done-list
+  // OR when task.completed is explicitly true (e.g., loaded from a - [x] line).
+  const isCompleted = (column?.isDone ?? false) || task.completed;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
     data: { columnId: task.columnId, taskId: task.id, type: "task" },

@@ -112,7 +112,7 @@ type TaskColumnProps = {
   onMoveTask: (taskId: string, columnId: string, index: number) => void;
   onUpdateColumn: (
     columnId: string,
-    patch: { title?: string; color?: TaskColumnColor; collapsed?: boolean },
+    patch: { title?: string; color?: TaskColumnColor; collapsed?: boolean; isDone?: boolean },
   ) => void;
   onUpdateTask: (
     taskId: string,
@@ -313,6 +313,10 @@ export const TaskColumn = memo(function TaskColumn({
                 ))}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onUpdateColumn(column.id, { isDone: !column.isDone })}>
+              {column.isDone ? "Unmark as done list" : "Mark as done list"}
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={() => onDeleteColumn(column.id)}>
               Delete list

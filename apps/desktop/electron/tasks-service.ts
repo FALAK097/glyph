@@ -8,6 +8,7 @@ import {
   normalizeTaskLabels,
 } from "../src/core/tasks.js";
 import type {
+  ArchivedTaskEntry,
   TaskColumn,
   TaskColumnCreateInput,
   TaskColumnDeleteInput,
@@ -18,6 +19,7 @@ import type {
   TaskIndexSnapshot,
   TaskMoveInput,
   TaskMutationResult,
+  TaskUnarchiveInput,
   TaskUpdateInput,
   WorkspaceTask,
 } from "../src/core/tasks.js";
@@ -45,6 +47,7 @@ const parseMetaComment = (line: string, prefix: string): Record<string, string> 
   return result;
 };
 
+// NOTE: $ anchor removed so archive lines with trailing <!-- list: ... --> comments parse correctly.
 const parseTaskLine = (
   line: string,
 ): {
@@ -63,7 +66,7 @@ const parseTaskLine = (
   let content = trimmed.slice(5).trim();
   let meta: Record<string, string> = {};
 
-  const metaMatch = content.match(/<!--\s*task-meta:\s*(.*?)\s*-->$/);
+  const metaMatch = content.match(/<!--\s*task-meta:\s*(.*?)\s*-->/);
   if (metaMatch) {
     meta = parseMetaComment(content, "task-meta") ?? {};
     content = content.slice(0, content.indexOf("<!--")).trim();
@@ -82,7 +85,7 @@ const parseTaskLine = (
     labels.push(labelMatch[1]);
   }
 
-  let title = content
+  const title = content
     .replace(/#[A-Za-z][\w/-]*/g, "")
     .trim()
     .replace(/\s+/g, " ");
@@ -98,9 +101,23 @@ const serializeTask = (task: WorkspaceTask): string => {
   return `${checkbox} ${task.title}${labelStr ? ` ${labelStr}` : ""}${dueStr} ${meta}`;
 };
 
+const serializeArchivedEntry = (entry: ArchivedTaskEntry): string => {
+  const meta = `<!-- task-meta: id=${entry.id} created=${entry.createdAt} updated=${entry.updatedAt} -->`;
+  const labelStr = entry.labels.map((l) => `#${l}`).join(" ");
+  const dueStr = entry.dueDate ? ` due:${entry.dueDate}` : "";
+  const listComment = entry.sourceColumnTitle ? ` <!-- list: ${entry.sourceColumnTitle} -->` : "";
+  const checkbox = entry.completed ? "- [x]" : "- [ ]";
+  return `${checkbox} ${entry.title}${labelStr ? ` ${labelStr}` : ""}${dueStr} ${meta}${listComment}`;
+};
+
 const serializeColumn = (column: TaskColumn): string => {
-  const meta = `<!-- column-meta: id=${column.id} color=${column.color} collapsed=${column.collapsed} created=${column.createdAt} updated=${column.updatedAt} -->`;
+  const meta = `<!-- column-meta: id=${column.id} color=${column.color} collapsed=${column.collapsed} isDone=${column.isDone} created=${column.createdAt} updated=${column.updatedAt} -->`;
   return `## ${column.title}\n${meta}`;
+};
+
+type ArchiveSection = {
+  dateLabel: string;
+  entries: ArchivedTaskEntry[];
 };
 
 const createDefaultBoard = (): { columns: TaskColumn[]; tasks: WorkspaceTask[] } => {
@@ -108,7 +125,6 @@ const createDefaultBoard = (): { columns: TaskColumn[]; tasks: WorkspaceTask[] }
   return {
     columns: DEFAULT_TASK_COLUMNS.map((column) => ({
       ...column,
-      id: createId("column"),
       collapsed: false,
       taskIds: [],
       createdAt: now,
@@ -120,18 +136,63 @@ const createDefaultBoard = (): { columns: TaskColumn[]; tasks: WorkspaceTask[] }
 
 const parseBoardMarkdown = (
   markdown: string,
-): { columns: TaskColumn[]; tasks: WorkspaceTask[] } => {
+): { columns: TaskColumn[]; tasks: WorkspaceTask[]; archiveSections: ArchiveSection[] } => {
   const lines = markdown.split("\n");
   const columns: TaskColumn[] = [];
   const tasks: WorkspaceTask[] = [];
   const columnTaskIds: string[][] = [];
+  const archiveSections: ArchiveSection[] = [];
 
   let currentColumnIndex = -1;
+  let inArchive = false;
+  let currentArchiveSectionIndex = -1;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
 
+    // Top-level "# Archive" heading marks start of archive section — stop board parsing
+    if (trimmed === "# Archive") {
+      inArchive = true;
+      currentColumnIndex = -1;
+      continue;
+    }
+
+    if (inArchive) {
+      // Archive date subsections like "## Archived 2024-01-15"
+      if (trimmed.startsWith("## Archived ")) {
+        const dateLabel = trimmed.slice("## Archived ".length).trim();
+        archiveSections.push({ dateLabel, entries: [] });
+        currentArchiveSectionIndex = archiveSections.length - 1;
+        continue;
+      }
+
+      // Parse archived task lines
+      if (currentArchiveSectionIndex >= 0) {
+        const taskData = parseTaskLine(line);
+        if (taskData) {
+          // Extract <!-- list: ColumnName --> comment from the original line
+          const listMatch = line.match(/<!--\s*list:\s*(.*?)\s*-->/);
+          const sourceColumnTitle = listMatch ? listMatch[1].trim() : "";
+          const now = Date.now();
+          const entry: ArchivedTaskEntry = {
+            id: taskData.meta.id || createId("task"),
+            title: taskData.title,
+            labels: normalizeTaskLabels(taskData.labels),
+            dueDate: taskData.dueDate,
+            completed: taskData.completed,
+            createdAt: taskData.meta.created ? Number(taskData.meta.created) : now,
+            updatedAt: taskData.meta.updated ? Number(taskData.meta.updated) : now,
+            archivedAt: archiveSections[currentArchiveSectionIndex]?.dateLabel ?? "",
+            sourceColumnTitle,
+          };
+          archiveSections[currentArchiveSectionIndex]!.entries.push(entry);
+        }
+      }
+      continue;
+    }
+
+    // Active board: parse column headers
     if (trimmed.startsWith("## ")) {
       const title = trimmed.slice(3).trim();
       let meta: Record<string, string> = {};
@@ -143,11 +204,19 @@ const parseBoardMarkdown = (
         }
       }
       const now = Date.now();
+
+      // Auto-migrate: columns titled "Done" (case-insensitive) with no explicit isDone in meta
+      // get isDone=true for backward compatibility with pre-isDone workspaces.
+      const hasExplicitIsDone = meta.isDone !== undefined;
+      const isDoneByTitle = !hasExplicitIsDone && title.toLowerCase() === "done";
+      const isDone = hasExplicitIsDone ? meta.isDone === "true" : isDoneByTitle;
+
       const column: TaskColumn = {
         id: meta.id || createId("column"),
         title,
         color: isTaskColumnColor(meta.color) ? meta.color : "slate",
         collapsed: meta.collapsed === "true",
+        isDone,
         taskIds: [],
         createdAt: meta.created ? Number(meta.created) : now,
         updatedAt: meta.updated ? Number(meta.updated) : now,
@@ -164,7 +233,7 @@ const parseBoardMarkdown = (
       const task: WorkspaceTask = {
         id: taskData.meta.id || createId("task"),
         title: taskData.title,
-        columnId: columns[currentColumnIndex].id,
+        columnId: columns[currentColumnIndex]!.id,
         labels: normalizeTaskLabels(taskData.labels),
         dueDate: taskData.dueDate,
         completed: taskData.completed,
@@ -172,18 +241,27 @@ const parseBoardMarkdown = (
         updatedAt: taskData.meta.updated ? Number(taskData.meta.updated) : now,
       };
       tasks.push(task);
-      columnTaskIds[currentColumnIndex].push(task.id);
+      columnTaskIds[currentColumnIndex]!.push(task.id);
     }
   }
 
   for (let i = 0; i < columns.length; i++) {
-    columns[i].taskIds = columnTaskIds[i];
+    columns[i]!.taskIds = columnTaskIds[i]!;
   }
 
-  return columns.length > 0 ? { columns, tasks } : createDefaultBoard();
+  if (columns.length === 0) {
+    const defaultBoard = createDefaultBoard();
+    return { ...defaultBoard, archiveSections };
+  }
+
+  return { columns, tasks, archiveSections };
 };
 
-const serializeBoardMarkdown = (columns: TaskColumn[], tasks: WorkspaceTask[]): string => {
+const serializeBoardMarkdown = (
+  columns: TaskColumn[],
+  tasks: WorkspaceTask[],
+  archiveSections: ArchiveSection[],
+): string => {
   const taskById = new Map(tasks.map((t) => [t.id, t]));
   const lines: string[] = ["# Tasks", ""];
 
@@ -199,6 +277,18 @@ const serializeBoardMarkdown = (columns: TaskColumn[], tasks: WorkspaceTask[]): 
     lines.push("");
   }
 
+  // Append archive sections if any exist
+  if (archiveSections.length > 0) {
+    lines.push("# Archive", "");
+    for (const section of archiveSections) {
+      lines.push(`## Archived ${section.dateLabel}`, "");
+      for (const entry of section.entries) {
+        lines.push(serializeArchivedEntry(entry));
+      }
+      lines.push("");
+    }
+  }
+
   return lines.join("\n");
 };
 
@@ -206,6 +296,7 @@ export function createTasksService() {
   let workspaceRoot: string | null = null;
   let columns: TaskColumn[] = [];
   let tasks: WorkspaceTask[] = [];
+  let archiveSections: ArchiveSection[] = [];
   let pendingSave: Promise<void> | null = null;
   let snapshot: TaskIndexSnapshot = {
     workspaceRoot: null,
@@ -240,7 +331,7 @@ export function createTasksService() {
     }
 
     const filePath = getBoardPath(workspaceRoot);
-    const data = serializeBoardMarkdown(columns, tasks);
+    const data = serializeBoardMarkdown(columns, tasks, archiveSections);
     const nextSnapshot = createSnapshot();
 
     const write = async () => {
@@ -258,6 +349,7 @@ export function createTasksService() {
       const board = createDefaultBoard();
       columns = board.columns;
       tasks = board.tasks;
+      archiveSections = [];
       snapshot = createSnapshot();
       return snapshot;
     }
@@ -267,6 +359,7 @@ export function createTasksService() {
       const parsed = parseBoardMarkdown(await fs.readFile(filePath, "utf8"));
       columns = parsed.columns;
       tasks = parsed.tasks;
+      archiveSections = parsed.archiveSections;
     } catch (readError) {
       const code =
         typeof readError === "object" && readError && "code" in readError
@@ -276,6 +369,7 @@ export function createTasksService() {
         const board = createDefaultBoard();
         columns = board.columns;
         tasks = board.tasks;
+        archiveSections = [];
         await save();
       } else {
         throw readError;
@@ -376,6 +470,9 @@ export function createTasksService() {
       task.dueDate =
         typeof input.dueDate === "string" && input.dueDate.trim() ? input.dueDate.trim() : null;
     }
+    if (typeof input.completed === "boolean") {
+      task.completed = input.completed;
+    }
     task.updatedAt = Date.now();
     await save();
     return { ok: true, task, snapshot };
@@ -411,6 +508,7 @@ export function createTasksService() {
       title,
       color: isTaskColumnColor(input.color) ? input.color : "blue",
       collapsed: false,
+      isDone: typeof input.isDone === "boolean" ? input.isDone : false,
       taskIds: [],
       createdAt: now,
       updatedAt: now,
@@ -437,6 +535,9 @@ export function createTasksService() {
     if (typeof input.collapsed === "boolean") {
       column.collapsed = input.collapsed;
     }
+    if (typeof input.isDone === "boolean") {
+      column.isDone = input.isDone;
+    }
     column.updatedAt = Date.now();
     await save();
     return { ok: true, column, snapshot };
@@ -451,8 +552,8 @@ export function createTasksService() {
       return mutationError("missing-column", "Task list no longer exists.");
     }
     const [column] = columns.splice(from, 1);
-    columns.splice(clampIndex(input.index, columns.length), 0, column);
-    column.updatedAt = Date.now();
+    columns.splice(clampIndex(input.index, columns.length), 0, column!);
+    column!.updatedAt = Date.now();
     await save();
     return { ok: true, column, snapshot };
   };
@@ -475,11 +576,125 @@ export function createTasksService() {
     return { ok: true, column, snapshot };
   };
 
+  /**
+   * Archives all tasks from columns marked isDone=true into a dated section
+   * inside Tasks.md under the "# Archive" heading. Tasks are removed from the
+   * active board after archiving.
+   */
+  const archiveCompletedTasks = async (): Promise<TaskMutationResult> => {
+    if (!workspaceRoot) {
+      return mutationError("missing-workspace", "Open a workspace before archiving tasks.");
+    }
+
+    const doneColumns = columns.filter((column) => column.isDone);
+    const tasksToArchive = tasks.filter((task) =>
+      doneColumns.some((column) => column.id === task.columnId),
+    );
+
+    if (tasksToArchive.length === 0) {
+      return { ok: true, snapshot };
+    }
+
+    const columnById = new Map(columns.map((c) => [c.id, c]));
+    const dateLabel = new Date().toISOString().slice(0, 10);
+
+    const newEntries: ArchivedTaskEntry[] = tasksToArchive.map((task) => ({
+      id: task.id,
+      title: task.title,
+      labels: task.labels,
+      dueDate: task.dueDate,
+      completed: task.completed,
+      createdAt: task.createdAt,
+      updatedAt: task.updatedAt,
+      archivedAt: dateLabel,
+      sourceColumnTitle: columnById.get(task.columnId)?.title ?? "",
+    }));
+
+    // Find or create today's archive section
+    const existingSection = archiveSections.find((s) => s.dateLabel === dateLabel);
+    if (existingSection) {
+      existingSection.entries.push(...newEntries);
+    } else {
+      archiveSections.push({ dateLabel, entries: newEntries });
+    }
+
+    // Remove archived tasks from the active board
+    const archivedIds = new Set(tasksToArchive.map((t) => t.id));
+    tasks = tasks.filter((t) => !archivedIds.has(t.id));
+    for (const column of columns) {
+      column.taskIds = column.taskIds.filter((id) => !archivedIds.has(id));
+    }
+
+    await save();
+    return { ok: true, snapshot };
+  };
+
+  const getArchivedTasks = (): ArchivedTaskEntry[] => {
+    return archiveSections.flatMap((section) => section.entries);
+  };
+
+  const unarchiveTask = async (input: TaskUnarchiveInput): Promise<TaskMutationResult> => {
+    if (!workspaceRoot) {
+      return mutationError("missing-workspace", "Open a workspace before restoring tasks.");
+    }
+
+    const targetColumn = getColumn(input.columnId);
+    if (!targetColumn) {
+      return mutationError("missing-column", "Target list no longer exists.");
+    }
+
+    // Find the archived entry across all sections
+    let foundEntry: ArchivedTaskEntry | null = null;
+    let foundSectionIndex = -1;
+    for (let i = 0; i < archiveSections.length; i++) {
+      const entry = archiveSections[i]!.entries.find((e) => e.id === input.taskId);
+      if (entry) {
+        foundEntry = entry;
+        foundSectionIndex = i;
+        break;
+      }
+    }
+
+    if (!foundEntry) {
+      return mutationError("missing-task", "Archived task not found.");
+    }
+
+    // Restore as a WorkspaceTask
+    const now = Date.now();
+    const restoredTask: WorkspaceTask = {
+      id: foundEntry.id,
+      title: foundEntry.title,
+      columnId: targetColumn.id,
+      labels: foundEntry.labels,
+      dueDate: foundEntry.dueDate,
+      completed: foundEntry.completed,
+      createdAt: foundEntry.createdAt,
+      updatedAt: now,
+    };
+
+    tasks.push(restoredTask);
+    targetColumn.taskIds.push(restoredTask.id);
+    targetColumn.updatedAt = now;
+
+    // Remove from archive section
+    archiveSections[foundSectionIndex]!.entries = archiveSections[
+      foundSectionIndex
+    ]!.entries.filter((e) => e.id !== input.taskId);
+    // Prune empty sections
+    archiveSections = archiveSections.filter((s) => s.entries.length > 0);
+
+    await save();
+    snapshot = createSnapshot();
+    return { ok: true, task: restoredTask, snapshot };
+  };
+
   return {
+    archiveCompletedTasks,
     createColumn,
     createTask,
     deleteColumn,
     deleteTask,
+    getArchivedTasks,
     getSnapshot: () => snapshot,
     moveColumn,
     moveTask,
@@ -488,6 +703,7 @@ export function createTasksService() {
     setWorkspace(nextWorkspaceRoot: string | null) {
       workspaceRoot = nextWorkspaceRoot;
     },
+    unarchiveTask,
     updateColumn,
     updateTask,
   };

@@ -15,11 +15,13 @@ import {
   horizontalListSortingStrategy,
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ArrowDownIcon,
   ArrowUpIcon,
+  ArchiveIcon,
   FileIcon,
   OutlineIcon,
   PlusIcon,
@@ -37,6 +39,7 @@ import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { TaskColumn as TaskColumnModel, TaskColumnColor, WorkspaceTask } from "@/core/tasks";
 import { TASK_COLUMN_COLORS_PICKER } from "@/core/tasks";
+import type { ArchivedTaskEntry, TaskUnarchiveInput } from "@/core/tasks";
 import { cn } from "@/core/utils";
 import { applyTaskMutation, groupTasksByColumn, useTasksStore } from "@/store/tasks";
 
@@ -353,14 +356,18 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
   const [isAddingColumn, setIsAddingColumn] = useState(false);
   const [newColumnTitle, setNewColumnTitle] = useState("");
   const [newColumnColor, setNewColumnColor] = useState<TaskColumnColor>("blue");
+  const [newColumnIsDone, setNewColumnIsDone] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const [viewMode, setViewMode] = useState<TasksViewMode>(getInitialViewMode);
   const [sortColumn, setSortColumn] = useState<SortColumn>("task");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+  const [archivedTasks, setArchivedTasks] = useState<ArchivedTaskEntry[]>([]);
   const isDraggingRef = useRef(false);
   const boardScrollRef = useHorizontalScrollRef<HTMLDivElement>(isDraggingRef);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -462,6 +469,16 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
     return list;
   }, [filteredTasks, columns, sortColumn, sortDirection]);
 
+  // Virtualizer for the table view — keeps rendering fast with hundreds of tasks
+  const tableVirtualizer = useVirtualizer({
+    count: sortedFilteredTasks.length,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => 56,
+    overscan: 8,
+  });
+  const virtualTableItems = tableVirtualizer.getVirtualItems();
+  const virtualTableTotalSize = tableVirtualizer.getTotalSize();
+
   const runMutation = useCallback(
     async (mutation: Promise<Awaited<ReturnType<typeof glyph.createTask>>>) => {
       const result = await applyTaskMutation(mutation, setSnapshot);
@@ -497,7 +514,10 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
   );
 
   const handleUpdateColumn = useCallback(
-    (columnId: string, patch: { title?: string; color?: TaskColumnColor; collapsed?: boolean }) => {
+    (
+      columnId: string,
+      patch: { title?: string; color?: TaskColumnColor; collapsed?: boolean; isDone?: boolean },
+    ) => {
       void runMutation(glyph.updateTaskColumn({ id: columnId, ...patch }));
     },
     [glyph, runMutation],
@@ -509,6 +529,38 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
     },
     [glyph, runMutation],
   );
+
+  const handleOpenArchive = useCallback(async () => {
+    const entries = await glyph.getArchivedTasks();
+    setArchivedTasks(entries);
+    setIsArchiveOpen(true);
+  }, [glyph]);
+
+  const handleUnarchiveTask = useCallback(
+    async (input: TaskUnarchiveInput) => {
+      await runMutation(glyph.unarchiveTask(input));
+      // Refresh the archive list after unarchiving
+      const entries = await glyph.getArchivedTasks();
+      setArchivedTasks(entries);
+    },
+    [glyph, runMutation],
+  );
+
+  const handleArchiveCompleted = useCallback(async () => {
+    const doneColumns = columns.filter((c) => c.isDone);
+    const doneTaskCount = tasks.filter((t) => doneColumns.some((c) => c.id === t.columnId)).length;
+    if (doneTaskCount === 0) {
+      return;
+    }
+    if (
+      !window.confirm(
+        `Archive ${doneTaskCount} task${doneTaskCount === 1 ? "" : "s"} from done list${doneColumns.length === 1 ? "" : "s"}? They will be stored in the Tasks.md archive section.`,
+      )
+    ) {
+      return;
+    }
+    await runMutation(glyph.archiveCompletedTasks());
+  }, [columns, glyph, runMutation, tasks]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveDragId(String(event.active.id));
@@ -575,15 +627,21 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
         return;
       }
       const result = await runMutation(
-        glyph.createTaskColumn({ title, color: newColumnColor, index: columns.length }),
+        glyph.createTaskColumn({
+          title,
+          color: newColumnColor,
+          isDone: newColumnIsDone,
+          index: columns.length,
+        }),
       );
       if (result.ok) {
         setIsAddingColumn(false);
         setNewColumnTitle("");
         setNewColumnColor("blue");
+        setNewColumnIsDone(false);
       }
     },
-    [columns.length, glyph, newColumnColor, newColumnTitle, runMutation],
+    [columns.length, glyph, newColumnColor, newColumnIsDone, newColumnTitle, runMutation],
   );
 
   return (
@@ -672,6 +730,42 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
                         <button
                           type="button"
                           className="grid h-8 w-8 place-items-center rounded text-muted-foreground hover:text-foreground"
+                          aria-label="Archive options"
+                        />
+                      }
+                    >
+                      <ArchiveIcon size={16} />
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Archive</TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent
+                  align="end"
+                  className="w-52 bg-popover text-popover-foreground"
+                >
+                  <DropdownMenuItem
+                    onClick={() => void handleArchiveCompleted()}
+                    disabled={
+                      !columns.some((c) => c.isDone) ||
+                      tasks.filter((t) => columns.find((c) => c.id === t.columnId)?.isDone)
+                        .length === 0
+                    }
+                  >
+                    Archive done lists
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => void handleOpenArchive()}>
+                    View archive
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <DropdownMenu>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger
+                      render={
+                        <button
+                          type="button"
+                          className="grid h-8 w-8 place-items-center rounded text-muted-foreground hover:text-foreground"
                           aria-label="Change tasks view"
                         />
                       }
@@ -742,7 +836,7 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
                 </DragOverlay>
               </DndContext>
             ) : (
-              <div className="h-full overflow-auto px-5 pt-16 pb-5">
+              <div ref={tableContainerRef} className="h-full overflow-auto px-5 pt-16 pb-5">
                 <div className="mx-auto max-w-5xl overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">
                   <table className="w-full text-left">
                     <thead className="border-b border-border/60 bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
@@ -784,17 +878,48 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
                           </td>
                         </tr>
                       ) : (
-                        sortedFilteredTasks.map((task, index) => (
-                          <TableRow
-                            key={task.id}
-                            task={task}
-                            column={getTaskColumn(task, columns)}
-                            allColumns={columns}
-                            index={index}
-                            onUpdateTask={handleUpdateTask}
-                            onMoveTask={handleMoveTask}
-                          />
-                        ))
+                        <>
+                          {/* Top spacer for virtual rows above viewport */}
+                          {virtualTableItems[0]?.start > 0 && (
+                            <tr aria-hidden="true">
+                              <td
+                                style={{ height: virtualTableItems[0].start, padding: 0 }}
+                                colSpan={3}
+                              />
+                            </tr>
+                          )}
+                          {virtualTableItems.map((virtualItem) => {
+                            const task = sortedFilteredTasks[virtualItem.index];
+                            if (!task) return null;
+                            return (
+                              <TableRow
+                                key={task.id}
+                                task={task}
+                                column={getTaskColumn(task, columns)}
+                                allColumns={columns}
+                                index={virtualItem.index}
+                                onUpdateTask={handleUpdateTask}
+                                onMoveTask={handleMoveTask}
+                              />
+                            );
+                          })}
+                          {/* Bottom spacer for virtual rows below viewport */}
+                          {virtualTableItems.length > 0 &&
+                            (virtualTableItems[virtualTableItems.length - 1]?.end ?? 0) <
+                              virtualTableTotalSize && (
+                              <tr aria-hidden="true">
+                                <td
+                                  style={{
+                                    height:
+                                      virtualTableTotalSize -
+                                      (virtualTableItems[virtualTableItems.length - 1]?.end ?? 0),
+                                    padding: 0,
+                                  }}
+                                  colSpan={3}
+                                />
+                              </tr>
+                            )}
+                        </>
                       )}
                     </tbody>
                   </table>
@@ -839,6 +964,15 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
                     </Tooltip>
                   ))}
                 </div>
+                <label className="mt-3 flex cursor-pointer items-center gap-2.5">
+                  <input
+                    type="checkbox"
+                    checked={newColumnIsDone}
+                    onChange={(e) => setNewColumnIsDone(e.target.checked)}
+                    className="h-4 w-4 rounded border-border accent-primary"
+                  />
+                  <span className="text-sm text-foreground">Mark as done list</span>
+                </label>
                 <div className="mt-3 flex justify-end gap-1.5">
                   <Button
                     type="button"
@@ -857,6 +991,108 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
           </div>
         )}
       </main>
+
+      {/* Archive viewer modal */}
+      {isArchiveOpen ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setIsArchiveOpen(false);
+          }}
+        >
+          <div className="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-border bg-popover shadow-2xl">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <h2 className="text-base font-semibold text-foreground">Archive</h2>
+              <button
+                type="button"
+                onClick={() => setIsArchiveOpen(false)}
+                className="grid h-7 w-7 place-items-center rounded text-muted-foreground hover:text-foreground"
+                aria-label="Close archive"
+              >
+                ×
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+              {archivedTasks.length === 0 ? (
+                <p className="py-10 text-center text-sm text-muted-foreground">
+                  No archived tasks yet.
+                </p>
+              ) : (
+                <table className="w-full text-left text-sm">
+                  <thead className="sticky top-0 border-b border-border bg-popover text-xs uppercase tracking-wide text-muted-foreground">
+                    <tr>
+                      <th className="pb-2 pr-4 font-medium">Task</th>
+                      <th className="pb-2 pr-4 font-medium">Was in</th>
+                      <th className="pb-2 pr-4 font-medium">Archived</th>
+                      <th className="pb-2 font-medium" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/40">
+                    {archivedTasks.map((entry) => (
+                      <tr key={entry.id} className="group">
+                        <td className="py-2.5 pr-4">
+                          <span className="block font-medium text-foreground">{entry.title}</span>
+                          {entry.labels.length > 0 && (
+                            <span className="mt-1 flex flex-wrap gap-1">
+                              {entry.labels.map((label) => (
+                                <span
+                                  key={label}
+                                  className="rounded-full bg-primary/8 px-1.5 py-0.5 text-xs text-primary"
+                                >
+                                  #{label}
+                                </span>
+                              ))}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 pr-4 text-muted-foreground">
+                          {entry.sourceColumnTitle}
+                        </td>
+                        <td className="py-2.5 pr-4 text-muted-foreground">{entry.archivedAt}</td>
+                        <td className="py-2.5">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              render={
+                                <button
+                                  type="button"
+                                  className="rounded px-2.5 py-1 text-xs font-medium text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
+                                />
+                              }
+                            >
+                              Restore
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              align="end"
+                              className="w-48 bg-popover text-popover-foreground"
+                            >
+                              {columns.map((col) => (
+                                <DropdownMenuItem
+                                  key={col.id}
+                                  onClick={() =>
+                                    void handleUnarchiveTask({ taskId: entry.id, columnId: col.id })
+                                  }
+                                >
+                                  <span
+                                    className={cn(
+                                      "mr-2 h-2 w-2 rounded-full border-2 bg-background",
+                                      COLOR_DOTS[col.color],
+                                    )}
+                                  />
+                                  {col.title}
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

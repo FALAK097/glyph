@@ -28,6 +28,8 @@ import type {
   TaskMoveInput,
   TaskMutationResult,
   TaskUpdateInput,
+  ArchivedTaskEntry,
+  TaskUnarchiveInput,
 } from "@/core/tasks";
 
 declare global {
@@ -77,6 +79,9 @@ declare global {
       updateTaskColumn: (input: TaskColumnUpdateInput) => Promise<TaskMutationResult>;
       moveTaskColumn: (input: TaskColumnMoveInput) => Promise<TaskMutationResult>;
       deleteTaskColumn: (input: TaskColumnDeleteInput) => Promise<TaskMutationResult>;
+      archiveCompletedTasks: () => Promise<TaskMutationResult>;
+      getArchivedTasks: () => Promise<ArchivedTaskEntry[]>;
+      unarchiveTask: (input: TaskUnarchiveInput) => Promise<TaskMutationResult>;
       getSidebarNode: (
         kind: "file" | "directory",
         targetPath: string,

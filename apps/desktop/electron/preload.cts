@@ -31,7 +31,9 @@ import type {
   TaskIndexSnapshot,
   TaskMoveInput,
   TaskMutationResult,
+  TaskUnarchiveInput,
   TaskUpdateInput,
+  ArchivedTaskEntry,
 } from "../src/core/tasks.js";
 
 /**
@@ -167,6 +169,15 @@ const api = {
   },
   deleteTaskColumn(input: TaskColumnDeleteInput) {
     return ipcRenderer.invoke("tasks:columns:delete", input) as Promise<TaskMutationResult>;
+  },
+  archiveCompletedTasks() {
+    return ipcRenderer.invoke("tasks:archive-completed") as Promise<TaskMutationResult>;
+  },
+  getArchivedTasks() {
+    return ipcRenderer.invoke("tasks:get-archived") as Promise<ArchivedTaskEntry[]>;
+  },
+  unarchiveTask(input: TaskUnarchiveInput) {
+    return ipcRenderer.invoke("tasks:unarchive", input) as Promise<TaskMutationResult>;
   },
   getSidebarNode(kind: "file" | "directory", targetPath: string) {
     return ipcRenderer.invoke("sidebar:getNode", kind, targetPath) as Promise<

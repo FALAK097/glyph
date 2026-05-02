@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 
 import type { TaskColumnColor } from "@/core/tasks";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/core/utils";
 
 const COLOR_BORDER: Record<TaskColumnColor, string> = {
@@ -19,7 +18,7 @@ const COLOR_BORDER: Record<TaskColumnColor, string> = {
   violet: "border-chart-4/35",
 };
 
-// Overrides the Input's default purple --ring focus styles to match column color
+// Overrides the default purple --ring focus styles to match column color
 const COLOR_INPUT_FOCUS: Record<TaskColumnColor, string> = {
   amber: "focus-visible:border-chart-2/60 focus-visible:ring-chart-2/25",
   blue: "focus-visible:border-primary/60 focus-visible:ring-primary/25",
@@ -76,6 +75,12 @@ type PopoverAnchor = {
   viewportHeight: number;
 };
 
+type CalendarDay = {
+  day: number;
+  month: number;
+  year: number;
+};
+
 type TaskInlineEditorProps = {
   autoFocus?: boolean;
   color?: TaskColumnColor;
@@ -97,6 +102,7 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
 }: TaskInlineEditorProps) {
   const [value, setValue] = useState(initialValue);
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [calendarSelectedDay, setCalendarSelectedDay] = useState<CalendarDay | null>(null);
   const [today] = useState(() => {
     const current = new Date();
     return {
@@ -105,10 +111,12 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
       year: current.getFullYear(),
     };
   });
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const [anchor, setAnchor] = useState<PopoverAnchor | null>(null);
+  const [selectedTagIndex, setSelectedTagIndex] = useState(0);
 
+  // The last whitespace-delimited token determines which popover shows
   const activeToken = value.split(/\s/).at(-1) ?? "";
   const showDatePicker = activeToken.startsWith("@");
   const tagQuery = activeToken.startsWith("#") ? activeToken.slice(1).toLowerCase() : "";
@@ -120,6 +128,18 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
         : [],
     [activeToken, deferredTagQuery, tagSuggestions],
   );
+
+  // Reset selected tag index when suggestions change
+  useEffect(() => {
+    setSelectedTagIndex(0);
+  }, [matchingTags.length]);
+
+  // Reset calendar selected day when date picker closes
+  useEffect(() => {
+    if (!showDatePicker) {
+      setCalendarSelectedDay(null);
+    }
+  }, [showDatePicker]);
 
   const showPopover = showDatePicker || matchingTags.length > 0;
 
@@ -140,9 +160,17 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
     });
   }, [showPopover]);
 
+  // Auto-grow textarea height to fit content
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+
   const replaceActiveToken = useCallback((nextToken: string) => {
     setValue((current) => `${current.replace(/\S*$/, "").trimEnd()} ${nextToken} `.trimStart());
-    window.setTimeout(() => inputRef.current?.focus(), 0);
+    window.setTimeout(() => textareaRef.current?.focus(), 0);
   }, []);
 
   const handleSubmit = useCallback(
@@ -197,13 +225,17 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
           <div style={popoverStyle}>
             {matchingTags.length > 0 ? (
               <div className="w-56 rounded-lg border border-border bg-popover p-1.5 shadow-xl">
-                {matchingTags.map((tag) => (
+                {matchingTags.map((tag, tagIndex) => (
                   <button
                     key={tag}
                     type="button"
                     onMouseDown={(event) => event.preventDefault()}
+                    onMouseEnter={() => setSelectedTagIndex(tagIndex)}
                     onClick={() => replaceActiveToken(`#${tag}`)}
-                    className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm hover:bg-muted"
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm",
+                      tagIndex === selectedTagIndex ? "bg-muted" : "hover:bg-muted",
+                    )}
                   >
                     <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
                       #{tag}
@@ -246,6 +278,11 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
                   {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
                     const isToday =
                       today.day === day && today.month === month && today.year === year;
+                    const isSelected =
+                      calendarSelectedDay !== null &&
+                      calendarSelectedDay.day === day &&
+                      calendarSelectedDay.month === month &&
+                      calendarSelectedDay.year === year;
                     return (
                       <button
                         key={day}
@@ -254,9 +291,13 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
                         onClick={() => replaceActiveToken(formatDate(day, month, year))}
                         className={cn(
                           "rounded-md py-1.5 text-sm transition-colors",
-                          isToday
-                            ? "bg-primary/15 font-semibold text-primary hover:bg-primary/25"
-                            : "text-popover-foreground hover:bg-muted hover:text-foreground",
+                          isSelected && isToday
+                            ? "bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
+                            : isSelected
+                              ? "bg-primary/80 font-semibold text-primary-foreground hover:bg-primary/70"
+                              : isToday
+                                ? "bg-primary/15 font-semibold text-primary hover:bg-primary/25"
+                                : "text-popover-foreground hover:bg-muted hover:text-foreground",
                         )}
                       >
                         {day}
@@ -281,16 +322,78 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
           color ? COLOR_BORDER[color] : "border-border",
         )}
       >
-        <Input
-          ref={inputRef}
+        <textarea
+          ref={textareaRef}
           autoFocus={autoFocus}
+          rows={1}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Escape") onCancel();
+            if (e.key === "Escape") {
+              onCancel();
+              return;
+            }
+            // Tab / Shift+Tab with date picker open: navigate calendar days
+            if (e.key === "Tab" && showDatePicker) {
+              e.preventDefault();
+              const dir = e.shiftKey ? -1 : 1;
+              const base = calendarSelectedDay ?? today;
+              const d = new Date(base.year, base.month, base.day + dir);
+              const next: CalendarDay = {
+                day: d.getDate(),
+                month: d.getMonth(),
+                year: d.getFullYear(),
+              };
+              setCalendarSelectedDay(next);
+              // Keep the calendar showing the month that contains the selected day
+              setCalendarMonth(new Date(next.year, next.month, 1));
+              return;
+            }
+            // Shift+Enter: insert a newline — native textarea behaviour, no preventDefault needed
+            if (e.key === "Enter" && e.shiftKey) {
+              return;
+            }
+            // Enter with date picker open: confirm selected day (or today if none selected)
+            if (e.key === "Enter" && showDatePicker) {
+              e.preventDefault();
+              const d = calendarSelectedDay ?? today;
+              replaceActiveToken(formatDate(d.day, d.month, d.year));
+              return;
+            }
+            // Enter with tag suggestions open: select highlighted tag
+            if (e.key === "Enter" && matchingTags.length > 0) {
+              e.preventDefault();
+              replaceActiveToken(`#${matchingTags[selectedTagIndex] ?? matchingTags[0]}`);
+              return;
+            }
+            // Enter with no popover open: submit the form
+            if (e.key === "Enter") {
+              e.preventDefault();
+              const parsed = parseTaskText(value);
+              if (!parsed.title) return;
+              onSubmit(parsed);
+              setValue("");
+              return;
+            }
+            // Arrow keys to navigate tag suggestions
+            if (e.key === "ArrowDown" && matchingTags.length > 0) {
+              e.preventDefault();
+              setSelectedTagIndex((i) => Math.min(i + 1, matchingTags.length - 1));
+              return;
+            }
+            if (e.key === "ArrowUp" && matchingTags.length > 0) {
+              e.preventDefault();
+              setSelectedTagIndex((i) => Math.max(i - 1, 0));
+            }
           }}
           placeholder="Task title #project @date"
-          className={cn("h-9", color && COLOR_INPUT_FOCUS[color])}
+          className={cn(
+            // Mirror Input component styling minus fixed height — auto-grows via useEffect
+            "min-h-9 w-full min-w-0 resize-none overflow-hidden rounded-md border border-input bg-transparent px-2.5 py-1.5 text-sm shadow-xs outline-none transition-[color,box-shadow]",
+            "placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+            "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30",
+            color && COLOR_INPUT_FOCUS[color],
+          )}
         />
         <div className="mt-2 flex justify-end gap-1.5">
           <Button type="button" size="sm" variant="ghost" onClick={onCancel}>

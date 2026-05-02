@@ -21,6 +21,18 @@ import type {
   SkillLibraryChangeEvent,
   SkillLibrarySnapshot,
 } from "../src/core/skills.js";
+import type {
+  TaskColumnCreateInput,
+  TaskColumnDeleteInput,
+  TaskColumnMoveInput,
+  TaskColumnUpdateInput,
+  TaskCreateInput,
+  TaskDeleteInput,
+  TaskIndexSnapshot,
+  TaskMoveInput,
+  TaskMutationResult,
+  TaskUpdateInput,
+} from "../src/core/tasks.js";
 
 /**
  * Retries an IPC invoke when the main process handler is not yet registered.
@@ -126,6 +138,36 @@ const api = {
   searchWorkspace(query: string) {
     return ipcRenderer.invoke("workspace:search", query) as Promise<SearchResult[]>;
   },
+  listTasks() {
+    return ipcRenderer.invoke("tasks:list") as Promise<TaskIndexSnapshot>;
+  },
+  refreshTasks() {
+    return ipcRenderer.invoke("tasks:refresh") as Promise<TaskIndexSnapshot>;
+  },
+  updateTask(input: TaskUpdateInput) {
+    return ipcRenderer.invoke("tasks:update", input) as Promise<TaskMutationResult>;
+  },
+  moveTask(input: TaskMoveInput) {
+    return ipcRenderer.invoke("tasks:move", input) as Promise<TaskMutationResult>;
+  },
+  deleteTask(input: TaskDeleteInput) {
+    return ipcRenderer.invoke("tasks:delete", input) as Promise<TaskMutationResult>;
+  },
+  createTask(input: TaskCreateInput) {
+    return ipcRenderer.invoke("tasks:create", input) as Promise<TaskMutationResult>;
+  },
+  createTaskColumn(input: TaskColumnCreateInput) {
+    return ipcRenderer.invoke("tasks:columns:create", input) as Promise<TaskMutationResult>;
+  },
+  updateTaskColumn(input: TaskColumnUpdateInput) {
+    return ipcRenderer.invoke("tasks:columns:update", input) as Promise<TaskMutationResult>;
+  },
+  moveTaskColumn(input: TaskColumnMoveInput) {
+    return ipcRenderer.invoke("tasks:columns:move", input) as Promise<TaskMutationResult>;
+  },
+  deleteTaskColumn(input: TaskColumnDeleteInput) {
+    return ipcRenderer.invoke("tasks:columns:delete", input) as Promise<TaskMutationResult>;
+  },
   getSidebarNode(kind: "file" | "directory", targetPath: string) {
     return ipcRenderer.invoke("sidebar:getNode", kind, targetPath) as Promise<
       WorkspaceSnapshot["tree"][number] | null
@@ -172,6 +214,17 @@ const api = {
 
     return () => {
       ipcRenderer.removeListener("skills:changed", wrapped);
+    };
+  },
+  onTasksChanged(listener: (snapshot: TaskIndexSnapshot) => void) {
+    const wrapped = (_event: Electron.IpcRendererEvent, payload: TaskIndexSnapshot) => {
+      listener(payload);
+    };
+
+    ipcRenderer.on("tasks:changed", wrapped);
+
+    return () => {
+      ipcRenderer.removeListener("tasks:changed", wrapped);
     };
   },
   onCommand(listener: (command: AppCommand) => void) {

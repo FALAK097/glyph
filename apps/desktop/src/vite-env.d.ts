@@ -17,6 +17,18 @@ import type {
   ExternalFileTarget,
 } from "@/core/workspace";
 import type { SkillDocument, SkillLibraryChangeEvent, SkillLibrarySnapshot } from "@/core/skills";
+import type {
+  TaskColumnCreateInput,
+  TaskColumnDeleteInput,
+  TaskColumnMoveInput,
+  TaskColumnUpdateInput,
+  TaskCreateInput,
+  TaskDeleteInput,
+  TaskIndexSnapshot,
+  TaskMoveInput,
+  TaskMutationResult,
+  TaskUpdateInput,
+} from "@/core/tasks";
 
 declare global {
   interface Window {
@@ -55,6 +67,16 @@ declare global {
         folderName: string,
       ) => Promise<WorkspaceSnapshot["tree"] | null>;
       searchWorkspace: (query: string) => Promise<SearchResult[]>;
+      listTasks: () => Promise<TaskIndexSnapshot>;
+      refreshTasks: () => Promise<TaskIndexSnapshot>;
+      updateTask: (input: TaskUpdateInput) => Promise<TaskMutationResult>;
+      moveTask: (input: TaskMoveInput) => Promise<TaskMutationResult>;
+      deleteTask: (input: TaskDeleteInput) => Promise<TaskMutationResult>;
+      createTask: (input: TaskCreateInput) => Promise<TaskMutationResult>;
+      createTaskColumn: (input: TaskColumnCreateInput) => Promise<TaskMutationResult>;
+      updateTaskColumn: (input: TaskColumnUpdateInput) => Promise<TaskMutationResult>;
+      moveTaskColumn: (input: TaskColumnMoveInput) => Promise<TaskMutationResult>;
+      deleteTaskColumn: (input: TaskColumnDeleteInput) => Promise<TaskMutationResult>;
       getSidebarNode: (
         kind: "file" | "directory",
         targetPath: string,
@@ -68,6 +90,7 @@ declare global {
       installUpdate: () => Promise<void>;
       onWorkspaceChanged: (listener: (event: WorkspaceChangeEvent) => void) => () => void;
       onSkillLibraryChanged: (listener: (event: SkillLibraryChangeEvent) => void) => () => void;
+      onTasksChanged: (listener: (snapshot: TaskIndexSnapshot) => void) => () => void;
       onCommand: (listener: (command: AppCommand) => void) => () => void;
       getPendingExternalPath: () => Promise<ExternalFileTarget | null>;
       revealInFinder: (targetPath: string) => Promise<boolean>;

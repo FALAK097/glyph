@@ -16,6 +16,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createSkillsService } from "./skills-service.js";
+import { createTasksService } from "./tasks-service.js";
 import type {
   AppCommand,
   AppInfo,
@@ -30,6 +31,16 @@ import type {
   UpdateState,
   WorkspaceSnapshot,
 } from "../src/core/workspace.js";
+import type {
+  TaskColumnCreateInput,
+  TaskColumnDeleteInput,
+  TaskColumnMoveInput,
+  TaskColumnUpdateInput,
+  TaskCreateInput,
+  TaskDeleteInput,
+  TaskMoveInput,
+  TaskUpdateInput,
+} from "../src/core/tasks.js";
 import {
   DEFAULT_SHORTCUTS,
   canonicalizeShortcut,
@@ -106,6 +117,7 @@ const skillsService = createSkillsService({
     mainWindow.webContents.send("skills:changed", event);
   },
 });
+const tasksService = createTasksService();
 
 function createDefaultPersistedUpdateState(): PersistedUpdateState {
   return {
@@ -1857,13 +1869,19 @@ async function openWorkspace(
 
       const nextTree = await buildDirectoryTree(dirPath);
       searchableFilesCache = await collectMarkdownFiles(nextTree);
+      tasksService.setWorkspace(activeWorkspaceRoot);
+      const taskSnapshot = await tasksService.refreshChanged();
       mainWindow.webContents.send("workspace:changed", {
         rootPath: dirPath,
         tree: nextTree,
         changedPaths,
       });
+      mainWindow.webContents.send("tasks:changed", taskSnapshot);
     }, 100);
   });
+
+  tasksService.setWorkspace(activeWorkspaceRoot);
+  await tasksService.rebuild();
 
   return {
     rootPath: dirPath,
@@ -2178,6 +2196,115 @@ ipcMain.handle("workspace:createFolder", async (_event, parentDir: string, folde
 });
 
 ipcMain.handle("workspace:search", async (_event, query: string) => searchWorkspace(query));
+
+ipcMain.handle("tasks:list", async () => {
+  if (!activeWorkspaceRoot) {
+    return tasksService.getSnapshot();
+  }
+
+  const snapshot = tasksService.getSnapshot();
+  if (!snapshot.indexedAt || snapshot.workspaceRoot !== activeWorkspaceRoot) {
+    return tasksService.rebuild();
+  }
+
+  return snapshot;
+});
+
+ipcMain.handle("tasks:refresh", async () => tasksService.rebuild());
+
+ipcMain.handle("tasks:update", async (_event, input: unknown) => {
+  if (!input || typeof input !== "object") {
+    throw new Error("Invalid task update input.");
+  }
+  const { id, ..._rest } = input as Record<string, unknown>;
+  if (typeof id !== "string" || !id.trim()) {
+    throw new Error("Task id must be a non-empty string.");
+  }
+  return tasksService.updateTask(input as TaskUpdateInput);
+});
+
+ipcMain.handle("tasks:move", async (_event, input: unknown) => {
+  if (!input || typeof input !== "object") {
+    throw new Error("Invalid task move input.");
+  }
+  const { id, columnId } = input as Record<string, unknown>;
+  if (typeof id !== "string" || !id.trim()) {
+    throw new Error("Task id must be a non-empty string.");
+  }
+  if (typeof columnId !== "string" || !columnId.trim()) {
+    throw new Error("columnId must be a non-empty string.");
+  }
+  return tasksService.moveTask(input as TaskMoveInput);
+});
+
+ipcMain.handle("tasks:delete", async (_event, input: unknown) => {
+  if (!input || typeof input !== "object") {
+    throw new Error("Invalid task delete input.");
+  }
+  const { id } = input as Record<string, unknown>;
+  if (typeof id !== "string" || !id.trim()) {
+    throw new Error("Task id must be a non-empty string.");
+  }
+  return tasksService.deleteTask(input as TaskDeleteInput);
+});
+
+ipcMain.handle("tasks:create", async (_event, input: unknown) => {
+  if (!input || typeof input !== "object") {
+    throw new Error("Invalid task create input.");
+  }
+  const { title, columnId } = input as Record<string, unknown>;
+  if (typeof title !== "string" || !title.trim()) {
+    throw new Error("Task title must be a non-empty string.");
+  }
+  if (typeof columnId !== "string" || !columnId.trim()) {
+    throw new Error("columnId must be a non-empty string.");
+  }
+  return tasksService.createTask(input as TaskCreateInput);
+});
+
+ipcMain.handle("tasks:columns:create", async (_event, input: unknown) => {
+  if (!input || typeof input !== "object") {
+    throw new Error("Invalid column create input.");
+  }
+  const { title } = input as Record<string, unknown>;
+  if (typeof title !== "string" || !title.trim()) {
+    throw new Error("Column title must be a non-empty string.");
+  }
+  return tasksService.createColumn(input as TaskColumnCreateInput);
+});
+
+ipcMain.handle("tasks:columns:update", async (_event, input: unknown) => {
+  if (!input || typeof input !== "object") {
+    throw new Error("Invalid column update input.");
+  }
+  const { id } = input as Record<string, unknown>;
+  if (typeof id !== "string" || !id.trim()) {
+    throw new Error("Column id must be a non-empty string.");
+  }
+  return tasksService.updateColumn(input as TaskColumnUpdateInput);
+});
+
+ipcMain.handle("tasks:columns:move", async (_event, input: unknown) => {
+  if (!input || typeof input !== "object") {
+    throw new Error("Invalid column move input.");
+  }
+  const { id } = input as Record<string, unknown>;
+  if (typeof id !== "string" || !id.trim()) {
+    throw new Error("Column id must be a non-empty string.");
+  }
+  return tasksService.moveColumn(input as TaskColumnMoveInput);
+});
+
+ipcMain.handle("tasks:columns:delete", async (_event, input: unknown) => {
+  if (!input || typeof input !== "object") {
+    throw new Error("Invalid column delete input.");
+  }
+  const { id } = input as Record<string, unknown>;
+  if (typeof id !== "string" || !id.trim()) {
+    throw new Error("Column id must be a non-empty string.");
+  }
+  return tasksService.deleteColumn(input as TaskColumnDeleteInput);
+});
 
 ipcMain.handle("sidebar:getNode", async (_event, kind: "file" | "directory", targetPath: string) =>
   getSidebarNode(kind, targetPath),

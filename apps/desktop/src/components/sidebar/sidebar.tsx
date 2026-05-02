@@ -46,7 +46,7 @@ function SidebarSkillCollectionRow({
         <SkillSourceLogo iconKind={item.iconKind} sourceKind={item.sourceKind} variant="compact" />
         <span className="truncate text-sm font-medium">{item.label}</span>
       </span>
-      <span className="ml-3 rounded-full bg-background/80 px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
+      <span className="ml-3 rounded-full px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
         {item.count}
       </span>
     </button>

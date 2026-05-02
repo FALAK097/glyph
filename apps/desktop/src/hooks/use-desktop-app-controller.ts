@@ -2746,6 +2746,16 @@ export const useDesktopAppController = (
         return;
       }
 
+      if (command === "navigate-back") {
+        navigateBack();
+        return;
+      }
+
+      if (command === "navigate-forward") {
+        navigateForward();
+        return;
+      }
+
       if (command === "next-tab") {
         await activateAdjacentNoteTab(1);
         return;
@@ -2806,6 +2816,8 @@ export const useDesktopAppController = (
     closeActivePane,
     focusNextPane,
     focusPreviousPane,
+    navigateBack,
+    navigateForward,
     syncOpenedFile,
     syncWorkspace,
     glyph,

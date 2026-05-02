@@ -122,17 +122,18 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       (skill) => isSamePath(skill.skillFilePath, path) || isSamePath(skill.agentsFilePath, path),
     );
     const opened = await skillsController.openSkillByPath(path);
-    if (opened) {
-      const nextCollectionId = matchingSkill
-        ? matchingSkill.sourceId === "agents-global"
-          ? "global-skills"
-          : matchingSkill.sourceId === "project-skills"
-            ? "project-skills"
-            : `${matchingSkill.sourceKind}-tool`
-        : "all-skills";
-      setSkillsExpanded(true);
-      setSelectedSkillCollectionId(nextCollectionId);
+    if (!opened) {
+      return;
     }
+    const nextCollectionId = matchingSkill
+      ? matchingSkill.sourceId === "agents-global"
+        ? "global-skills"
+        : matchingSkill.sourceId === "project-skills"
+          ? "project-skills"
+          : `${matchingSkill.sourceKind}-tool`
+      : "all-skills";
+    setSkillsExpanded(true);
+    setSelectedSkillCollectionId(nextCollectionId);
     setViewerMode("skill");
   };
   onRestoreTasksRef.current = () => {

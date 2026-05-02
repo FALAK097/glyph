@@ -166,7 +166,9 @@ export type AppCommand =
   | "split-down"
   | "close-pane"
   | "focus-next-pane"
-  | "focus-previous-pane";
+  | "focus-previous-pane"
+  | "navigate-back"
+  | "navigate-forward";
 
 export type ExternalFileTarget = {
   path: string;

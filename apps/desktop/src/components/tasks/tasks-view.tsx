@@ -39,7 +39,6 @@ import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { TaskColumn as TaskColumnModel, TaskColumnColor, WorkspaceTask } from "@/core/tasks";
 import { TASK_COLUMN_COLORS_PICKER } from "@/core/tasks";
-import type { ArchivedTaskEntry, TaskUnarchiveInput } from "@/core/tasks";
 import { cn } from "@/core/utils";
 import { applyTaskMutation, groupTasksByColumn, useTasksStore } from "@/store/tasks";
 
@@ -363,8 +362,6 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
   const [viewMode, setViewMode] = useState<TasksViewMode>(getInitialViewMode);
   const [sortColumn, setSortColumn] = useState<SortColumn>("task");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const [isArchiveOpen, setIsArchiveOpen] = useState(false);
-  const [archivedTasks, setArchivedTasks] = useState<ArchivedTaskEntry[]>([]);
   const isDraggingRef = useRef(false);
   const boardScrollRef = useHorizontalScrollRef<HTMLDivElement>(isDraggingRef);
   const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -526,22 +523,6 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
   const handleUpdateTask = useCallback(
     (taskId: string, value: { title: string; labels: string[]; dueDate: string | null }) => {
       void runMutation(glyph.updateTask({ id: taskId, ...value }));
-    },
-    [glyph, runMutation],
-  );
-
-  const handleOpenArchive = useCallback(async () => {
-    const entries = await glyph.getArchivedTasks();
-    setArchivedTasks(entries);
-    setIsArchiveOpen(true);
-  }, [glyph]);
-
-  const handleUnarchiveTask = useCallback(
-    async (input: TaskUnarchiveInput) => {
-      await runMutation(glyph.unarchiveTask(input));
-      // Refresh the archive list after unarchiving
-      const entries = await glyph.getArchivedTasks();
-      setArchivedTasks(entries);
     },
     [glyph, runMutation],
   );
@@ -722,42 +703,19 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
                 </TooltipTrigger>
                 <TooltipContent side="bottom">Search tasks</TooltipContent>
               </Tooltip>
-              <DropdownMenu>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <DropdownMenuTrigger
-                      render={
-                        <button
-                          type="button"
-                          className="grid h-8 w-8 place-items-center rounded text-muted-foreground hover:text-foreground"
-                          aria-label="Archive options"
-                        />
-                      }
-                    >
-                      <ArchiveIcon size={16} />
-                    </DropdownMenuTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">Archive</TooltipContent>
-                </Tooltip>
-                <DropdownMenuContent
-                  align="end"
-                  className="w-52 bg-popover text-popover-foreground"
-                >
-                  <DropdownMenuItem
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
                     onClick={() => void handleArchiveCompleted()}
-                    disabled={
-                      !columns.some((c) => c.isDone) ||
-                      tasks.filter((t) => columns.find((c) => c.id === t.columnId)?.isDone)
-                        .length === 0
-                    }
+                    className="grid h-8 w-8 place-items-center rounded text-muted-foreground hover:text-foreground"
+                    aria-label="Archive done tasks"
                   >
-                    Archive done lists
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => void handleOpenArchive()}>
-                    View archive
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    <ArchiveIcon size={16} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Archive done tasks</TooltipContent>
+              </Tooltip>
               <DropdownMenu>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -991,108 +949,6 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
           </div>
         )}
       </main>
-
-      {/* Archive viewer modal */}
-      {isArchiveOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setIsArchiveOpen(false);
-          }}
-        >
-          <div className="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-border bg-popover shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <h2 className="text-base font-semibold text-foreground">Archive</h2>
-              <button
-                type="button"
-                onClick={() => setIsArchiveOpen(false)}
-                className="grid h-7 w-7 place-items-center rounded text-muted-foreground hover:text-foreground"
-                aria-label="Close archive"
-              >
-                ×
-              </button>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-3">
-              {archivedTasks.length === 0 ? (
-                <p className="py-10 text-center text-sm text-muted-foreground">
-                  No archived tasks yet.
-                </p>
-              ) : (
-                <table className="w-full text-left text-sm">
-                  <thead className="sticky top-0 border-b border-border bg-popover text-xs uppercase tracking-wide text-muted-foreground">
-                    <tr>
-                      <th className="pb-2 pr-4 font-medium">Task</th>
-                      <th className="pb-2 pr-4 font-medium">Was in</th>
-                      <th className="pb-2 pr-4 font-medium">Archived</th>
-                      <th className="pb-2 font-medium" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/40">
-                    {archivedTasks.map((entry) => (
-                      <tr key={entry.id} className="group">
-                        <td className="py-2.5 pr-4">
-                          <span className="block font-medium text-foreground">{entry.title}</span>
-                          {entry.labels.length > 0 && (
-                            <span className="mt-1 flex flex-wrap gap-1">
-                              {entry.labels.map((label) => (
-                                <span
-                                  key={label}
-                                  className="rounded-full bg-primary/8 px-1.5 py-0.5 text-xs text-primary"
-                                >
-                                  #{label}
-                                </span>
-                              ))}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-2.5 pr-4 text-muted-foreground">
-                          {entry.sourceColumnTitle}
-                        </td>
-                        <td className="py-2.5 pr-4 text-muted-foreground">{entry.archivedAt}</td>
-                        <td className="py-2.5">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              render={
-                                <button
-                                  type="button"
-                                  className="rounded px-2.5 py-1 text-xs font-medium text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground group-hover:opacity-100"
-                                />
-                              }
-                            >
-                              Restore
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                              align="end"
-                              className="w-48 bg-popover text-popover-foreground"
-                            >
-                              {columns.map((col) => (
-                                <DropdownMenuItem
-                                  key={col.id}
-                                  onClick={() =>
-                                    void handleUnarchiveTask({ taskId: entry.id, columnId: col.id })
-                                  }
-                                >
-                                  <span
-                                    className={cn(
-                                      "mr-2 h-2 w-2 rounded-full border-2 bg-background",
-                                      COLOR_DOTS[col.color],
-                                    )}
-                                  />
-                                  {col.title}
-                                </DropdownMenuItem>
-                              ))}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

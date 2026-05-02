@@ -93,11 +93,12 @@ const parseTaskLine = (
   return { title, labels, dueDate, completed: isChecked, meta };
 };
 
-const serializeTask = (task: WorkspaceTask): string => {
+const serializeTask = (task: WorkspaceTask, columnIsDone = false): string => {
   const meta = `<!-- task-meta: id=${task.id} created=${task.createdAt} updated=${task.updatedAt} -->`;
   const labelStr = task.labels.map((l) => `#${l}`).join(" ");
   const dueStr = task.dueDate ? ` due:${task.dueDate}` : "";
-  const checkbox = task.completed ? "- [x]" : "- [ ]";
+  // Render [x] if the column is a "done" column OR if the task itself is marked completed.
+  const checkbox = columnIsDone || task.completed ? "- [x]" : "- [ ]";
   return `${checkbox} ${task.title}${labelStr ? ` ${labelStr}` : ""}${dueStr} ${meta}`;
 };
 
@@ -106,8 +107,8 @@ const serializeArchivedEntry = (entry: ArchivedTaskEntry): string => {
   const labelStr = entry.labels.map((l) => `#${l}`).join(" ");
   const dueStr = entry.dueDate ? ` due:${entry.dueDate}` : "";
   const listComment = entry.sourceColumnTitle ? ` <!-- list: ${entry.sourceColumnTitle} -->` : "";
-  const checkbox = entry.completed ? "- [x]" : "- [ ]";
-  return `${checkbox} ${entry.title}${labelStr ? ` ${labelStr}` : ""}${dueStr} ${meta}${listComment}`;
+  // Archived tasks are always rendered as checked — they are done by definition.
+  return `- [x] ${entry.title}${labelStr ? ` ${labelStr}` : ""}${dueStr} ${meta}${listComment}`;
 };
 
 const serializeColumn = (column: TaskColumn): string => {
@@ -196,12 +197,17 @@ const parseBoardMarkdown = (
     if (trimmed.startsWith("## ")) {
       const title = trimmed.slice(3).trim();
       let meta: Record<string, string> = {};
-      if (i + 1 < lines.length) {
-        const nextMeta = parseMetaComment(lines[i + 1], "column-meta");
+      // Look past any blank lines for the column-meta comment. Markdown editors
+      // sometimes insert an empty line between the heading and the comment.
+      for (let j = i + 1; j < lines.length; j++) {
+        const nextLine = lines[j];
+        if (nextLine.trim() === "") continue;
+        const nextMeta = parseMetaComment(nextLine, "column-meta");
         if (nextMeta) {
           meta = nextMeta;
-          i++;
+          i = j;
         }
+        break; // stop at the first non-blank line regardless of whether it was meta
       }
       const now = Date.now();
 
@@ -271,7 +277,7 @@ const serializeBoardMarkdown = (
     for (const taskId of column.taskIds) {
       const task = taskById.get(taskId);
       if (task) {
-        lines.push(serializeTask(task));
+        lines.push(serializeTask(task, column.isDone));
       }
     }
     lines.push("");

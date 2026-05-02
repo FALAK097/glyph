@@ -1,6 +1,7 @@
 import { memo, useCallback, useLayoutEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
+import { parseMarkdownFrontmatter, serializeMarkdownFrontmatter } from "@/core/frontmatter";
 import { getDisplayFileName, isSamePath } from "@/core/paths";
 import {
   getDirectTabShortcutDisplay,
@@ -12,6 +13,7 @@ import { useLayoutStore } from "@/store/layout";
 import { useSessionStore } from "@/store/session";
 import { useWorkspaceStore } from "@/store/workspace";
 
+import { FrontmatterBlock } from "./frontmatter-block";
 import { MarkdownEditor } from "./markdown-editor";
 import { NoteTabsBar } from "./note-tabs-bar";
 import { useSplitViewActivePaneContext, useSplitViewContext } from "./split-view-context";
@@ -70,10 +72,11 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
     return "Saved";
   }, [activeTab, isDirty, isSaving]);
 
+  const parsedContent = useMemo(() => parseMarkdownFrontmatter(content), [content]);
   const wordCount = useMemo(() => {
-    if (!content) return 0;
-    return content.split(/\s+/).filter(Boolean).length;
-  }, [content]);
+    if (!parsedContent.body) return 0;
+    return parsedContent.body.split(/\s+/).filter(Boolean).length;
+  }, [parsedContent.body]);
 
   const readingTime = useMemo(() => Math.max(1, Math.ceil(wordCount / 200)), [wordCount]);
 
@@ -130,10 +133,33 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
   const handleContentChange = useCallback(
     (value: string) => {
       if (paneActiveTabId) {
-        ctx.onContentChange(paneId, paneActiveTabId, value);
+        ctx.onContentChange(
+          paneId,
+          paneActiveTabId,
+          serializeMarkdownFrontmatter({
+            frontmatterText: parsedContent.frontmatterText,
+            body: value,
+          }),
+        );
       }
     },
-    [ctx.onContentChange, paneId, paneActiveTabId],
+    [ctx.onContentChange, paneId, paneActiveTabId, parsedContent.frontmatterText],
+  );
+
+  const handleFrontmatterChange = useCallback(
+    (frontmatterText: string) => {
+      if (paneActiveTabId) {
+        ctx.onContentChange(
+          paneId,
+          paneActiveTabId,
+          serializeMarkdownFrontmatter({
+            frontmatterText,
+            body: parsedContent.body,
+          }),
+        );
+      }
+    },
+    [ctx.onContentChange, paneId, paneActiveTabId, parsedContent.body],
   );
 
   const handleSelectTab = useCallback(
@@ -180,7 +206,7 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
       onPointerDown={handleFocus}
     >
       <MarkdownEditor
-        content={content}
+        content={parsedContent.body}
         fileName={fileName}
         filePath={filePath}
         isEditable={isEditorEditable}
@@ -192,6 +218,15 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
         footerMetaLabel={footerMetaLabel}
         wordCount={wordCount}
         readingTime={readingTime}
+        topContent={
+          parsedContent.frontmatterText ? (
+            <FrontmatterBlock
+              value={parsedContent.frontmatterText}
+              isEditable={isEditorEditable}
+              onChange={handleFrontmatterChange}
+            />
+          ) : null
+        }
         subheaderContent={
           noteTabItems.length > 0 ? (
             <NoteTabsBar

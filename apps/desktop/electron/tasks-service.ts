@@ -34,6 +34,25 @@ const clampIndex = (index: unknown, length: number) =>
     ? Math.max(0, Math.min(Math.trunc(index), length))
     : length;
 
+const MIN_COLUMN_WIDTH = 260;
+const MAX_COLUMN_WIDTH = 560;
+
+const normalizeColumnWidth = (width: unknown) => {
+  if (typeof width !== "number" || !Number.isFinite(width)) {
+    return null;
+  }
+
+  return Math.max(MIN_COLUMN_WIDTH, Math.min(Math.trunc(width), MAX_COLUMN_WIDTH));
+};
+
+const getLocalDateLabel = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const parseMetaComment = (line: string, prefix: string): Record<string, string> | null => {
   const match = line.match(new RegExp(`<!--\\s*${prefix}:\\s*(.*?)\\s*-->`));
   if (!match) return null;
@@ -112,7 +131,8 @@ const serializeArchivedEntry = (entry: ArchivedTaskEntry): string => {
 };
 
 const serializeColumn = (column: TaskColumn): string => {
-  const meta = `<!-- column-meta: id=${column.id} color=${column.color} collapsed=${column.collapsed} isDone=${column.isDone} created=${column.createdAt} updated=${column.updatedAt} -->`;
+  const widthMeta = column.width ? ` width=${column.width}` : "";
+  const meta = `<!-- column-meta: id=${column.id} color=${column.color} collapsed=${column.collapsed} isDone=${column.isDone}${widthMeta} created=${column.createdAt} updated=${column.updatedAt} -->`;
   return `## ${column.title}\n${meta}`;
 };
 
@@ -127,6 +147,7 @@ const createDefaultBoard = (): { columns: TaskColumn[]; tasks: WorkspaceTask[] }
     columns: DEFAULT_TASK_COLUMNS.map((column) => ({
       ...column,
       collapsed: false,
+      width: null,
       taskIds: [],
       createdAt: now,
       updatedAt: now,
@@ -222,6 +243,7 @@ const parseBoardMarkdown = (
         title,
         color: isTaskColumnColor(meta.color) ? meta.color : "slate",
         collapsed: meta.collapsed === "true",
+        width: normalizeColumnWidth(Number(meta.width)),
         isDone,
         taskIds: [],
         createdAt: meta.created ? Number(meta.created) : now,
@@ -410,6 +432,7 @@ export function createTasksService() {
       return mutationError("missing-column", "Task list no longer exists.");
     }
 
+    const sourceColumn = getColumn(task.columnId);
     for (const column of columns) {
       column.taskIds = column.taskIds.filter((taskId) => taskId !== task.id);
     }
@@ -417,6 +440,9 @@ export function createTasksService() {
     targetColumn.taskIds.splice(targetIndex, 0, task.id);
     task.columnId = targetColumn.id;
     task.updatedAt = Date.now();
+    if (targetColumn.isDone && !sourceColumn?.isDone) {
+      task.dueDate = getLocalDateLabel();
+    }
     targetColumn.updatedAt = task.updatedAt;
     await save();
     return { ok: true, task, snapshot };
@@ -517,6 +543,7 @@ export function createTasksService() {
       title,
       color: isTaskColumnColor(input.color) ? input.color : "blue",
       collapsed: false,
+      width: null,
       isDone: typeof input.isDone === "boolean" ? input.isDone : false,
       taskIds: [],
       createdAt: now,
@@ -543,6 +570,9 @@ export function createTasksService() {
     }
     if (typeof input.collapsed === "boolean") {
       column.collapsed = input.collapsed;
+    }
+    if (input.width !== undefined) {
+      column.width = normalizeColumnWidth(input.width);
     }
     if (typeof input.isDone === "boolean") {
       column.isDone = input.isDone;

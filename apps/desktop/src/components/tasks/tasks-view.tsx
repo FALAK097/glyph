@@ -37,7 +37,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { TaskColumn as TaskColumnModel, TaskColumnColor, WorkspaceTask } from "@/core/tasks";
+import type {
+  TaskColumn as TaskColumnModel,
+  TaskColumnColor,
+  TaskColumnUpdateInput,
+  WorkspaceTask,
+} from "@/core/tasks";
 import { TASK_COLUMN_COLORS_PICKER } from "@/core/tasks";
 import { cn } from "@/core/utils";
 import { applyTaskMutation, groupTasksByColumn, useTasksStore } from "@/store/tasks";
@@ -511,10 +516,7 @@ export function TasksView({ glyph, onOpenMarkdown }: TasksViewProps) {
   );
 
   const handleUpdateColumn = useCallback(
-    (
-      columnId: string,
-      patch: { title?: string; color?: TaskColumnColor; collapsed?: boolean; isDone?: boolean },
-    ) => {
+    (columnId: string, patch: Omit<TaskColumnUpdateInput, "id">) => {
       void runMutation(glyph.updateTaskColumn({ id: columnId, ...patch }));
     },
     [glyph, runMutation],

@@ -73,6 +73,7 @@ export function useSkillLibraryController(
   const draftContentRef = useRef(draftContent);
   const lastSyncedContentRef = useRef("");
   const isSavingRef = useRef(false);
+  const recentlySavedPathRef = useRef<string | null>(null);
   const autosaveTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const documentRequestNonceRef = useRef(0);
   const searchRequestNonceRef = useRef(0);
@@ -300,10 +301,8 @@ export function useSkillLibraryController(
 
     try {
       const savedDocument = await glyph.saveSkillDocument(currentDocument.path, nextDraft);
-      setActiveDocument(savedDocument);
-      setDraftContent(savedDocument.content);
-      draftContentRef.current = savedDocument.content;
-      lastSyncedContentRef.current = savedDocument.content;
+      recentlySavedPathRef.current = currentDocument.path;
+      lastSyncedContentRef.current = nextDraft;
       setLastSavedAt(savedDocument.lastModifiedAt);
       setPendingExternalChange(null);
       return true;
@@ -520,18 +519,32 @@ export function useSkillLibraryController(
     }
 
     return glyph.onSkillLibraryChanged((event) => {
+      const currentDocument = activeDocumentRef.current;
+      const isCurrentDocumentChanged = currentDocument
+        ? event.changedPaths.some((changedPath) => isSamePath(changedPath, currentDocument.path))
+        : false;
+
       setSnapshot(event.snapshot);
 
-      const currentDocument = activeDocumentRef.current;
+      if (
+        isCurrentDocumentChanged &&
+        currentDocument &&
+        recentlySavedPathRef.current &&
+        isSamePath(recentlySavedPathRef.current, currentDocument.path)
+      ) {
+        recentlySavedPathRef.current = null;
+        return;
+      }
+
+      if (isCurrentDocumentChanged && isSavingRef.current) {
+        return;
+      }
+
       if (!currentDocument) {
         return;
       }
 
-      const isCurrentDocumentChanged = event.changedPaths.some((changedPath) =>
-        isSamePath(changedPath, currentDocument.path),
-      );
-
-      if (!isCurrentDocumentChanged || isSavingRef.current) {
+      if (!isCurrentDocumentChanged) {
         return;
       }
 

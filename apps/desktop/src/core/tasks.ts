@@ -30,6 +30,7 @@ export type TaskColumn = {
   title: string;
   color: TaskColumnColor;
   collapsed: boolean;
+  width: number | null;
   /** When true, tasks in this column are considered "done" for archiving and visual dimming. */
   isDone: boolean;
   taskIds: string[];
@@ -131,6 +132,7 @@ export type TaskColumnUpdateInput = {
   title?: string;
   color?: TaskColumnColor;
   collapsed?: boolean;
+  width?: number | null;
   isDone?: boolean;
 };
 

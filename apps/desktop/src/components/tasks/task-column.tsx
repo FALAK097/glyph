@@ -1,6 +1,6 @@
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { memo, useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 
 import { ArrowDownIcon, DotsHorizontalIcon, PlusIcon } from "@/components/icons";
 import {
@@ -34,67 +34,77 @@ function DragGripIcon() {
 
 const COLOR_STYLES: Record<
   TaskColumnColor,
-  { add: string; dot: string; count: string; header: string }
+  { add: string; dot: string; count: string; header: string; resize: string }
 > = {
   amber: {
     add: "hover:border-chart-2/35 hover:text-chart-2",
     count: "bg-chart-2/15 text-chart-2",
     dot: "border-chart-2",
     header: "bg-chart-2/8",
+    resize: "bg-chart-2/45",
   },
   blue: {
     add: "hover:border-primary/35 hover:text-primary",
     count: "bg-primary/10 text-primary",
     dot: "border-primary",
     header: "bg-primary/5",
+    resize: "bg-primary/45",
   },
   cyan: {
     add: "hover:border-chart-3/35 hover:text-chart-3",
     count: "bg-chart-3/15 text-chart-3",
     dot: "border-chart-3",
     header: "bg-chart-3/8",
+    resize: "bg-chart-3/45",
   },
   emerald: {
     add: "hover:border-chart-5/35 hover:text-chart-5",
     count: "bg-chart-5/15 text-chart-5",
     dot: "border-chart-5",
     header: "bg-chart-5/8",
+    resize: "bg-chart-5/45",
   },
   lime: {
     add: "hover:border-chart-5/35 hover:text-chart-5",
     count: "bg-chart-5/15 text-chart-5",
     dot: "border-chart-5",
     header: "bg-chart-5/8",
+    resize: "bg-chart-5/45",
   },
   orange: {
     add: "hover:border-chart-2/35 hover:text-chart-2",
     count: "bg-chart-2/15 text-chart-2",
     dot: "border-chart-2",
     header: "bg-chart-2/8",
+    resize: "bg-chart-2/45",
   },
   pink: {
     add: "hover:border-chart-4/35 hover:text-chart-4",
     count: "bg-chart-4/15 text-chart-4",
     dot: "border-chart-4",
     header: "bg-chart-4/8",
+    resize: "bg-chart-4/45",
   },
   rose: {
     add: "hover:border-destructive/35 hover:text-destructive",
     count: "bg-destructive/12 text-destructive",
     dot: "border-destructive",
     header: "bg-destructive/8",
+    resize: "bg-destructive/45",
   },
   slate: {
     add: "hover:border-muted-foreground/35 hover:text-foreground",
     count: "bg-muted text-muted-foreground",
     dot: "border-muted-foreground",
     header: "bg-muted/40",
+    resize: "bg-muted-foreground/35",
   },
   violet: {
     add: "hover:border-chart-4/35 hover:text-chart-4",
     count: "bg-chart-4/15 text-chart-4",
     dot: "border-chart-4",
     header: "bg-chart-4/8",
+    resize: "bg-chart-4/45",
   },
 };
 
@@ -112,7 +122,13 @@ type TaskColumnProps = {
   onMoveTask: (taskId: string, columnId: string, index: number) => void;
   onUpdateColumn: (
     columnId: string,
-    patch: { title?: string; color?: TaskColumnColor; collapsed?: boolean; isDone?: boolean },
+    patch: {
+      title?: string;
+      color?: TaskColumnColor;
+      collapsed?: boolean;
+      width?: number | null;
+      isDone?: boolean;
+    },
   ) => void;
   onUpdateTask: (
     taskId: string,
@@ -137,6 +153,8 @@ export const TaskColumn = memo(function TaskColumn({
 }: TaskColumnProps) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [draftTitle, setDraftTitle] = useState(column.title);
+  const resizeStateRef = useRef<{ startX: number; startWidth: number; width: number } | null>(null);
+  const [liveWidth, setLiveWidth] = useState(column.width ?? 340);
 
   useEffect(() => {
     if (!isRenaming) {
@@ -148,6 +166,22 @@ export const TaskColumn = memo(function TaskColumn({
     data: { columnId: column.id, type: "column" },
   });
   const color = COLOR_STYLES[column.color];
+  const columnWidth = liveWidth;
+
+  useEffect(() => {
+    setLiveWidth(column.width ?? 340);
+  }, [column.width]);
+
+  useEffect(() => {
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    return () => {
+      if (resizeStateRef.current) {
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      }
+    };
+  }, []);
 
   const toggleCollapsed = useCallback(() => {
     onUpdateColumn(column.id, { collapsed: !column.collapsed });
@@ -166,6 +200,59 @@ export const TaskColumn = memo(function TaskColumn({
     }
     setIsRenaming(false);
   }, [column.id, column.title, draftTitle, onUpdateColumn]);
+
+  const handleResizePointerDown = useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const startWidth = liveWidth;
+      resizeStateRef.current = { startX: event.clientX, startWidth, width: startWidth };
+      event.currentTarget.setPointerCapture(event.pointerId);
+      document.body.style.userSelect = "none";
+    },
+    [liveWidth],
+  );
+
+  const handleResizePointerMove = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    const state = resizeStateRef.current;
+    if (!state) {
+      return;
+    }
+
+    const nextWidth = Math.max(260, Math.min(560, state.startWidth + event.clientX - state.startX));
+    state.width = nextWidth;
+    setLiveWidth(nextWidth);
+  }, []);
+
+  const handleResizePointerUp = useCallback(
+    (event: React.PointerEvent<HTMLButtonElement>) => {
+      const state = resizeStateRef.current;
+      if (!state) {
+        return;
+      }
+
+      resizeStateRef.current = null;
+      event.currentTarget.releasePointerCapture(event.pointerId);
+      document.body.style.userSelect = "";
+      onUpdateColumn(column.id, { width: Math.round(state.width) });
+    },
+    [column.id, onUpdateColumn],
+  );
+
+  const handleResizePointerCancel = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    const state = resizeStateRef.current;
+    if (!state) {
+      return;
+    }
+
+    resizeStateRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    document.body.style.userSelect = "";
+    setLiveWidth(state.startWidth);
+  }, []);
 
   if (column.collapsed) {
     return (
@@ -210,9 +297,9 @@ export const TaskColumn = memo(function TaskColumn({
   return (
     <section
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
+      style={{ transform: CSS.Transform.toString(transform), transition, width: columnWidth }}
       className={cn(
-        "flex h-[calc(100vh-132px)] min-h-[520px] w-[340px] shrink-0 flex-col rounded-lg border border-border bg-muted/25 shadow-xs",
+        "relative flex h-[calc(100vh-132px)] min-h-[520px] shrink-0 flex-col rounded-lg border border-border bg-muted/25 shadow-xs",
         isDragging ? "opacity-55 shadow-md" : "",
       )}
       aria-label={`${column.title} tasks`}
@@ -367,6 +454,22 @@ export const TaskColumn = memo(function TaskColumn({
           Add a Task
         </button>
       </div>
+      <button
+        type="button"
+        aria-label={`Resize ${column.title} list`}
+        className="group/resize absolute top-2 right-[-4px] bottom-2 z-10 flex w-2 cursor-col-resize items-center justify-center rounded-full outline-none"
+        onPointerDown={handleResizePointerDown}
+        onPointerMove={handleResizePointerMove}
+        onPointerUp={handleResizePointerUp}
+        onPointerCancel={handleResizePointerCancel}
+      >
+        <span
+          className={cn(
+            "h-10 w-1 rounded-full opacity-0 transition-opacity duration-100 ease-out group-hover/resize:opacity-100 group-focus-visible/resize:opacity-100 group-active/resize:opacity-100",
+            color.resize,
+          )}
+        />
+      </button>
     </section>
   );
 });

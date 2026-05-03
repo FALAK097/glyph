@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getShortcutDisplay } from "@/core/shortcuts";
+import { cn } from "@/core/utils";
 
 import type {
   DragPosition,
@@ -22,6 +23,8 @@ import type {
 
 import { SkillSourceLogo } from "@/components/skills/skill-source-logo";
 import { ChevronRightIcon, PlusIcon, FolderPlusIcon } from "@/components/icons";
+import { getSkillSourceAccent } from "@/core/skill-source-accents";
+import { NoteCollectionRow } from "./note-collection-row";
 import { SidebarTreeNode } from "./sidebar-tree-node";
 import { SidebarShortcutList } from "./sidebar-shortcut-row";
 
@@ -32,21 +35,39 @@ function SidebarSkillCollectionRow({
   item: SidebarSkillCollectionItem;
   onSelect?: (collectionId: string) => void;
 }) {
+  const accent = getSkillSourceAccent(item.sourceKind, item.iconKind);
+
   return (
     <button
       type="button"
       onClick={() => onSelect?.(item.id)}
-      className={`group flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.99] ${
-        item.isActive
-          ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-accent/30"
-          : "text-sidebar-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
-      }`}
+      className={cn(
+        "group flex w-full items-center justify-between rounded-md border-l-2 px-2 py-1.5 text-left transition-colors duration-100 ease-out",
+        item.isActive ? cn(accent.active, accent.border) : cn("border-l-transparent", accent.hover),
+      )}
     >
       <span className="flex min-w-0 items-center gap-2">
-        <SkillSourceLogo iconKind={item.iconKind} sourceKind={item.sourceKind} variant="compact" />
-        <span className="truncate text-sm font-medium">{item.label}</span>
+        <SkillSourceLogo
+          className={accent.icon}
+          iconKind={item.iconKind}
+          sourceKind={item.sourceKind}
+          variant="compact"
+        />
+        <span
+          className={cn(
+            "truncate text-sm",
+            item.isActive ? accent.text : "text-sidebar-foreground",
+          )}
+        >
+          {item.label}
+        </span>
       </span>
-      <span className="ml-3 rounded-full px-1.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
+      <span
+        className={cn(
+          "ml-3 min-w-5 text-right text-[11px] font-semibold tabular-nums",
+          item.isActive ? accent.text : "text-muted-foreground",
+        )}
+      >
         {item.count}
       </span>
     </button>
@@ -63,10 +84,12 @@ export const Sidebar = ({
   folderRevealLabel,
   openInFolderLabel,
   pinnedNotes,
+  noteCollections,
   skillCollections,
   onToggleNotesSection,
   onToggleSkillsSection,
   onOpenTasks,
+  onSelectNoteCollection,
   onSelectSkillCollection,
   onOpenFile,
   onDeleteFile,
@@ -81,6 +104,10 @@ export const Sidebar = ({
   onReorderNodes,
   onCreateNote,
   onCreateFolder,
+  onCreateNoteInCollection,
+  onCreateFolderInCollection,
+  onChangeNoteCollectionAccent,
+  onChangeNoteCollectionIcon,
 }: SidebarProps) => {
   const [nodeToDelete, setNodeToDelete] = useState<SidebarDeleteTarget | null>(null);
   const [folderToDelete, setFolderToDelete] = useState<SidebarDeleteTarget | null>(null);
@@ -88,6 +115,7 @@ export const Sidebar = ({
   const [folderToRemove, setFolderToRemove] = useState<SidebarRemoveTarget | null>(null);
   const pinnedList = pinnedNotes ?? [];
   const revealLabel = folderRevealLabel ?? openInFolderLabel ?? "Open in Finder";
+  const hasActiveSkillCollection = Boolean(skillCollections?.some((item) => item.isActive));
   const pinnedPaths = useMemo(() => pinnedList.map((note) => note.path), [pinnedList]);
   const handleRequestRemoveFolder = useCallback((folder: SidebarRemoveTarget) => {
     setFolderToRemove(folder);
@@ -143,23 +171,23 @@ export const Sidebar = ({
 
   return (
     <aside className="flex h-full min-h-0 w-[280px] flex-col border-r border-border bg-sidebar">
-      <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-3">
-        <div className="mb-3 px-2">
+      <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto overflow-x-hidden py-2.5">
+        <div className="mb-3 px-3">
           <button
             type="button"
             aria-label="TASKS"
             onClick={onOpenTasks}
-            className={`group flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.99] ${
+            className={`group flex w-full items-center justify-between rounded-md px-1 py-1.5 text-left transition-colors duration-100 ease-out ${
               isTasksActive
-                ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm ring-1 ring-sidebar-accent/30"
-                : "text-sidebar-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
+                ? "text-sidebar-foreground"
+                : "text-sidebar-foreground hover:text-foreground"
             }`}
           >
             <p
               className={`text-[11px] font-semibold uppercase tracking-[0.18em] ${
                 isTasksActive
                   ? "text-sidebar-foreground"
-                  : "text-muted-foreground group-hover:text-sidebar-accent-foreground"
+                  : "text-muted-foreground group-hover:text-foreground"
               }`}
             >
               TASKS
@@ -194,38 +222,14 @@ export const Sidebar = ({
               </button>
             </div>
             {isSkillsExpanded ? (
-              <div>
-                <div className="space-y-1 px-2">
-                  {skillCollections
-                    .filter((item) => item.group === "scope")
-                    .map((item) => (
-                      <SidebarSkillCollectionRow
-                        key={item.id}
-                        item={item}
-                        onSelect={onSelectSkillCollection}
-                      />
-                    ))}
-                </div>
-                {skillCollections.some((item) => item.group === "tool") ? (
-                  <div className="mt-4">
-                    <div className="px-4 py-1.5">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                        TOOLS
-                      </p>
-                    </div>
-                    <div className="space-y-1 px-2">
-                      {skillCollections
-                        .filter((item) => item.group === "tool")
-                        .map((item) => (
-                          <SidebarSkillCollectionRow
-                            key={item.id}
-                            item={item}
-                            onSelect={onSelectSkillCollection}
-                          />
-                        ))}
-                    </div>
-                  </div>
-                ) : null}
+              <div className="space-y-0.5 px-3">
+                {skillCollections.map((item) => (
+                  <SidebarSkillCollectionRow
+                    key={item.id}
+                    item={item}
+                    onSelect={onSelectSkillCollection}
+                  />
+                ))}
               </div>
             ) : null}
           </div>
@@ -306,33 +310,29 @@ export const Sidebar = ({
                 </div>
               ) : null}
               <div className="px-2">
-                {tree.length === 0 && !activePath ? (
+                {(noteCollections?.length ?? 0) === 0 && tree.length === 0 && !activePath ? (
                   <p className="px-2 py-2 text-sm text-muted-foreground">
                     Create your first note or open the palette to start navigating.
                   </p>
                 ) : (
-                  <div className="space-y-0.5">
-                    {tree.map((entry) => (
-                      <SidebarTreeNode
-                        key={entry.node.path}
-                        node={entry.node}
-                        activePath={activePath}
-                        depth={0}
-                        folderRevealLabel={revealLabel}
-                        isExpanded={entry.isExpanded}
-                        pinnedPaths={pinnedPaths}
-                        onOpenFile={onOpenFile}
-                        onRequestRemoveFolder={handleRequestRemoveFolder}
-                        onRequestDeleteFolder={handleRequestDeleteFolder}
-                        onRequestRemoveFile={setFileToRemove}
+                  <div className="flex flex-col gap-0.5 px-0">
+                    {(noteCollections ?? []).map((item) => (
+                      <NoteCollectionRow
+                        key={item.id}
+                        item={{
+                          ...item,
+                          isActive: !isTasksActive && !hasActiveSkillCollection && item.isActive,
+                        }}
+                        onSelect={(path) => onSelectNoteCollection?.(path)}
+                        onCreateNote={onCreateNoteInCollection}
+                        onCreateFolder={onCreateFolderInCollection}
+                        onChangeAccent={onChangeNoteCollectionAccent}
+                        onChangeIcon={onChangeNoteCollectionIcon}
                         onRevealInFinder={onRevealInFinder}
-                        onRequestDelete={handleRequestDelete}
-                        onRenameFile={onRenameFile}
                         onRenameFolder={onRenameFolder}
-                        onToggleFolder={onToggleFolder}
-                        onTogglePinnedFile={onTogglePinnedFile}
-                        draggable
-                        onDropNode={handleDropNode}
+                        onRemoveFolder={onRemoveFolder}
+                        onDeleteFolder={onDeleteFolder}
+                        revealLabel={revealLabel}
                       />
                     ))}
                   </div>

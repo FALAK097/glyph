@@ -60,6 +60,7 @@ type EditorToolbarProps = {
   onDismissUpdateAction: (() => void) | undefined;
   isManualReleaseButton: boolean;
   headerPaddingClass: string;
+  browserPaneHeader?: React.ReactNode;
   onOpenSettings: (() => void) | undefined;
   headerAccessory: React.ReactNode;
   content: string;
@@ -109,6 +110,7 @@ export function EditorToolbar({
   onDismissUpdateAction,
   isManualReleaseButton,
   headerPaddingClass,
+  browserPaneHeader,
   onOpenSettings,
   headerAccessory,
   content,
@@ -246,6 +248,12 @@ export function EditorToolbar({
           </Tooltip>
         ) : null}
       </div>
+
+      {browserPaneHeader ? (
+        <div className="flex h-8 w-[292px] shrink-0 items-center justify-end border-l border-border/50 px-4">
+          {browserPaneHeader}
+        </div>
+      ) : null}
 
       {/* Center: search bar */}
       {shouldShowCommandPalette && onOpenCommandPalette ? (

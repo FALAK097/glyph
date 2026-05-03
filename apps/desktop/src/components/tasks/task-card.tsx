@@ -35,11 +35,16 @@ const cardColorClass: Record<TaskColumn["color"], string> = {
   blue: "border-primary/35",
   cyan: "border-chart-3/35",
   emerald: "border-chart-5/35",
+  coral: "border-orange-500/35",
+  indigo: "border-indigo-500/35",
   lime: "border-chart-5/35",
   orange: "border-chart-2/35",
   pink: "border-chart-4/35",
+  red: "border-red-600/35",
   rose: "border-destructive/35",
   slate: "border-muted-foreground/25",
+  sky: "border-sky-500/35",
+  teal: "border-teal-500/35",
   violet: "border-chart-4/35",
 };
 

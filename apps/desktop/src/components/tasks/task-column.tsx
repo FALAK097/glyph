@@ -50,12 +50,26 @@ const COLOR_STYLES: Record<
     header: "bg-primary/5",
     resize: "bg-primary/45",
   },
+  sky: {
+    add: "hover:border-sky-500/35 hover:text-sky-600 dark:hover:text-sky-400",
+    count: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+    dot: "border-sky-500",
+    header: "bg-sky-500/8",
+    resize: "bg-sky-500/45",
+  },
   cyan: {
     add: "hover:border-chart-3/35 hover:text-chart-3",
     count: "bg-chart-3/15 text-chart-3",
     dot: "border-chart-3",
     header: "bg-chart-3/8",
     resize: "bg-chart-3/45",
+  },
+  teal: {
+    add: "hover:border-teal-500/35 hover:text-teal-600 dark:hover:text-teal-400",
+    count: "bg-teal-500/10 text-teal-600 dark:text-teal-400",
+    dot: "border-teal-500",
+    header: "bg-teal-500/8",
+    resize: "bg-teal-500/45",
   },
   emerald: {
     add: "hover:border-chart-5/35 hover:text-chart-5",
@@ -78,6 +92,13 @@ const COLOR_STYLES: Record<
     header: "bg-chart-2/8",
     resize: "bg-chart-2/45",
   },
+  coral: {
+    add: "hover:border-orange-500/35 hover:text-orange-600 dark:hover:text-orange-400",
+    count: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+    dot: "border-orange-500",
+    header: "bg-orange-500/8",
+    resize: "bg-orange-500/45",
+  },
   pink: {
     add: "hover:border-chart-4/35 hover:text-chart-4",
     count: "bg-chart-4/15 text-chart-4",
@@ -92,6 +113,13 @@ const COLOR_STYLES: Record<
     header: "bg-destructive/8",
     resize: "bg-destructive/45",
   },
+  red: {
+    add: "hover:border-red-600/35 hover:text-red-600 dark:hover:text-red-400",
+    count: "bg-red-600/10 text-red-600 dark:text-red-400",
+    dot: "border-red-600",
+    header: "bg-red-600/8",
+    resize: "bg-red-600/45",
+  },
   slate: {
     add: "hover:border-muted-foreground/35 hover:text-foreground",
     count: "bg-muted text-muted-foreground",
@@ -105,6 +133,13 @@ const COLOR_STYLES: Record<
     dot: "border-chart-4",
     header: "bg-chart-4/8",
     resize: "bg-chart-4/45",
+  },
+  indigo: {
+    add: "hover:border-indigo-500/35 hover:text-indigo-600 dark:hover:text-indigo-400",
+    count: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
+    dot: "border-indigo-500",
+    header: "bg-indigo-500/8",
+    resize: "bg-indigo-500/45",
   },
 };
 
@@ -372,7 +407,7 @@ export const TaskColumn = memo(function TaskColumn({
                 />
                 Color
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="grid w-auto grid-cols-7 gap-2 p-2">
+              <DropdownMenuSubContent className="grid w-auto grid-cols-5 gap-2 p-2">
                 {TASK_COLUMN_COLORS_PICKER.map((nextColor) => (
                   <Tooltip key={nextColor}>
                     <TooltipTrigger asChild>

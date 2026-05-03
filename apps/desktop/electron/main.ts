@@ -71,6 +71,42 @@ const GITHUB_RELEASES_URL = "https://github.com/FALAK097/glyph/releases";
 const GITHUB_LATEST_RELEASE_API_URL = "https://api.github.com/repos/FALAK097/glyph/releases/latest";
 const MARKDOWN_PREVIEW_SUFFIX_PATTERN = /\.(md|mdx|markdown)$/i;
 const MARKDOWN_HEADING_PATTERN = /^#{1,6}\s+(.*)$/;
+const NOTE_COLLECTION_ACCENT_KEYS = [
+  "violet",
+  "indigo",
+  "blue",
+  "sky",
+  "cyan",
+  "teal",
+  "emerald",
+  "lime",
+  "amber",
+  "orange",
+  "coral",
+  "rose",
+  "pink",
+  "red",
+  "slate",
+] as const;
+const NOTE_COLLECTION_ICON_KEYS = [
+  "folder",
+  "book",
+  "briefcase",
+  "calendar",
+  "sparkles",
+  "rocket",
+  "tag",
+  "archive",
+  "leaf",
+  "layers",
+  "globe",
+  "home",
+  "camera",
+  "notebook",
+  "star",
+] as const;
+type NoteCollectionAccentValue = (typeof NOTE_COLLECTION_ACCENT_KEYS)[number];
+type NoteCollectionIconValue = (typeof NOTE_COLLECTION_ICON_KEYS)[number];
 
 type PersistedUpdateState = {
   stagedVersion: string | null;
@@ -1030,6 +1066,51 @@ function normalizePersistedFileList(input: unknown) {
     : [];
 }
 
+function isNoteCollectionAccentValue(value: unknown): value is NoteCollectionAccentValue {
+  return (
+    typeof value === "string" &&
+    NOTE_COLLECTION_ACCENT_KEYS.includes(value as NoteCollectionAccentValue)
+  );
+}
+
+function isNoteCollectionIconValue(value: unknown): value is NoteCollectionIconValue {
+  return (
+    typeof value === "string" &&
+    NOTE_COLLECTION_ICON_KEYS.includes(value as NoteCollectionIconValue)
+  );
+}
+
+function normalizeNoteFolderAppearances(input: unknown): AppSettings["noteFolderAppearances"] {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(input).flatMap(([folderPath, appearance]) => {
+      if (
+        !folderPath ||
+        !appearance ||
+        typeof appearance !== "object" ||
+        Array.isArray(appearance)
+      ) {
+        return [];
+      }
+
+      const candidate = appearance as { accent?: unknown; icon?: unknown };
+      const normalized: AppSettings["noteFolderAppearances"][string] = {};
+
+      if (isNoteCollectionAccentValue(candidate.accent)) {
+        normalized.accent = candidate.accent;
+      }
+      if (isNoteCollectionIconValue(candidate.icon)) {
+        normalized.icon = candidate.icon;
+      }
+
+      return Object.keys(normalized).length > 0 ? [[folderPath, normalized]] : [];
+    }),
+  );
+}
+
 function normalizeEditorPreferences(
   input: Partial<AppSettings["editorPreferences"]> | undefined,
 ): AppSettings["editorPreferences"] {
@@ -1329,11 +1410,7 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
     themeMode: isThemeMode(candidate.themeMode) ? candidate.themeMode : defaults.themeMode,
     hiddenFiles: Array.from(new Set(validHiddenFiles)),
     pinnedFiles: Array.from(new Set(validPinnedFiles)),
-    noteFolderAppearances:
-      typeof candidate.noteFolderAppearances === "object" &&
-      candidate.noteFolderAppearances !== null
-        ? (candidate.noteFolderAppearances as AppSettings["noteFolderAppearances"])
-        : defaults.noteFolderAppearances,
+    noteFolderAppearances: normalizeNoteFolderAppearances(candidate.noteFolderAppearances),
     shortcuts: Array.isArray(candidate.shortcuts)
       ? normalizeShortcutSettings(
           candidate.shortcuts.filter(
@@ -1474,6 +1551,20 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
         : null;
   }
 
+  if ("noteFolderAppearances" in candidate) {
+    if (
+      !candidate.noteFolderAppearances ||
+      typeof candidate.noteFolderAppearances !== "object" ||
+      Array.isArray(candidate.noteFolderAppearances)
+    ) {
+      throw new Error("noteFolderAppearances must be an object.");
+    }
+
+    nextPatch.noteFolderAppearances = normalizeNoteFolderAppearances(
+      candidate.noteFolderAppearances,
+    );
+  }
+
   const invalidKeys = Object.keys(candidate).filter(
     (key) =>
       ![
@@ -1487,6 +1578,7 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
         "editorPreferences",
         "autoOpenPDF",
         "dismissedUpdateVersion",
+        "noteFolderAppearances",
       ].includes(key),
   );
 
@@ -1748,13 +1840,65 @@ function extractNoteTitle(content: string): string {
   return "Untitled";
 }
 
+function getDisplayMarkdownFileName(filePath: string): string {
+  const fileName = path.basename(filePath).trim();
+  const displayName = fileName.replace(/\.(md|mdx|markdown)$/i, "");
+  return displayName.length > 0 ? displayName : fileName || "Untitled";
+}
+
+function serializeNoteExcerptLine(line: string): string {
+  return line
+    .replace(/\\([\\`*_{}\[\]()#+\-.!>])/g, "$1")
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_match, target: string, label?: string) =>
+      (label ?? target).trim(),
+    )
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/[*_~>#]/g, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\|/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function extractNoteExcerpt(content: string): string {
   const lines = content.split("\n");
   const cleanLines: string[] = [];
+  let isFrontmatter = false;
+  let isCodeBlock = false;
+
   for (const line of lines) {
     const trimmed = line.trim();
-    if (trimmed && !trimmed.startsWith("#")) {
-      cleanLines.push(trimmed.replace(/[*_`~\[\]()]/g, ""));
+
+    if (trimmed === "---" && cleanLines.length === 0) {
+      isFrontmatter = true;
+      continue;
+    }
+    if (isFrontmatter) {
+      if (trimmed === "---") {
+        isFrontmatter = false;
+      }
+      continue;
+    }
+    if (trimmed.startsWith("```")) {
+      isCodeBlock = !isCodeBlock;
+      continue;
+    }
+    if (
+      !trimmed ||
+      isCodeBlock ||
+      trimmed.startsWith("#") ||
+      trimmed.startsWith("|") ||
+      /^[-:| ]+$/.test(trimmed)
+    ) {
+      continue;
+    }
+
+    const serialized = serializeNoteExcerptLine(trimmed);
+    if (serialized) {
+      cleanLines.push(serialized);
       if (cleanLines.join(" ").length >= 150) break;
     }
   }
@@ -1804,7 +1948,7 @@ async function getNoteBrowserEntries(targetPath: string | null): Promise<NoteBro
 
       entries.push({
         path: filePath,
-        title: extractNoteTitle(normalizedContent),
+        title: getDisplayMarkdownFileName(filePath),
         excerpt: extractNoteExcerpt(normalizedContent),
         modifiedAt: stats.mtime.toISOString(),
         createdAt: stats.birthtime.toISOString(),

@@ -17,12 +17,18 @@ import type {
 export const NOTE_COLLECTION_ACCENT_KEYS: NoteCollectionAccentKey[] = [
   "violet",
   "indigo",
+  "blue",
   "sky",
+  "cyan",
   "teal",
   "emerald",
+  "lime",
   "amber",
+  "orange",
   "coral",
   "rose",
+  "pink",
+  "red",
   "slate",
 ];
 
@@ -37,12 +43,19 @@ export const NOTE_COLLECTION_ICON_KEYS: NoteCollectionIconKey[] = [
   "archive",
   "leaf",
   "layers",
+  "globe",
+  "home",
+  "camera",
+  "notebook",
+  "star",
 ];
 
 export type NoteCollectionItem = {
   id: string;
   label: string;
   path: string;
+  sourcePath: string;
+  appearancePath: string;
   count: number;
   notePaths: string[];
   accent: NoteCollectionAccentKey;
@@ -50,10 +63,12 @@ export type NoteCollectionItem = {
   isActive: boolean;
   workspacePath: string | null;
   isRootCollection: boolean;
+  isAllCollection: boolean;
 };
 
 type CollectionBuildInput = {
   path: string;
+  sourcePath: string;
   workspacePath: string | null;
   isRootCollection: boolean;
   notePaths: string[];
@@ -95,10 +110,10 @@ export function getNoteCollectionAppearance(
 
 function getCollectionLabel(input: CollectionBuildInput) {
   if (input.isRootCollection) {
-    return getDisplayFileName(getBaseName(input.path));
+    return getDisplayFileName(getBaseName(input.sourcePath));
   }
 
-  return getBaseName(input.path);
+  return getBaseName(input.sourcePath);
 }
 
 function collectMarkdownPaths(node: DirectoryNode): string[] {
@@ -132,6 +147,7 @@ export function buildNoteCollections(
     if (node.type === "file") {
       addCollection(collections, {
         path: node.path,
+        sourcePath: node.path,
         workspacePath: null,
         isRootCollection: true,
         notePaths: [node.path],
@@ -139,22 +155,12 @@ export function buildNoteCollections(
       return;
     }
 
-    const rootNotePaths = node.children
-      .filter((child): child is Extract<DirectoryNode, { type: "file" }> => child.type === "file")
-      .map((child) => child.path);
-
     addCollection(collections, {
       path: node.path,
+      sourcePath: node.path,
       workspacePath: node.path,
       isRootCollection: true,
       notePaths: collectMarkdownPaths(node),
-    });
-
-    addCollection(collections, {
-      path: `${normalizeCollectionKey(node.path)}/.root`,
-      workspacePath: node.path,
-      isRootCollection: false,
-      notePaths: rootNotePaths,
     });
 
     node.children.forEach((child) => {
@@ -164,6 +170,7 @@ export function buildNoteCollections(
 
       addCollection(collections, {
         path: child.path,
+        sourcePath: child.path,
         workspacePath: node.path,
         isRootCollection: false,
         notePaths: collectMarkdownPaths(child),
@@ -171,7 +178,7 @@ export function buildNoteCollections(
     });
   });
 
-  return collections
+  const builtCollections = collections
     .filter((collection) => collection.notePaths.length > 0)
     .map((collection) => {
       const appearanceSourcePath = collection.path.endsWith("/.root")
@@ -184,6 +191,8 @@ export function buildNoteCollections(
         id: normalizedCollectionPath,
         label: collection.path.endsWith("/.root") ? "Root Notes" : getCollectionLabel(collection),
         path: normalizedCollectionPath,
+        sourcePath: normalizeCollectionKey(collection.sourcePath),
+        appearancePath: appearanceSourcePath,
         count: collection.notePaths.length,
         notePaths: collection.notePaths,
         accent: appearance.accent,
@@ -193,6 +202,7 @@ export function buildNoteCollections(
           : false,
         workspacePath: collection.workspacePath,
         isRootCollection: collection.isRootCollection,
+        isAllCollection: false,
       };
     })
     .sort((left, right) => {
@@ -201,6 +211,34 @@ export function buildNoteCollections(
       }
       return left.label.localeCompare(right.label);
     });
+
+  const allNotePaths = Array.from(
+    new Set(builtCollections.flatMap((collection) => collection.notePaths)),
+  );
+
+  if (allNotePaths.length === 0) {
+    return builtCollections;
+  }
+
+  const allNotesPath = "__glyph_all_notes__";
+  const allNotesAppearance = getNoteCollectionAppearance(allNotesPath, appearances);
+  const allNotesCollection: NoteCollectionItem = {
+    id: allNotesPath,
+    label: "All Notes",
+    path: allNotesPath,
+    sourcePath: builtCollections[0]?.sourcePath ?? allNotesPath,
+    appearancePath: allNotesPath,
+    count: allNotePaths.length,
+    notePaths: allNotePaths,
+    accent: allNotesAppearance.accent,
+    icon: allNotesAppearance.icon,
+    isActive: activeCollectionPath === allNotesPath,
+    workspacePath: null,
+    isRootCollection: true,
+    isAllCollection: true,
+  };
+
+  return [allNotesCollection, ...builtCollections];
 }
 
 export function filterNoteBrowserEntries(

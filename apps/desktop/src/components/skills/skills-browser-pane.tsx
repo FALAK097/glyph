@@ -1,70 +1,53 @@
 import type { SkillBrowserItem } from "@/core/skill-groups";
+import { getSkillSourceAccent, type SkillCollectionIconKind } from "@/core/skill-source-accents";
+import type { SkillSourceKind } from "@/core/skills";
 import { cn } from "@/core/utils";
-import { Input } from "../ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
-import { SearchIcon } from "../icons";
+import { FileDownIcon, LinkIcon, MoreVerticalIcon } from "../icons";
+import { FileManagerLogo } from "../file-manager-logo";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
 import { SkillSourceLogo, SkillSourceLogoStack } from "./skill-source-logo";
 
 type SkillsBrowserPaneProps = {
   activeSkillId: string | null;
   items: SkillBrowserItem[];
-  searchQuery: string;
-  onSearchQueryChange: (value: string) => void;
   onSelectSkill: (skillId: string) => void;
-  title: string;
+  sourceKind?: SkillSourceKind;
+  iconKind?: SkillCollectionIconKind;
+  onCopySkill?: (item: SkillBrowserItem) => void;
+  onCopySkillPath?: (item: SkillBrowserItem) => void;
+  onRevealSkill?: (item: SkillBrowserItem) => void;
+  onExportSkill?: (item: SkillBrowserItem) => void;
 };
 
 export function SkillsBrowserPane({
   activeSkillId,
   items,
-  searchQuery,
-  onSearchQueryChange,
   onSelectSkill,
-  title,
+  sourceKind,
+  iconKind,
+  onCopySkill,
+  onCopySkillPath,
+  onRevealSkill,
+  onExportSkill,
 }: SkillsBrowserPaneProps) {
-  const countLabel = "skill";
-  const searchLabel = "skills";
-  const isMacLike = navigator.platform.includes("Mac");
-  const headerSpacingClass = isMacLike ? "pt-8" : "pt-4";
-  const hasQuery = searchQuery.trim().length > 0;
-
   return (
     <aside className="flex h-full min-h-0 w-[292px] flex-col border-r border-border bg-background">
-      <div className={`border-b border-border/70 px-4 py-3 ${headerSpacingClass}`}>
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            {title}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {items.length} {countLabel}
-            {items.length === 1 ? "" : "s"}
-          </p>
-        </div>
-        <div className="relative mt-3">
-          <SearchIcon
-            size={14}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/80"
-          />
-          <Input
-            value={searchQuery}
-            onChange={(event) => onSearchQueryChange(event.target.value)}
-            placeholder={`Search ${searchLabel}...`}
-            aria-label={`Search ${searchLabel}`}
-            className="h-8 border-border/70 bg-background pl-8 pr-2.5 text-sm shadow-none"
-          />
-        </div>
-      </div>
       <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto px-2 py-2">
         {items.length === 0 ? (
           <div className="rounded-xl px-3 py-3 text-sm text-muted-foreground">
-            {hasQuery
-              ? "No skills match your search yet."
-              : "No skills are available in this source yet."}
+            No skills are available in this source yet.
           </div>
         ) : (
           items.map((item) => {
             const isActive = item.memberSkillIds.includes(activeSkillId ?? "");
             const tooltipLabels = item.sourceNames;
+            const accent = getSkillSourceAccent(sourceKind ?? item.sourceKinds[0], iconKind);
 
             return (
               <button
@@ -73,31 +56,89 @@ export function SkillsBrowserPane({
                 aria-current={isActive ? "true" : undefined}
                 onClick={() => onSelectSkill(item.representativeSkillId)}
                 className={cn(
-                  "mb-1 flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-[background-color,color,transform] duration-150 ease-out active:scale-[0.99]",
-                  isActive ? "bg-accent text-accent-foreground" : "hover:bg-muted/70",
+                  "group mb-0.5 flex w-full items-start gap-2.5 rounded-md border-l-2 px-3 py-2.5 text-left transition-colors duration-100 ease-out",
+                  isActive
+                    ? cn(accent.active, accent.border)
+                    : cn("border-l-transparent", accent.hover),
                 )}
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex min-w-0 items-start justify-between gap-3">
-                    <p className="truncate text-sm font-medium text-foreground">{item.name}</p>
-                    {item.hasAgentsFile ? (
-                      <span className="shrink-0 rounded-full bg-background/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                        Agent
-                      </span>
-                    ) : null}
+                    <p
+                      className={cn(
+                        "line-clamp-1 min-w-0 text-sm font-medium break-all",
+                        isActive ? accent.text : "text-foreground",
+                      )}
+                    >
+                      {item.name}
+                    </p>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        render={
+                          <button
+                            type="button"
+                            className="grid h-6 w-6 shrink-0 place-items-center rounded-sm text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
+                            aria-label={`${item.name} options`}
+                            onClick={(event) => event.stopPropagation()}
+                          />
+                        }
+                      >
+                        <MoreVerticalIcon size={14} />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="start"
+                        side="right"
+                        sideOffset={8}
+                        className="w-48"
+                      >
+                        <DropdownMenuItem onClick={() => onSelectSkill(item.representativeSkillId)}>
+                          Open
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onCopySkill?.(item)}>
+                          <LinkIcon size={14} className="opacity-70" />
+                          Copy as Markdown
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onCopySkillPath?.(item)}>
+                          <LinkIcon size={14} className="opacity-70" />
+                          Copy skill path
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onRevealSkill?.(item)}>
+                          <FileManagerLogo
+                            label="Reveal in Finder"
+                            size={14}
+                            className="opacity-70"
+                          />
+                          Reveal in Finder
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onExportSkill?.(item)}>
+                          <FileDownIcon size={14} className="opacity-70" />
+                          Export as PDF
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                   {tooltipLabels.length > 0 ? (
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <div className="mt-1.5 inline-flex w-fit items-center">
+                        <div className="mt-1.5 inline-flex w-fit items-center gap-1.5">
                           {item.sourceKinds.length > 1 ? (
                             <SkillSourceLogoStack
+                              className={accent.icon}
                               sourceKinds={item.sourceKinds}
                               variant="compact"
                             />
                           ) : (
-                            <SkillSourceLogo sourceKind={item.sourceKinds[0]} variant="compact" />
+                            <SkillSourceLogo
+                              className={accent.icon}
+                              sourceKind={item.sourceKinds[0]}
+                              variant="compact"
+                            />
                           )}
+                          {item.hasAgentsFile ? (
+                            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                              AGENTS.md
+                            </span>
+                          ) : null}
                         </div>
                       </TooltipTrigger>
                       <TooltipContent

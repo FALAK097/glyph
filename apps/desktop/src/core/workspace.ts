@@ -77,12 +77,18 @@ export type SearchResult = {
 export type NoteCollectionAccentKey =
   | "violet"
   | "indigo"
+  | "blue"
   | "sky"
+  | "cyan"
   | "teal"
   | "emerald"
+  | "lime"
   | "amber"
+  | "orange"
   | "coral"
   | "rose"
+  | "pink"
+  | "red"
   | "slate";
 
 export type NoteCollectionIconKey =
@@ -95,7 +101,12 @@ export type NoteCollectionIconKey =
   | "tag"
   | "archive"
   | "leaf"
-  | "layers";
+  | "layers"
+  | "globe"
+  | "home"
+  | "camera"
+  | "notebook"
+  | "star";
 
 export type NoteFolderAppearance = {
   accent: NoteCollectionAccentKey;

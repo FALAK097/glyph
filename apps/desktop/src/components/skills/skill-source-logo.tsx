@@ -163,7 +163,7 @@ function renderIcon({
         aria-hidden="true"
         className={cn("inline-flex shrink-0 items-center justify-center", sizeClasses, className)}
       >
-        <OutlineIcon size={iconSize} className="text-muted-foreground" />
+        <OutlineIcon size={iconSize} className="text-current" />
       </span>
     );
   }
@@ -174,7 +174,7 @@ function renderIcon({
         aria-hidden="true"
         className={cn("inline-flex shrink-0 items-center justify-center", sizeClasses, className)}
       >
-        <ShortcutIcon size={iconSize} className="text-muted-foreground" />
+        <ShortcutIcon size={iconSize} className="text-current" />
       </span>
     );
   }
@@ -187,9 +187,7 @@ function renderIcon({
       >
         <svg
           viewBox="0 0 20 20"
-          className={
-            variant === "badge" ? "size-4 text-muted-foreground" : "size-3.5 text-muted-foreground"
-          }
+          className={variant === "badge" ? "size-4 text-current" : "size-3.5 text-current"}
           fill="none"
           stroke="currentColor"
           strokeLinecap="round"
@@ -210,7 +208,7 @@ function renderIcon({
         aria-hidden="true"
         className={cn("inline-flex shrink-0 items-center justify-center", sizeClasses, className)}
       >
-        <FolderIcon size={iconSize} className="text-muted-foreground" />
+        <FolderIcon size={iconSize} className="text-current" />
       </span>
     );
   }
@@ -223,9 +221,7 @@ function renderIcon({
       >
         <svg
           viewBox="0 0 20 20"
-          className={
-            variant === "badge" ? "size-4 text-muted-foreground" : "size-3.5 text-muted-foreground"
-          }
+          className={variant === "badge" ? "size-4 text-current" : "size-3.5 text-current"}
           fill="none"
           stroke="currentColor"
           strokeLinecap="round"
@@ -248,7 +244,7 @@ function renderIcon({
       {logoSource ? (
         <img src={logoSource} alt="" className={imageClassName} />
       ) : (
-        <FileIcon size={iconSize} className="text-muted-foreground/85" />
+        <FileIcon size={iconSize} className="text-current" />
       )}
     </span>
   );

@@ -1,5 +1,10 @@
 import type { SkillSourceKind } from "@/core/skills";
-import type { DirectoryNode } from "@/core/workspace";
+import type { NoteCollectionItem } from "@/core/note-collections";
+import type {
+  DirectoryNode,
+  NoteCollectionAccentKey,
+  NoteCollectionIconKey,
+} from "@/core/workspace";
 import type { NoteShortcutItem } from "./navigation";
 
 export type DragPosition = "before" | "after" | "inside";
@@ -28,12 +33,14 @@ export type SidebarProps = {
   isSkillsExpanded?: boolean;
   isTasksActive?: boolean;
   pinnedNotes?: NoteShortcutItem[];
+  noteCollections?: NoteCollectionItem[];
   folderRevealLabel?: string;
   openInFolderLabel?: string;
   skillCollections?: SidebarSkillCollectionItem[];
   onToggleNotesSection?: () => void;
   onToggleSkillsSection?: () => void;
   onOpenTasks?: () => void;
+  onSelectNoteCollection?: (collectionPath: string) => void;
   onSelectSkillCollection?: (collectionId: string) => void;
   onOpenCommandPalette?: () => void;
   onOpenFile: (filePath: string) => void;
@@ -53,6 +60,10 @@ export type SidebarProps = {
   ) => void | Promise<void>;
   onCreateNote?: () => void;
   onCreateFolder?: () => void;
+  onCreateNoteInCollection?: (collectionPath: string) => void;
+  onCreateFolderInCollection?: (collectionPath: string) => void;
+  onChangeNoteCollectionAccent?: (collectionPath: string, accent: NoteCollectionAccentKey) => void;
+  onChangeNoteCollectionIcon?: (collectionPath: string, icon: NoteCollectionIconKey) => void;
 };
 
 export type SidebarDeleteTarget = {

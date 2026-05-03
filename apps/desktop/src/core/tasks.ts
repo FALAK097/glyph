@@ -1,27 +1,38 @@
 export const TASK_COLUMN_COLORS = [
   "blue",
-  "amber",
-  "violet",
-  "emerald",
-  "rose",
-  "slate",
+  "sky",
   "cyan",
-  "orange",
-  "pink",
+  "teal",
+  "emerald",
   "lime",
+  "amber",
+  "orange",
+  "coral",
+  "rose",
+  "pink",
+  "red",
+  "violet",
+  "indigo",
+  "slate",
 ] as const;
 
 export type TaskColumnColor = (typeof TASK_COLUMN_COLORS)[number];
 
-/** Curated subset of visually-distinct colors shown in UI pickers.
- *  Backwards-compatible: removed colors still exist in data. */
 export const TASK_COLUMN_COLORS_PICKER: TaskColumnColor[] = [
   "blue",
-  "rose",
-  "emerald",
-  "amber",
+  "sky",
   "cyan",
+  "teal",
+  "emerald",
+  "lime",
+  "amber",
+  "orange",
+  "coral",
+  "rose",
+  "pink",
+  "red",
   "violet",
+  "indigo",
   "slate",
 ];
 

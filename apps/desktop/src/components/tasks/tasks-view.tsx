@@ -57,11 +57,16 @@ const COLOR_DOTS: Record<TaskColumnColor, string> = {
   blue: "border-primary",
   cyan: "border-chart-3",
   emerald: "border-chart-5",
+  coral: "border-orange-500",
+  indigo: "border-indigo-500",
   lime: "border-chart-5",
   orange: "border-chart-2",
   pink: "border-chart-4",
+  red: "border-red-600",
   rose: "border-destructive",
   slate: "border-muted-foreground",
+  sky: "border-sky-500",
+  teal: "border-teal-500",
   violet: "border-chart-4",
 };
 
@@ -70,11 +75,16 @@ const LIST_TEXT_COLORS: Record<TaskColumnColor, string> = {
   blue: "text-primary",
   cyan: "text-chart-3",
   emerald: "text-chart-5",
+  coral: "text-orange-600 dark:text-orange-400",
+  indigo: "text-indigo-600 dark:text-indigo-400",
   lime: "text-chart-5",
   orange: "text-chart-2",
   pink: "text-chart-4",
+  red: "text-red-600 dark:text-red-400",
   rose: "text-destructive",
   slate: "text-muted-foreground",
+  sky: "text-sky-600 dark:text-sky-400",
+  teal: "text-teal-600 dark:text-teal-400",
   violet: "text-chart-4",
 };
 
@@ -83,11 +93,16 @@ const LIST_BG_COLORS: Record<TaskColumnColor, string> = {
   blue: "bg-primary/10",
   cyan: "bg-chart-3/10",
   emerald: "bg-chart-5/10",
+  coral: "bg-orange-500/10",
+  indigo: "bg-indigo-500/10",
   lime: "bg-chart-5/10",
   orange: "bg-chart-2/10",
   pink: "bg-chart-4/10",
+  red: "bg-red-600/10",
   rose: "bg-destructive/10",
   slate: "bg-muted",
+  sky: "bg-sky-500/10",
+  teal: "bg-teal-500/10",
   violet: "bg-chart-4/10",
 };
 
@@ -724,7 +739,7 @@ export function TasksView({ glyph, onOpenTaskSource: _onOpenTaskSource }: TasksV
                   placeholder="List name"
                   className="h-9"
                 />
-                <div className="mt-3 grid grid-cols-7 gap-2">
+                <div className="mt-3 grid grid-cols-5 gap-2">
                   {TASK_COLUMN_COLORS_PICKER.map((color) => (
                     <Tooltip key={color}>
                       <TooltipTrigger asChild>
@@ -732,12 +747,18 @@ export function TasksView({ glyph, onOpenTaskSource: _onOpenTaskSource }: TasksV
                           type="button"
                           onClick={() => setNewColumnColor(color)}
                           className={cn(
-                            "h-7 w-7 rounded-full border-2 bg-background transition-transform hover:scale-110",
-                            COLOR_DOTS[color],
-                            newColumnColor === color ? "ring-2 ring-ring/40" : "",
+                            "grid h-8 w-8 place-items-center rounded-md border border-transparent transition-transform hover:border-border hover:scale-110",
+                            newColumnColor === color ? "bg-muted" : "",
                           )}
                           aria-label={`Use ${color}`}
-                        />
+                        >
+                          <span
+                            className={cn(
+                              "h-4 w-4 rounded-full border-2 bg-background",
+                              COLOR_DOTS[color],
+                            )}
+                          />
+                        </button>
                       </TooltipTrigger>
                       <TooltipContent side="bottom">
                         {color[0].toUpperCase() + color.slice(1)}

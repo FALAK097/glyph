@@ -42,11 +42,11 @@ function SidebarSkillCollectionRow({
       type="button"
       onClick={() => onSelect?.(item.id)}
       className={cn(
-        "group flex w-full items-center justify-between rounded-md border-l-2 px-2 py-1.5 text-left transition-colors duration-100 ease-out",
+        "group flex w-full items-center justify-between rounded-md border-l-2 px-1 py-1.5 text-left transition-colors duration-100 ease-out",
         item.isActive ? cn(accent.active, accent.border) : cn("border-l-transparent", accent.hover),
       )}
     >
-      <span className="flex min-w-0 items-center gap-2">
+      <span className="flex min-w-0 items-center gap-1.5">
         <SkillSourceLogo
           className={accent.icon}
           iconKind={item.iconKind}

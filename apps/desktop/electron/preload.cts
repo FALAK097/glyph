@@ -184,6 +184,11 @@ const api = {
       WorkspaceSnapshot["tree"][number] | null
     >;
   },
+  getNoteBrowserEntries(targetPath: string | null) {
+    return ipcRenderer.invoke("sidebar:getNoteBrowserEntries", targetPath) as Promise<
+      import("../src/core/workspace.js").NoteBrowserEntry[]
+    >;
+  },
   getSettings() {
     return invokeWithRetry<AppSettings>("settings:get");
   },

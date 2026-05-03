@@ -53,6 +53,8 @@ body {
   --sidebar-accent-foreground: oklch(0.392 0.034 277);
   --sidebar-border: oklch(0.928 0.01 281);
   --sidebar-ring: oklch(0.642 0.16 279);
+  --footer: oklch(0.97 0.006 286);
+  --footer-foreground: oklch(0.332 0.028 277);
   --editor-link: oklch(0.602 0.171 279);
   --font-sans: Geist, sans-serif;
   --font-serif: Georgia, serif;
@@ -113,6 +115,8 @@ body {
   --sidebar-accent-foreground: oklch(0.947 0.009 286);
   --sidebar-border: oklch(0.31 0.014 282);
   --sidebar-ring: oklch(0.676 0.149 279);
+  --footer: oklch(0.245 0.013 286);
+  --footer-foreground: oklch(0.918 0.01 286);
   --editor-link: oklch(0.703 0.141 267);
   --radius: 0.5rem;
   --font-sans: Geist, sans-serif;
@@ -165,6 +169,8 @@ body {
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-footer: var(--footer);
+  --color-footer-foreground: var(--footer-foreground);
 
   --font-sans: Geist, sans-serif;
   --font-mono: Geist Mono, monospace;

@@ -30,7 +30,6 @@ import { TaskTokenHighlight } from "./tiptap-extension/task-token-highlight";
 import { Button } from "@/components/ui/button";
 
 import { EditorToolbar } from "./editor-toolbar";
-import { EditorFooter } from "./editor-footer";
 import { EditorDialogs } from "./editor-dialogs";
 import { useUpdateStateFlags } from "./update-notification";
 import { SlashCommand } from "@/core/slash-command";
@@ -1473,13 +1472,14 @@ export const MarkdownEditor = ({
           </div>
         </aside>
       ) : null}
-      <EditorFooter
+      {/* EditorFooter moved to AppFooter component in AppLayout */}
+      {/* <EditorFooter
         wordCount={wordCount}
         readingTime={readingTime}
         footerMetaLabel={footerMetaLabel}
         saveStateLabel={saveStateLabel}
         toast={toast}
-      />
+      /> */}
       <EditorDialogs
         activeDialog={activeDialog}
         onDialogChange={setActiveDialog}

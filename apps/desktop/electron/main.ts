@@ -25,6 +25,7 @@ import type {
   DialogKind,
   DirectoryNode,
   FileOpenResult,
+  NoteBrowserEntry,
   NoteLinkPreview,
   ResolvedLinkTarget,
   SearchResult,
@@ -977,6 +978,7 @@ function getDefaultSettings(): AppSettings {
     themeMode: "light",
     hiddenFiles: [],
     pinnedFiles: [],
+    noteFolderAppearances: {},
     shortcuts: DEFAULT_SHORTCUTS,
     sidebar: {
       items: [],
@@ -1327,6 +1329,11 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
     themeMode: isThemeMode(candidate.themeMode) ? candidate.themeMode : defaults.themeMode,
     hiddenFiles: Array.from(new Set(validHiddenFiles)),
     pinnedFiles: Array.from(new Set(validPinnedFiles)),
+    noteFolderAppearances:
+      typeof candidate.noteFolderAppearances === "object" &&
+      candidate.noteFolderAppearances !== null
+        ? (candidate.noteFolderAppearances as AppSettings["noteFolderAppearances"])
+        : defaults.noteFolderAppearances,
     shortcuts: Array.isArray(candidate.shortcuts)
       ? normalizeShortcutSettings(
           candidate.shortcuts.filter(
@@ -1728,6 +1735,92 @@ async function getSidebarNode(
   } catch {
     return null;
   }
+}
+
+function extractNoteTitle(content: string): string {
+  const lines = content.split("\n");
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("# ")) {
+      return trimmed.slice(2).trim() || "Untitled";
+    }
+  }
+  return "Untitled";
+}
+
+function extractNoteExcerpt(content: string): string {
+  const lines = content.split("\n");
+  const cleanLines: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed && !trimmed.startsWith("#")) {
+      cleanLines.push(trimmed.replace(/[*_`~\[\]()]/g, ""));
+      if (cleanLines.join(" ").length >= 150) break;
+    }
+  }
+  const excerpt = cleanLines.join(" ").slice(0, 150);
+  return excerpt.length === 150 ? excerpt + "..." : excerpt;
+}
+
+async function getAllMarkdownFiles(dirPath: string): Promise<string[]> {
+  const results: string[] = [];
+  try {
+    const entries = await fs.readdir(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dirPath, entry.name);
+      if (entry.isDirectory()) {
+        const subFiles = await getAllMarkdownFiles(fullPath);
+        results.push(...subFiles);
+      } else if (isMarkdownFile(entry.name)) {
+        results.push(fullPath);
+      }
+    }
+  } catch {
+    // Ignore inaccessible directories
+  }
+  return results;
+}
+
+async function getNoteBrowserEntries(targetPath: string | null): Promise<NoteBrowserEntry[]> {
+  const settings = await loadSettings();
+  const rootPath = targetPath || settings.defaultWorkspacePath;
+  if (!rootPath) return [];
+
+  try {
+    await fs.access(rootPath);
+  } catch {
+    return [];
+  }
+
+  const mdFiles = await getAllMarkdownFiles(rootPath);
+  const entries: NoteBrowserEntry[] = [];
+
+  for (const filePath of mdFiles) {
+    try {
+      const stats = await fs.stat(filePath);
+      const content = await fs.readFile(filePath, "utf8");
+      const normalizedContent = content.replace(/\r\n?/g, "\n");
+      const wordCount = normalizedContent.split(/\s+/).filter(Boolean).length;
+
+      entries.push({
+        path: filePath,
+        title: extractNoteTitle(normalizedContent),
+        excerpt: extractNoteExcerpt(normalizedContent),
+        modifiedAt: stats.mtime.toISOString(),
+        createdAt: stats.birthtime.toISOString(),
+        sizeBytes: stats.size,
+        wordCount,
+      });
+    } catch {
+      // Skip files that can't be read
+    }
+  }
+
+  return entries.sort((a, b) => {
+    const aTime = a.modifiedAt ? new Date(a.modifiedAt).getTime() : 0;
+    const bTime = b.modifiedAt ? new Date(b.modifiedAt).getTime() : 0;
+    return bTime - aTime;
+  });
 }
 
 async function buildDirectoryTree(dirPath: string): Promise<DirectoryNode[]> {
@@ -2331,6 +2424,10 @@ ipcMain.handle("tasks:unarchive", async (_event, input: unknown) => {
 
 ipcMain.handle("sidebar:getNode", async (_event, kind: "file" | "directory", targetPath: string) =>
   getSidebarNode(kind, targetPath),
+);
+
+ipcMain.handle("sidebar:getNoteBrowserEntries", async (_event, targetPath: string | null) =>
+  getNoteBrowserEntries(targetPath),
 );
 
 ipcMain.handle("workspace:openDocument", async () => {

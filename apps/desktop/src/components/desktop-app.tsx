@@ -26,6 +26,8 @@ import { useSkillLibraryController } from "@/hooks/use-skill-library-controller"
 import { AppLayout } from "./app-layout";
 import { CommandPalette } from "./command-palette";
 import { EditorToolbar } from "./editor-toolbar";
+import { NotesFooterContent } from "./notes-footer-content";
+import { SkillsFooterContent } from "./skills-footer-content";
 import { NoteConfirmDialog } from "./note-confirm-dialog";
 import { NoteRenameDialog } from "./note-rename-dialog";
 import { SettingsPanel } from "./settings-panel";
@@ -1655,10 +1657,22 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     />
   );
 
+  // ─── Footer generation ────────────────────────────────────────────────
+  const footerNode: React.ReactNode =
+    isAppBootstrapping ? null : isTasksSurfaceVisible ? null : isSkillSurfaceVisible ? (
+      <SkillsFooterContent
+        draftContent={skillsController.draftContent || ""}
+        saveStateLabel={skillsController.saveStateLabel}
+      />
+    ) : (
+      <NotesFooterContent draftContent={controller.draftContent || ""} />
+    );
+
   return (
     <TooltipProvider>
       <AppLayout
         toolbar={toolbarNode}
+        footer={footerNode}
         shouldCollapseSidebar={shouldCollapseSidebar}
         tree={controller.visibleSidebarNodes}
         activePath={viewerMode === "note" ? (controller.activeFile?.path ?? null) : null}

@@ -6,9 +6,11 @@ import type {
 } from "@/types/sidebar";
 
 import { Sidebar } from "./sidebar/sidebar";
+import { AppFooter } from "./app-footer";
 
 type AppLayoutProps = {
   toolbar?: React.ReactNode;
+  footer?: React.ReactNode;
   shouldCollapseSidebar: boolean;
   tree: SidebarTopLevelNode[];
   activePath: string | null;
@@ -42,6 +44,7 @@ type AppLayoutProps = {
 
 export function AppLayout({
   toolbar,
+  footer,
   shouldCollapseSidebar,
   tree,
   activePath,
@@ -114,8 +117,9 @@ export function AppLayout({
           />
         )}
 
-        <main className="relative h-full min-h-0 overflow-hidden bg-background">{children}</main>
+        <main className="relative flex-1 min-h-0 overflow-hidden bg-background">{children}</main>
       </div>
+      {footer ? <AppFooter content={footer} /> : null}
     </div>
   );
 }

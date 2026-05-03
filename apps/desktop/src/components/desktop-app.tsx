@@ -1677,7 +1677,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       onDismissUpdateAction={undefined}
       isManualReleaseButton={false}
       headerPaddingClass={noteHeaderPaddingClass}
-      browserPaneHeader={undefined}
       onOpenSettings={handleOpenSettings}
       headerAccessory={
         <TasksHeaderActions glyph={glyph} onOpenMarkdown={() => void handleOpenTasksMarkdown()} />
@@ -1746,18 +1745,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       onDismissUpdateAction={undefined}
       isManualReleaseButton={false}
       headerPaddingClass={noteHeaderPaddingClass}
-      browserPaneHeader={
-        activeSkillCollection ? (
-          <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
-            <p className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              {activeSkillCollection.label}
-            </p>
-            <p className="shrink-0 text-xs text-muted-foreground tabular-nums">
-              {activeSkillCollection.count} skills
-            </p>
-          </div>
-        ) : null
-      }
       onOpenSettings={handleOpenSettings}
       headerAccessory={null}
       content={skillsController.draftContent}
@@ -1836,18 +1823,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       onDismissUpdateAction={() => void controller.dismissUpdateNotification()}
       isManualReleaseButton={noteUpdateStateFlags.isManualReleaseButton}
       headerPaddingClass={noteHeaderPaddingClass}
-      browserPaneHeader={
-        activeNoteCollection ? (
-          <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
-            <p className="min-w-0 truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-              {activeNoteCollection.label}
-            </p>
-            <p className="shrink-0 text-xs text-muted-foreground tabular-nums">
-              {activeNoteCollection.count} notes
-            </p>
-          </div>
-        ) : null
-      }
       onOpenSettings={handleOpenSettings}
       headerAccessory={null}
       content={controller.draftContent}

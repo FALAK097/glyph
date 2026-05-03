@@ -249,12 +249,6 @@ export function EditorToolbar({
         ) : null}
       </div>
 
-      {browserPaneHeader ? (
-        <div className="flex h-8 w-[292px] shrink-0 items-center border-l border-border/50 pl-3">
-          {browserPaneHeader}
-        </div>
-      ) : null}
-
       {/* Center: search bar */}
       {shouldShowCommandPalette && onOpenCommandPalette ? (
         <div className="flex-1 flex justify-center px-2 min-w-0">

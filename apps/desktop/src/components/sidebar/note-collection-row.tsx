@@ -1,7 +1,17 @@
 import { createPortal } from "react-dom";
-import { memo, useCallback, useMemo, useState, type ComponentType } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { FileManagerLogo } from "@/components/file-manager-logo";
 import { cn } from "@/core/utils";
 import {
@@ -256,15 +266,31 @@ export const NoteCollectionRow = memo(function NoteCollectionRow({
   const accent = ACCENT_STYLES[item.accent];
   const [menuCoords, setMenuCoords] = useState<{ left: number; top: number } | null>(null);
   const closeMenu = useCallback(() => setMenuCoords(null), []);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!isRenaming) return;
+    const timer = window.setTimeout(() => {
+      renameInputRef.current?.focus();
+      renameInputRef.current?.select();
+    }, 50);
+    return () => window.clearTimeout(timer);
+  }, [isRenaming]);
+
+  const handleRenameSubmit = useCallback(() => {
+    const trimmed = renameValue.trim();
+    setIsRenaming(false);
+    if (!trimmed || trimmed === item.label) return;
+    onRenameFolder?.(item.sourcePath, trimmed);
+  }, [renameValue, item.label, item.sourcePath, onRenameFolder]);
 
   const handleRename = useCallback(() => {
-    const nextName = window.prompt("Rename folder", item.label);
-    if (!nextName?.trim()) {
-      return;
-    }
-
-    onRenameFolder?.(item.sourcePath, nextName.trim());
-  }, [item.label, item.sourcePath, onRenameFolder]);
+    closeMenu();
+    setRenameValue(item.label);
+    setIsRenaming(true);
+  }, [item.label, closeMenu]);
   const menuItems = useMemo(
     () => [
       {
@@ -375,9 +401,7 @@ export const NoteCollectionRow = memo(function NoteCollectionRow({
                     disabled={!menuItem.enabled}
                     onClick={() => {
                       menuItem.action();
-                      if (menuItem.label !== "Rename") {
-                        closeMenu();
-                      }
+                      closeMenu();
                     }}
                     className={cn(
                       "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent disabled:pointer-events-none disabled:opacity-40",
@@ -476,6 +500,42 @@ export const NoteCollectionRow = memo(function NoteCollectionRow({
             document.body,
           )
         : null}
+      <Dialog
+        open={isRenaming}
+        onOpenChange={(open) => {
+          if (!open) setIsRenaming(false);
+        }}
+      >
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Rename Folder</DialogTitle>
+            <DialogDescription>
+              Update <span className="font-semibold text-foreground">"{item.label}"</span> to a new
+              name.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            ref={renameInputRef}
+            aria-label="New folder name"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleRenameSubmit();
+              }
+            }}
+          />
+          <DialogFooter>
+            <Button variant="outline" type="button" onClick={() => setIsRenaming(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleRenameSubmit}>
+              Rename
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 });

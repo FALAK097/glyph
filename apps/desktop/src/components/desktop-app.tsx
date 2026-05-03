@@ -1,6 +1,6 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { getDisplayFileName, isSamePath, normalizePath } from "@/core/paths";
+import { getBaseName, getDisplayFileName, isSamePath, normalizePath } from "@/core/paths";
 import { buildNoteCollections, filterNoteBrowserEntries } from "@/core/note-collections";
 import { countGroupedSkills, groupSkillsForBrowse } from "@/core/skill-groups";
 import { getShortcutDisplay } from "@/core/shortcuts";
@@ -30,6 +30,7 @@ import { EditorToolbar } from "./editor-toolbar";
 import { NotesFooterContent } from "./notes-footer-content";
 import { NoteConfirmDialog } from "./note-confirm-dialog";
 import { NoteRenameDialog } from "./note-rename-dialog";
+import { DeleteDialog } from "./sidebar/sidebar-delete-dialogs";
 import { SettingsPanel } from "./settings-panel";
 import { SkillView } from "./skills/skill-view";
 import { SkillsBrowserPane } from "./skills/skills-browser-pane";
@@ -151,6 +152,11 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   };
   const [pendingNoteRename, setPendingNoteRename] = useState<PendingNoteRename | null>(null);
   const [pendingNoteConfirm, setPendingNoteConfirm] = useState<PendingNoteConfirm | null>(null);
+  const [pendingFolderDelete, setPendingFolderDelete] = useState<{
+    path: string;
+    name: string;
+  } | null>(null);
+  const [noteBrowserRefreshNonce, setNoteBrowserRefreshNonce] = useState(0);
   const [paletteSkillResultIds, setPaletteSkillResultIds] = useState<string[] | null>(null);
   const [resolvedPaletteSkillQuery, setResolvedPaletteSkillQuery] = useState("");
   const [skillInitialScrollTop, setSkillInitialScrollTop] = useState(0);
@@ -519,7 +525,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     return () => {
       isCancelled = true;
     };
-  }, [activeNoteCollection, glyph, noteCollections]);
+  }, [activeNoteCollection, glyph, noteCollections, noteBrowserRefreshNonce]);
 
   useEffect(() => {
     if (
@@ -780,6 +786,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
 
     await controller.handleRenameFile(pendingNoteRename.path, nextName);
     setPendingNoteRename(null);
+    setNoteBrowserRefreshNonce((n) => n + 1);
   }, [controller, pendingNoteRename]);
 
   const handleOpenCurrentNoteConfirm = useCallback(
@@ -806,11 +813,21 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     if (pendingNoteConfirm.kind === "remove") {
       await controller.handleRemoveFileFromGlyph(pendingNoteConfirm.path);
     } else {
+      // Optimistically remove from notes browser if present
+      setNoteBrowserEntries((current) =>
+        current.filter((item) => !isSamePath(item.path, pendingNoteConfirm.path)),
+      );
       await controller.handleDeleteFile(pendingNoteConfirm.path);
     }
 
     setPendingNoteConfirm(null);
   }, [controller, pendingNoteConfirm]);
+
+  const handleConfirmFolderDelete = useCallback(async () => {
+    if (!pendingFolderDelete) return;
+    await controller.handleDeleteFolder(pendingFolderDelete.path);
+    setPendingFolderDelete(null);
+  }, [controller, pendingFolderDelete]);
 
   const handleCopyCurrentNoteMarkdown = useCallback(async () => {
     await copyText(controller.draftContent);
@@ -1887,11 +1904,16 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         onOpenFile={(filePath) => void handleOpenNoteFile(filePath)}
         onOpenCommandPalette={handleOpenCommandPalette}
         onDeleteFile={controller.handleDeleteFile}
-        onDeleteFolder={(folderPath) => void controller.handleDeleteFolder(folderPath)}
+        onDeleteFolder={(folderPath) => {
+          setPendingFolderDelete({ path: folderPath, name: getBaseName(folderPath) });
+        }}
         onRemoveFileFromGlyph={(filePath) => void controller.handleRemoveFileFromGlyph(filePath)}
         onTogglePinnedFile={(filePath) => void controller.togglePinnedFile(filePath)}
         onRemoveFolder={controller.handleRemoveFolder}
-        onRenameFile={controller.handleRenameFile}
+        onRenameFile={async (filePath, newName) => {
+          await controller.handleRenameFile(filePath, newName);
+          setNoteBrowserRefreshNonce((n) => n + 1);
+        }}
         onRenameFolder={(folderPath, newName) =>
           void controller.handleRenameFolder(folderPath, newName)
         }
@@ -2038,10 +2060,11 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                     });
                   }}
                   onDeleteNote={(entry) => {
-                    setNoteBrowserEntries((current) =>
-                      current.filter((item) => !isSamePath(item.path, entry.path)),
-                    );
-                    void controller.handleDeleteFile(entry.path);
+                    setPendingNoteConfirm({
+                      kind: "delete",
+                      path: entry.path,
+                      name: entry.title,
+                    });
                   }}
                 />
               ) : null
@@ -2092,6 +2115,25 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         pending={pendingNoteConfirm}
         onDismiss={() => setPendingNoteConfirm(null)}
         onConfirm={() => void handleConfirmCurrentNoteAction()}
+      />
+      <DeleteDialog
+        open={Boolean(pendingFolderDelete)}
+        onOpenChange={(open) => {
+          if (!open) setPendingFolderDelete(null);
+        }}
+        title="Delete Folder"
+        description={
+          pendingFolderDelete ? (
+            <>
+              Are you sure you want to permanently delete{" "}
+              <span className="font-semibold text-foreground">
+                &ldquo;{pendingFolderDelete.name}&rdquo;
+              </span>{" "}
+              and all its contents? This action cannot be undone.
+            </>
+          ) : null
+        }
+        onConfirm={() => void handleConfirmFolderDelete()}
       />
     </TooltipProvider>
   );

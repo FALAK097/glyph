@@ -6,7 +6,6 @@ import { getDisplayFileName, normalizePath } from "@/core/paths";
 import { cn } from "@/core/utils";
 
 import type { NoteShortcutItem } from "@/types/navigation";
-import type { SidebarRemoveTarget } from "@/types/sidebar";
 
 import { PinIcon } from "@/components/icons";
 
@@ -17,11 +16,6 @@ type SidebarShortcutRowProps = {
   item: NoteShortcutItem;
   onOpenFile: (filePath: string) => void;
   onTogglePinnedFile?: (filePath: string) => void;
-  onDeleteFile: (filePath: string) => void;
-  onRequestRemoveFile?: (file: SidebarRemoveTarget) => void;
-  onRenameFile: (filePath: string, newName: string) => void;
-  onRevealInFinder?: (filePath: string) => void;
-  revealLabel?: string;
 };
 
 export const SidebarShortcutRow = memo(function SidebarShortcutRow({
@@ -29,11 +23,6 @@ export const SidebarShortcutRow = memo(function SidebarShortcutRow({
   item,
   onOpenFile,
   onTogglePinnedFile,
-  onDeleteFile: _onDeleteFile,
-  onRequestRemoveFile: _onRequestRemoveFile,
-  onRenameFile: _onRenameFile,
-  onRevealInFinder: _onRevealInFinder,
-  revealLabel: _revealLabel = "Reveal in Finder",
 }: SidebarShortcutRowProps) {
   const isActive = normalizePathKey(activePath ?? "") === normalizePathKey(item.path);
   const displayFileName = useMemo(() => {
@@ -101,11 +90,6 @@ type SidebarShortcutListProps = {
   items: NoteShortcutItem[];
   onOpenFile: (filePath: string) => void;
   onTogglePinnedFile?: (filePath: string) => void;
-  onDeleteFile: (filePath: string) => void;
-  onRequestRemoveFile?: (file: SidebarRemoveTarget) => void;
-  onRenameFile: (filePath: string, newName: string) => void;
-  onRevealInFinder?: (filePath: string) => void;
-  revealLabel?: string;
 };
 
 export const SidebarShortcutList = memo(function SidebarShortcutList({
@@ -113,11 +97,6 @@ export const SidebarShortcutList = memo(function SidebarShortcutList({
   items,
   onOpenFile,
   onTogglePinnedFile,
-  onDeleteFile,
-  onRequestRemoveFile,
-  onRenameFile,
-  onRevealInFinder,
-  revealLabel,
 }: SidebarShortcutListProps) {
   if (items.length === 0) {
     return null;
@@ -132,11 +111,6 @@ export const SidebarShortcutList = memo(function SidebarShortcutList({
           item={item}
           onOpenFile={onOpenFile}
           onTogglePinnedFile={onTogglePinnedFile}
-          onDeleteFile={onDeleteFile}
-          onRequestRemoveFile={onRequestRemoveFile}
-          onRenameFile={onRenameFile}
-          onRevealInFinder={onRevealInFinder}
-          revealLabel={revealLabel}
         />
       ))}
     </div>

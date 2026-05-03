@@ -927,6 +927,9 @@ export const useDesktopAppController = (
   const createNote = useCallback(
     async (targetDir?: string | null) => {
       let baseDir: string | null = targetDir ? normalizePath(targetDir) : null;
+      if (baseDir && /\.(md|mdx|markdown)$/i.test(baseDir)) {
+        baseDir = getDirName(baseDir);
+      }
 
       // Prefer the last created folder so a new note lands inside it.
       // This works regardless of workspace mode — the folder path is always valid.
@@ -1016,6 +1019,9 @@ export const useDesktopAppController = (
   const createFolder = useCallback(
     async (targetDir?: string | null) => {
       let baseDir: string | null = targetDir ? normalizePath(targetDir) : null;
+      if (baseDir && /\.(md|mdx|markdown)$/i.test(baseDir)) {
+        baseDir = getDirName(baseDir);
+      }
 
       if (!baseDir && isWorkspaceMode && rootPath) {
         const activeFileDir = activeFile ? getDirName(activeFile.path) : null;

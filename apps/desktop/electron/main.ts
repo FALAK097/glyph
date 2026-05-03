@@ -13,6 +13,7 @@ import {
 import electronUpdater from "electron-updater";
 import { watch } from "chokidar";
 import fs from "node:fs/promises";
+import type { Stats } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createSkillsService } from "./skills-service.js";
@@ -1829,17 +1830,6 @@ async function getSidebarNode(
   }
 }
 
-function extractNoteTitle(content: string): string {
-  const lines = content.split("\n");
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("# ")) {
-      return trimmed.slice(2).trim() || "Untitled";
-    }
-  }
-  return "Untitled";
-}
-
 function getDisplayMarkdownFileName(filePath: string): string {
   const fileName = path.basename(filePath).trim();
   const displayName = fileName.replace(/\.(md|mdx|markdown)$/i, "");
@@ -1848,7 +1838,7 @@ function getDisplayMarkdownFileName(filePath: string): string {
 
 function serializeNoteExcerptLine(line: string): string {
   return line
-    .replace(/\\([\\`*_{}\[\]()#+\-.!>])/g, "$1")
+    .replace(/\\([\\`*_{}[\]()#+\-.!>])/g, "$1")
     .replace(/<!--[\s\S]*?-->/g, " ")
     .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
@@ -1925,18 +1915,53 @@ async function getAllMarkdownFiles(dirPath: string): Promise<string[]> {
   return results;
 }
 
+function isPathWithinRoot(targetPath: string, rootPath: string): boolean {
+  const resolvedTarget = normalizePathForComparison(path.resolve(targetPath));
+  const resolvedRoot = normalizePathForComparison(path.resolve(rootPath));
+  if (resolvedTarget === resolvedRoot) {
+    return true;
+  }
+
+  const relative = path.relative(resolvedRoot, resolvedTarget);
+  return relative.length > 0 && !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
+async function resolveAllowedNoteBrowserPath(
+  targetPath: string | null,
+  settings: AppSettings,
+): Promise<string | null> {
+  const fallbackPath = targetPath ?? settings.defaultWorkspacePath;
+  if (!fallbackPath) return null;
+
+  const normalizedTarget = path.resolve(path.normalize(fallbackPath));
+  const allowedRoots = [
+    settings.defaultWorkspacePath,
+    activeWorkspaceRoot,
+    ...settings.sidebar.items.map((item) => item.path),
+  ].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+
+  const isAllowed = allowedRoots.some((rootPath) => isPathWithinRoot(normalizedTarget, rootPath));
+  return isAllowed ? normalizedTarget : null;
+}
+
 async function getNoteBrowserEntries(targetPath: string | null): Promise<NoteBrowserEntry[]> {
   const settings = await loadSettings();
-  const rootPath = targetPath || settings.defaultWorkspacePath;
+  const rootPath = await resolveAllowedNoteBrowserPath(targetPath, settings);
   if (!rootPath) return [];
 
+  let rootStats: Stats;
   try {
-    await fs.access(rootPath);
+    rootStats = await fs.stat(rootPath);
   } catch {
     return [];
   }
 
-  const mdFiles = await getAllMarkdownFiles(rootPath);
+  const mdFiles =
+    rootStats.isFile() && isMarkdownFile(rootPath)
+      ? [rootPath]
+      : rootStats.isDirectory()
+        ? await getAllMarkdownFiles(rootPath)
+        : [];
   const entries: NoteBrowserEntry[] = [];
 
   for (const filePath of mdFiles) {
@@ -1965,6 +1990,12 @@ async function getNoteBrowserEntries(targetPath: string | null): Promise<NoteBro
     const bTime = b.modifiedAt ? new Date(b.modifiedAt).getTime() : 0;
     return bTime - aTime;
   });
+}
+
+async function getNoteBrowserEntriesBatch(
+  targetPaths: Array<string | null>,
+): Promise<NoteBrowserEntry[][]> {
+  return Promise.all(targetPaths.map((targetPath) => getNoteBrowserEntries(targetPath)));
 }
 
 async function buildDirectoryTree(dirPath: string): Promise<DirectoryNode[]> {
@@ -2578,6 +2609,11 @@ ipcMain.handle("sidebar:getNode", async (_event, kind: "file" | "directory", tar
 
 ipcMain.handle("sidebar:getNoteBrowserEntries", async (_event, targetPath: string | null) =>
   getNoteBrowserEntries(targetPath),
+);
+
+ipcMain.handle(
+  "sidebar:getNoteBrowserEntriesBatch",
+  async (_event, targetPaths: Array<string | null>) => getNoteBrowserEntriesBatch(targetPaths),
 );
 
 ipcMain.handle("workspace:openDocument", async () => {

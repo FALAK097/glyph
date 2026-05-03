@@ -1058,11 +1058,7 @@ test("delete file removes it from the sidebar", async ({}, testInfo) => {
       .first();
     await expect(noteButton).toBeVisible({ timeout: 3000 });
 
-    // Hover the note row to reveal the "..." (Note actions) menu button, then click it
-    await noteButton.hover();
-    const noteActionsBtn = glyph.window.getByRole("button", { name: "Note actions" }).first();
-    await noteActionsBtn.click({ force: true });
-    // Context menu items render as plain <button> elements (role="button"), not menuitem
+    await selectPaletteItem(glyph.window, "delete current note", /delete current note/i);
     const deleteButton = glyph.window.getByRole("button", { name: /^Delete$/ });
     await expect(deleteButton).toBeVisible();
     await deleteButton.click();
@@ -1089,16 +1085,9 @@ test("rename file updates its name in the sidebar", async ({}, testInfo) => {
       .first();
     await expect(noteButton).toBeVisible({ timeout: 3000 });
 
-    // Hover to reveal the "..." button, then click → Rename
-    await noteButton.hover();
-    const noteActionsBtn = glyph.window.getByRole("button", { name: "Note actions" }).first();
-    await noteActionsBtn.click({ force: true });
-    const renameButton = glyph.window.getByRole("button", { name: /^Rename$/ });
-    await expect(renameButton).toBeVisible();
-    await renameButton.click();
+    await selectPaletteItem(glyph.window, "rename current note", /rename current note/i);
 
-    // An inline input appears — it has no aria-label, select by type="text"
-    const renameInput = glyph.window.locator('input[type="text"]').last();
+    const renameInput = glyph.window.getByLabel("New note name");
     await expect(renameInput).toBeVisible();
     await renameInput.fill("my-renamed-note");
     await glyph.window.keyboard.press("Enter");

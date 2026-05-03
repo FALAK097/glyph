@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 
 /**
  * Returns a ref to attach to any horizontally-scrollable container.
@@ -10,7 +10,12 @@ import { useEffect, useRef } from "react";
  * - When `disabledRef` is truthy (e.g. during a drag operation) the handler
  *   is a no-op so it doesn't interfere with drag-and-drop.
  */
-export function useHorizontalScroll<T extends HTMLElement>(disabledRef?: React.RefObject<boolean>) {
+type BooleanRef = RefObject<boolean> | { current: boolean };
+
+export function useHorizontalScroll<T extends HTMLElement>(
+  disabledRef?: BooleanRef,
+  refreshKey?: unknown,
+) {
   const ref = useRef<T>(null);
 
   useEffect(() => {
@@ -40,7 +45,7 @@ export function useHorizontalScroll<T extends HTMLElement>(disabledRef?: React.R
 
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [disabledRef]);
+  }, [disabledRef, refreshKey]);
 
   return ref;
 }

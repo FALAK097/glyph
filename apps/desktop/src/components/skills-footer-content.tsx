@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { calculateDocumentMetrics } from "@/core/document-metrics";
+import { parseSkillDocument } from "@/core/skills";
 import { FooterStats } from "./footer-stats";
 
 type SkillsFooterContentProps = {
@@ -8,7 +9,10 @@ type SkillsFooterContentProps = {
 };
 
 export function SkillsFooterContent({ draftContent, saveStateLabel }: SkillsFooterContentProps) {
-  const metrics = useMemo(() => calculateDocumentMetrics(draftContent), [draftContent]);
+  const metrics = useMemo(
+    () => calculateDocumentMetrics(parseSkillDocument(draftContent).body),
+    [draftContent],
+  );
 
   return (
     <FooterStats

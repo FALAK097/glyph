@@ -160,6 +160,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const paletteFilterQuery = controller.paletteQuery.trim().toLowerCase();
   const shouldCollapseSidebar =
     controller.isSidebarCollapsed || (viewerMode === "note" && controller.isFocusMode);
+  const shouldCollapseBrowserPane = viewerMode === "note" && controller.isFocusMode;
   const allSkills = skillsController.snapshot?.skills ?? [];
   const globalSkills = useMemo(
     () => allSkills.filter((skill) => skill.sourceId === "agents-global"),
@@ -406,7 +407,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     (collectionPath: string, accent: NoteCollectionAccentKey) => {
       const currentAppearances = controller.settings?.noteFolderAppearances ?? {};
       const nextAppearance = {
-        ...(currentAppearances[collectionPath] ?? {}),
+        ...currentAppearances[collectionPath],
         accent,
       };
       void controller.saveSettings({
@@ -423,7 +424,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     (collectionPath: string, icon: NoteCollectionIconKey) => {
       const currentAppearances = controller.settings?.noteFolderAppearances ?? {};
       const nextAppearance = {
-        ...(currentAppearances[collectionPath] ?? {}),
+        ...currentAppearances[collectionPath],
         icon,
       };
       void controller.saveSettings({
@@ -491,7 +492,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     let isCancelled = false;
 
     setIsNoteBrowserLoading(true);
-    void Promise.all(targetPaths.map((targetPath) => glyph.getNoteBrowserEntries(targetPath)))
+    void glyph
+      .getNoteBrowserEntriesBatch(targetPaths)
       .then((entryGroups) => {
         if (isCancelled) {
           return;
@@ -1998,7 +2000,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         ) : (
           <AppSurfaceShell
             browserPane={
-              activeNoteCollection ? (
+              shouldCollapseBrowserPane ? undefined : activeNoteCollection ? (
                 <NotesBrowserPane
                   activePath={controller.activeFile?.path ?? null}
                   entries={visibleNoteBrowserEntries}
@@ -2036,11 +2038,10 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                     });
                   }}
                   onDeleteNote={(entry) => {
-                    setPendingNoteConfirm({
-                      kind: "delete",
-                      path: entry.path,
-                      name: entry.title,
-                    });
+                    setNoteBrowserEntries((current) =>
+                      current.filter((item) => !isSamePath(item.path, entry.path)),
+                    );
+                    void controller.handleDeleteFile(entry.path);
                   }}
                 />
               ) : null

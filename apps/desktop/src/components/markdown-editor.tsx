@@ -38,7 +38,7 @@ import { TableControls } from "./table-controls";
 import { FindPanel } from "./find-panel";
 import { LinkPreview } from "./link-preview";
 import { ImageControls } from "./image-controls";
-import { ArrowUpIcon, OutlineIcon } from "./icons";
+import { ArrowUpIcon, CheckCircleIcon, OutlineIcon } from "./icons";
 import {
   clamp,
   collectEditorOutline,
@@ -211,10 +211,6 @@ export const MarkdownEditor = ({
   editorFocusRequest,
   findRequest,
   showToolbar = true,
-  saveStateLabel,
-  footerMetaLabel,
-  wordCount,
-  readingTime,
   onChange,
   onToggleSidebar,
   isSidebarCollapsed,
@@ -1472,14 +1468,25 @@ export const MarkdownEditor = ({
           </div>
         </aside>
       ) : null}
-      {/* EditorFooter moved to AppFooter component in AppLayout */}
-      {/* <EditorFooter
-        wordCount={wordCount}
-        readingTime={readingTime}
-        footerMetaLabel={footerMetaLabel}
-        saveStateLabel={saveStateLabel}
-        toast={toast}
-      /> */}
+      {toast ? (
+        <div
+          className="fixed bottom-12 right-4 z-50 flex max-w-[360px] items-start gap-3 rounded-lg border border-border bg-card px-4 py-3 shadow-lg"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="mt-0.5 text-foreground" aria-hidden="true">
+            <CheckCircleIcon size={16} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="m-0 text-sm font-medium leading-snug text-foreground">{toast.title}</p>
+            {toast.description ? (
+              <p className="m-0 mt-0.5 break-words text-xs leading-snug text-muted-foreground">
+                {toast.description}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       <EditorDialogs
         activeDialog={activeDialog}
         onDialogChange={setActiveDialog}

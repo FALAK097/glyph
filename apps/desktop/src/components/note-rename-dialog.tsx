@@ -34,17 +34,14 @@ export function NoteRenameDialog({
 }: NoteRenameDialogProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const isOpen = pending !== null;
-  const prevOpenRef = useRef(false);
 
   useEffect(() => {
-    const justOpened = isOpen && !prevOpenRef.current;
-    prevOpenRef.current = isOpen;
-    if (justOpened) {
-      const timer = setTimeout(() => {
+    if (isOpen) {
+      const timer = window.setTimeout(() => {
         inputRef.current?.focus();
         inputRef.current?.select();
       }, 50);
-      return () => clearTimeout(timer);
+      return () => window.clearTimeout(timer);
     }
   }, [isOpen]);
 

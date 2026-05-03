@@ -1,31 +1,13 @@
-import { useCallback, useMemo, useState } from "react";
-
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getShortcutDisplay } from "@/core/shortcuts";
 import { cn } from "@/core/utils";
 
-import type {
-  DragPosition,
-  SidebarDeleteTarget,
-  SidebarProps,
-  SidebarRemoveTarget,
-  SidebarSkillCollectionItem,
-} from "@/types/sidebar";
+import type { SidebarProps, SidebarSkillCollectionItem } from "@/types/sidebar";
 
 import { SkillSourceLogo } from "@/components/skills/skill-source-logo";
 import { ChevronRightIcon, PlusIcon, FolderPlusIcon } from "@/components/icons";
 import { getSkillSourceAccent } from "@/core/skill-source-accents";
 import { NoteCollectionRow } from "./note-collection-row";
-import { SidebarTreeNode } from "./sidebar-tree-node";
 import { SidebarShortcutList } from "./sidebar-shortcut-row";
 
 function SidebarSkillCollectionRow({
@@ -92,16 +74,11 @@ export const Sidebar = ({
   onSelectNoteCollection,
   onSelectSkillCollection,
   onOpenFile,
-  onDeleteFile,
   onDeleteFolder,
-  onRemoveFileFromGlyph,
   onTogglePinnedFile,
   onRemoveFolder,
-  onRenameFile,
   onRenameFolder,
   onRevealInFinder,
-  onToggleFolder,
-  onReorderNodes,
   onCreateNote,
   onCreateFolder,
   onCreateNoteInCollection,
@@ -109,61 +86,9 @@ export const Sidebar = ({
   onChangeNoteCollectionAccent,
   onChangeNoteCollectionIcon,
 }: SidebarProps) => {
-  const [nodeToDelete, setNodeToDelete] = useState<SidebarDeleteTarget | null>(null);
-  const [folderToDelete, setFolderToDelete] = useState<SidebarDeleteTarget | null>(null);
-  const [fileToRemove, setFileToRemove] = useState<SidebarRemoveTarget | null>(null);
-  const [folderToRemove, setFolderToRemove] = useState<SidebarRemoveTarget | null>(null);
   const pinnedList = pinnedNotes ?? [];
   const revealLabel = folderRevealLabel ?? openInFolderLabel ?? "Open in Finder";
   const hasActiveSkillCollection = Boolean(skillCollections?.some((item) => item.isActive));
-  const pinnedPaths = useMemo(() => pinnedList.map((note) => note.path), [pinnedList]);
-  const handleRequestRemoveFolder = useCallback((folder: SidebarRemoveTarget) => {
-    setFolderToRemove(folder);
-  }, []);
-  const handleRequestDeleteFolder = useCallback((folder: SidebarDeleteTarget) => {
-    setFolderToDelete(folder);
-  }, []);
-  const handleRequestDelete = useCallback((node: SidebarDeleteTarget) => {
-    setNodeToDelete(node);
-  }, []);
-  const handleDropNode = useCallback(
-    async (sourcePath: string, targetPath: string, position: DragPosition) => {
-      if (!sourcePath || sourcePath === targetPath) {
-        return;
-      }
-
-      await onReorderNodes(sourcePath, targetPath, position);
-    },
-    [onReorderNodes],
-  );
-
-  const handleConfirmDelete = () => {
-    if (nodeToDelete) {
-      onDeleteFile(nodeToDelete.path);
-    }
-    setNodeToDelete(null);
-  };
-
-  const handleConfirmDeleteFolder = () => {
-    if (folderToDelete) {
-      onDeleteFolder?.(folderToDelete.path);
-    }
-    setFolderToDelete(null);
-  };
-
-  const handleConfirmRemoveFile = () => {
-    if (fileToRemove) {
-      onRemoveFileFromGlyph?.(fileToRemove.path);
-    }
-    setFileToRemove(null);
-  };
-
-  const handleConfirmRemove = () => {
-    if (folderToRemove) {
-      onRemoveFolder(folderToRemove.path);
-    }
-    setFolderToRemove(null);
-  };
 
   if (isCollapsed) {
     return null;
@@ -297,15 +222,6 @@ export const Sidebar = ({
                     items={pinnedList}
                     onOpenFile={onOpenFile}
                     onTogglePinnedFile={onTogglePinnedFile}
-                    onRequestRemoveFile={setFileToRemove}
-                    onDeleteFile={(filePath) => {
-                      const segments = filePath.replace(/\\/g, "/").split("/");
-                      const name = segments.pop() ?? filePath;
-                      setNodeToDelete({ path: filePath, name });
-                    }}
-                    onRenameFile={onRenameFile}
-                    onRevealInFinder={onRevealInFinder}
-                    revealLabel={revealLabel}
                   />
                 </div>
               ) : null}
@@ -342,127 +258,6 @@ export const Sidebar = ({
           ) : null}
         </div>
       </div>
-
-      {nodeToDelete ? (
-        <Dialog
-          open={true}
-          onOpenChange={(open) => {
-            if (!open) {
-              setNodeToDelete(null);
-            }
-          }}
-        >
-          <DialogContent className="sm:max-w-[420px]">
-            <DialogHeader>
-              <DialogTitle>Delete Note</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to delete{" "}
-                <span className="font-semibold text-foreground">"{nodeToDelete.name}"</span>? This
-                action cannot be undone.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" type="button" onClick={() => setNodeToDelete(null)}>
-                Cancel
-              </Button>
-              <Button variant="destructive" type="button" onClick={handleConfirmDelete}>
-                Delete
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      ) : null}
-
-      {folderToDelete ? (
-        <Dialog
-          open={true}
-          onOpenChange={(open) => {
-            if (!open) {
-              setFolderToDelete(null);
-            }
-          }}
-        >
-          <DialogContent className="sm:max-w-[420px]">
-            <DialogHeader>
-              <DialogTitle>Delete Folder</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to permanently delete{" "}
-                <span className="font-semibold text-foreground">"{folderToDelete.name}"</span> and
-                all its contents? This action cannot be undone.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" type="button" onClick={() => setFolderToDelete(null)}>
-                Cancel
-              </Button>
-              <Button variant="destructive" type="button" onClick={handleConfirmDeleteFolder}>
-                Delete
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      ) : null}
-
-      {folderToRemove ? (
-        <Dialog
-          open={true}
-          onOpenChange={(open) => {
-            if (!open) {
-              setFolderToRemove(null);
-            }
-          }}
-        >
-          <DialogContent className="sm:max-w-[420px]">
-            <DialogHeader>
-              <DialogTitle>Remove Folder From Glyph</DialogTitle>
-              <DialogDescription>
-                Remove{" "}
-                <span className="font-semibold text-foreground">"{folderToRemove.name}"</span> from
-                Glyph? This only removes it from the sidebar and does not delete anything from your
-                device.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" type="button" onClick={() => setFolderToRemove(null)}>
-                Cancel
-              </Button>
-              <Button type="button" onClick={handleConfirmRemove}>
-                Remove
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      ) : null}
-
-      {fileToRemove ? (
-        <Dialog
-          open={true}
-          onOpenChange={(open) => {
-            if (!open) {
-              setFileToRemove(null);
-            }
-          }}
-        >
-          <DialogContent className="sm:max-w-[420px]">
-            <DialogHeader>
-              <DialogTitle>Remove Note From Glyph</DialogTitle>
-              <DialogDescription>
-                Remove <span className="font-semibold text-foreground">"{fileToRemove.name}"</span>{" "}
-                from Glyph? This only hides it from the app and does not delete the file from your
-                device.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" type="button" onClick={() => setFileToRemove(null)}>
-                Cancel
-              </Button>
-              <Button type="button" onClick={handleConfirmRemoveFile}>
-                Remove
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      ) : null}
     </aside>
   );
 };

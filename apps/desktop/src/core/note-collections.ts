@@ -75,6 +75,7 @@ type CollectionBuildInput = {
 };
 
 const normalizeCollectionKey = (value: string) => normalizePath(value).replace(/\/+$/, "");
+const toCollectionLookupKey = (value: string) => normalizeCollectionKey(value).toLowerCase();
 
 const createHash = (value: string) => {
   let hash = 0;
@@ -186,9 +187,10 @@ export function buildNoteCollections(
         : collection.path;
       const appearance = getNoteCollectionAppearance(appearanceSourcePath, appearances);
       const normalizedCollectionPath = normalizeCollectionKey(collection.path);
+      const collectionLookupKey = toCollectionLookupKey(collection.path);
 
       return {
-        id: normalizedCollectionPath,
+        id: collectionLookupKey,
         label: collection.path.endsWith("/.root") ? "Root Notes" : getCollectionLabel(collection),
         path: normalizedCollectionPath,
         sourcePath: normalizeCollectionKey(collection.sourcePath),
@@ -198,7 +200,7 @@ export function buildNoteCollections(
         accent: appearance.accent,
         icon: appearance.icon,
         isActive: activeCollectionPath
-          ? normalizeCollectionKey(activeCollectionPath) === normalizedCollectionPath
+          ? toCollectionLookupKey(activeCollectionPath) === collectionLookupKey
           : false,
         workspacePath: collection.workspacePath,
         isRootCollection: collection.isRootCollection,
@@ -247,12 +249,12 @@ export function filterNoteBrowserEntries(
   collection: Pick<NoteCollectionItem, "notePaths"> | null,
 ) {
   const notePathSet = collection
-    ? new Set(collection.notePaths.map((path) => normalizePath(path)))
+    ? new Set(collection.notePaths.map((path) => normalizePath(path).toLowerCase()))
     : null;
   const normalizedQuery = query.trim().toLowerCase();
 
   return entries.filter((entry) => {
-    if (notePathSet && !notePathSet.has(normalizePath(entry.path))) {
+    if (notePathSet && !notePathSet.has(normalizePath(entry.path).toLowerCase())) {
       return false;
     }
 

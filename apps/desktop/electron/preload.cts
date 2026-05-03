@@ -189,6 +189,11 @@ const api = {
       import("../src/core/workspace.js").NoteBrowserEntry[]
     >;
   },
+  getNoteBrowserEntriesBatch(targetPaths: Array<string | null>) {
+    return ipcRenderer.invoke("sidebar:getNoteBrowserEntriesBatch", targetPaths) as Promise<
+      import("../src/core/workspace.js").NoteBrowserEntry[][]
+    >;
+  },
   getSettings() {
     return invokeWithRetry<AppSettings>("settings:get");
   },

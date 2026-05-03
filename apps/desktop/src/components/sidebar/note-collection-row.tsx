@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { useState, type ComponentType } from "react";
+import { memo, useCallback, useMemo, useState, type ComponentType } from "react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { FileManagerLogo } from "@/components/file-manager-logo";
@@ -239,7 +239,7 @@ type NoteCollectionRowProps = {
   revealLabel?: string;
 };
 
-export function NoteCollectionRow({
+export const NoteCollectionRow = memo(function NoteCollectionRow({
   item,
   onSelect,
   onCreateNote,
@@ -255,55 +255,68 @@ export function NoteCollectionRow({
   const Icon = ICONS[item.icon];
   const accent = ACCENT_STYLES[item.accent];
   const [menuCoords, setMenuCoords] = useState<{ left: number; top: number } | null>(null);
-  const closeMenu = () => setMenuCoords(null);
+  const closeMenu = useCallback(() => setMenuCoords(null), []);
 
-  const handleRename = () => {
+  const handleRename = useCallback(() => {
     const nextName = window.prompt("Rename folder", item.label);
     if (!nextName?.trim()) {
       return;
     }
 
     onRenameFolder?.(item.sourcePath, nextName.trim());
-  };
-  const menuItems = [
-    {
-      label: "New note here",
-      icon: <PlusIcon size={14} className="opacity-70" />,
-      action: () => onCreateNote?.(item.sourcePath),
-      enabled: Boolean(onCreateNote),
-    },
-    {
-      label: "New folder here",
-      icon: <FolderPlusIcon size={14} className="opacity-70" />,
-      action: () => onCreateFolder?.(item.sourcePath),
-      enabled: Boolean(onCreateFolder),
-    },
-    {
-      label: "Rename",
-      icon: <PencilIcon size={14} className="opacity-70" />,
-      action: handleRename,
-      enabled: Boolean(onRenameFolder),
-    },
-    {
-      label: revealLabel,
-      icon: <FileManagerLogo label={revealLabel} size={14} className="opacity-70" />,
-      action: () => onRevealInFinder?.(item.sourcePath),
-      enabled: Boolean(onRevealInFinder),
-    },
-    {
-      label: "Remove",
-      icon: <XIcon size={14} className="opacity-70" />,
-      action: () => onRemoveFolder?.(item.sourcePath),
-      enabled: Boolean(onRemoveFolder),
-    },
-    {
-      label: "Delete",
-      icon: <TrashIcon size={14} className="opacity-70" />,
-      action: () => onDeleteFolder?.(item.sourcePath),
-      enabled: Boolean(onDeleteFolder),
-      destructive: true,
-    },
-  ];
+  }, [item.label, item.sourcePath, onRenameFolder]);
+  const menuItems = useMemo(
+    () => [
+      {
+        label: "New note here",
+        icon: <PlusIcon size={14} className="opacity-70" />,
+        action: () => onCreateNote?.(item.sourcePath),
+        enabled: Boolean(onCreateNote),
+      },
+      {
+        label: "New folder here",
+        icon: <FolderPlusIcon size={14} className="opacity-70" />,
+        action: () => onCreateFolder?.(item.sourcePath),
+        enabled: Boolean(onCreateFolder),
+      },
+      {
+        label: "Rename",
+        icon: <PencilIcon size={14} className="opacity-70" />,
+        action: handleRename,
+        enabled: Boolean(onRenameFolder),
+      },
+      {
+        label: revealLabel,
+        icon: <FileManagerLogo label={revealLabel} size={14} className="opacity-70" />,
+        action: () => onRevealInFinder?.(item.sourcePath),
+        enabled: Boolean(onRevealInFinder),
+      },
+      {
+        label: "Remove",
+        icon: <XIcon size={14} className="opacity-70" />,
+        action: () => onRemoveFolder?.(item.sourcePath),
+        enabled: Boolean(onRemoveFolder),
+      },
+      {
+        label: "Delete",
+        icon: <TrashIcon size={14} className="opacity-70" />,
+        action: () => onDeleteFolder?.(item.sourcePath),
+        enabled: Boolean(onDeleteFolder),
+        destructive: true,
+      },
+    ],
+    [
+      handleRename,
+      item.sourcePath,
+      onCreateFolder,
+      onCreateNote,
+      onDeleteFolder,
+      onRemoveFolder,
+      onRenameFolder,
+      onRevealInFinder,
+      revealLabel,
+    ],
+  );
 
   return (
     <div
@@ -362,11 +375,14 @@ export function NoteCollectionRow({
                     disabled={!menuItem.enabled}
                     onClick={() => {
                       menuItem.action();
-                      closeMenu();
+                      if (menuItem.label !== "Rename") {
+                        closeMenu();
+                      }
                     }}
                     className={cn(
                       "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent disabled:pointer-events-none disabled:opacity-40",
                       menuItem.destructive ? "text-destructive hover:bg-destructive/10" : "",
+                      menuItem.destructive ? "[&_svg]:text-destructive" : "",
                     )}
                   >
                     {menuItem.icon}
@@ -377,6 +393,7 @@ export function NoteCollectionRow({
                 <div className="group/menu-item relative">
                   <button
                     type="button"
+                    aria-haspopup="menu"
                     className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
                   >
                     <span
@@ -388,7 +405,7 @@ export function NoteCollectionRow({
                     Color
                     <span className="ml-auto text-muted-foreground">›</span>
                   </button>
-                  <div className="invisible absolute left-full top-0 z-10 ml-1 grid w-[168px] grid-cols-5 gap-1.5 rounded-md border border-border bg-popover p-2 opacity-0 shadow-lg transition-opacity group-hover/menu-item:visible group-hover/menu-item:opacity-100">
+                  <div className="invisible absolute left-full top-0 z-10 ml-1 grid w-[168px] grid-cols-5 gap-1.5 rounded-md border border-border bg-popover p-2 opacity-0 shadow-lg transition-opacity group-hover/menu-item:visible group-hover/menu-item:opacity-100 group-focus-within/menu-item:visible group-focus-within/menu-item:opacity-100">
                     {NOTE_COLLECTION_ACCENT_KEYS.map((accentKey) => (
                       <Tooltip key={accentKey}>
                         <TooltipTrigger asChild>
@@ -420,13 +437,14 @@ export function NoteCollectionRow({
                 <div className="group/menu-item relative">
                   <button
                     type="button"
+                    aria-haspopup="menu"
                     className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
                   >
                     <FileIcon size={14} className={cn("opacity-70", accent.iconColor)} />
                     Icon
                     <span className="ml-auto text-muted-foreground">›</span>
                   </button>
-                  <div className="invisible absolute left-full top-0 z-10 ml-1 grid w-[168px] grid-cols-5 gap-1.5 rounded-md border border-border bg-popover p-2 opacity-0 shadow-lg transition-opacity group-hover/menu-item:visible group-hover/menu-item:opacity-100">
+                  <div className="invisible absolute left-full top-0 z-10 ml-1 grid w-[168px] grid-cols-5 gap-1.5 rounded-md border border-border bg-popover p-2 opacity-0 shadow-lg transition-opacity group-hover/menu-item:visible group-hover/menu-item:opacity-100 group-focus-within/menu-item:visible group-focus-within/menu-item:opacity-100">
                     {NOTE_COLLECTION_ICON_KEYS.map((iconKey) => {
                       const OptionIcon = ICONS[iconKey];
                       return (
@@ -460,4 +478,6 @@ export function NoteCollectionRow({
         : null}
     </div>
   );
-}
+});
+
+NoteCollectionRow.displayName = "NoteCollectionRow";

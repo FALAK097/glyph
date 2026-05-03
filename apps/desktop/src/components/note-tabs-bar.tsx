@@ -91,6 +91,19 @@ export function NoteTabsBar({
     );
   }, []);
 
+  const handleWheel = useCallback((event: WheelEvent) => {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer) {
+      return;
+    }
+
+    // Only handle horizontal scroll for tabs
+    if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
+      event.preventDefault();
+      scrollContainer.scrollBy({ left: event.deltaX });
+    }
+  }, []);
+
   useEffect(() => {
     updateScrollState();
 
@@ -100,13 +113,15 @@ export function NoteTabsBar({
     }
 
     scrollContainer.addEventListener("scroll", updateScrollState, { passive: true });
+    scrollContainer.addEventListener("wheel", handleWheel, { passive: false });
     window.addEventListener("resize", updateScrollState);
 
     return () => {
       scrollContainer.removeEventListener("scroll", updateScrollState);
+      scrollContainer.removeEventListener("wheel", handleWheel);
       window.removeEventListener("resize", updateScrollState);
     };
-  }, [tabOrderKey, updateScrollState]);
+  }, [tabOrderKey, updateScrollState, handleWheel]);
 
   useEffect(() => {
     if (!activeTabId) {

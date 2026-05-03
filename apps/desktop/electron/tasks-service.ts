@@ -322,6 +322,7 @@ const serializeBoardMarkdown = (
 
 export function createTasksService() {
   let workspaceRoot: string | null = null;
+  let isDefaultWorkspace = false;
   let columns: TaskColumn[] = [];
   let tasks: WorkspaceTask[] = [];
   let archiveSections: ArchiveSection[] = [];
@@ -372,7 +373,7 @@ export function createTasksService() {
     await pendingSave;
   };
 
-  const rebuild = async () => {
+  const rebuild = async (isDefault: boolean = isDefaultWorkspace) => {
     if (!workspaceRoot) {
       const board = createDefaultBoard();
       columns = board.columns;
@@ -397,11 +398,20 @@ export function createTasksService() {
           ? String((readError as { code?: unknown }).code)
           : "";
       if (code === "ENOENT") {
-        const board = createDefaultBoard();
-        columns = board.columns;
-        tasks = board.tasks;
-        archiveSections = [];
-        await save();
+        // Only auto-create Tasks.md for the default workspace.
+        // For non-default workspaces, use empty task state without creating a file.
+        if (isDefault) {
+          const board = createDefaultBoard();
+          columns = board.columns;
+          tasks = board.tasks;
+          archiveSections = [];
+          await save();
+        } else {
+          const board = createDefaultBoard();
+          columns = board.columns;
+          tasks = board.tasks;
+          archiveSections = [];
+        }
       } else {
         throw readError;
       }
@@ -739,8 +749,9 @@ export function createTasksService() {
     moveTask,
     rebuild,
     refreshChanged: async () => (workspaceRoot ? rebuild() : snapshot),
-    setWorkspace(nextWorkspaceRoot: string | null) {
+    setWorkspace(nextWorkspaceRoot: string | null, isDefault: boolean = true) {
       workspaceRoot = nextWorkspaceRoot;
+      isDefaultWorkspace = isDefault;
     },
     unarchiveTask,
     updateColumn,

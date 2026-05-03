@@ -1931,6 +1931,12 @@ async function openWorkspace(
     },
   });
 
+  // Determine if this is the default workspace before setting up watcher
+  const settingsForWorkspace = await loadSettings();
+  const isDefaultWorkspace =
+    normalizePathForComparison(dirPath) ===
+    normalizePathForComparison(settingsForWorkspace.defaultWorkspacePath);
+
   // Debounce rapid filesystem changes (e.g. git checkout) to avoid
   // redundant directory tree rebuilds. Coalesce into a single rebuild
   // after 100ms of quiet.
@@ -1963,7 +1969,7 @@ async function openWorkspace(
 
       const nextTree = await buildDirectoryTree(dirPath);
       searchableFilesCache = await collectMarkdownFiles(nextTree);
-      tasksService.setWorkspace(activeWorkspaceRoot);
+      tasksService.setWorkspace(activeWorkspaceRoot, isDefaultWorkspace);
       const taskSnapshot = await tasksService.refreshChanged();
       mainWindow.webContents.send("workspace:changed", {
         rootPath: dirPath,
@@ -1974,8 +1980,8 @@ async function openWorkspace(
     }, 100);
   });
 
-  tasksService.setWorkspace(activeWorkspaceRoot);
-  await tasksService.rebuild();
+  tasksService.setWorkspace(activeWorkspaceRoot, isDefaultWorkspace);
+  await tasksService.rebuild(isDefaultWorkspace);
 
   return {
     rootPath: dirPath,

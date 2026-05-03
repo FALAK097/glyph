@@ -36,6 +36,7 @@ import type {
 } from "@/core/tasks";
 import { TASK_COLUMN_COLORS_PICKER } from "@/core/tasks";
 import { cn } from "@/core/utils";
+import { useHorizontalScroll } from "@/hooks/use-horizontal-scroll";
 import { applyTaskMutation, groupTasksByColumn, useTasksStore } from "@/store/tasks";
 import { useTasksUIStore } from "@/store/tasks-ui";
 
@@ -92,27 +93,6 @@ const LIST_BG_COLORS: Record<TaskColumnColor, string> = {
 
 function getTaskColumn(task: WorkspaceTask, columns: TaskColumnModel[]) {
   return columns.find((column) => column.id === task.columnId) ?? null;
-}
-
-function useHorizontalScrollRef<T extends HTMLElement>(isDraggingRef: React.RefObject<boolean>) {
-  const ref = useRef<T>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      if (isDraggingRef.current) return;
-      if (e.deltaY === 0) return;
-      const canScrollLeft = el.scrollLeft > 0;
-      const canScrollRight = el.scrollLeft < el.scrollWidth - el.clientWidth;
-      if ((e.deltaY < 0 && canScrollLeft) || (e.deltaY > 0 && canScrollRight)) {
-        e.preventDefault();
-        el.scrollLeft += e.deltaY;
-      }
-    };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, [isDraggingRef]);
-  return ref;
 }
 
 function SortHeader({
@@ -347,7 +327,7 @@ export function TasksView({ glyph, onOpenTaskSource: _onOpenTaskSource }: TasksV
   const [sortColumn, setSortColumn] = useState<SortColumn>("task");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const isDraggingRef = useRef(false);
-  const boardScrollRef = useHorizontalScrollRef<HTMLDivElement>(isDraggingRef);
+  const boardScrollRef = useHorizontalScroll<HTMLDivElement>(isDraggingRef);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),

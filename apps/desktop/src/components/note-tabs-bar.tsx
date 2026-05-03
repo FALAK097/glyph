@@ -4,6 +4,7 @@ import type { DragEvent } from "react";
 import { isSamePath } from "@/core/paths";
 import { cn } from "@/core/utils";
 import type { TabMovePosition } from "@/core/workspace";
+import { useHorizontalScroll } from "@/hooks/use-horizontal-scroll";
 
 import { XIcon } from "./icons";
 
@@ -65,7 +66,7 @@ export function NoteTabsBar({
   onSelectTab,
   tabs,
 }: NoteTabsBarProps) {
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useHorizontalScroll<HTMLDivElement>();
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const draggedTabPathRef = useRef<string | null>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -89,20 +90,7 @@ export function NoteTabsBar({
     setCanScrollRight(
       scrollContainer.scrollLeft + scrollContainer.clientWidth < scrollContainer.scrollWidth - 4,
     );
-  }, []);
-
-  const handleWheel = useCallback((event: WheelEvent) => {
-    const scrollContainer = scrollContainerRef.current;
-    if (!scrollContainer) {
-      return;
-    }
-
-    // Only handle horizontal scroll for tabs
-    if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {
-      event.preventDefault();
-      scrollContainer.scrollBy({ left: event.deltaX });
-    }
-  }, []);
+  }, [scrollContainerRef]);
 
   useEffect(() => {
     updateScrollState();
@@ -113,15 +101,13 @@ export function NoteTabsBar({
     }
 
     scrollContainer.addEventListener("scroll", updateScrollState, { passive: true });
-    scrollContainer.addEventListener("wheel", handleWheel, { passive: false });
     window.addEventListener("resize", updateScrollState);
 
     return () => {
       scrollContainer.removeEventListener("scroll", updateScrollState);
-      scrollContainer.removeEventListener("wheel", handleWheel);
       window.removeEventListener("resize", updateScrollState);
     };
-  }, [tabOrderKey, updateScrollState, handleWheel]);
+  }, [tabOrderKey, updateScrollState, scrollContainerRef]);
 
   useEffect(() => {
     if (!activeTabId) {

@@ -1427,15 +1427,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       isSamePath(filePath, activeNoteFile.path),
     );
 
-  const toolbarNode: React.ReactNode = isAppBootstrapping ? (
-    <div
-      className={`flex items-center gap-2 border-b border-border/40 py-2 ${noteHeaderPaddingClass}`}
-    >
-      <div className="h-8 w-8 rounded-md bg-muted/70 motion-safe:animate-pulse" />
-      <div className="mx-auto h-8 w-full max-w-sm rounded-full bg-muted/60 motion-safe:animate-pulse" />
-      <div className="h-8 w-8 rounded-md bg-muted/70 motion-safe:animate-pulse" />
-    </div>
-  ) : isTasksSurfaceVisible ? (
+  const toolbarNode: React.ReactNode = isAppBootstrapping ? null : isTasksSurfaceVisible ? (
     <EditorToolbar
       _isMacLike={isMacLike}
       isSidebarCollapsed={controller.isSidebarCollapsed}
@@ -1722,11 +1714,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
               activeSkillId={
                 viewerMode === "skill" ? (skillsController.activeSkill?.id ?? null) : null
               }
-              isLoading={
-                !skillsController.hasLoadedOnce ||
-                skillsController.isLoading ||
-                Boolean(pendingSkillRestorePath)
-              }
               items={visibleSkillItems}
               searchQuery={skillsController.searchQuery}
               onSelectSkill={(skillId) => void handleSelectSkill(skillId)}
@@ -1736,17 +1723,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
           ) : null}
 
           <div className="min-h-0 min-w-0">
-            {isAppBootstrapping ? (
-              <div className="flex h-full min-h-0 flex-col bg-background">
-                <div className="flex min-h-0 flex-1 flex-col gap-4 px-8 py-8">
-                  <div className="h-6 w-40 rounded-md bg-muted/60 motion-safe:animate-pulse" />
-                  <div className="h-4 w-72 rounded-md bg-muted/40 motion-safe:animate-pulse" />
-                  <div className="mt-6 h-40 rounded-2xl bg-muted/35 motion-safe:animate-pulse" />
-                  <div className="h-4 w-4/5 rounded-md bg-muted/30 motion-safe:animate-pulse" />
-                  <div className="h-4 w-3/5 rounded-md bg-muted/30 motion-safe:animate-pulse" />
-                </div>
-              </div>
-            ) : isTasksSurfaceVisible ? (
+            {isTasksSurfaceVisible ? (
               <div className="flex h-full min-h-0 flex-col bg-background">
                 <Suspense
                   fallback={

@@ -5,11 +5,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { SearchIcon } from "../icons";
 import { SkillSourceLogo, SkillSourceLogoStack } from "./skill-source-logo";
 
-const SKELETON_COUNT = 4;
-
 type SkillsBrowserPaneProps = {
   activeSkillId: string | null;
-  isLoading?: boolean;
   items: SkillBrowserItem[];
   searchQuery: string;
   onSearchQueryChange: (value: string) => void;
@@ -19,7 +16,6 @@ type SkillsBrowserPaneProps = {
 
 export function SkillsBrowserPane({
   activeSkillId,
-  isLoading = false,
   items,
   searchQuery,
   onSearchQueryChange,
@@ -59,21 +55,7 @@ export function SkillsBrowserPane({
         </div>
       </div>
       <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto px-2 py-2">
-        {isLoading ? (
-          <div className="space-y-2 px-1 pt-1">
-            {Array.from({ length: SKELETON_COUNT }).map((_, index) => (
-              <div
-                key={index}
-                className="rounded-xl border border-border/40 bg-background px-3 py-3"
-              >
-                <div className="h-4 w-24 rounded bg-muted/60 motion-safe:animate-pulse" />
-                <div className="mt-2 h-3 w-16 rounded bg-muted/45 motion-safe:animate-pulse" />
-                <div className="mt-3 h-3 w-full rounded bg-muted/35 motion-safe:animate-pulse" />
-                <div className="mt-2 h-3 w-3/4 rounded bg-muted/30 motion-safe:animate-pulse" />
-              </div>
-            ))}
-          </div>
-        ) : items.length === 0 ? (
+        {items.length === 0 ? (
           <div className="rounded-xl px-3 py-3 text-sm text-muted-foreground">
             {hasQuery
               ? "No skills match your search yet."

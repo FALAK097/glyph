@@ -167,7 +167,7 @@ export function EditorToolbar({
     <div
       role="banner"
       aria-label="Glyph"
-      className={`app-drag-region flex items-center py-0.5 border-b border-border/40 gap-2 bg-background ${headerPaddingClass}`}
+      className={`app-drag-region flex items-center py-1 border-b border-border/40 gap-2 bg-background ${headerPaddingClass}`}
     >
       {/* Left: toolbar + title */}
       <div className="flex items-center gap-1 flex-shrink-0 min-w-0">
@@ -253,7 +253,7 @@ export function EditorToolbar({
           <Button
             variant="outline"
             size="sm"
-            className="w-full max-w-sm justify-between px-3 py-1.5 text-sm text-muted-foreground shadow-sm hover:bg-accent hover:text-accent-foreground"
+            className="w-full max-w-sm justify-between px-3 py-1 text-sm text-muted-foreground shadow-sm hover:bg-accent hover:text-accent-foreground"
             onClick={onOpenCommandPalette}
             type="button"
           >

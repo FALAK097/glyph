@@ -42,7 +42,7 @@ function SidebarSkillCollectionRow({
       type="button"
       onClick={() => onSelect?.(item.id)}
       className={cn(
-        "group flex w-full items-center justify-between rounded-md border-l-2 px-0.5 py-1.5 text-left transition-colors duration-100 ease-out",
+        "group flex w-full items-center justify-between rounded-md border-l-2 px-0.5 py-1.5 pr-2 text-left transition-colors duration-100 ease-out",
         item.isActive ? cn(accent.active, accent.border) : cn("border-l-transparent", accent.hover),
       )}
     >

@@ -222,7 +222,7 @@ export const Sidebar = ({
               </button>
             </div>
             {isSkillsExpanded ? (
-              <div className="space-y-0.5 px-3">
+              <div className="space-y-0.5 px-2">
                 {skillCollections.map((item) => (
                   <SidebarSkillCollectionRow
                     key={item.id}

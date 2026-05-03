@@ -250,7 +250,7 @@ export function EditorToolbar({
       </div>
 
       {browserPaneHeader ? (
-        <div className="flex h-8 w-[292px] shrink-0 items-center justify-end border-l border-border/50 px-4">
+        <div className="flex h-8 w-[292px] shrink-0 items-center border-l border-border/50 pl-3">
           {browserPaneHeader}
         </div>
       ) : null}

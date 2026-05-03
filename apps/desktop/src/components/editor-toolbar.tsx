@@ -60,7 +60,6 @@ type EditorToolbarProps = {
   onDismissUpdateAction: (() => void) | undefined;
   isManualReleaseButton: boolean;
   headerPaddingClass: string;
-  browserPaneHeader?: React.ReactNode;
   onOpenSettings: (() => void) | undefined;
   headerAccessory: React.ReactNode;
   content: string;
@@ -110,7 +109,6 @@ export function EditorToolbar({
   onDismissUpdateAction,
   isManualReleaseButton,
   headerPaddingClass,
-  browserPaneHeader,
   onOpenSettings,
   headerAccessory,
   content,

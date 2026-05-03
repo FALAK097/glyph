@@ -2607,14 +2607,31 @@ ipcMain.handle("sidebar:getNode", async (_event, kind: "file" | "directory", tar
   getSidebarNode(kind, targetPath),
 );
 
-ipcMain.handle("sidebar:getNoteBrowserEntries", async (_event, targetPath: string | null) =>
-  getNoteBrowserEntries(targetPath),
-);
+ipcMain.handle("sidebar:getNoteBrowserEntries", async (_event, targetPath: unknown) => {
+  if (targetPath !== null && typeof targetPath !== "string") {
+    throw new Error(
+      `sidebar:getNoteBrowserEntries: invalid targetPath — expected string | null, got ${typeof targetPath}`,
+    );
+  }
+  return getNoteBrowserEntries(targetPath);
+});
 
-ipcMain.handle(
-  "sidebar:getNoteBrowserEntriesBatch",
-  async (_event, targetPaths: Array<string | null>) => getNoteBrowserEntriesBatch(targetPaths),
-);
+ipcMain.handle("sidebar:getNoteBrowserEntriesBatch", async (_event, targetPaths: unknown) => {
+  if (!Array.isArray(targetPaths)) {
+    throw new Error(
+      `sidebar:getNoteBrowserEntriesBatch: invalid targetPaths — expected array, got ${typeof targetPaths}`,
+    );
+  }
+  const validated = targetPaths.map((item, i) => {
+    if (item !== null && typeof item !== "string") {
+      throw new Error(
+        `sidebar:getNoteBrowserEntriesBatch: invalid element at index ${i} — expected string | null, got ${typeof item}`,
+      );
+    }
+    return item as string | null;
+  });
+  return getNoteBrowserEntriesBatch(validated);
+});
 
 ipcMain.handle("workspace:openDocument", async () => {
   const selection = await showOpenDialog("file");

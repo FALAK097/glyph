@@ -341,7 +341,7 @@ export function TasksView({ glyph, onOpenTaskSource: _onOpenTaskSource }: TasksV
   const [newColumnIsDone, setNewColumnIsDone] = useState(false);
   const [sortColumn, setSortColumn] = useState<SortColumn>("task");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const isDraggingRef = useRef(false);
+  const isDraggingRef = useRef<boolean>(false);
   const boardScrollRef = useHorizontalScroll<HTMLDivElement>(isDraggingRef, viewMode);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const sensors = useSensors(

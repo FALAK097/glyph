@@ -508,7 +508,20 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         const entriesByPath = new Map(
           entryGroups.flat().map((entry) => [entry.path.replace(/\\/g, "/").toLowerCase(), entry]),
         );
-        setNoteBrowserEntries(Array.from(entriesByPath.values()));
+        const sorted = Array.from(entriesByPath.values()).sort((a, b) => {
+          const aTime = a.modifiedAt
+            ? new Date(a.modifiedAt).getTime()
+            : a.createdAt
+              ? new Date(a.createdAt).getTime()
+              : 0;
+          const bTime = b.modifiedAt
+            ? new Date(b.modifiedAt).getTime()
+            : b.createdAt
+              ? new Date(b.createdAt).getTime()
+              : 0;
+          return bTime - aTime;
+        });
+        setNoteBrowserEntries(sorted);
       })
       .catch(() => {
         if (isCancelled) {
@@ -1478,6 +1491,57 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     },
     [controller.togglePinnedFile],
   );
+  // ── NotesBrowserPane stable callbacks ─────────────────────────────────────
+  const handleBrowserOpenNote = useCallback(
+    (filePath: string) => void handleOpenNoteFile(filePath),
+    [handleOpenNoteFile],
+  );
+  const handleBrowserCopyNote = useCallback(
+    (entry: { path: string }) => {
+      void glyph
+        .readFile(entry.path)
+        .then((file) => copyText(file.content))
+        .catch(() => {});
+    },
+    [copyText],
+  );
+  const handleBrowserCopyNotePath = useCallback(
+    (entry: { path: string }) => void copyText(entry.path),
+    [copyText],
+  );
+  const handleBrowserExportNote = useCallback(
+    (entry: { path: string }) => {
+      void glyph
+        .readFile(entry.path)
+        .then((file) => exportDocumentToPdf(file.content, file.name))
+        .catch(() => {});
+    },
+    [exportDocumentToPdf],
+  );
+  const handleBrowserTogglePinnedNote = useCallback(
+    (entry: { path: string }) => handleTogglePinnedPath(entry.path),
+    [handleTogglePinnedPath],
+  );
+  const handleBrowserIsNotePinned = useCallback(
+    (entry: { path: string }) =>
+      (controller.settings?.pinnedFiles ?? []).some((filePath) => isSamePath(filePath, entry.path)),
+    [controller.settings?.pinnedFiles],
+  );
+  const handleBrowserRenameNote = useCallback((entry: { path: string; title: string }) => {
+    setPendingNoteRename({ path: entry.path, name: entry.title, value: entry.title });
+  }, []);
+  const handleBrowserRevealNote = useCallback(
+    (entry: { path: string }) => void controller.revealInFinder(entry.path),
+    [controller.revealInFinder],
+  );
+  const handleBrowserRemoveNote = useCallback((entry: { path: string; title: string }) => {
+    setPendingNoteConfirm({ kind: "remove", path: entry.path, name: entry.title });
+  }, []);
+  const handleBrowserDeleteNote = useCallback((entry: { path: string; title: string }) => {
+    setPendingNoteConfirm({ kind: "delete", path: entry.path, name: entry.title });
+  }, []);
+  // ──────────────────────────────────────────────────────────────────────────
+
   const handleSelectPaneTab = useCallback(
     (paneId: string, path: string) => {
       useLayoutStore.getState().setActivePaneId(paneId);
@@ -1673,7 +1737,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       onNavigateForward={handleNavigateForward}
       onCreateNote={undefined}
       newNoteShortcut={undefined}
-      fileName={skillsController.activeDocument?.name ?? null}
+      fileName={null}
       filePath={null}
       shouldShowCommandPalette={true}
       onOpenCommandPalette={handleOpenCommandPalette}
@@ -1687,7 +1751,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       onToggleFocusMode={undefined}
       focusModeShortcut={undefined}
       shouldShowUpdateActionButton={false}
-      shouldShowMoreOptions={Boolean(skillsController.activeDocument)}
+      shouldShowMoreOptions={false}
       updateButtonVariant="outline"
       isUpdateButtonDisabled={true}
       updateButtonLabel=""
@@ -1963,7 +2027,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                 if (skill) {
                   void glyph
                     .readSkillDocument(skill.skillFilePath)
-                    .then((document) => copyText(document.content));
+                    .then((document) => copyText(document.content))
+                    .catch(() => {});
                 }
               }}
               onCopySkillPath={(item) => {
@@ -1989,7 +2054,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                 if (skill) {
                   void glyph
                     .readSkillDocument(skill.skillFilePath)
-                    .then((document) => exportDocumentToPdf(document.content, document.name));
+                    .then((document) => exportDocumentToPdf(document.content, document.name))
+                    .catch(() => {});
                 }
               }}
             />
@@ -2028,44 +2094,16 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                   entries={visibleNoteBrowserEntries}
                   isLoading={isNoteBrowserLoading}
                   accent={activeNoteCollection.accent}
-                  onOpenNote={(filePath) => void handleOpenNoteFile(filePath)}
-                  onCopyNote={(entry) => {
-                    void glyph.readFile(entry.path).then((file) => copyText(file.content));
-                  }}
-                  onCopyNotePath={(entry) => void copyText(entry.path)}
-                  onExportNote={(entry) => {
-                    void glyph
-                      .readFile(entry.path)
-                      .then((file) => exportDocumentToPdf(file.content, file.name));
-                  }}
-                  onTogglePinnedNote={(entry) => handleTogglePinnedPath(entry.path)}
-                  isNotePinned={(entry) =>
-                    (controller.settings?.pinnedFiles ?? []).some((filePath) =>
-                      isSamePath(filePath, entry.path),
-                    )
-                  }
-                  onRenameNote={(entry) => {
-                    setPendingNoteRename({
-                      path: entry.path,
-                      name: entry.title,
-                      value: entry.title,
-                    });
-                  }}
-                  onRevealNote={(entry) => void controller.revealInFinder(entry.path)}
-                  onRemoveNote={(entry) => {
-                    setPendingNoteConfirm({
-                      kind: "remove",
-                      path: entry.path,
-                      name: entry.title,
-                    });
-                  }}
-                  onDeleteNote={(entry) => {
-                    setPendingNoteConfirm({
-                      kind: "delete",
-                      path: entry.path,
-                      name: entry.title,
-                    });
-                  }}
+                  onOpenNote={handleBrowserOpenNote}
+                  onCopyNote={handleBrowserCopyNote}
+                  onCopyNotePath={handleBrowserCopyNotePath}
+                  onExportNote={handleBrowserExportNote}
+                  onTogglePinnedNote={handleBrowserTogglePinnedNote}
+                  isNotePinned={handleBrowserIsNotePinned}
+                  onRenameNote={handleBrowserRenameNote}
+                  onRevealNote={handleBrowserRevealNote}
+                  onRemoveNote={handleBrowserRemoveNote}
+                  onDeleteNote={handleBrowserDeleteNote}
                 />
               ) : null
             }

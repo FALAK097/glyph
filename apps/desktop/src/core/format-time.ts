@@ -4,6 +4,7 @@ export function formatSaveTime(timestamp: number | null | undefined): string {
   }
 
   return `Saved ${new Date(timestamp).toLocaleString([], {
+    year: "numeric",
     month: "short",
     day: "numeric",
     hour: "numeric",

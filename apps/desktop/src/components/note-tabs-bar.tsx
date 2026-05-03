@@ -90,7 +90,7 @@ export function NoteTabsBar({
     setCanScrollRight(
       scrollContainer.scrollLeft + scrollContainer.clientWidth < scrollContainer.scrollWidth - 4,
     );
-  }, [scrollContainerRef]);
+  }, []);
 
   useEffect(() => {
     updateScrollState();
@@ -107,7 +107,7 @@ export function NoteTabsBar({
       scrollContainer.removeEventListener("scroll", updateScrollState);
       window.removeEventListener("resize", updateScrollState);
     };
-  }, [tabOrderKey, updateScrollState, scrollContainerRef]);
+  }, [tabOrderKey, updateScrollState]);
 
   useEffect(() => {
     if (!activeTabId) {

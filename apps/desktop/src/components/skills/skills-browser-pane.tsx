@@ -50,11 +50,18 @@ export function SkillsBrowserPane({
             const accent = getSkillSourceAccent(sourceKind ?? item.sourceKinds[0], iconKind);
 
             return (
-              <button
+              <div
                 key={item.id}
-                type="button"
+                role="button"
+                tabIndex={0}
                 aria-current={isActive ? "true" : undefined}
                 onClick={() => onSelectSkill(item.representativeSkillId)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onSelectSkill(item.representativeSkillId);
+                  }
+                }}
                 className={cn(
                   "group flex w-full cursor-pointer items-start gap-2 border-b border-l-2 border-b-border/70 px-4 py-3 text-left transition-colors duration-100 ease-out",
                   isActive
@@ -157,7 +164,7 @@ export function SkillsBrowserPane({
                     </p>
                   ) : null}
                 </div>
-              </button>
+              </div>
             );
           })
         )}

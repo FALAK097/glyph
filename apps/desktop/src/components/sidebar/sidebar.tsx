@@ -1,3 +1,5 @@
+import { useCallback, useMemo } from "react";
+
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getShortcutDisplay } from "@/core/shortcuts";
 import { cn } from "@/core/utils";
@@ -89,6 +91,20 @@ export const Sidebar = ({
   const pinnedList = pinnedNotes ?? [];
   const revealLabel = folderRevealLabel ?? openInFolderLabel ?? "Open in Finder";
   const hasActiveSkillCollection = Boolean(skillCollections?.some((item) => item.isActive));
+
+  const adjustedNoteCollections = useMemo(
+    () =>
+      (noteCollections ?? []).map((item) => ({
+        ...item,
+        isActive: !isTasksActive && !hasActiveSkillCollection && item.isActive,
+      })),
+    [noteCollections, isTasksActive, hasActiveSkillCollection],
+  );
+
+  const handleSelectNoteCollection = useCallback(
+    (path: string) => onSelectNoteCollection?.(path),
+    [onSelectNoteCollection],
+  );
 
   if (isCollapsed) {
     return null;
@@ -232,14 +248,11 @@ export const Sidebar = ({
                   </p>
                 ) : (
                   <div className="flex flex-col gap-0.5 px-0">
-                    {(noteCollections ?? []).map((item) => (
+                    {adjustedNoteCollections.map((item) => (
                       <NoteCollectionRow
                         key={item.id}
-                        item={{
-                          ...item,
-                          isActive: !isTasksActive && !hasActiveSkillCollection && item.isActive,
-                        }}
-                        onSelect={(path) => onSelectNoteCollection?.(path)}
+                        item={item}
+                        onSelect={handleSelectNoteCollection}
                         onCreateNote={onCreateNoteInCollection}
                         onCreateFolder={onCreateFolderInCollection}
                         onChangeAccent={onChangeNoteCollectionAccent}

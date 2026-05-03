@@ -482,8 +482,8 @@ export const SidebarTreeNode = memo(function SidebarTreeNode({
                   size="icon-xs"
                   aria-label="Note actions"
                   className="rounded bg-transparent text-muted-foreground opacity-100 transition-opacity hover:text-foreground hover:!bg-transparent focus-visible:!bg-transparent"
-                  onPointerDownCapture={handleMenuToggle}
-                  onMouseDown={handleMenuToggle}
+                  onPointerDownCapture={(event) => event.stopPropagation()}
+                  onMouseDown={(event) => event.stopPropagation()}
                   onClick={handleMenuToggle}
                   type="button"
                 >

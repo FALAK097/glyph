@@ -167,7 +167,7 @@ export function EditorToolbar({
     <div
       role="banner"
       aria-label="Glyph"
-      className={`app-drag-region flex items-center py-1 border-b border-border/40 gap-2 bg-background ${headerPaddingClass}`}
+      className={`app-drag-region flex items-center py-0.5 border-b border-border/40 gap-2 bg-background ${headerPaddingClass}`}
     >
       {/* Left: toolbar + title */}
       <div className="flex items-center gap-1 flex-shrink-0 min-w-0">

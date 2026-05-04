@@ -45,8 +45,8 @@ export const SidebarShortcutRow = memo(function SidebarShortcutRow({
         className={cn(
           "flex min-w-0 flex-1 cursor-pointer items-center rounded-md border-l-2 px-2 py-1.5 transition-colors duration-100 ease-out",
           isActive
-            ? "border-l-slate-500 bg-slate-500/10 text-sidebar-foreground dark:bg-slate-400/15"
-            : "border-l-transparent text-sidebar-foreground hover:bg-slate-500/5 dark:hover:bg-slate-400/10",
+            ? "border-l-sidebar-primary bg-sidebar-primary/10 text-sidebar-foreground"
+            : "border-l-transparent text-sidebar-foreground hover:bg-sidebar-accent",
         )}
       >
         <Tooltip>
@@ -55,7 +55,7 @@ export const SidebarShortcutRow = memo(function SidebarShortcutRow({
               type="button"
               className={cn(
                 "mr-2 grid h-5 w-5 shrink-0 place-items-center rounded-sm transition-colors hover:text-foreground",
-                isActive ? "text-slate-600 dark:text-slate-300" : "text-muted-foreground",
+                isActive ? "text-sidebar-primary" : "text-muted-foreground",
               )}
               onClick={(event) => {
                 event.stopPropagation();

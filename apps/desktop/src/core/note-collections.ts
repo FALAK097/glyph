@@ -100,7 +100,8 @@ export function getNoteCollectionAppearance(
   appearances: NoteFolderAppearanceMap | null | undefined,
 ) {
   const normalizedPath = normalizeCollectionKey(path);
-  const explicit = appearances?.[normalizedPath];
+  const lookupKey = normalizedPath.toLowerCase();
+  const explicit = appearances?.[lookupKey];
   const fallback = getDefaultNoteCollectionAppearance(normalizedPath);
 
   return {
@@ -144,6 +145,29 @@ export function buildNoteCollections(
 ): NoteCollectionItem[] {
   const collections: CollectionBuildInput[] = [];
 
+  const processDirectoryNode = (
+    node: Extract<DirectoryNode, { type: "directory" }>,
+    workspacePath: string | null,
+    isRootCollection: boolean,
+  ) => {
+    addCollection(collections, {
+      path: node.path,
+      sourcePath: node.path,
+      workspacePath,
+      isRootCollection,
+      notePaths: collectMarkdownPaths(node),
+    });
+
+    // Recursively process nested directories
+    node.children.forEach((child) => {
+      if (child.type !== "directory") {
+        return;
+      }
+
+      processDirectoryNode(child, node.path, false);
+    });
+  };
+
   nodes.forEach((node) => {
     if (node.type === "file") {
       addCollection(collections, {
@@ -156,27 +180,7 @@ export function buildNoteCollections(
       return;
     }
 
-    addCollection(collections, {
-      path: node.path,
-      sourcePath: node.path,
-      workspacePath: node.path,
-      isRootCollection: true,
-      notePaths: collectMarkdownPaths(node),
-    });
-
-    node.children.forEach((child) => {
-      if (child.type !== "directory") {
-        return;
-      }
-
-      addCollection(collections, {
-        path: child.path,
-        sourcePath: child.path,
-        workspacePath: node.path,
-        isRootCollection: false,
-        notePaths: collectMarkdownPaths(child),
-      });
-    });
+    processDirectoryNode(node, node.path, true);
   });
 
   const builtCollections = collections
@@ -280,12 +284,12 @@ export function remapNoteFolderAppearances(
   oldPath: string,
   newPath: string,
 ) {
-  const normalizedOldPath = normalizeCollectionKey(oldPath);
-  const normalizedNewPath = normalizeCollectionKey(newPath);
+  const normalizedOldPath = normalizeCollectionKey(oldPath).toLowerCase();
+  const normalizedNewPath = normalizeCollectionKey(newPath).toLowerCase();
 
   return Object.fromEntries(
     Object.entries(appearances).map(([entryPath, value]) => {
-      const normalizedEntryPath = normalizeCollectionKey(entryPath);
+      const normalizedEntryPath = normalizeCollectionKey(entryPath).toLowerCase();
       if (!isPathInside(normalizedEntryPath, normalizedOldPath)) {
         return [normalizedEntryPath, value] as const;
       }
@@ -300,11 +304,11 @@ export function removeNoteFolderAppearances(
   appearances: NoteFolderAppearanceMap,
   removedPath: string,
 ) {
-  const normalizedRemovedPath = normalizeCollectionKey(removedPath);
+  const normalizedRemovedPath = normalizeCollectionKey(removedPath).toLowerCase();
 
   return Object.fromEntries(
     Object.entries(appearances).filter(([entryPath]) => {
-      const normalizedEntryPath = normalizeCollectionKey(entryPath);
+      const normalizedEntryPath = normalizeCollectionKey(entryPath).toLowerCase();
       return !isPathInside(normalizedEntryPath, normalizedRemovedPath);
     }),
   );

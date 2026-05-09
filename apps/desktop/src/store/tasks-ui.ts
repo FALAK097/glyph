@@ -4,6 +4,15 @@ export type TasksViewMode = "board" | "table";
 
 export const TASK_VIEW_STORAGE_KEY = "glyph.tasks.viewMode";
 export const ADD_TO_TOP_STORAGE_KEY = "glyph.tasks.addToTop";
+export const SELECTED_TAG_STORAGE_KEY = "glyph.tasks.selectedTag";
+
+const getInitialSelectedTag = (): string | null => {
+  try {
+    return window.localStorage.getItem(SELECTED_TAG_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+};
 
 const isTasksViewMode = (value: string | null): value is TasksViewMode =>
   value === "board" || value === "table";
@@ -29,11 +38,13 @@ const getInitialAddToTop = (): Record<string, boolean> => {
 type TasksUIState = {
   isSearching: boolean;
   searchQuery: string;
+  selectedTag: string | null;
   viewMode: TasksViewMode;
   isAddingColumn: boolean;
   addToTopByColumn: Record<string, boolean>;
   setIsSearching: (value: boolean) => void;
   setSearchQuery: (value: string) => void;
+  setSelectedTag: (tag: string | null) => void;
   setViewMode: (mode: TasksViewMode) => void;
   setIsAddingColumn: (value: boolean) => void;
   setAddToTopForColumn: (columnId: string, addToTop: boolean) => void;
@@ -42,11 +53,24 @@ type TasksUIState = {
 export const useTasksUIStore = create<TasksUIState>()((set) => ({
   isSearching: false,
   searchQuery: "",
+  selectedTag: getInitialSelectedTag(),
   viewMode: getInitialViewMode(),
   isAddingColumn: false,
   addToTopByColumn: getInitialAddToTop(),
   setIsSearching: (value) => set({ isSearching: value }),
   setSearchQuery: (value) => set({ searchQuery: value }),
+  setSelectedTag: (tag) => {
+    set({ selectedTag: tag });
+    try {
+      if (tag === null) {
+        window.localStorage.removeItem(SELECTED_TAG_STORAGE_KEY);
+      } else {
+        window.localStorage.setItem(SELECTED_TAG_STORAGE_KEY, tag);
+      }
+    } catch {
+      // ignore storage errors
+    }
+  },
   setViewMode: (mode) => {
     set({ viewMode: mode });
     try {

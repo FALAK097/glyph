@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.10.0](https://github.com/FALAK097/glyph/compare/v0.9.0...v0.10.0) (2026-05-09)
+
+
+### Features
+
+* **desktop:** default PDF auto-open on export and polish theme select dropdown ([695e8e8](https://github.com/FALAK097/glyph/commit/695e8e88b91c9dbe6b16b451da04e52c33bc3254))
+* **desktop:** polish tasks board and frontmatter editing ([89b4ff6](https://github.com/FALAK097/glyph/commit/89b4ff6f6d80f64c1b5fb804a67ed04a1c386466))
+* **desktop:** unified top navbar with cross-surface navigation ([4bcef75](https://github.com/FALAK097/glyph/commit/4bcef752a93b97e2a8516f729263a7c46b4bf5a6))
+* **editor:** support H4-H6 headings, markdown shortcuts, outline extraction, and mid-paragraph slash menu trigger ([4bfc5e9](https://github.com/FALAK097/glyph/commit/4bfc5e9995c3e410753a31f5da9635f512e0d6d6))
+* implement unified footer system with metrics and save state ([337f3f6](https://github.com/FALAK097/glyph/commit/337f3f6fb639269db3b093851b2b590e5edabe62))
+* remove skeleton loaders from app initialization and skills browser ([3c65ffd](https://github.com/FALAK097/glyph/commit/3c65ffd106ec5b24f676e69deb7ff5617afaec79))
+* sync active note collection on tab switch dynamically without useEffect ([e5d2f9f](https://github.com/FALAK097/glyph/commit/e5d2f9f14fbff25ba559fad9add19b28a3cfdac0))
+* **tasks:** add support to filter tasks by hashtag across both board and table ([e8f856b](https://github.com/FALAK097/glyph/commit/e8f856b96a2e3d8b06a004b010e4429d0c543d30))
+* **tasks:** refine tag filter styling, add task counts, and implement localStorage persistence ([9da4575](https://github.com/FALAK097/glyph/commit/9da4575b3acf7e1bb325b9d532a1b673164f3fa8))
+
+
+### Bug Fixes
+
+* add right padding to skill count for proper spacing ([3290a59](https://github.com/FALAK097/glyph/commit/3290a597fe6f3049e8470b8804859feb114e5c39))
+* adjust browserPaneHeader padding and sidebar skills alignment ([1bf796b](https://github.com/FALAK097/glyph/commit/1bf796be6ecc52a8a8d36897a4f4b4e73d1700b2))
+* adjust toolbar and search button padding for proper spacing ([29ff921](https://github.com/FALAK097/glyph/commit/29ff921691e7aeddec22b982f9e16ac253ea5390))
+* align folder info with sidebar and adjust skill icons padding ([ddbee7a](https://github.com/FALAK097/glyph/commit/ddbee7a785a6528de870e0298a4445ba35e9f8e0))
+* **desktop:** address CodeRabbit review comments on PR [#205](https://github.com/FALAK097/glyph/issues/205) ([ea05209](https://github.com/FALAK097/glyph/commit/ea05209e1974e7262c2027fe31e6400062851cf7))
+* **desktop:** address PR [#206](https://github.com/FALAK097/glyph/issues/206) review — memoize handlers, validate IPC, fix toolbar, polish ([11d3619](https://github.com/FALAK097/glyph/commit/11d36195f0076707e1211f05875063d22fce7a57))
+* **desktop:** refresh note browser after rename, use dialog for folder rename ([659b176](https://github.com/FALAK097/glyph/commit/659b1762baf1fe6f1b696a6bc2152000baf5d692))
+* **desktop:** restore note actions and review fixes ([929dddc](https://github.com/FALAK097/glyph/commit/929dddc485e76f24c245c58073fb28678ba6fdf1))
+* **e2e:** replace empty destructuring pattern with _ to silence no-empty-pattern lint ([7efb974](https://github.com/FALAK097/glyph/commit/7efb9742a98bf13a4f033147a20fe5137c96e2a2))
+* **e2e:** restore aria-label="Glyph" on toolbar for shell detection ([3d562d2](https://github.com/FALAK097/glyph/commit/3d562d2cd54913c9ed5ded4fe05b7b649b8fa181))
+* **e2e:** use file-level eslint-disable for no-empty-pattern instead of _ ([47a7d1f](https://github.com/FALAK097/glyph/commit/47a7d1f54c45c9d6a6481c396d9fb3fce2a19873))
+* increase footer color contrast with sidebar ([496875d](https://github.com/FALAK097/glyph/commit/496875d08cacb481f972b276d730e3d37cc8fcb0))
+* push skills icons further left ([cbe9303](https://github.com/FALAK097/glyph/commit/cbe930305750738afcc95e338cd22ed904529b94))
+* push skills icons more to left for alignment ([81b28bb](https://github.com/FALAK097/glyph/commit/81b28bb2fa38d75231fb824a4fa1abb40d105cab))
+* reduce toolbar padding to prevent border touching ([14f9cf3](https://github.com/FALAK097/glyph/commit/14f9cf3b9cbdbd941e7bcd59bd8d4853ca11e90a))
+* remove browserPaneHeader and adjust skills sidebar alignment ([cfe3cc3](https://github.com/FALAK097/glyph/commit/cfe3cc3c9a5db811cfebfa4db260cef68e3f3351))
+* remove unused browserPaneHeader parameter ([489cfc7](https://github.com/FALAK097/glyph/commit/489cfc78f952ec3a04d864d13e67dac8bbd415f8))
+* resolve PR [#206](https://github.com/FALAK097/glyph/issues/206) CodeRabbit comments ([1bd663b](https://github.com/FALAK097/glyph/commit/1bd663b1e4a5ec2071447e93a618d4c64cd860aa))
+* **tasks:** filter current column in move menu and reset completed state on move ([cb5b358](https://github.com/FALAK097/glyph/commit/cb5b358dcb5b5e6fd7bfe9d6e8a663fa2876072b))
+* **tasks:** improve scroll behavior and add horizontal scroll buttons ([b3951e3](https://github.com/FALAK097/glyph/commit/b3951e3c1d920b1efd9281631367cbc9af887cd1))
+* unify navbar, sidebar, and footer colors with editor background ([9300d75](https://github.com/FALAK097/glyph/commit/9300d75d20678c987a8290c4f7caa3de6e509f6b))
+
 ## [0.9.0](https://github.com/FALAK097/glyph/compare/v0.8.0...v0.9.0) (2026-05-02)
 
 

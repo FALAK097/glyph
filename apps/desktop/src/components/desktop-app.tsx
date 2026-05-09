@@ -281,13 +281,51 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       selectedNoteCollectionPath,
     ],
   );
-  const activeNoteCollection = useMemo(
-    () =>
-      noteCollections.find((collection) => collection.path === selectedNoteCollectionPath) ??
-      noteCollections[0] ??
-      null,
-    [noteCollections, selectedNoteCollectionPath],
-  );
+  const activeNoteCollection = useMemo(() => {
+    const activeFile = controller.activeFile;
+    if (!activeFile) {
+      return (
+        noteCollections.find((collection) => collection.path === selectedNoteCollectionPath) ??
+        noteCollections[0] ??
+        null
+      );
+    }
+
+    const currentCollection = noteCollections.find(
+      (collection) => collection.path === selectedNoteCollectionPath,
+    );
+    if (
+      currentCollection &&
+      (currentCollection.isAllCollection ||
+        currentCollection.notePaths.some((notePath) => isSamePath(notePath, activeFile.path)))
+    ) {
+      return currentCollection;
+    }
+
+    const containingCollection = [...noteCollections]
+      .filter(
+        (collection) =>
+          !collection.isAllCollection &&
+          collection.notePaths.some((notePath) => isSamePath(notePath, activeFile.path)),
+      )
+      .sort((left, right) => right.sourcePath.length - left.sourcePath.length)[0];
+
+    if (containingCollection) {
+      Promise.resolve().then(() => {
+        setSelectedNoteCollectionPath(containingCollection.path);
+        setLastNotePathForCollection(containingCollection.path, activeFile.path);
+      });
+      return containingCollection;
+    }
+
+    return currentCollection ?? noteCollections[0] ?? null;
+  }, [
+    controller.activeFile,
+    noteCollections,
+    selectedNoteCollectionPath,
+    setSelectedNoteCollectionPath,
+    setLastNotePathForCollection,
+  ]);
   const currentNoteDisplayName = useMemo(
     () => (controller.activeFile ? getDisplayFileName(controller.activeFile.name) : ""),
     [controller.activeFile],

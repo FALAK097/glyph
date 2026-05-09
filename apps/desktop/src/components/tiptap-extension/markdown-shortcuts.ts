@@ -1,6 +1,6 @@
 import { Extension, nodeInputRule, textblockTypeInputRule, wrappingInputRule } from "@tiptap/core";
 
-const HEADING_LEVELS = [1, 2, 3, 4];
+const HEADING_LEVELS = [1, 2, 3, 4, 5, 6];
 
 const BLOCKQUOTE_INPUT_REGEX = /^\s*>\s$/;
 const BULLET_LIST_INPUT_REGEX = /^\s*([-+*])\s$/;

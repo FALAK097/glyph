@@ -98,7 +98,7 @@ export function collectEditorOutline(editor: Editor): EditorOutlineItem[] {
     }
 
     const level = Number(node.attrs.level ?? 0);
-    if (level < 1 || level > 4) {
+    if (level < 1 || level > 6) {
       return;
     }
 

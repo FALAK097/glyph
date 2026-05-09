@@ -53,6 +53,33 @@ const COMMANDS: SlashCommandWithKey[] = [
     shortcut: `${MODIFIER_TOKENS.cmdOrCtrl} ${MODIFIER_TOKENS.alt} 3`,
   },
   {
+    id: "h4",
+    title: "Heading 4",
+    description: "Detailed subsection heading",
+    keywords: ["h4", "heading", "####"],
+    group: "Headings",
+    icon: "Heading03Icon",
+    shortcut: `${MODIFIER_TOKENS.cmdOrCtrl} ${MODIFIER_TOKENS.alt} 4`,
+  },
+  {
+    id: "h5",
+    title: "Heading 5",
+    description: "Fine-grained heading",
+    keywords: ["h5", "heading", "#####"],
+    group: "Headings",
+    icon: "Heading03Icon",
+    shortcut: `${MODIFIER_TOKENS.cmdOrCtrl} ${MODIFIER_TOKENS.alt} 5`,
+  },
+  {
+    id: "h6",
+    title: "Heading 6",
+    description: "Smallest section heading",
+    keywords: ["h6", "heading", "######"],
+    group: "Headings",
+    icon: "Heading03Icon",
+    shortcut: `${MODIFIER_TOKENS.cmdOrCtrl} ${MODIFIER_TOKENS.alt} 6`,
+  },
+  {
     id: "bullet",
     title: "Bullet List",
     description: "Create an unordered list",
@@ -196,6 +223,15 @@ const runCommand = ({
     case "h3":
       editor.chain().focus().toggleHeading({ level: 3 }).run();
       return;
+    case "h4":
+      editor.chain().focus().toggleHeading({ level: 4 }).run();
+      return;
+    case "h5":
+      editor.chain().focus().toggleHeading({ level: 5 }).run();
+      return;
+    case "h6":
+      editor.chain().focus().toggleHeading({ level: 6 }).run();
+      return;
     case "bullet":
       editor.chain().focus().toggleBulletList().run();
       return;
@@ -252,7 +288,8 @@ const getSuggestionItems = ({ query }: { query: string }) => {
 const slashSuggestion: Omit<SuggestionOptions<SlashCommandWithKey>, "editor"> = {
   char: "/",
   allowSpaces: true,
-  startOfLine: true,
+  startOfLine: false,
+  allowedPrefixes: [" ", "\n", "\t"],
   items: getSuggestionItems,
   command: runCommand,
   render: () => {

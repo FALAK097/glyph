@@ -340,6 +340,7 @@ export function TasksView({ glyph, onOpenTaskSource: _onOpenTaskSource }: TasksV
   const searchQuery = useTasksUIStore((s) => s.searchQuery);
   const viewMode = useTasksUIStore((s) => s.viewMode);
   const addToTopByColumn = useTasksUIStore((s) => s.addToTopByColumn);
+  const selectedTag = useTasksUIStore((s) => s.selectedTag);
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const [creatingColumnId, setCreatingColumnId] = useState<string | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
@@ -431,13 +432,22 @@ export function TasksView({ glyph, onOpenTaskSource: _onOpenTaskSource }: TasksV
   const groupedTasks = useMemo(() => groupTasksByColumn(columns, tasks), [columns, tasks]);
   const filteredTasks = useMemo(() => {
     const query = deferredSearchQuery.trim().toLowerCase();
-    if (!query) {
-      return tasks;
+    let result = tasks;
+
+    if (selectedTag) {
+      result = result.filter((task) =>
+        task.labels.some((label) => label.toLowerCase() === selectedTag.toLowerCase()),
+      );
     }
-    return tasks.filter((task) =>
+
+    if (!query) {
+      return result;
+    }
+
+    return result.filter((task) =>
       [task.title, task.dueDate ?? "", ...task.labels].join(" ").toLowerCase().includes(query),
     );
-  }, [deferredSearchQuery, tasks]);
+  }, [deferredSearchQuery, tasks, selectedTag]);
   const filteredTaskIds = useMemo(
     () => new Set(filteredTasks.map((task) => task.id)),
     [filteredTasks],

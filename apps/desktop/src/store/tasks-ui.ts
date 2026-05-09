@@ -29,11 +29,13 @@ const getInitialAddToTop = (): Record<string, boolean> => {
 type TasksUIState = {
   isSearching: boolean;
   searchQuery: string;
+  selectedTag: string | null;
   viewMode: TasksViewMode;
   isAddingColumn: boolean;
   addToTopByColumn: Record<string, boolean>;
   setIsSearching: (value: boolean) => void;
   setSearchQuery: (value: string) => void;
+  setSelectedTag: (tag: string | null) => void;
   setViewMode: (mode: TasksViewMode) => void;
   setIsAddingColumn: (value: boolean) => void;
   setAddToTopForColumn: (columnId: string, addToTop: boolean) => void;
@@ -42,11 +44,13 @@ type TasksUIState = {
 export const useTasksUIStore = create<TasksUIState>()((set) => ({
   isSearching: false,
   searchQuery: "",
+  selectedTag: null,
   viewMode: getInitialViewMode(),
   isAddingColumn: false,
   addToTopByColumn: getInitialAddToTop(),
   setIsSearching: (value) => set({ isSearching: value }),
   setSearchQuery: (value) => set({ searchQuery: value }),
+  setSelectedTag: (tag) => set({ selectedTag: tag }),
   setViewMode: (mode) => {
     set({ viewMode: mode });
     try {

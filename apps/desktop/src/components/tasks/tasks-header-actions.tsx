@@ -52,6 +52,16 @@ export function TasksHeaderActions({ glyph, onOpenMarkdown }: TasksHeaderActions
     return Array.from(tagsSet).sort();
   }, [tasks]);
 
+  const tagCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    tasks.forEach((task) => {
+      task.labels.forEach((label) => {
+        counts[label] = (counts[label] || 0) + 1;
+      });
+    });
+    return counts;
+  }, [tasks]);
+
   const handleArchiveCompleted = useCallback(async () => {
     const doneColumns = columns.filter((c) => c.isDone);
     const doneTaskCount = tasks.filter((t) => doneColumns.some((c) => c.id === t.columnId)).length;
@@ -156,19 +166,29 @@ export function TasksHeaderActions({ glyph, onOpenMarkdown }: TasksHeaderActions
           align="end"
           className="w-48 bg-popover text-popover-foreground max-h-60 overflow-y-auto"
         >
-          <DropdownMenuItem onClick={() => setSelectedTag(null)}>
+          <DropdownMenuItem onClick={() => setSelectedTag(null)} className="flex items-center">
             <span className="mr-2 grid h-4 w-4 place-items-center">
               {selectedTag === null ? <TickIcon size={14} /> : null}
             </span>
-            All Tags
+            <span className="flex-1 font-medium">All</span>
+            <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+              {tasks.length}
+            </span>
           </DropdownMenuItem>
           {allTags.length > 0 && <div className="h-px bg-border my-1" />}
           {allTags.map((tag) => (
-            <DropdownMenuItem key={tag} onClick={() => setSelectedTag(tag)}>
+            <DropdownMenuItem
+              key={tag}
+              onClick={() => setSelectedTag(tag)}
+              className="flex items-center"
+            >
               <span className="mr-2 grid h-4 w-4 place-items-center">
                 {selectedTag === tag ? <TickIcon size={14} /> : null}
               </span>
-              #{tag}
+              <span className="flex-1 truncate">{tag}</span>
+              <span className="ml-2 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                {tagCounts[tag]}
+              </span>
             </DropdownMenuItem>
           ))}
           {allTags.length === 0 && (

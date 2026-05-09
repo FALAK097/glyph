@@ -301,7 +301,7 @@ export const TaskColumn = memo(function TaskColumn({
         ref={setNodeRef}
         style={{ transform: CSS.Transform.toString(transform), transition }}
         className={cn(
-          "flex h-[calc(100vh-132px)] min-h-[520px] w-20 shrink-0 flex-col items-center gap-3 rounded-lg border border-border bg-muted/25 py-3 shadow-xs",
+          "flex h-[calc(100vh-132px)] min-h-[520px] w-20 shrink-0 flex-col items-center gap-3 rounded-lg border border-border bg-transparent py-3 shadow-xs",
           isDragging ? "opacity-55 shadow-md" : "",
         )}
         aria-label={`${column.title} tasks`}
@@ -340,7 +340,7 @@ export const TaskColumn = memo(function TaskColumn({
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, width: columnWidth }}
       className={cn(
-        "relative flex h-[calc(100vh-132px)] min-h-[520px] shrink-0 flex-col rounded-lg border border-border bg-muted/25 shadow-xs",
+        "relative flex h-[calc(100vh-132px)] min-h-[520px] shrink-0 flex-col rounded-lg border border-border bg-transparent shadow-xs",
         isDragging ? "opacity-55 shadow-md" : "",
       )}
       aria-label={`${column.title} tasks`}
@@ -492,7 +492,7 @@ export const TaskColumn = memo(function TaskColumn({
           type="button"
           onClick={() => onCreate(column.id)}
           className={cn(
-            "flex h-10 w-full items-center justify-center gap-1 rounded-md border border-border bg-background text-sm font-medium text-muted-foreground shadow-xs transition-[border-color,color,transform] duration-100 ease-out active:scale-[0.99] focus-visible:outline-none focus-visible:ring-3",
+            "flex h-10 w-full items-center justify-center gap-1 rounded-md border border-border bg-muted/25 text-sm font-medium text-muted-foreground shadow-xs transition-[border-color,color,transform] duration-100 ease-out active:scale-[0.99] focus-visible:outline-none focus-visible:ring-3 hover:bg-muted/40",
             color.add,
           )}
         >

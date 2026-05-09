@@ -450,8 +450,13 @@ export function createTasksService() {
     targetColumn.taskIds.splice(targetIndex, 0, task.id);
     task.columnId = targetColumn.id;
     task.updatedAt = Date.now();
-    if (targetColumn.isDone && !sourceColumn?.isDone) {
-      task.dueDate = getLocalDateLabel();
+    if (targetColumn.isDone) {
+      task.completed = true;
+      if (!sourceColumn?.isDone) {
+        task.dueDate = getLocalDateLabel();
+      }
+    } else {
+      task.completed = false;
     }
     targetColumn.updatedAt = task.updatedAt;
     await save();

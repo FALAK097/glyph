@@ -218,14 +218,16 @@ export const TaskCard = memo(function TaskCard({
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>Move to list</DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
-              {columns.map((targetColumn) => (
-                <DropdownMenuItem
-                  key={targetColumn.id}
-                  onClick={() => onMove(task.id, targetColumn.id, Number.MAX_SAFE_INTEGER)}
-                >
-                  {targetColumn.title}
-                </DropdownMenuItem>
-              ))}
+              {columns
+                .filter((targetColumn) => targetColumn.id !== task.columnId)
+                .map((targetColumn) => (
+                  <DropdownMenuItem
+                    key={targetColumn.id}
+                    onClick={() => onMove(task.id, targetColumn.id, Number.MAX_SAFE_INTEGER)}
+                  >
+                    {targetColumn.title}
+                  </DropdownMenuItem>
+                ))}
             </DropdownMenuSubContent>
           </DropdownMenuSub>
         </DropdownMenuContent>

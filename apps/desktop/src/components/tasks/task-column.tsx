@@ -475,7 +475,7 @@ export const TaskColumn = memo(function TaskColumn({
           ))}
         </SortableContext>
       </div>
-      <div className="shrink-0 border-t border-border bg-muted/20 p-3">
+      <div className="shrink-0 p-3">
         {isCreating ? (
           <div className="mb-2">
             <TaskInlineEditor

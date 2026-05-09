@@ -98,9 +98,6 @@ export function SkillsBrowserPane({
                         sideOffset={8}
                         className="w-48"
                       >
-                        <DropdownMenuItem onClick={() => onSelectSkill(item.representativeSkillId)}>
-                          Open
-                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => onCopySkill?.(item)}>
                           <LinkIcon size={14} className="opacity-70" />
                           Copy as Markdown

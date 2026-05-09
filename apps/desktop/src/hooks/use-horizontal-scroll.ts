@@ -31,6 +31,25 @@ export function useHorizontalScroll<T extends HTMLElement>(
       // scroll naturally without preventDefault so momentum scrolling is preserved.
       if (Math.abs(deltaX) > Math.abs(deltaY)) return;
 
+      // Check if there is any element between event.target and el that can scroll vertically.
+      // If so, let that element handle the vertical scroll instead of translating it to horizontal.
+      let target = event.target as Node | null;
+      while (target && target !== el) {
+        if (target instanceof HTMLElement) {
+          const style = window.getComputedStyle(target);
+          const isScrollableY = style.overflowY === "auto" || style.overflowY === "scroll";
+          const hasScrollableContent = target.scrollHeight > target.clientHeight;
+          if (isScrollableY && hasScrollableContent) {
+            const canScrollDown = target.scrollTop + target.clientHeight < target.scrollHeight - 1;
+            const canScrollUp = target.scrollTop > 0;
+            if ((deltaY > 0 && canScrollDown) || (deltaY < 0 && canScrollUp)) {
+              return;
+            }
+          }
+        }
+        target = target.parentNode;
+      }
+
       // Pure vertical wheel (regular mouse) or trackpad with no horizontal
       // component: remap deltaY → horizontal scroll.
       const canScrollLeft = el.scrollLeft > 0;

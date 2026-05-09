@@ -18,7 +18,13 @@ import {
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
-import { ArrowDownIcon, ArrowUpIcon, TickIcon } from "@/components/icons";
+import {
+  ArrowDownIcon,
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  ArrowUpIcon,
+  TickIcon,
+} from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -345,6 +351,56 @@ export function TasksView({ glyph, onOpenTaskSource: _onOpenTaskSource }: TasksV
   const isDraggingRef = useRef<boolean>(false);
   const boardScrollRef = useHorizontalScroll<HTMLDivElement>(isDraggingRef, viewMode);
   const tableContainerRef = useRef<HTMLDivElement>(null);
+  const [showScrollButtons, setShowScrollButtons] = useState(false);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollState = useCallback(() => {
+    const el = boardScrollRef.current;
+    if (!el) return;
+    const hasOverflow = el.scrollWidth > el.clientWidth;
+    setShowScrollButtons(hasOverflow);
+    setCanScrollLeft(el.scrollLeft > 0);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 1);
+  }, [boardScrollRef]);
+
+  const scrollLeft = useCallback(() => {
+    const el = boardScrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: -320, behavior: "smooth" });
+  }, [boardScrollRef]);
+
+  const scrollRight = useCallback(() => {
+    const el = boardScrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: 320, behavior: "smooth" });
+  }, [boardScrollRef]);
+
+  useEffect(() => {
+    if (viewMode !== "board") return;
+    const el = boardScrollRef.current;
+    if (!el) return;
+
+    updateScrollState();
+
+    el.addEventListener("scroll", updateScrollState);
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateScrollState();
+    });
+    resizeObserver.observe(el);
+
+    const mutationObserver = new MutationObserver(() => {
+      updateScrollState();
+    });
+    mutationObserver.observe(el, { childList: true, subtree: true });
+
+    return () => {
+      el.removeEventListener("scroll", updateScrollState);
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+    };
+  }, [viewMode, updateScrollState, columns, tasks]);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -592,49 +648,84 @@ export function TasksView({ glyph, onOpenTaskSource: _onOpenTaskSource }: TasksV
         ) : (
           <div className="relative h-full min-h-0">
             {viewMode === "board" ? (
-              <DndContext
-                sensors={sensors}
-                collisionDetection={collisionDetection}
-                onDragStart={handleDragStart}
-                onDragCancel={() => setActiveDragId(null)}
-                onDragEnd={handleDragEnd}
-              >
-                <div
-                  ref={boardScrollRef}
-                  className="scrollbar-hide flex h-full items-start gap-5 overflow-x-auto bg-background px-5 pt-4 pb-5"
+              <>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={collisionDetection}
+                  onDragStart={handleDragStart}
+                  onDragCancel={() => setActiveDragId(null)}
+                  onDragEnd={handleDragEnd}
                 >
-                  <SortableContext
-                    items={columns.map((column) => column.id)}
-                    strategy={horizontalListSortingStrategy}
+                  <div
+                    ref={boardScrollRef}
+                    className="scrollbar-hide flex h-full items-start gap-5 overflow-x-auto bg-background px-5 pt-4 pb-5"
                   >
-                    {columns.map((column) => (
-                      <TaskColumn
-                        key={column.id}
-                        column={column}
-                        columns={columns}
-                        tasks={visibleGroupedTasks[column.id] ?? []}
-                        isCreating={creatingColumnId === column.id}
-                        tagSuggestions={tagSuggestions}
-                        onCreate={setCreatingColumnId}
-                        onCreateTask={handleCreateTask}
-                        onCancelCreate={() => setCreatingColumnId(null)}
-                        onDeleteColumn={handleDeleteColumn}
-                        onDeleteTask={handleDeleteTask}
-                        onMoveTask={handleMoveTask}
-                        onUpdateColumn={handleUpdateColumn}
-                        onUpdateTask={handleUpdateTask}
-                      />
-                    ))}
-                  </SortableContext>
-                </div>
-                <DragOverlay dropAnimation={null}>
-                  {activeDragTask ? (
-                    <div className="w-[306px]">
-                      <TaskCardSurface task={activeDragTask} isDragging />
-                    </div>
-                  ) : null}
-                </DragOverlay>
-              </DndContext>
+                    <SortableContext
+                      items={columns.map((column) => column.id)}
+                      strategy={horizontalListSortingStrategy}
+                    >
+                      {columns.map((column) => (
+                        <TaskColumn
+                          key={column.id}
+                          column={column}
+                          columns={columns}
+                          tasks={visibleGroupedTasks[column.id] ?? []}
+                          isCreating={creatingColumnId === column.id}
+                          tagSuggestions={tagSuggestions}
+                          onCreate={setCreatingColumnId}
+                          onCreateTask={handleCreateTask}
+                          onCancelCreate={() => setCreatingColumnId(null)}
+                          onDeleteColumn={handleDeleteColumn}
+                          onDeleteTask={handleDeleteTask}
+                          onMoveTask={handleMoveTask}
+                          onUpdateColumn={handleUpdateColumn}
+                          onUpdateTask={handleUpdateTask}
+                        />
+                      ))}
+                    </SortableContext>
+                  </div>
+                  <DragOverlay dropAnimation={null}>
+                    {activeDragTask ? (
+                      <div className="w-[306px]">
+                        <TaskCardSurface task={activeDragTask} isDragging />
+                      </div>
+                    ) : null}
+                  </DragOverlay>
+                </DndContext>
+
+                {showScrollButtons && (
+                  <div className="absolute right-6 bottom-6 z-30 flex items-center gap-1">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={scrollLeft}
+                          disabled={!canScrollLeft}
+                          className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground active:scale-95 disabled:pointer-events-none disabled:opacity-30"
+                          aria-label="Scroll left"
+                        >
+                          <ArrowLeftIcon size={20} />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Scroll left</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={scrollRight}
+                          disabled={!canScrollRight}
+                          className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground active:scale-95 disabled:pointer-events-none disabled:opacity-30"
+                          aria-label="Scroll right"
+                        >
+                          <ArrowRightIcon size={20} />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">Scroll right</TooltipContent>
+                    </Tooltip>
+                  </div>
+                )}
+              </>
             ) : (
               <div ref={tableContainerRef} className="h-full overflow-auto px-5 pt-4 pb-5">
                 <div className="mx-auto max-w-5xl overflow-hidden rounded-xl border border-border/60 bg-card shadow-sm">

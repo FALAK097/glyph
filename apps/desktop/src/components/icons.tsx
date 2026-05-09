@@ -5,27 +5,41 @@ import {
   ArrowRight01Icon as ArrowRight01Svg,
   ArrowUp01Icon as ArrowUp01Svg,
   ArrowDown01Icon as ArrowDown01Svg,
+  Book01Icon as Book01Svg,
+  Briefcase01Icon as Briefcase01Svg,
+  Calendar01Icon as Calendar01Svg,
+  Camera01Icon as Camera01Svg,
   Cancel01Icon as Cancel01Svg,
   CheckmarkCircle01Icon as CheckmarkCircle01Svg,
   CopyIcon as CopySvg,
   Delete02Icon as Delete02Svg,
+  DiscountTag01Icon as DiscountTag01Svg,
   File01Icon as File01Svg,
   FileDownIcon as FileDownSvg,
   Folder01Icon as Folder01Svg,
   FolderAddIcon as FolderAddSvg,
+  Globe02Icon as Globe02Svg,
+  Home01Icon as Home01Svg,
+  HonourStarIcon as HonourStarSvg,
+  Idea01Icon as Idea01Svg,
   KeyboardIcon as KeyboardSvg,
+  Layers01Icon as Layers01Svg,
+  Leaf01Icon as Leaf01Svg,
   Link01Icon as Link01Svg,
   ListViewIcon as ListViewSvg,
   Maximize01Icon as Maximize01Svg,
   MoreHorizontalIcon as MoreHorizontalSvg,
   MoreVerticalIcon as MoreVerticalSvg,
+  Notebook01Icon as Notebook01Svg,
   PanelLeftIcon as HugePanelLeftIcon,
   PanelRightIcon as HugePanelRightIcon,
   PinIcon as HugePinIcon,
   PinOffIcon as HugePinOffIcon,
   PencilEdit02Icon as PencilEdit02Svg,
+  Rocket01Icon as Rocket01Svg,
   Search01Icon as Search01Svg,
   Settings01Icon as Settings01Svg,
+  SparklesIcon as SparklesSvg,
   UnfoldMoreIcon as UnfoldMoreSvg,
   Tick02Icon as Tick02Svg,
 } from "@hugeicons/core-free-icons";
@@ -145,3 +159,21 @@ export const ArchiveIcon = (props: IconProps) => (
     <path d="M10 12h4" />
   </svg>
 );
+
+// Note collection icon set — HugeIcons free
+export const BookIcon = (props: IconProps) => <HugeIcon icon={Book01Svg} {...props} />;
+export const BriefcaseIcon = (props: IconProps) => <HugeIcon icon={Briefcase01Svg} {...props} />;
+export const CalendarIcon = (props: IconProps) => <HugeIcon icon={Calendar01Svg} {...props} />;
+export const CameraIcon = (props: IconProps) => <HugeIcon icon={Camera01Svg} {...props} />;
+export const DiscountTagIcon = (props: IconProps) => (
+  <HugeIcon icon={DiscountTag01Svg} {...props} />
+);
+export const GlobeIcon = (props: IconProps) => <HugeIcon icon={Globe02Svg} {...props} />;
+export const HomeIcon = (props: IconProps) => <HugeIcon icon={Home01Svg} {...props} />;
+export const HonourStarIcon = (props: IconProps) => <HugeIcon icon={HonourStarSvg} {...props} />;
+export const IdeaIcon = (props: IconProps) => <HugeIcon icon={Idea01Svg} {...props} />;
+export const LayersIcon = (props: IconProps) => <HugeIcon icon={Layers01Svg} {...props} />;
+export const LeafIcon = (props: IconProps) => <HugeIcon icon={Leaf01Svg} {...props} />;
+export const NotebookIcon = (props: IconProps) => <HugeIcon icon={Notebook01Svg} {...props} />;
+export const RocketIcon = (props: IconProps) => <HugeIcon icon={Rocket01Svg} {...props} />;
+export const SparklesIcon = (props: IconProps) => <HugeIcon icon={SparklesSvg} {...props} />;

@@ -5,6 +5,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { ArrowDownIcon, DotsHorizontalIcon, PlusIcon } from "@/components/icons";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -18,6 +19,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import type { TaskColumn as TaskColumnModel, TaskColumnColor, WorkspaceTask } from "@/core/tasks";
 import { TASK_COLUMN_COLORS_PICKER } from "@/core/tasks";
 import { cn } from "@/core/utils";
+import { useTasksUIStore } from "@/store/tasks-ui";
 
 import { TaskCard } from "./task-card";
 import { TaskInlineEditor } from "./task-inline-editor";
@@ -37,74 +39,109 @@ const COLOR_STYLES: Record<
   { add: string; dot: string; count: string; header: string; resize: string }
 > = {
   amber: {
-    add: "hover:border-chart-2/35 hover:text-chart-2",
+    add: "hover:border-chart-2/35 hover:text-chart-2 focus-visible:border-chart-2/60 focus-visible:ring-chart-2/25",
     count: "bg-chart-2/15 text-chart-2",
     dot: "border-chart-2",
     header: "bg-chart-2/8",
     resize: "bg-chart-2/45",
   },
   blue: {
-    add: "hover:border-primary/35 hover:text-primary",
+    add: "hover:border-primary/35 hover:text-primary focus-visible:border-primary/60 focus-visible:ring-primary/25",
     count: "bg-primary/10 text-primary",
     dot: "border-primary",
     header: "bg-primary/5",
     resize: "bg-primary/45",
   },
+  sky: {
+    add: "hover:border-sky-500/35 hover:text-sky-600 dark:hover:text-sky-400 focus-visible:border-sky-500/60 focus-visible:ring-sky-500/25",
+    count: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+    dot: "border-sky-500",
+    header: "bg-sky-500/8",
+    resize: "bg-sky-500/45",
+  },
   cyan: {
-    add: "hover:border-chart-3/35 hover:text-chart-3",
+    add: "hover:border-chart-3/35 hover:text-chart-3 focus-visible:border-chart-3/60 focus-visible:ring-chart-3/25",
     count: "bg-chart-3/15 text-chart-3",
     dot: "border-chart-3",
     header: "bg-chart-3/8",
     resize: "bg-chart-3/45",
   },
+  teal: {
+    add: "hover:border-teal-500/35 hover:text-teal-600 dark:hover:text-teal-400 focus-visible:border-teal-500/60 focus-visible:ring-teal-500/25",
+    count: "bg-teal-500/10 text-teal-600 dark:text-teal-400",
+    dot: "border-teal-500",
+    header: "bg-teal-500/8",
+    resize: "bg-teal-500/45",
+  },
   emerald: {
-    add: "hover:border-chart-5/35 hover:text-chart-5",
+    add: "hover:border-chart-5/35 hover:text-chart-5 focus-visible:border-chart-5/60 focus-visible:ring-chart-5/25",
     count: "bg-chart-5/15 text-chart-5",
     dot: "border-chart-5",
     header: "bg-chart-5/8",
     resize: "bg-chart-5/45",
   },
   lime: {
-    add: "hover:border-chart-5/35 hover:text-chart-5",
+    add: "hover:border-chart-5/35 hover:text-chart-5 focus-visible:border-chart-5/60 focus-visible:ring-chart-5/25",
     count: "bg-chart-5/15 text-chart-5",
     dot: "border-chart-5",
     header: "bg-chart-5/8",
     resize: "bg-chart-5/45",
   },
   orange: {
-    add: "hover:border-chart-2/35 hover:text-chart-2",
+    add: "hover:border-chart-2/35 hover:text-chart-2 focus-visible:border-chart-2/60 focus-visible:ring-chart-2/25",
     count: "bg-chart-2/15 text-chart-2",
     dot: "border-chart-2",
     header: "bg-chart-2/8",
     resize: "bg-chart-2/45",
   },
+  coral: {
+    add: "hover:border-orange-500/35 hover:text-orange-600 dark:hover:text-orange-400 focus-visible:border-orange-500/60 focus-visible:ring-orange-500/25",
+    count: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+    dot: "border-orange-500",
+    header: "bg-orange-500/8",
+    resize: "bg-orange-500/45",
+  },
   pink: {
-    add: "hover:border-chart-4/35 hover:text-chart-4",
+    add: "hover:border-chart-4/35 hover:text-chart-4 focus-visible:border-chart-4/60 focus-visible:ring-chart-4/25",
     count: "bg-chart-4/15 text-chart-4",
     dot: "border-chart-4",
     header: "bg-chart-4/8",
     resize: "bg-chart-4/45",
   },
   rose: {
-    add: "hover:border-destructive/35 hover:text-destructive",
+    add: "hover:border-destructive/35 hover:text-destructive focus-visible:border-destructive/60 focus-visible:ring-destructive/25",
     count: "bg-destructive/12 text-destructive",
     dot: "border-destructive",
     header: "bg-destructive/8",
     resize: "bg-destructive/45",
   },
+  red: {
+    add: "hover:border-red-600/35 hover:text-red-600 dark:hover:text-red-400 focus-visible:border-red-600/60 focus-visible:ring-red-600/25",
+    count: "bg-red-600/10 text-red-600 dark:text-red-400",
+    dot: "border-red-600",
+    header: "bg-red-600/8",
+    resize: "bg-red-600/45",
+  },
   slate: {
-    add: "hover:border-muted-foreground/35 hover:text-foreground",
+    add: "hover:border-muted-foreground/35 hover:text-foreground focus-visible:border-muted-foreground/40 focus-visible:ring-muted-foreground/15",
     count: "bg-muted text-muted-foreground",
     dot: "border-muted-foreground",
     header: "bg-muted/40",
     resize: "bg-muted-foreground/35",
   },
   violet: {
-    add: "hover:border-chart-4/35 hover:text-chart-4",
+    add: "hover:border-chart-4/35 hover:text-chart-4 focus-visible:border-chart-4/60 focus-visible:ring-chart-4/25",
     count: "bg-chart-4/15 text-chart-4",
     dot: "border-chart-4",
     header: "bg-chart-4/8",
     resize: "bg-chart-4/45",
+  },
+  indigo: {
+    add: "hover:border-indigo-500/35 hover:text-indigo-600 dark:hover:text-indigo-400 focus-visible:border-indigo-500/60 focus-visible:ring-indigo-500/25",
+    count: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
+    dot: "border-indigo-500",
+    header: "bg-indigo-500/8",
+    resize: "bg-indigo-500/45",
   },
 };
 
@@ -155,6 +192,10 @@ export const TaskColumn = memo(function TaskColumn({
   const [draftTitle, setDraftTitle] = useState(column.title);
   const resizeStateRef = useRef<{ startX: number; startWidth: number; width: number } | null>(null);
   const [liveWidth, setLiveWidth] = useState(column.width ?? 340);
+
+  const addToTopByColumn = useTasksUIStore((s) => s.addToTopByColumn);
+  const setAddToTopForColumn = useTasksUIStore((s) => s.setAddToTopForColumn);
+  const addToTop = addToTopByColumn[column.id] ?? false;
 
   useEffect(() => {
     if (!isRenaming) {
@@ -362,8 +403,6 @@ export const TaskColumn = memo(function TaskColumn({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56 bg-popover text-popover-foreground">
             <DropdownMenuItem onClick={() => onCreate(column.id)}>Add task</DropdownMenuItem>
-            <DropdownMenuItem onClick={toggleCollapsed}>Collapse list</DropdownMenuItem>
-            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => setIsRenaming(true)}>Edit list</DropdownMenuItem>
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
@@ -372,7 +411,7 @@ export const TaskColumn = memo(function TaskColumn({
                 />
                 Color
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="grid w-auto grid-cols-7 gap-2 p-2">
+              <DropdownMenuSubContent className="grid w-auto grid-cols-5 gap-2 p-2">
                 {TASK_COLUMN_COLORS_PICKER.map((nextColor) => (
                   <Tooltip key={nextColor}>
                     <TooltipTrigger asChild>
@@ -401,6 +440,13 @@ export const TaskColumn = memo(function TaskColumn({
               </DropdownMenuSubContent>
             </DropdownMenuSub>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={toggleCollapsed}>Collapse list</DropdownMenuItem>
+            <DropdownMenuCheckboxItem
+              checked={addToTop}
+              onCheckedChange={(checked) => setAddToTopForColumn(column.id, checked)}
+            >
+              Add new tasks to top
+            </DropdownMenuCheckboxItem>
             <DropdownMenuItem onClick={() => onUpdateColumn(column.id, { isDone: !column.isDone })}>
               {column.isDone ? "Unmark as done list" : "Mark as done list"}
             </DropdownMenuItem>
@@ -446,7 +492,7 @@ export const TaskColumn = memo(function TaskColumn({
           type="button"
           onClick={() => onCreate(column.id)}
           className={cn(
-            "flex h-10 w-full items-center justify-center gap-1 rounded-md border border-border bg-background text-sm font-medium text-muted-foreground shadow-xs transition-[border-color,color,transform] duration-100 ease-out active:scale-[0.99]",
+            "flex h-10 w-full items-center justify-center gap-1 rounded-md border border-border bg-background text-sm font-medium text-muted-foreground shadow-xs transition-[border-color,color,transform] duration-100 ease-out active:scale-[0.99] focus-visible:outline-none focus-visible:ring-3",
             color.add,
           )}
         >

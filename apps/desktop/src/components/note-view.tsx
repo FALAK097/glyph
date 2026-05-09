@@ -32,7 +32,6 @@ type NoteViewProps = {
   shortcuts: ShortcutSetting[];
   canGoBack: boolean;
   canGoForward: boolean;
-  autoOpenPDFSetting: boolean;
   folderRevealLabel: string;
   isActiveFilePinned: boolean;
   isFocusMode: boolean;
@@ -82,7 +81,6 @@ export function NoteView({
   shortcuts,
   canGoBack,
   canGoForward,
-  autoOpenPDFSetting,
   folderRevealLabel,
   isActiveFilePinned,
   isFocusMode,
@@ -194,7 +192,6 @@ export function NoteView({
       onOpenNewWindow={onOpenNewWindow}
       canGoBack={canGoBack}
       canGoForward={canGoForward}
-      autoOpenPDFSetting={autoOpenPDFSetting}
       folderRevealLabel={folderRevealLabel}
       isActiveFilePinned={isActiveFilePinned}
       isFocusMode={isFocusMode}

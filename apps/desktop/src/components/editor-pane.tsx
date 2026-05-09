@@ -273,7 +273,6 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
         zoomResetShortcut={getShortcutDisplay(ctx.shortcuts, "zoom-reset", navigator.platform)}
         canGoBack={ctx.canGoBack}
         canGoForward={ctx.canGoForward}
-        autoOpenPDFSetting={ctx.autoOpenPDFSetting}
         folderRevealLabel={ctx.folderRevealLabel}
         isActiveFilePinned={isActiveFilePinned}
         onTogglePinnedFile={filePath ? handleTogglePinnedFile : undefined}

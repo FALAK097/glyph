@@ -10,11 +10,16 @@ const COLOR_BORDER: Record<TaskColumnColor, string> = {
   blue: "border-primary/35",
   cyan: "border-chart-3/35",
   emerald: "border-chart-5/35",
+  coral: "border-orange-500/35",
+  indigo: "border-indigo-500/35",
   lime: "border-chart-5/35",
   orange: "border-chart-2/35",
   pink: "border-chart-4/35",
+  red: "border-red-600/35",
   rose: "border-destructive/35",
   slate: "border-muted-foreground/25",
+  sky: "border-sky-500/35",
+  teal: "border-teal-500/35",
   violet: "border-chart-4/35",
 };
 
@@ -24,11 +29,16 @@ const COLOR_INPUT_FOCUS: Record<TaskColumnColor, string> = {
   blue: "focus-visible:border-primary/60 focus-visible:ring-primary/25",
   cyan: "focus-visible:border-chart-3/60 focus-visible:ring-chart-3/25",
   emerald: "focus-visible:border-chart-5/60 focus-visible:ring-chart-5/25",
+  coral: "focus-visible:border-orange-500/60 focus-visible:ring-orange-500/25",
+  indigo: "focus-visible:border-indigo-500/60 focus-visible:ring-indigo-500/25",
   lime: "focus-visible:border-chart-5/60 focus-visible:ring-chart-5/25",
   orange: "focus-visible:border-chart-2/60 focus-visible:ring-chart-2/25",
   pink: "focus-visible:border-chart-4/60 focus-visible:ring-chart-4/25",
+  red: "focus-visible:border-red-600/60 focus-visible:ring-red-600/25",
   rose: "focus-visible:border-destructive/60 focus-visible:ring-destructive/25",
   slate: "focus-visible:border-muted-foreground/40 focus-visible:ring-muted-foreground/15",
+  sky: "focus-visible:border-sky-500/60 focus-visible:ring-sky-500/25",
+  teal: "focus-visible:border-teal-500/60 focus-visible:ring-teal-500/25",
   violet: "focus-visible:border-chart-4/60 focus-visible:ring-chart-4/25",
 };
 
@@ -38,11 +48,16 @@ const COLOR_BUTTON: Record<TaskColumnColor, string> = {
   blue: "bg-primary hover:bg-primary/80",
   cyan: "bg-chart-3 hover:bg-chart-3/80",
   emerald: "bg-chart-5 hover:bg-chart-5/80",
+  coral: "bg-orange-500 hover:bg-orange-500/80",
+  indigo: "bg-indigo-500 hover:bg-indigo-500/80",
   lime: "bg-chart-5 hover:bg-chart-5/80",
   orange: "bg-chart-2 hover:bg-chart-2/80",
   pink: "bg-chart-4 hover:bg-chart-4/80",
+  red: "bg-red-600 hover:bg-red-600/80",
   rose: "bg-destructive hover:bg-destructive/80",
   slate: "bg-muted-foreground hover:bg-muted-foreground/80",
+  sky: "bg-sky-500 hover:bg-sky-500/80",
+  teal: "bg-teal-500 hover:bg-teal-500/80",
   violet: "bg-chart-4 hover:bg-chart-4/80",
 };
 
@@ -111,14 +126,55 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
       year: current.getFullYear(),
     };
   });
+  const [cursorIndex, setCursorIndex] = useState(() => initialValue.length);
+  const [isInteracted, setIsInteracted] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const [anchor, setAnchor] = useState<PopoverAnchor | null>(null);
   const [selectedTagIndex, setSelectedTagIndex] = useState(0);
 
-  // The last whitespace-delimited token determines which popover shows
-  const activeToken = value.split(/\s/).at(-1) ?? "";
-  const showDatePicker = activeToken.startsWith("@");
+  // Sync calendar selections with the current parsed due date in text input
+  const parsedDueDate = useMemo(() => parseTaskText(value).dueDate, [value]);
+
+  const [prevParsedDueDate, setPrevParsedDueDate] = useState<string | null>(null);
+  if (parsedDueDate !== prevParsedDueDate) {
+    setPrevParsedDueDate(parsedDueDate);
+    if (parsedDueDate) {
+      const parts = parsedDueDate.split("-").map(Number);
+      if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+        const year = parts[0];
+        const month = parts[1] - 1;
+        const day = parts[2];
+        setCalendarSelectedDay({ day, month, year });
+        setCalendarMonth(new Date(year, month, 1));
+      }
+    } else {
+      setCalendarSelectedDay(null);
+    }
+  }
+
+  // Force cursor/focus to the end of input text on mount using a callback ref
+  const hasAutofocused = useRef(false);
+  const handleTextareaRef = useCallback(
+    (el: HTMLTextAreaElement | null) => {
+      textareaRef.current = el;
+      if (el && autoFocus && !hasAutofocused.current) {
+        hasAutofocused.current = true;
+        el.focus();
+        const len = el.value.length;
+        el.setSelectionRange(len, len);
+      }
+    },
+    [autoFocus],
+  );
+
+  // Get active token at cursor selection
+  const activeToken = useMemo(() => {
+    const beforeCursor = value.slice(0, cursorIndex);
+    return beforeCursor.split(/\s/).at(-1) ?? "";
+  }, [value, cursorIndex]);
+
+  const showDatePicker = activeToken.startsWith("@") || DATE_PATTERN.test(activeToken);
   const tagQuery = activeToken.startsWith("#") ? activeToken.slice(1).toLowerCase() : "";
   const deferredTagQuery = useDeferredValue(tagQuery);
   const matchingTags = useMemo(
@@ -129,20 +185,21 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
     [activeToken, deferredTagQuery, tagSuggestions],
   );
 
-  // Reset selected tag index when suggestions change (dep on matchingTags, not .length,
-  // so same-size result swaps after the query changes also reset the highlight).
-  useEffect(() => {
+  const [prevTagQuery, setPrevTagQuery] = useState("");
+  if (tagQuery !== prevTagQuery) {
+    setPrevTagQuery(tagQuery);
     setSelectedTagIndex(0);
-  }, [matchingTags]);
+  }
 
-  // Reset calendar selected day when date picker closes
-  useEffect(() => {
+  const [prevShowDatePicker, setPrevShowDatePicker] = useState(false);
+  if (showDatePicker !== prevShowDatePicker) {
+    setPrevShowDatePicker(showDatePicker);
     if (!showDatePicker) {
       setCalendarSelectedDay(null);
     }
-  }, [showDatePicker]);
+  }
 
-  const showPopover = showDatePicker || matchingTags.length > 0;
+  const showPopover = isInteracted && (showDatePicker || matchingTags.length > 0);
 
   useEffect(() => {
     if (!showPopover) {
@@ -183,10 +240,27 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
     }
   }, [showPopover, value]);
 
-  const replaceActiveToken = useCallback((nextToken: string) => {
-    setValue((current) => `${current.replace(/\S*$/, "").trimEnd()} ${nextToken} `.trimStart());
-    window.setTimeout(() => textareaRef.current?.focus(), 0);
-  }, []);
+  const replaceActiveToken = useCallback(
+    (nextToken: string) => {
+      setValue((current) => {
+        const beforeCursor = current.slice(0, cursorIndex);
+        const afterCursor = current.slice(cursorIndex);
+        const nextBefore = beforeCursor.replace(/\S*$/, nextToken + " ");
+        const nextValue = nextBefore + afterCursor.trimStart();
+        window.setTimeout(() => {
+          const textarea = textareaRef.current;
+          if (textarea) {
+            textarea.focus();
+            const newCursorPos = nextBefore.length;
+            textarea.setSelectionRange(newCursorPos, newCursorPos);
+            setCursorIndex(newCursorPos);
+          }
+        }, 0);
+        return nextValue;
+      });
+    },
+    [cursorIndex],
+  );
 
   const handleSubmit = useCallback(
     (event: React.FormEvent<HTMLFormElement>) => {
@@ -221,7 +295,9 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
   const TAGS_H = matchingTags.length * 40;
   const popoverHeight = showDatePicker ? CALENDAR_H : TAGS_H;
   const spaceBelow = anchor ? anchor.viewportHeight - anchor.bottom - 8 : 0;
-  const openBelow = !anchor || spaceBelow >= popoverHeight || spaceBelow >= anchor.top - 8;
+  const openBelow = showDatePicker
+    ? !anchor || spaceBelow >= popoverHeight || spaceBelow >= anchor.top - 8
+    : false; // Tag suggestions always appear above the input
 
   const popoverStyle: React.CSSProperties = anchor
     ? openBelow
@@ -248,13 +324,13 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
                     onMouseEnter={() => setSelectedTagIndex(tagIndex)}
                     onClick={() => replaceActiveToken(`#${tag}`)}
                     className={cn(
-                      "flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm",
-                      tagIndex === selectedTagIndex ? "bg-muted" : "hover:bg-muted",
+                      "flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm transition-colors",
+                      tagIndex === selectedTagIndex
+                        ? "bg-primary/15 text-primary font-medium"
+                        : "hover:bg-muted text-foreground",
                     )}
                   >
-                    <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">
-                      #{tag}
-                    </span>
+                    <span className="px-1.5 py-0.5 text-xs font-medium">#{tag}</span>
                   </button>
                 ))}
               </div>
@@ -338,11 +414,20 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
         )}
       >
         <textarea
-          ref={textareaRef}
+          ref={handleTextareaRef}
           autoFocus={autoFocus}
           rows={1}
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onPointerDown={() => setIsInteracted(true)}
+          onChange={(e) => {
+            setIsInteracted(true);
+            setValue(e.target.value);
+            setCursorIndex(e.target.selectionStart);
+          }}
+          onSelect={(e) => {
+            setIsInteracted(true);
+            setCursorIndex(e.currentTarget.selectionStart);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Escape") {
               onCancel();
@@ -396,6 +481,7 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
               setSelectedTagIndex((i) => Math.min(i + 1, matchingTags.length - 1));
               return;
             }
+            // Arrow keys to navigate tag suggestions
             if (e.key === "ArrowUp" && matchingTags.length > 0) {
               e.preventDefault();
               setSelectedTagIndex((i) => Math.max(i - 1, 0));
@@ -411,14 +497,20 @@ export const TaskInlineEditor = memo(function TaskInlineEditor({
           )}
         />
         <div className="mt-2 flex justify-end gap-1.5">
-          <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={onCancel}
+            className={cn(color && COLOR_INPUT_FOCUS[color])}
+          >
             Cancel
           </Button>
           <Button
             type="submit"
             size="sm"
             disabled={!parseTaskText(value).title}
-            className={cn(color && COLOR_BUTTON[color])}
+            className={cn(color && [COLOR_BUTTON[color], COLOR_INPUT_FOCUS[color]])}
           >
             {submitLabel}
           </Button>

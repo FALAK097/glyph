@@ -50,7 +50,6 @@ export type MarkdownEditorProps = {
   navigateForwardShortcut?: string;
   canGoBack?: boolean;
   canGoForward?: boolean;
-  autoOpenPDFSetting?: boolean;
   isActiveFilePinned?: boolean;
   onOutlineJumpHandled?: () => void;
   updateState?: UpdateState | null;

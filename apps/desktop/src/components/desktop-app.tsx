@@ -1,18 +1,17 @@
-import React, {
-  Suspense,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { getDisplayFileName, isSamePath, normalizePath } from "@/core/paths";
+import { getBaseName, getDisplayFileName, isSamePath, normalizePath } from "@/core/paths";
+import { buildNoteCollections, filterNoteBrowserEntries } from "@/core/note-collections";
 import { countGroupedSkills, groupSkillsForBrowse } from "@/core/skill-groups";
 import { getShortcutDisplay } from "@/core/shortcuts";
 import { SKILL_AGENT_CATALOG } from "@/core/skill-agent-catalog";
-import type { ThemeMode, TabMovePosition } from "@/core/workspace";
+import type {
+  NoteCollectionAccentKey,
+  NoteCollectionIconKey,
+  NoteBrowserEntry,
+  ThemeMode,
+  TabMovePosition,
+} from "@/core/workspace";
 import { useLayoutStore } from "@/store/layout";
 import { useSessionStore } from "@/store/session";
 import { useWorkspaceStore } from "@/store/workspace";
@@ -24,13 +23,18 @@ import { useDesktopAppController } from "@/hooks/use-desktop-app-controller";
 import { useSkillLibraryController } from "@/hooks/use-skill-library-controller";
 
 import { AppLayout } from "./app-layout";
+import { AppSurfaceShell } from "./app-surface-shell";
 import { CommandPalette } from "./command-palette";
+import { NotesBrowserPane } from "./notes/notes-browser-pane";
 import { EditorToolbar } from "./editor-toolbar";
+import { NotesFooterContent } from "./notes-footer-content";
 import { NoteConfirmDialog } from "./note-confirm-dialog";
 import { NoteRenameDialog } from "./note-rename-dialog";
+import { DeleteDialog } from "./sidebar/sidebar-delete-dialogs";
 import { SettingsPanel } from "./settings-panel";
 import { SkillView } from "./skills/skill-view";
 import { SkillsBrowserPane } from "./skills/skills-browser-pane";
+import { SkillsFooterContent } from "./skills-footer-content";
 import { SplitContainer } from "./split-container";
 import { SplitViewActivePaneProvider, SplitViewProvider } from "./split-view-context";
 import { TasksHeaderActions } from "./tasks/tasks-header-actions";
@@ -48,6 +52,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const viewerMode = useSessionStore((state) => state.viewerMode);
   const isNotesExpanded = useSessionStore((state) => state.isNotesExpanded);
   const isSkillsExpanded = useSessionStore((state) => state.isSkillsExpanded);
+  const selectedNoteCollectionPath = useSessionStore((state) => state.selectedNoteCollectionPath);
+  const notesBrowserPaneWidth = useSessionStore((state) => state.notesBrowserPaneWidth);
   const selectedSkillCollectionId = useSessionStore((state) => state.selectedSkillCollectionId);
   const noteWorkspacePath = useSessionStore((state) => state.noteWorkspacePath);
   const noteFilePath = useSessionStore((state) => state.noteFilePath);
@@ -59,6 +65,18 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const setViewerMode = useSessionStore((state) => state.setViewerMode);
   const setNotesExpanded = useSessionStore((state) => state.setNotesExpanded);
   const setSkillsExpanded = useSessionStore((state) => state.setSkillsExpanded);
+  const setSelectedNoteCollectionPath = useSessionStore(
+    (state) => state.setSelectedNoteCollectionPath,
+  );
+  const setLastNotePathForCollection = useSessionStore(
+    (state) => state.setLastNotePathForCollection,
+  );
+  const getLastNotePathForCollection = useSessionStore(
+    (state) => state.getLastNotePathForCollection,
+  );
+  const setNoteOrderForCollection = useSessionStore((state) => state.setNoteOrderForCollection);
+  const getNoteOrderForCollection = useSessionStore((state) => state.getNoteOrderForCollection);
+  const setNotesBrowserPaneWidth = useSessionStore((state) => state.setNotesBrowserPaneWidth);
   const setSelectedSkillCollectionId = useSessionStore(
     (state) => state.setSelectedSkillCollectionId,
   );
@@ -142,6 +160,11 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   };
   const [pendingNoteRename, setPendingNoteRename] = useState<PendingNoteRename | null>(null);
   const [pendingNoteConfirm, setPendingNoteConfirm] = useState<PendingNoteConfirm | null>(null);
+  const [pendingFolderDelete, setPendingFolderDelete] = useState<{
+    path: string;
+    name: string;
+  } | null>(null);
+  const [noteBrowserRefreshNonce, setNoteBrowserRefreshNonce] = useState(0);
   const [paletteSkillResultIds, setPaletteSkillResultIds] = useState<string[] | null>(null);
   const [resolvedPaletteSkillQuery, setResolvedPaletteSkillQuery] = useState("");
   const [skillInitialScrollTop, setSkillInitialScrollTop] = useState(0);
@@ -151,6 +174,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const paletteFilterQuery = controller.paletteQuery.trim().toLowerCase();
   const shouldCollapseSidebar =
     controller.isSidebarCollapsed || (viewerMode === "note" && controller.isFocusMode);
+  const shouldCollapseBrowserPane = viewerMode === "note" && controller.isFocusMode;
   const allSkills = skillsController.snapshot?.skills ?? [];
   const globalSkills = useMemo(
     () => allSkills.filter((skill) => skill.sourceId === "agents-global"),
@@ -244,35 +268,85 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       skillCollections.find((collection) => collection.id === selectedSkillCollectionId) ?? null,
     [selectedSkillCollectionId, skillCollections],
   );
+  const noteCollections = useMemo(
+    () =>
+      buildNoteCollections(
+        controller.visibleSidebarNodes.map((entry) => entry.node),
+        selectedNoteCollectionPath,
+        controller.settings?.noteFolderAppearances,
+      ),
+    [
+      controller.settings?.noteFolderAppearances,
+      controller.visibleSidebarNodes,
+      selectedNoteCollectionPath,
+    ],
+  );
+  const activeNoteCollection = useMemo(() => {
+    const activeFile = controller.activeFile;
+    if (!activeFile) {
+      return (
+        noteCollections.find((collection) => collection.path === selectedNoteCollectionPath) ??
+        noteCollections[0] ??
+        null
+      );
+    }
+
+    const currentCollection = noteCollections.find(
+      (collection) => collection.path === selectedNoteCollectionPath,
+    );
+    if (
+      currentCollection &&
+      (currentCollection.isAllCollection ||
+        currentCollection.notePaths.some((notePath) => isSamePath(notePath, activeFile.path)))
+    ) {
+      return currentCollection;
+    }
+
+    const containingCollection = [...noteCollections]
+      .filter(
+        (collection) =>
+          !collection.isAllCollection &&
+          collection.notePaths.some((notePath) => isSamePath(notePath, activeFile.path)),
+      )
+      .sort((left, right) => right.sourcePath.length - left.sourcePath.length)[0];
+
+    if (containingCollection) {
+      Promise.resolve().then(() => {
+        setSelectedNoteCollectionPath(containingCollection.path);
+        setLastNotePathForCollection(containingCollection.path, activeFile.path);
+      });
+      return containingCollection;
+    }
+
+    return currentCollection ?? noteCollections[0] ?? null;
+  }, [
+    controller.activeFile,
+    noteCollections,
+    selectedNoteCollectionPath,
+    setSelectedNoteCollectionPath,
+    setLastNotePathForCollection,
+  ]);
   const currentNoteDisplayName = useMemo(
     () => (controller.activeFile ? getDisplayFileName(controller.activeFile.name) : ""),
     [controller.activeFile],
   );
-  const handleDocumentScrollPositionChange = useCallback(
-    (targetPath: string | null, scrollTop: number) => {
-      setDocumentScroll(targetPath, scrollTop);
-    },
-    [setDocumentScroll],
-  );
-
-  useLayoutEffect(() => {
-    setSkillInitialScrollTop(
-      skillsController.activeDocument
-        ? useSessionStore.getState().getDocumentScroll(skillsController.activeDocument.path)
-        : 0,
-    );
-  }, [skillsController.activeDocument, viewerMode]);
-
   const visibleSkills = useMemo(() => {
     if (!activeSkillCollection) {
       return [];
     }
 
-    return skillsController.filteredSkills.filter((skill) => activeSkillCollection.matches(skill));
-  }, [activeSkillCollection, skillsController.filteredSkills]);
+    return allSkills.filter((skill) => activeSkillCollection.matches(skill));
+  }, [activeSkillCollection, allSkills]);
   const visibleSkillItems = useMemo(() => {
     return groupSkillsForBrowse(visibleSkills);
   }, [visibleSkills]);
+  const [noteBrowserEntries, setNoteBrowserEntries] = useState<NoteBrowserEntry[]>([]);
+  const [isNoteBrowserLoading, setIsNoteBrowserLoading] = useState(false);
+  const visibleNoteBrowserEntries = useMemo(
+    () => filterNoteBrowserEntries(noteBrowserEntries, "", activeNoteCollection),
+    [activeNoteCollection, noteBrowserEntries],
+  );
+  const activeNoteCollectionPath = activeNoteCollection?.path ?? null;
 
   const handleToggleSkillsSection = useCallback(() => {
     const nextValue = !isSkillsExpanded;
@@ -287,6 +361,35 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const handleToggleNotesSection = useCallback(() => {
     setNotesExpanded(!isNotesExpanded);
   }, [isNotesExpanded, setNotesExpanded]);
+
+  const handleSelectNoteCollection = useCallback(
+    async (collectionPath: string) => {
+      const collection = noteCollections.find((item) => item.path === collectionPath);
+      const lastNotePath = getLastNotePathForCollection(collectionPath);
+      const targetNotePath =
+        lastNotePath && collection?.notePaths.some((notePath) => isSamePath(notePath, lastNotePath))
+          ? lastNotePath
+          : (collection?.notePaths[0] ?? null);
+
+      setSelectedSkillCollectionId(null);
+      setSelectedNoteCollectionPath(collectionPath);
+      setViewerMode("note");
+
+      if (targetNotePath) {
+        await controller.openFile(targetNotePath);
+        setLastNotePathForCollection(collectionPath, targetNotePath);
+      }
+    },
+    [
+      controller,
+      getLastNotePathForCollection,
+      noteCollections,
+      setLastNotePathForCollection,
+      setSelectedNoteCollectionPath,
+      setSelectedSkillCollectionId,
+      setViewerMode,
+    ],
+  );
 
   const activateSkillCollection = useCallback(
     (collectionId: string) => {
@@ -342,6 +445,58 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     [openSkillInCollection],
   );
 
+  const handleCreateNoteInCollection = useCallback(
+    (collectionPath: string) => {
+      void controller.createNote(collectionPath);
+      setSelectedNoteCollectionPath(collectionPath);
+      setViewerMode("note");
+    },
+    [controller, setSelectedNoteCollectionPath, setViewerMode],
+  );
+
+  const handleCreateFolderInCollection = useCallback(
+    (collectionPath: string) => {
+      void controller.createFolder(collectionPath);
+      setSelectedNoteCollectionPath(collectionPath);
+      setViewerMode("note");
+    },
+    [controller, setSelectedNoteCollectionPath, setViewerMode],
+  );
+
+  const handleChangeNoteCollectionAccent = useCallback(
+    (collectionPath: string, accent: NoteCollectionAccentKey) => {
+      const currentAppearances = controller.settings?.noteFolderAppearances ?? {};
+      const nextAppearance = {
+        ...currentAppearances[collectionPath],
+        accent,
+      };
+      void controller.saveSettings({
+        noteFolderAppearances: {
+          ...currentAppearances,
+          [collectionPath]: nextAppearance,
+        },
+      });
+    },
+    [controller],
+  );
+
+  const handleChangeNoteCollectionIcon = useCallback(
+    (collectionPath: string, icon: NoteCollectionIconKey) => {
+      const currentAppearances = controller.settings?.noteFolderAppearances ?? {};
+      const nextAppearance = {
+        ...currentAppearances[collectionPath],
+        icon,
+      };
+      void controller.saveSettings({
+        noteFolderAppearances: {
+          ...currentAppearances,
+          [collectionPath]: nextAppearance,
+        },
+      });
+    },
+    [controller],
+  );
+
   useEffect(() => {
     if (!sessionHasHydrated) {
       return;
@@ -349,6 +504,124 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
 
     setIsInitialSkillRestorePending(initialSkillSessionRef.current.viewerMode === "skill");
   }, [sessionHasHydrated]);
+
+  useEffect(() => {
+    // Wait for the workspace to finish booting before touching the persisted
+    // selection — otherwise the effect fires while noteCollections is still
+    // empty (workspace not yet open) and incorrectly wipes the restored path.
+    if (!controller.hasBooted) {
+      return;
+    }
+
+    if (noteCollections.length === 0) {
+      if (selectedNoteCollectionPath !== null) {
+        setSelectedNoteCollectionPath(null);
+      }
+      return;
+    }
+
+    // If no collection was previously selected, do not auto-select — let the
+    // user choose. Only auto-recover when a previously valid selection has
+    // since been removed (e.g. the folder was deleted).
+    if (selectedNoteCollectionPath === null) {
+      return;
+    }
+
+    if (noteCollections.some((collection) => collection.path === selectedNoteCollectionPath)) {
+      return;
+    }
+
+    setSelectedNoteCollectionPath(noteCollections[0]?.path ?? null);
+  }, [
+    controller.hasBooted,
+    noteCollections,
+    selectedNoteCollectionPath,
+    setSelectedNoteCollectionPath,
+  ]);
+
+  useEffect(() => {
+    const targetPaths = activeNoteCollection?.isAllCollection
+      ? Array.from(
+          new Set(
+            noteCollections
+              .filter((collection) => collection.isRootCollection && !collection.isAllCollection)
+              .map((collection) => collection.sourcePath),
+          ),
+        )
+      : [activeNoteCollection?.sourcePath ?? null];
+    let isCancelled = false;
+
+    setIsNoteBrowserLoading(true);
+    void glyph
+      .getNoteBrowserEntriesBatch(targetPaths)
+      .then((entryGroups) => {
+        if (isCancelled) {
+          return;
+        }
+
+        const entriesByPath = new Map(
+          entryGroups.flat().map((entry) => [entry.path.replace(/\\/g, "/").toLowerCase(), entry]),
+        );
+        const sorted = Array.from(entriesByPath.values()).sort((a, b) => {
+          const aTime = a.modifiedAt
+            ? new Date(a.modifiedAt).getTime()
+            : a.createdAt
+              ? new Date(a.createdAt).getTime()
+              : 0;
+          const bTime = b.modifiedAt
+            ? new Date(b.modifiedAt).getTime()
+            : b.createdAt
+              ? new Date(b.createdAt).getTime()
+              : 0;
+          return bTime - aTime;
+        });
+        const order = getNoteOrderForCollection(activeNoteCollection.path);
+        const orderIndexes = new Map(
+          order.map((path, index) => [path.replace(/\\/g, "/").toLowerCase(), index]),
+        );
+        const ordered = sorted.sort((a, b) => {
+          const aIndex = orderIndexes.get(a.path.replace(/\\/g, "/").toLowerCase());
+          const bIndex = orderIndexes.get(b.path.replace(/\\/g, "/").toLowerCase());
+
+          if (aIndex !== undefined && bIndex !== undefined) {
+            return aIndex - bIndex;
+          }
+
+          if (aIndex !== undefined) {
+            return -1;
+          }
+
+          if (bIndex !== undefined) {
+            return 1;
+          }
+
+          return 0;
+        });
+
+        setNoteBrowserEntries(ordered);
+      })
+      .catch(() => {
+        if (isCancelled) {
+          return;
+        }
+        setNoteBrowserEntries([]);
+      })
+      .finally(() => {
+        if (!isCancelled) {
+          setIsNoteBrowserLoading(false);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    activeNoteCollection,
+    getNoteOrderForCollection,
+    glyph,
+    noteCollections,
+    noteBrowserRefreshNonce,
+  ]);
 
   useEffect(() => {
     if (
@@ -477,11 +750,37 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
 
   const handleOpenNoteFile = useCallback(
     async (filePath: string) => {
+      const normalizedFilePath = filePath.replace(/\\/g, "/").toLowerCase();
+      const containingCollection = [...noteCollections]
+        .filter(
+          (collection) =>
+            !collection.isAllCollection &&
+            collection.notePaths.some(
+              (notePath) => notePath.replace(/\\/g, "/").toLowerCase() === normalizedFilePath,
+            ),
+        )
+        .sort((left, right) => right.sourcePath.length - left.sourcePath.length)[0];
+
       setSelectedSkillCollectionId(null);
+      if (activeNoteCollection?.isAllCollection) {
+        setSelectedNoteCollectionPath(activeNoteCollection.path);
+        setLastNotePathForCollection(activeNoteCollection.path, filePath);
+      } else if (containingCollection) {
+        setSelectedNoteCollectionPath(containingCollection.path);
+        setLastNotePathForCollection(containingCollection.path, filePath);
+      }
       setViewerMode("note");
       await controller.openFile(filePath);
     },
-    [controller, setSelectedSkillCollectionId, setViewerMode],
+    [
+      activeNoteCollection,
+      controller,
+      noteCollections,
+      setLastNotePathForCollection,
+      setSelectedNoteCollectionPath,
+      setSelectedSkillCollectionId,
+      setViewerMode,
+    ],
   );
 
   const handleOpenTasks = useCallback(() => {
@@ -507,7 +806,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     await controller.openFile(tasksPath);
   }, [controller, setSelectedSkillCollectionId, setViewerMode]);
 
-  const handleOpenSkillLink = useCallback(
+  const handleOpenLinkedFile = useCallback(
     async (targetPath: string) => {
       const matchingSkill = allSkills.find(
         (skill) =>
@@ -538,6 +837,12 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     },
     [activateSkillCollection, allSkills, controller, skillsController],
   );
+  const handleDocumentScrollPositionChange = useCallback(
+    (targetPath: string | null, scrollTop: number) => {
+      setDocumentScroll(targetPath, scrollTop);
+    },
+    [setDocumentScroll],
+  );
   const closePalette = useCallback(() => {
     controller.setIsPaletteOpen(false);
   }, [controller.setIsPaletteOpen]);
@@ -551,11 +856,11 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       const pdfName = fileName.replace(/\.(md|mdx|markdown)$/i, ".pdf");
       const absolutePath = await glyph.exportMarkdownToPDF(markdown, pdfName);
 
-      if ((controller.settings?.autoOpenPDF ?? true) && absolutePath) {
+      if (absolutePath) {
         await glyph.openExternal(absolutePath);
       }
     },
-    [controller.settings?.autoOpenPDF, glyph],
+    [glyph],
   );
 
   const handleRenameCurrentNote = useCallback(() => {
@@ -583,6 +888,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
 
     await controller.handleRenameFile(pendingNoteRename.path, nextName);
     setPendingNoteRename(null);
+    setNoteBrowserRefreshNonce((n) => n + 1);
   }, [controller, pendingNoteRename]);
 
   const handleOpenCurrentNoteConfirm = useCallback(
@@ -609,11 +915,21 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     if (pendingNoteConfirm.kind === "remove") {
       await controller.handleRemoveFileFromGlyph(pendingNoteConfirm.path);
     } else {
+      // Optimistically remove from notes browser if present
+      setNoteBrowserEntries((current) =>
+        current.filter((item) => !isSamePath(item.path, pendingNoteConfirm.path)),
+      );
       await controller.handleDeleteFile(pendingNoteConfirm.path);
     }
 
     setPendingNoteConfirm(null);
   }, [controller, pendingNoteConfirm]);
+
+  const handleConfirmFolderDelete = useCallback(async () => {
+    if (!pendingFolderDelete) return;
+    await controller.handleDeleteFolder(pendingFolderDelete.path);
+    setPendingFolderDelete(null);
+  }, [controller, pendingFolderDelete]);
 
   const handleCopyCurrentNoteMarkdown = useCallback(async () => {
     await copyText(controller.draftContent);
@@ -646,25 +962,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     await exportDocumentToPdf(controller.draftContent, controller.activeFile.name);
     closePalette();
   }, [closePalette, controller.activeFile, controller.draftContent, exportDocumentToPdf]);
-
-  const handleCopyCurrentSkillMarkdown = useCallback(async () => {
-    await copyText(skillsController.draftContent);
-    closePalette();
-  }, [closePalette, copyText, skillsController.draftContent]);
-
-  const handleExportCurrentSkill = useCallback(async () => {
-    if (!skillsController.activeDocument) {
-      return;
-    }
-
-    await exportDocumentToPdf(skillsController.draftContent, skillsController.activeDocument.name);
-    closePalette();
-  }, [
-    closePalette,
-    exportDocumentToPdf,
-    skillsController.activeDocument,
-    skillsController.draftContent,
-  ]);
 
   const isSkillSurfaceVisible = viewerMode === "skill";
   const isTasksSurfaceVisible = viewerMode === "tasks";
@@ -715,6 +1012,23 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     selectedSkillCollectionId,
     visibleSkillItems.length,
     visibleSkills.length,
+  ]);
+  const handleCopyCurrentSkillMarkdown = useCallback(async () => {
+    await copyText(skillsController.draftContent);
+    closePalette();
+  }, [closePalette, copyText, skillsController.draftContent]);
+  const handleExportCurrentSkill = useCallback(async () => {
+    if (!skillsController.activeDocument) {
+      return;
+    }
+
+    await exportDocumentToPdf(skillsController.draftContent, skillsController.activeDocument.name);
+    closePalette();
+  }, [
+    closePalette,
+    exportDocumentToPdf,
+    skillsController.activeDocument,
+    skillsController.draftContent,
   ]);
   const openSkillFromSearchResult = useCallback(
     async (skillId: string) => {
@@ -1226,8 +1540,11 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     controller.settings?.dismissedUpdateVersion ?? null,
   );
   const handleCreateNote = useCallback(() => {
-    void controller.createNote();
-  }, [controller.createNote]);
+    void controller.createNote(activeNoteCollection?.sourcePath ?? undefined);
+  }, [activeNoteCollection?.sourcePath, controller.createNote]);
+  const handleCreateFolder = useCallback(() => {
+    void controller.createFolder(activeNoteCollection?.sourcePath ?? undefined);
+  }, [activeNoteCollection?.sourcePath, controller.createFolder]);
   const handleNavigateBack = useCallback(() => {
     void controller.navigateBack();
   }, [controller.navigateBack]);
@@ -1250,12 +1567,100 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     void controller.dismissUpdateNotification();
   }, [controller.dismissUpdateNotification]);
   const handleDisabledToolbarAction = useCallback(async () => {}, []);
+  useEffect(() => {
+    setSkillInitialScrollTop(
+      skillsController.activeDocument
+        ? useSessionStore.getState().getDocumentScroll(skillsController.activeDocument.path)
+        : 0,
+    );
+  }, [skillsController.activeDocument, viewerMode]);
   const handleTogglePinnedPath = useCallback(
     (filePath: string) => {
       void controller.togglePinnedFile(filePath);
     },
     [controller.togglePinnedFile],
   );
+  // ── NotesBrowserPane stable callbacks ─────────────────────────────────────
+  const handleBrowserOpenNote = useCallback(
+    (filePath: string) => void handleOpenNoteFile(filePath),
+    [handleOpenNoteFile],
+  );
+  const handleBrowserReorderNote = useCallback(
+    (sourcePath: string, targetPath: string, position: "before" | "after") => {
+      if (!activeNoteCollectionPath) {
+        return;
+      }
+
+      setNoteBrowserEntries((current) => {
+        const sourceIndex = current.findIndex((entry) => isSamePath(entry.path, sourcePath));
+        const targetIndex = current.findIndex((entry) => isSamePath(entry.path, targetPath));
+
+        if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) {
+          return current;
+        }
+
+        const nextEntries = [...current];
+        const [moved] = nextEntries.splice(sourceIndex, 1);
+        const nextTargetIndex = nextEntries.findIndex((entry) =>
+          isSamePath(entry.path, targetPath),
+        );
+        const insertIndex = position === "before" ? nextTargetIndex : nextTargetIndex + 1;
+        nextEntries.splice(insertIndex, 0, moved);
+        setNoteOrderForCollection(
+          activeNoteCollectionPath,
+          nextEntries.map((entry) => entry.path),
+        );
+        return nextEntries;
+      });
+    },
+    [activeNoteCollectionPath, setNoteOrderForCollection],
+  );
+  const handleBrowserCopyNote = useCallback(
+    (entry: { path: string }) => {
+      void glyph
+        .readFile(entry.path)
+        .then((file) => copyText(file.content))
+        .catch(() => {});
+    },
+    [copyText],
+  );
+  const handleBrowserCopyNotePath = useCallback(
+    (entry: { path: string }) => void copyText(entry.path),
+    [copyText],
+  );
+  const handleBrowserExportNote = useCallback(
+    (entry: { path: string }) => {
+      void glyph
+        .readFile(entry.path)
+        .then((file) => exportDocumentToPdf(file.content, file.name))
+        .catch(() => {});
+    },
+    [exportDocumentToPdf],
+  );
+  const handleBrowserTogglePinnedNote = useCallback(
+    (entry: { path: string }) => handleTogglePinnedPath(entry.path),
+    [handleTogglePinnedPath],
+  );
+  const handleBrowserIsNotePinned = useCallback(
+    (entry: { path: string }) =>
+      (controller.settings?.pinnedFiles ?? []).some((filePath) => isSamePath(filePath, entry.path)),
+    [controller.settings?.pinnedFiles],
+  );
+  const handleBrowserRenameNote = useCallback((entry: { path: string; title: string }) => {
+    setPendingNoteRename({ path: entry.path, name: entry.title, value: entry.title });
+  }, []);
+  const handleBrowserRevealNote = useCallback(
+    (entry: { path: string }) => void controller.revealInFinder(entry.path),
+    [controller.revealInFinder],
+  );
+  const handleBrowserRemoveNote = useCallback((entry: { path: string; title: string }) => {
+    setPendingNoteConfirm({ kind: "remove", path: entry.path, name: entry.title });
+  }, []);
+  const handleBrowserDeleteNote = useCallback((entry: { path: string; title: string }) => {
+    setPendingNoteConfirm({ kind: "delete", path: entry.path, name: entry.title });
+  }, []);
+  // ──────────────────────────────────────────────────────────────────────────
+
   const handleSelectPaneTab = useCallback(
     (paneId: string, path: string) => {
       useLayoutStore.getState().setActivePaneId(paneId);
@@ -1348,7 +1753,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       isFocusMode: controller.isFocusMode,
       showOutline: controller.showOutline,
       editorScale: controller.editorScale,
-      autoOpenPDFSetting: controller.settings?.autoOpenPDF ?? true,
       folderRevealLabel: controller.folderRevealLabel,
       updateState: controller.updateState,
       updatesMode: controller.appInfo?.updatesMode,
@@ -1363,7 +1767,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       onCreateNote: handleCreateNote,
       onOpenSettings: handleOpenSettings,
       onOpenCommandPalette: handleOpenCommandPalette,
-      onOpenLinkedFile: (path: string) => void handleOpenSkillLink(path),
+      onOpenLinkedFile: (path: string) => void handleOpenLinkedFile(path),
       onScrollPositionChange: handleDocumentScrollPositionChange,
       onNavigateBack: handleNavigateBack,
       onNavigateForward: handleNavigateForward,
@@ -1391,7 +1795,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       controller.folderRevealLabel,
       controller.isFocusMode,
       controller.isSidebarCollapsed,
-      controller.settings?.autoOpenPDF,
       controller.settings?.dismissedUpdateVersion,
       controller.settings?.pinnedFiles,
       controller.shortcuts,
@@ -1407,8 +1810,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       handleNavigateBack,
       handleNavigateForward,
       handleOpenCommandPalette,
+      handleOpenLinkedFile,
       handleOpenSettings,
-      handleOpenSkillLink,
       handlePaneContentChange,
       handleSelectPaneTab,
       handleToggleFocusMode,
@@ -1425,15 +1828,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       isSamePath(filePath, activeNoteFile.path),
     );
 
-  const toolbarNode: React.ReactNode = isAppBootstrapping ? (
-    <div
-      className={`flex items-center gap-2 border-b border-border/40 py-2 ${noteHeaderPaddingClass}`}
-    >
-      <div className="h-8 w-8 rounded-md bg-muted/70 motion-safe:animate-pulse" />
-      <div className="mx-auto h-8 w-full max-w-sm rounded-full bg-muted/60 motion-safe:animate-pulse" />
-      <div className="h-8 w-8 rounded-md bg-muted/70 motion-safe:animate-pulse" />
-    </div>
-  ) : isTasksSurfaceVisible ? (
+  const toolbarNode: React.ReactNode = isAppBootstrapping ? null : isTasksSurfaceVisible ? (
     <EditorToolbar
       _isMacLike={isMacLike}
       isSidebarCollapsed={controller.isSidebarCollapsed}
@@ -1527,7 +1922,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       onNavigateForward={handleNavigateForward}
       onCreateNote={undefined}
       newNoteShortcut={undefined}
-      fileName={skillsController.activeDocument?.name ?? null}
+      fileName={null}
       filePath={null}
       shouldShowCommandPalette={true}
       onOpenCommandPalette={handleOpenCommandPalette}
@@ -1541,7 +1936,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       onToggleFocusMode={undefined}
       focusModeShortcut={undefined}
       shouldShowUpdateActionButton={false}
-      shouldShowMoreOptions={Boolean(skillsController.activeDocument)}
+      shouldShowMoreOptions={false}
       updateButtonVariant="outline"
       isUpdateButtonDisabled={true}
       updateButtonLabel=""
@@ -1603,7 +1998,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       )}
       onNavigateBack={() => void controller.navigateBack()}
       onNavigateForward={() => void controller.navigateForward()}
-      onCreateNote={() => void controller.createNote()}
+      onCreateNote={handleCreateNote}
       newNoteShortcut={getShortcutDisplay(controller.shortcuts, "new-note", navigator.platform)}
       fileName={activeNoteFile?.name ?? null}
       filePath={activeNoteFile?.path ?? null}
@@ -1619,7 +2014,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       onToggleFocusMode={() => void controller.toggleFocusMode()}
       focusModeShortcut={getShortcutDisplay(controller.shortcuts, "focus-mode", navigator.platform)}
       shouldShowUpdateActionButton={noteUpdateStateFlags.shouldShowUpdateActionButton}
-      shouldShowMoreOptions={true}
+      shouldShowMoreOptions={false}
       updateButtonVariant={noteUpdateStateFlags.updateButtonVariant}
       isUpdateButtonDisabled={noteUpdateStateFlags.isUpdateButtonDisabled}
       updateButtonLabel={noteUpdateStateFlags.updateButtonLabel}
@@ -1655,40 +2050,67 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     />
   );
 
+  // ─── Footer generation ────────────────────────────────────────────────
+  const footerNode: React.ReactNode =
+    isAppBootstrapping ? null : isTasksSurfaceVisible ? null : isSkillSurfaceVisible ? (
+      <SkillsFooterContent
+        draftContent={skillsController.draftContent || ""}
+        saveStateLabel={skillsController.saveStateLabel}
+      />
+    ) : (
+      <NotesFooterContent draftContent={controller.draftContent || ""} />
+    );
+
   return (
     <TooltipProvider>
       <AppLayout
         toolbar={toolbarNode}
+        footer={footerNode}
         shouldCollapseSidebar={shouldCollapseSidebar}
         tree={controller.visibleSidebarNodes}
-        activePath={viewerMode === "note" ? (controller.activeFile?.path ?? null) : null}
+        activePath={
+          viewerMode === "note" && !activeNoteCollection?.isAllCollection
+            ? (controller.activeFile?.path ?? null)
+            : null
+        }
         isSidebarCollapsed={controller.isSidebarCollapsed}
         isNotesExpanded={isNotesExpanded}
         isSkillsExpanded={isSkillsExpanded}
         isTasksActive={viewerMode === "tasks"}
         openInFolderLabel={controller.folderRevealLabel}
         pinnedNotes={controller.pinnedNotes}
+        noteCollections={noteCollections}
         skillCollections={sidebarSkillCollections}
         onToggleNotesSection={handleToggleNotesSection}
         onToggleSkillsSection={handleToggleSkillsSection}
         onOpenTasks={handleOpenTasks}
+        onSelectNoteCollection={handleSelectNoteCollection}
         onSelectSkillCollection={handleSelectSkillCollection}
         onOpenFile={(filePath) => void handleOpenNoteFile(filePath)}
         onOpenCommandPalette={handleOpenCommandPalette}
         onDeleteFile={controller.handleDeleteFile}
-        onDeleteFolder={(folderPath) => void controller.handleDeleteFolder(folderPath)}
+        onDeleteFolder={(folderPath) => {
+          setPendingFolderDelete({ path: folderPath, name: getBaseName(folderPath) });
+        }}
         onRemoveFileFromGlyph={(filePath) => void controller.handleRemoveFileFromGlyph(filePath)}
         onTogglePinnedFile={(filePath) => void controller.togglePinnedFile(filePath)}
         onRemoveFolder={controller.handleRemoveFolder}
-        onRenameFile={controller.handleRenameFile}
+        onRenameFile={async (filePath, newName) => {
+          await controller.handleRenameFile(filePath, newName);
+          setNoteBrowserRefreshNonce((n) => n + 1);
+        }}
         onRenameFolder={(folderPath, newName) =>
           void controller.handleRenameFolder(folderPath, newName)
         }
         onRevealInFinder={(targetPath) => void controller.revealInFinder(targetPath)}
         onToggleFolder={controller.handleToggleFolder}
         onReorderNodes={controller.handleReorderNodes}
-        onCreateNote={() => void controller.createNote()}
-        onCreateFolder={() => void controller.createFolder()}
+        onCreateNote={handleCreateNote}
+        onCreateFolder={handleCreateFolder}
+        onCreateNoteInCollection={handleCreateNoteInCollection}
+        onCreateFolderInCollection={handleCreateFolderInCollection}
+        onChangeNoteCollectionAccent={handleChangeNoteCollectionAccent}
+        onChangeNoteCollectionIcon={handleChangeNoteCollectionIcon}
       >
         {(viewerMode === "note" ? controller.error : skillsController.error) ? (
           <div className="mx-10 mt-4 mb-2 rounded-lg bg-destructive px-4 py-3 text-sm text-destructive-foreground">
@@ -1696,58 +2118,69 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
           </div>
         ) : null}
 
-        <div
-          className={`grid h-full min-h-0 ${
-            selectedSkillCollectionId
-              ? "grid-cols-[292px_minmax(0,1fr)]"
-              : "grid-cols-[minmax(0,1fr)]"
-          }`}
-        >
-          {selectedSkillCollectionId ? (
-            <SkillsBrowserPane
-              activeSkillId={
-                viewerMode === "skill" ? (skillsController.activeSkill?.id ?? null) : null
-              }
-              isLoading={
-                !skillsController.hasLoadedOnce ||
-                skillsController.isLoading ||
-                Boolean(pendingSkillRestorePath)
-              }
-              items={visibleSkillItems}
-              searchQuery={skillsController.searchQuery}
-              onSelectSkill={(skillId) => void handleSelectSkill(skillId)}
-              onSearchQueryChange={skillsController.setSearchQuery}
-              title={activeSkillCollection?.label ?? "Skills"}
-            />
-          ) : null}
-
-          <div className="min-h-0 min-w-0">
-            {isAppBootstrapping ? (
-              <div className="flex h-full min-h-0 flex-col bg-background">
-                <div className="flex min-h-0 flex-1 flex-col gap-4 px-8 py-8">
-                  <div className="h-6 w-40 rounded-md bg-muted/60 motion-safe:animate-pulse" />
-                  <div className="h-4 w-72 rounded-md bg-muted/40 motion-safe:animate-pulse" />
-                  <div className="mt-6 h-40 rounded-2xl bg-muted/35 motion-safe:animate-pulse" />
-                  <div className="h-4 w-4/5 rounded-md bg-muted/30 motion-safe:animate-pulse" />
-                  <div className="h-4 w-3/5 rounded-md bg-muted/30 motion-safe:animate-pulse" />
+        {isTasksSurfaceVisible ? (
+          <div className="flex h-full min-h-0 flex-col bg-background">
+            <Suspense
+              fallback={
+                <div className="grid h-full place-items-center text-sm text-muted-foreground">
+                  Loading tasks...
                 </div>
-              </div>
-            ) : isTasksSurfaceVisible ? (
-              <div className="flex h-full min-h-0 flex-col bg-background">
-                <Suspense
-                  fallback={
-                    <div className="grid h-full place-items-center text-sm text-muted-foreground">
-                      Loading tasks...
-                    </div>
-                  }
-                >
-                  <LazyTasksView
-                    glyph={glyph}
-                    onOpenTaskSource={(task) => void handleOpenTaskSource(task)}
-                  />
-                </Suspense>
-              </div>
-            ) : isSkillSurfaceVisible ? (
+              }
+            >
+              <LazyTasksView
+                glyph={glyph}
+                onOpenTaskSource={(task) => void handleOpenTaskSource(task)}
+              />
+            </Suspense>
+          </div>
+        ) : isSkillSurfaceVisible ? (
+          <div className="grid h-full min-h-0 grid-cols-[292px_minmax(0,1fr)]">
+            <SkillsBrowserPane
+              activeSkillId={skillsController.activeSkill?.id ?? null}
+              items={visibleSkillItems}
+              onSelectSkill={(skillId) => void handleSelectSkill(skillId)}
+              sourceKind={activeSkillCollection?.sourceKind}
+              iconKind={activeSkillCollection?.iconKind}
+              onCopySkill={(item) => {
+                const skill = allSkills.find(
+                  (candidate) => candidate.id === item.representativeSkillId,
+                );
+                if (skill) {
+                  void glyph
+                    .readSkillDocument(skill.skillFilePath)
+                    .then((document) => copyText(document.content))
+                    .catch(() => {});
+                }
+              }}
+              onCopySkillPath={(item) => {
+                const skill = allSkills.find(
+                  (candidate) => candidate.id === item.representativeSkillId,
+                );
+                if (skill) {
+                  void copyText(skill.skillFilePath);
+                }
+              }}
+              onRevealSkill={(item) => {
+                const skill = allSkills.find(
+                  (candidate) => candidate.id === item.representativeSkillId,
+                );
+                if (skill) {
+                  void skillsController.revealInFinder(skill.skillFilePath);
+                }
+              }}
+              onExportSkill={(item) => {
+                const skill = allSkills.find(
+                  (candidate) => candidate.id === item.representativeSkillId,
+                );
+                if (skill) {
+                  void glyph
+                    .readSkillDocument(skill.skillFilePath)
+                    .then((document) => exportDocumentToPdf(document.content, document.name))
+                    .catch(() => {});
+                }
+              }}
+            />
+            <div className="min-h-0 min-w-0 overflow-hidden">
               <SkillView
                 isSkillSurfaceLoading={isSkillSurfaceLoading}
                 isActiveSkillVisible={isActiveSkillVisible}
@@ -1764,26 +2197,52 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                 skillEmptyState={skillEmptyState}
                 folderRevealLabel={controller.folderRevealLabel}
                 showOutline={controller.showOutline}
-                onOpenLinkedFile={handleOpenSkillLink}
+                onOpenLinkedFile={handleOpenLinkedFile}
                 onScrollPositionChange={handleDocumentScrollPositionChange}
                 onDraftContentChange={skillsController.setDraftContent}
                 onKeepMineAfterExternalChange={skillsController.keepMineAfterExternalChange}
                 onReloadAfterExternalChange={skillsController.reloadAfterExternalChange}
                 onSelectDocumentTab={(kind) => void skillsController.openDocumentTab(kind)}
               />
-            ) : (
-              <div className="flex h-full min-h-0 flex-col bg-background">
-                <div className="min-h-0 flex-1">
-                  <SplitViewProvider value={splitViewContextValue}>
-                    <SplitViewActivePaneProvider value={splitViewActivePaneContextValue}>
-                      <SplitContainer />
-                    </SplitViewActivePaneProvider>
-                  </SplitViewProvider>
-                </div>
-              </div>
-            )}
+            </div>
           </div>
-        </div>
+        ) : (
+          <AppSurfaceShell
+            browserPane={
+              shouldCollapseBrowserPane ? undefined : activeNoteCollection ? (
+                <NotesBrowserPane
+                  activePath={controller.activeFile?.path ?? null}
+                  entries={visibleNoteBrowserEntries}
+                  isLoading={isNoteBrowserLoading}
+                  accent={activeNoteCollection.accent}
+                  onOpenNote={handleBrowserOpenNote}
+                  onCopyNote={handleBrowserCopyNote}
+                  onCopyNotePath={handleBrowserCopyNotePath}
+                  onExportNote={handleBrowserExportNote}
+                  onTogglePinnedNote={handleBrowserTogglePinnedNote}
+                  isNotePinned={handleBrowserIsNotePinned}
+                  onRenameNote={handleBrowserRenameNote}
+                  onRevealNote={handleBrowserRevealNote}
+                  onRemoveNote={handleBrowserRemoveNote}
+                  onDeleteNote={handleBrowserDeleteNote}
+                  onReorderNote={handleBrowserReorderNote}
+                />
+              ) : null
+            }
+            browserPaneWidth={notesBrowserPaneWidth}
+            onBrowserPaneResize={setNotesBrowserPaneWidth}
+          >
+            <div className="flex h-full min-h-0 flex-col bg-background">
+              <div className="min-h-0 flex-1">
+                <SplitViewProvider value={splitViewContextValue}>
+                  <SplitViewActivePaneProvider value={splitViewActivePaneContextValue}>
+                    <SplitContainer />
+                  </SplitViewActivePaneProvider>
+                </SplitViewProvider>
+              </div>
+            </div>
+          </AppSurfaceShell>
+        )}
       </AppLayout>
 
       <CommandPalette
@@ -1803,7 +2262,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         onChooseFolder={() => void controller.chooseFolderAndUpdateWorkspace()}
         onChangeMode={(mode: ThemeMode) => void controller.changeThemeMode(mode)}
         onChangeShortcuts={(shortcuts) => void controller.changeShortcuts(shortcuts)}
-        onChangeAutoOpenPDF={(enabled) => void controller.saveSettings({ autoOpenPDF: enabled })}
       />
       <NoteRenameDialog
         pending={pendingNoteRename}
@@ -1816,6 +2274,25 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         pending={pendingNoteConfirm}
         onDismiss={() => setPendingNoteConfirm(null)}
         onConfirm={() => void handleConfirmCurrentNoteAction()}
+      />
+      <DeleteDialog
+        open={Boolean(pendingFolderDelete)}
+        onOpenChange={(open) => {
+          if (!open) setPendingFolderDelete(null);
+        }}
+        title="Delete Folder"
+        description={
+          pendingFolderDelete ? (
+            <>
+              Are you sure you want to permanently delete{" "}
+              <span className="font-semibold text-foreground">
+                &ldquo;{pendingFolderDelete.name}&rdquo;
+              </span>{" "}
+              and all its contents? This action cannot be undone.
+            </>
+          ) : null
+        }
+        onConfirm={() => void handleConfirmFolderDelete()}
       />
     </TooltipProvider>
   );

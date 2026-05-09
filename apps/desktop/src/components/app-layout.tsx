@@ -1,3 +1,5 @@
+import type { NoteCollectionItem } from "@/core/note-collections";
+import type { NoteCollectionAccentKey, NoteCollectionIconKey } from "@/core/workspace";
 import type { NoteShortcutItem } from "@/types/navigation";
 import type {
   DragPosition,
@@ -6,9 +8,11 @@ import type {
 } from "@/types/sidebar";
 
 import { Sidebar } from "./sidebar/sidebar";
+import { AppFooter } from "./app-footer";
 
 type AppLayoutProps = {
   toolbar?: React.ReactNode;
+  footer?: React.ReactNode;
   shouldCollapseSidebar: boolean;
   tree: SidebarTopLevelNode[];
   activePath: string | null;
@@ -18,10 +22,12 @@ type AppLayoutProps = {
   isTasksActive: boolean;
   openInFolderLabel: string;
   pinnedNotes: NoteShortcutItem[];
+  noteCollections: NoteCollectionItem[];
   skillCollections: SidebarSkillCollectionItem[];
   onToggleNotesSection: () => void;
   onToggleSkillsSection: () => void;
   onOpenTasks: () => void;
+  onSelectNoteCollection: (collectionPath: string) => void;
   onSelectSkillCollection: (collectionId: string) => void;
   onOpenFile: (filePath: string) => void;
   onOpenCommandPalette: () => void;
@@ -37,11 +43,16 @@ type AppLayoutProps = {
   onReorderNodes: (sourcePath: string, targetPath: string, position: DragPosition) => void;
   onCreateNote?: () => void;
   onCreateFolder?: () => void;
+  onCreateNoteInCollection?: (collectionPath: string) => void;
+  onCreateFolderInCollection?: (collectionPath: string) => void;
+  onChangeNoteCollectionAccent?: (collectionPath: string, accent: NoteCollectionAccentKey) => void;
+  onChangeNoteCollectionIcon?: (collectionPath: string, icon: NoteCollectionIconKey) => void;
   children: React.ReactNode;
 };
 
 export function AppLayout({
   toolbar,
+  footer,
   shouldCollapseSidebar,
   tree,
   activePath,
@@ -51,10 +62,12 @@ export function AppLayout({
   isTasksActive,
   openInFolderLabel,
   pinnedNotes,
+  noteCollections,
   skillCollections,
   onToggleNotesSection,
   onToggleSkillsSection,
   onOpenTasks,
+  onSelectNoteCollection,
   onSelectSkillCollection,
   onOpenFile,
   onOpenCommandPalette,
@@ -70,6 +83,10 @@ export function AppLayout({
   onReorderNodes,
   onCreateNote,
   onCreateFolder,
+  onCreateNoteInCollection,
+  onCreateFolderInCollection,
+  onChangeNoteCollectionAccent,
+  onChangeNoteCollectionIcon,
   children,
 }: AppLayoutProps) {
   return (
@@ -92,10 +109,12 @@ export function AppLayout({
             isTasksActive={isTasksActive}
             openInFolderLabel={openInFolderLabel}
             pinnedNotes={pinnedNotes}
+            noteCollections={noteCollections}
             skillCollections={skillCollections}
             onToggleNotesSection={onToggleNotesSection}
             onToggleSkillsSection={onToggleSkillsSection}
             onOpenTasks={onOpenTasks}
+            onSelectNoteCollection={onSelectNoteCollection}
             onSelectSkillCollection={onSelectSkillCollection}
             onOpenFile={onOpenFile}
             onOpenCommandPalette={onOpenCommandPalette}
@@ -111,11 +130,16 @@ export function AppLayout({
             onReorderNodes={onReorderNodes}
             onCreateNote={onCreateNote}
             onCreateFolder={onCreateFolder}
+            onCreateNoteInCollection={onCreateNoteInCollection}
+            onCreateFolderInCollection={onCreateFolderInCollection}
+            onChangeNoteCollectionAccent={onChangeNoteCollectionAccent}
+            onChangeNoteCollectionIcon={onChangeNoteCollectionIcon}
           />
         )}
 
-        <main className="relative h-full min-h-0 overflow-hidden bg-background">{children}</main>
+        <main className="relative flex-1 min-h-0 overflow-hidden bg-background">{children}</main>
       </div>
+      {footer ? <AppFooter content={footer} /> : null}
     </div>
   );
 }

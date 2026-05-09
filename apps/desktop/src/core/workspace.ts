@@ -74,6 +74,57 @@ export type SearchResult = {
   snippet: string;
 };
 
+export type NoteCollectionAccentKey =
+  | "violet"
+  | "indigo"
+  | "blue"
+  | "sky"
+  | "cyan"
+  | "teal"
+  | "emerald"
+  | "lime"
+  | "amber"
+  | "orange"
+  | "coral"
+  | "rose"
+  | "pink"
+  | "red"
+  | "slate";
+
+export type NoteCollectionIconKey =
+  | "folder"
+  | "book"
+  | "briefcase"
+  | "calendar"
+  | "sparkles"
+  | "rocket"
+  | "tag"
+  | "archive"
+  | "leaf"
+  | "layers"
+  | "globe"
+  | "home"
+  | "camera"
+  | "notebook"
+  | "star";
+
+export type NoteFolderAppearance = {
+  accent: NoteCollectionAccentKey;
+  icon: NoteCollectionIconKey;
+};
+
+export type NoteFolderAppearanceMap = Record<string, Partial<NoteFolderAppearance>>;
+
+export type NoteBrowserEntry = {
+  path: string;
+  title: string;
+  excerpt: string;
+  modifiedAt: string | null;
+  createdAt: string | null;
+  sizeBytes: number;
+  wordCount: number;
+};
+
 export type ThemeMode = "light" | "dark" | "system";
 
 export type ShortcutSetting = {
@@ -105,6 +156,7 @@ export type AppSettings = {
   themeMode: ThemeMode;
   hiddenFiles: string[];
   pinnedFiles: string[];
+  noteFolderAppearances: NoteFolderAppearanceMap;
   shortcuts: ShortcutSetting[];
   sidebar: SidebarState;
   editorPreferences: EditorPreferences;

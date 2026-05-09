@@ -7,6 +7,10 @@ import type { LayoutNode, PaneState } from "@/core/workspace";
 
 const SESSION_STORAGE_KEY = "glyph.editor-session";
 const MAX_SCROLL_ENTRIES = 160;
+const DEFAULT_NOTES_BROWSER_PANE_WIDTH = 320;
+const DEFAULT_SKILLS_BROWSER_PANE_WIDTH = 292;
+const MIN_BROWSER_PANE_WIDTH = 240;
+const MAX_BROWSER_PANE_WIDTH = 520;
 
 type ViewerMode = "note" | "skill" | "tasks";
 
@@ -21,6 +25,12 @@ type SessionState = {
   isSidebarCollapsed: boolean;
   isNotesExpanded: boolean;
   isSkillsExpanded: boolean;
+  selectedNoteCollectionPath: string | null;
+  lastNotePathByCollection: Record<string, string>;
+  noteOrderByCollection: Record<string, string[]>;
+  notesBrowserSearchQuery: string;
+  notesBrowserPaneWidth: number;
+  skillsBrowserPaneWidth: number;
   selectedSkillCollectionId: string | null;
   noteWorkspacePath: string | null;
   noteFilePath: string | null;
@@ -37,6 +47,14 @@ type SessionState = {
   setSidebarCollapsed: (value: boolean) => void;
   setNotesExpanded: (value: boolean) => void;
   setSkillsExpanded: (value: boolean) => void;
+  setSelectedNoteCollectionPath: (value: string | null) => void;
+  setLastNotePathForCollection: (collectionPath: string, notePath: string) => void;
+  getLastNotePathForCollection: (collectionPath: string | null | undefined) => string | null;
+  setNoteOrderForCollection: (collectionPath: string, notePaths: string[]) => void;
+  getNoteOrderForCollection: (collectionPath: string | null | undefined) => string[];
+  setNotesBrowserSearchQuery: (value: string) => void;
+  setNotesBrowserPaneWidth: (value: number) => void;
+  setSkillsBrowserPaneWidth: (value: number) => void;
   setSelectedSkillCollectionId: (value: string | null) => void;
   setNoteSession: (
     workspacePath: string | null,
@@ -98,6 +116,11 @@ const trimScrollPositions = (positions: Record<string, ScrollEntry>) => {
   );
 };
 
+const clampBrowserPaneWidth = (value: number, fallback: number) =>
+  Number.isFinite(value)
+    ? Math.min(MAX_BROWSER_PANE_WIDTH, Math.max(MIN_BROWSER_PANE_WIDTH, Math.round(value)))
+    : fallback;
+
 export const useSessionStore = create<SessionState>()(
   persist(
     (set, get) => ({
@@ -106,6 +129,12 @@ export const useSessionStore = create<SessionState>()(
       isSidebarCollapsed: false,
       isNotesExpanded: true,
       isSkillsExpanded: false,
+      selectedNoteCollectionPath: null,
+      lastNotePathByCollection: {},
+      noteOrderByCollection: {},
+      notesBrowserSearchQuery: "",
+      notesBrowserPaneWidth: DEFAULT_NOTES_BROWSER_PANE_WIDTH,
+      skillsBrowserPaneWidth: DEFAULT_SKILLS_BROWSER_PANE_WIDTH,
       selectedSkillCollectionId: null,
       noteWorkspacePath: null,
       noteFilePath: null,
@@ -131,6 +160,65 @@ export const useSessionStore = create<SessionState>()(
       },
       setSkillsExpanded: (isSkillsExpanded) => {
         set({ isSkillsExpanded });
+      },
+      setSelectedNoteCollectionPath: (selectedNoteCollectionPath) => {
+        set({
+          selectedNoteCollectionPath: selectedNoteCollectionPath
+            ? normalizePath(selectedNoteCollectionPath)
+            : null,
+        });
+      },
+      setLastNotePathForCollection: (collectionPath, notePath) => {
+        const normalizedCollectionPath = normalizePath(collectionPath);
+        const normalizedNotePath = normalizePath(notePath);
+        set((state) => ({
+          lastNotePathByCollection: {
+            ...state.lastNotePathByCollection,
+            [normalizedCollectionPath.toLowerCase()]: normalizedNotePath,
+          },
+        }));
+      },
+      getLastNotePathForCollection: (collectionPath) => {
+        if (!collectionPath) {
+          return null;
+        }
+
+        return get().lastNotePathByCollection[normalizePath(collectionPath).toLowerCase()] ?? null;
+      },
+      setNoteOrderForCollection: (collectionPath, notePaths) => {
+        const normalizedCollectionPath = normalizePath(collectionPath);
+        set((state) => ({
+          noteOrderByCollection: {
+            ...state.noteOrderByCollection,
+            [normalizedCollectionPath.toLowerCase()]: normalizeUniquePaths(notePaths),
+          },
+        }));
+      },
+      getNoteOrderForCollection: (collectionPath) => {
+        if (!collectionPath) {
+          return [];
+        }
+
+        return get().noteOrderByCollection[normalizePath(collectionPath).toLowerCase()] ?? [];
+      },
+      setNotesBrowserSearchQuery: (notesBrowserSearchQuery) => {
+        set({ notesBrowserSearchQuery });
+      },
+      setNotesBrowserPaneWidth: (notesBrowserPaneWidth) => {
+        set((state) => ({
+          notesBrowserPaneWidth: clampBrowserPaneWidth(
+            notesBrowserPaneWidth,
+            state.notesBrowserPaneWidth,
+          ),
+        }));
+      },
+      setSkillsBrowserPaneWidth: (skillsBrowserPaneWidth) => {
+        set((state) => ({
+          skillsBrowserPaneWidth: clampBrowserPaneWidth(
+            skillsBrowserPaneWidth,
+            state.skillsBrowserPaneWidth,
+          ),
+        }));
       },
       setSelectedSkillCollectionId: (selectedSkillCollectionId) => {
         set({ selectedSkillCollectionId });
@@ -245,6 +333,12 @@ export const useSessionStore = create<SessionState>()(
         isSidebarCollapsed: state.isSidebarCollapsed,
         isNotesExpanded: state.isNotesExpanded,
         isSkillsExpanded: state.isSkillsExpanded,
+        selectedNoteCollectionPath: state.selectedNoteCollectionPath,
+        lastNotePathByCollection: state.lastNotePathByCollection,
+        noteOrderByCollection: state.noteOrderByCollection,
+        notesBrowserSearchQuery: state.notesBrowserSearchQuery,
+        notesBrowserPaneWidth: state.notesBrowserPaneWidth,
+        skillsBrowserPaneWidth: state.skillsBrowserPaneWidth,
         selectedSkillCollectionId: state.selectedSkillCollectionId,
         noteWorkspacePath: state.noteWorkspacePath,
         noteFilePath: state.noteFilePath,

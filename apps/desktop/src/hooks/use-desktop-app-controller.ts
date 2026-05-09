@@ -924,128 +924,61 @@ export const useDesktopAppController = (
     [activateNoteTab, getTabByPath, syncOpenedFile, glyph],
   );
 
-  const createNote = useCallback(async () => {
-    let baseDir: string | null = null;
+  const createNote = useCallback(
+    async (targetDir?: string | null) => {
+      let baseDir: string | null = targetDir ? normalizePath(targetDir) : null;
+      if (baseDir && /\.(md|mdx|markdown)$/i.test(baseDir)) {
+        baseDir = getDirName(baseDir);
+      }
 
-    // Prefer the last created folder so a new note lands inside it.
-    // This works regardless of workspace mode — the folder path is always valid.
-    const lastFolder = lastCreatedFolderPathRef.current;
-    if (lastFolder) {
-      baseDir = lastFolder;
-    } else if (isWorkspaceMode && rootPath) {
-      const activeFileDir = activeFile ? getDirName(activeFile.path) : null;
-      baseDir =
-        activeFileDir && isFileInsideWorkspace(activeFileDir, rootPath) ? activeFileDir : rootPath;
-    } else if (activeFile) {
-      baseDir = getDirName(activeFile.path);
-    } else if (settings?.defaultWorkspacePath) {
-      baseDir = settings.defaultWorkspacePath;
-    }
+      // Prefer the last created folder so a new note lands inside it.
+      // This works regardless of workspace mode — the folder path is always valid.
+      const lastFolder = lastCreatedFolderPathRef.current;
+      if (!baseDir && lastFolder) {
+        baseDir = lastFolder;
+      } else if (!baseDir && isWorkspaceMode && rootPath) {
+        const activeFileDir = activeFile ? getDirName(activeFile.path) : null;
+        baseDir =
+          activeFileDir && isFileInsideWorkspace(activeFileDir, rootPath)
+            ? activeFileDir
+            : rootPath;
+      } else if (!baseDir && activeFile) {
+        baseDir = getDirName(activeFile.path);
+      } else if (!baseDir && settings?.defaultWorkspacePath) {
+        baseDir = settings.defaultWorkspacePath;
+      }
 
-    if (!baseDir) {
-      return;
-    }
+      if (!baseDir) {
+        return;
+      }
 
-    const currentActiveTab = getActiveTab();
-    if (currentActiveTab) {
-      void persistNoteDraft(
-        {
-          draftContent: currentActiveTab.draftContent,
-          file: currentActiveTab.file,
-          isDirty: currentActiveTab.isDirty,
-        },
-        {
-          isActive: true,
-        },
-      );
-    }
-
-    setIsPaletteOpen(false);
-    const file = await glyph.createFile(baseDir, `Untitled-${Date.now()}.md`);
-    setActiveFile(file);
-    useLayoutStore
-      .getState()
-      .addTabToPane(useLayoutStore.getState().activePaneId, toPathKey(file.path));
-    setIsWorkspaceMode(true);
-
-    // Find which top-level workspace directory node owns the new file.
-    // Using sidebarNodes rather than rootPath correctly handles the case where
-    // multiple workspaces are open and the file lands in a non-default one.
-    const ownerNode = sidebarNodes.find(
-      (node) => node.type === "directory" && isFileInsideWorkspace(file.path, node.path),
-    );
-
-    if (ownerNode?.type === "directory") {
-      const workspaceNode = await glyph.getSidebarNode("directory", ownerNode.path);
-      if (workspaceNode?.type === "directory") {
-        setSidebarNodes((prev) =>
-          upsertSidebarFolder(prev, {
-            rootPath: ownerNode.path,
-            tree: workspaceNode.children,
-            activeFile: null,
-          }),
+      const currentActiveTab = getActiveTab();
+      if (currentActiveTab) {
+        void persistNoteDraft(
+          {
+            draftContent: currentActiveTab.draftContent,
+            file: currentActiveTab.file,
+            isDirty: currentActiveTab.isDirty,
+          },
+          {
+            isActive: true,
+          },
         );
       }
-    } else {
-      setSidebarNodes((prev) => upsertSidebarFile(prev, file));
-    }
 
-    pushHistory({ kind: "note", path: file.path });
-    requestEditorFocus("start");
-  }, [
-    activeFile,
-    getActiveTab,
-    glyph,
-    isWorkspaceMode,
-    persistNoteDraft,
-    pushHistory,
-    requestEditorFocus,
-    rootPath,
-    setActiveFile,
-    settings?.defaultWorkspacePath,
-    setIsPaletteOpen,
-    setSidebarNodes,
-    sidebarNodes,
-  ]);
+      setIsPaletteOpen(false);
+      const file = await glyph.createFile(baseDir, `Untitled-${Date.now()}.md`);
+      setActiveFile(file);
+      useLayoutStore
+        .getState()
+        .addTabToPane(useLayoutStore.getState().activePaneId, toPathKey(file.path));
+      setIsWorkspaceMode(true);
 
-  const createFolder = useCallback(async () => {
-    let baseDir: string | null = null;
-
-    if (isWorkspaceMode && rootPath) {
-      const activeFileDir = activeFile ? getDirName(activeFile.path) : null;
-      baseDir =
-        activeFileDir && isFileInsideWorkspace(activeFileDir, rootPath) ? activeFileDir : rootPath;
-    } else if (activeFile) {
-      baseDir = getDirName(activeFile.path);
-    } else if (settings?.defaultWorkspacePath) {
-      baseDir = settings.defaultWorkspacePath;
-    }
-
-    if (!baseDir) {
-      return;
-    }
-
-    setIsPaletteOpen(false);
-    const folderName = `New Folder-${Date.now()}`;
-    const nextTree = await glyph.createFolder(baseDir, folderName);
-
-    // Track the created folder path so the next createNote uses it as its parent
-    lastCreatedFolderPathRef.current = `${baseDir}/${folderName}`.replace(/\\/g, "/");
-
-    if (nextTree !== null) {
-      // Folder is inside the active workspace — use the returned tree directly.
-      if (rootPath) {
-        setSidebarNodes((prev) =>
-          upsertSidebarFolder(prev, { rootPath, tree: nextTree, activeFile: null }),
-        );
-      } else {
-        setSidebarNodes(nextTree);
-      }
-    } else {
-      // Folder is outside the active workspace — find which top-level directory
-      // node owns the new folder and refresh its subtree via IPC.
+      // Find which top-level workspace directory node owns the new file.
+      // Using sidebarNodes rather than rootPath correctly handles the case where
+      // multiple workspaces are open and the file lands in a non-default one.
       const ownerNode = sidebarNodes.find(
-        (node) => node.type === "directory" && isFileInsideWorkspace(baseDir, node.path),
+        (node) => node.type === "directory" && isFileInsideWorkspace(file.path, node.path),
       );
 
       if (ownerNode?.type === "directory") {
@@ -1059,18 +992,101 @@ export const useDesktopAppController = (
             }),
           );
         }
+      } else {
+        setSidebarNodes((prev) => upsertSidebarFile(prev, file));
       }
-    }
-  }, [
-    activeFile,
-    glyph,
-    isWorkspaceMode,
-    rootPath,
-    settings?.defaultWorkspacePath,
-    setIsPaletteOpen,
-    setSidebarNodes,
-    sidebarNodes,
-  ]);
+
+      pushHistory({ kind: "note", path: file.path });
+      requestEditorFocus("start");
+    },
+    [
+      activeFile,
+      getActiveTab,
+      glyph,
+      isWorkspaceMode,
+      persistNoteDraft,
+      pushHistory,
+      requestEditorFocus,
+      rootPath,
+      setActiveFile,
+      settings?.defaultWorkspacePath,
+      setIsPaletteOpen,
+      setSidebarNodes,
+      sidebarNodes,
+    ],
+  );
+
+  const createFolder = useCallback(
+    async (targetDir?: string | null) => {
+      let baseDir: string | null = targetDir ? normalizePath(targetDir) : null;
+      if (baseDir && /\.(md|mdx|markdown)$/i.test(baseDir)) {
+        baseDir = getDirName(baseDir);
+      }
+
+      if (!baseDir && isWorkspaceMode && rootPath) {
+        const activeFileDir = activeFile ? getDirName(activeFile.path) : null;
+        baseDir =
+          activeFileDir && isFileInsideWorkspace(activeFileDir, rootPath)
+            ? activeFileDir
+            : rootPath;
+      } else if (!baseDir && activeFile) {
+        baseDir = getDirName(activeFile.path);
+      } else if (!baseDir && settings?.defaultWorkspacePath) {
+        baseDir = settings.defaultWorkspacePath;
+      }
+
+      if (!baseDir) {
+        return;
+      }
+
+      setIsPaletteOpen(false);
+      const folderName = `New Folder-${Date.now()}`;
+      const nextTree = await glyph.createFolder(baseDir, folderName);
+
+      // Track the created folder path so the next createNote uses it as its parent
+      lastCreatedFolderPathRef.current = `${baseDir}/${folderName}`.replace(/\\/g, "/");
+
+      if (nextTree !== null) {
+        // Folder is inside the active workspace — use the returned tree directly.
+        if (rootPath) {
+          setSidebarNodes((prev) =>
+            upsertSidebarFolder(prev, { rootPath, tree: nextTree, activeFile: null }),
+          );
+        } else {
+          setSidebarNodes(nextTree);
+        }
+      } else {
+        // Folder is outside the active workspace — find which top-level directory
+        // node owns the new folder and refresh its subtree via IPC.
+        const ownerNode = sidebarNodes.find(
+          (node) => node.type === "directory" && isFileInsideWorkspace(baseDir, node.path),
+        );
+
+        if (ownerNode?.type === "directory") {
+          const workspaceNode = await glyph.getSidebarNode("directory", ownerNode.path);
+          if (workspaceNode?.type === "directory") {
+            setSidebarNodes((prev) =>
+              upsertSidebarFolder(prev, {
+                rootPath: ownerNode.path,
+                tree: workspaceNode.children,
+                activeFile: null,
+              }),
+            );
+          }
+        }
+      }
+    },
+    [
+      activeFile,
+      glyph,
+      isWorkspaceMode,
+      rootPath,
+      settings?.defaultWorkspacePath,
+      setIsPaletteOpen,
+      setSidebarNodes,
+      sidebarNodes,
+    ],
+  );
 
   const ensureActiveDraftFile = useCallback(
     async (draftValue: string) => {

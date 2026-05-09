@@ -35,12 +35,35 @@ const cardColorClass: Record<TaskColumn["color"], string> = {
   blue: "border-primary/35",
   cyan: "border-chart-3/35",
   emerald: "border-chart-5/35",
+  coral: "border-orange-500/35",
+  indigo: "border-indigo-500/35",
   lime: "border-chart-5/35",
   orange: "border-chart-2/35",
   pink: "border-chart-4/35",
+  red: "border-red-600/35",
   rose: "border-destructive/35",
   slate: "border-muted-foreground/25",
+  sky: "border-sky-500/35",
+  teal: "border-teal-500/35",
   violet: "border-chart-4/35",
+};
+
+const cardFocusRingClass: Record<TaskColumn["color"], string> = {
+  amber: "focus-visible:border-chart-2/60 focus-visible:ring-chart-2/25",
+  blue: "focus-visible:border-primary/60 focus-visible:ring-primary/25",
+  cyan: "focus-visible:border-chart-3/60 focus-visible:ring-chart-3/25",
+  emerald: "focus-visible:border-chart-5/60 focus-visible:ring-chart-5/25",
+  coral: "focus-visible:border-orange-500/60 focus-visible:ring-orange-500/25",
+  indigo: "focus-visible:border-indigo-500/60 focus-visible:ring-indigo-500/25",
+  lime: "focus-visible:border-chart-5/60 focus-visible:ring-chart-5/25",
+  orange: "focus-visible:border-chart-2/60 focus-visible:ring-chart-2/25",
+  pink: "focus-visible:border-chart-4/60 focus-visible:ring-chart-4/25",
+  red: "focus-visible:border-red-600/60 focus-visible:ring-red-600/25",
+  rose: "focus-visible:border-destructive/60 focus-visible:ring-destructive/25",
+  slate: "focus-visible:border-muted-foreground/45 focus-visible:ring-muted-foreground/15",
+  sky: "focus-visible:border-sky-500/60 focus-visible:ring-sky-500/25",
+  teal: "focus-visible:border-teal-500/60 focus-visible:ring-teal-500/25",
+  violet: "focus-visible:border-chart-4/60 focus-visible:ring-chart-4/25",
 };
 
 export function TaskCardSurface({
@@ -74,17 +97,12 @@ export function TaskCardSurface({
       {task.labels.length > 0 || task.dueDate ? (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {task.labels.map((label) => (
-            <span
-              key={label}
-              className="rounded-full bg-primary/10 px-2 py-0.5 text-sm font-medium text-primary"
-            >
+            <span key={label} className="text-sm font-medium text-primary">
               #{label}
             </span>
           ))}
           {task.dueDate ? (
-            <span className="rounded bg-muted px-1.5 py-0.5 text-sm font-medium text-foreground">
-              {task.dueDate}
-            </span>
+            <span className="text-sm font-medium text-muted-foreground">{task.dueDate}</span>
           ) : null}
         </div>
       ) : null}
@@ -157,7 +175,10 @@ export const TaskCard = memo(function TaskCard({
       <button
         type="button"
         onClick={() => setIsEditing(true)}
-        className="w-full cursor-grab rounded-md text-left outline-none active:cursor-grabbing focus-visible:ring-3 focus-visible:ring-ring/30"
+        className={cn(
+          "w-full cursor-grab rounded-md text-left outline-none active:cursor-grabbing focus-visible:outline-none focus-visible:ring-3",
+          column?.color ? cardFocusRingClass[column.color] : "focus-visible:ring-ring/30",
+        )}
       >
         <TaskCardSurface
           task={task}
@@ -171,7 +192,10 @@ export const TaskCard = memo(function TaskCard({
           render={
             <button
               type="button"
-              className="absolute top-2.5 right-2 grid h-7 w-7 place-items-center rounded text-muted-foreground hover:text-foreground"
+              className={cn(
+                "absolute top-2.5 right-2 grid h-7 w-7 place-items-center rounded text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-3",
+                column?.color ? cardFocusRingClass[column.color] : "focus-visible:ring-ring/30",
+              )}
               aria-label={`${task.title} options`}
             />
           }
@@ -179,7 +203,7 @@ export const TaskCard = memo(function TaskCard({
           <DotsHorizontalIcon size={15} />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52 bg-popover text-popover-foreground">
-          <DropdownMenuItem onClick={() => setIsEditing(true)}>Edit card</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setIsEditing(true)}>Edit task</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => onMove(task.id, task.columnId, 0)}>
             Move to top
@@ -188,20 +212,22 @@ export const TaskCard = memo(function TaskCard({
             Move to bottom
           </DropdownMenuItem>
           <DropdownMenuItem variant="destructive" onClick={() => onDelete(task.id)}>
-            Delete card
+            Delete task
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>Move to list</DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
-              {columns.map((targetColumn) => (
-                <DropdownMenuItem
-                  key={targetColumn.id}
-                  onClick={() => onMove(task.id, targetColumn.id, Number.MAX_SAFE_INTEGER)}
-                >
-                  {targetColumn.title}
-                </DropdownMenuItem>
-              ))}
+              {columns
+                .filter((targetColumn) => targetColumn.id !== task.columnId)
+                .map((targetColumn) => (
+                  <DropdownMenuItem
+                    key={targetColumn.id}
+                    onClick={() => onMove(task.id, targetColumn.id, Number.MAX_SAFE_INTEGER)}
+                  >
+                    {targetColumn.title}
+                  </DropdownMenuItem>
+                ))}
             </DropdownMenuSubContent>
           </DropdownMenuSub>
         </DropdownMenuContent>

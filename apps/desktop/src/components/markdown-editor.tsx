@@ -30,7 +30,6 @@ import { TaskTokenHighlight } from "./tiptap-extension/task-token-highlight";
 import { Button } from "@/components/ui/button";
 
 import { EditorToolbar } from "./editor-toolbar";
-import { EditorFooter } from "./editor-footer";
 import { EditorDialogs } from "./editor-dialogs";
 import { useUpdateStateFlags } from "./update-notification";
 import { SlashCommand } from "@/core/slash-command";
@@ -39,7 +38,7 @@ import { TableControls } from "./table-controls";
 import { FindPanel } from "./find-panel";
 import { LinkPreview } from "./link-preview";
 import { ImageControls } from "./image-controls";
-import { ArrowUpIcon, OutlineIcon } from "./icons";
+import { ArrowUpIcon, CheckCircleIcon, OutlineIcon } from "./icons";
 import {
   clamp,
   collectEditorOutline,
@@ -212,10 +211,6 @@ export const MarkdownEditor = ({
   editorFocusRequest,
   findRequest,
   showToolbar = true,
-  saveStateLabel,
-  footerMetaLabel,
-  wordCount,
-  readingTime,
   onChange,
   onToggleSidebar,
   isSidebarCollapsed,
@@ -236,7 +231,6 @@ export const MarkdownEditor = ({
   navigateForwardShortcut,
   canGoBack,
   canGoForward,
-  autoOpenPDFSetting,
   isActiveFilePinned,
   onOutlineJumpHandled,
   updateState,
@@ -491,6 +485,8 @@ export const MarkdownEditor = ({
         "[&>h2]:mt-8 [&>h2]:mb-3 [&>h2]:text-2xl [&>h2]:font-semibold [&>h2]:leading-tight",
         "[&>h3]:mt-7 [&>h3]:mb-2 [&>h3]:text-xl [&>h3]:font-semibold [&>h3]:leading-tight",
         "[&>h4]:mt-6 [&>h4]:mb-2 [&>h4]:text-lg [&>h4]:font-semibold [&>h4]:leading-tight",
+        "[&>h5]:mt-5 [&>h5]:mb-2 [&>h5]:text-base [&>h5]:font-semibold [&>h5]:leading-tight",
+        "[&>h6]:mt-5 [&>h6]:mb-2 [&>h6]:text-sm [&>h6]:font-semibold [&>h6]:leading-tight [&>h6]:text-muted-foreground",
         "[&>ul]:list-disc [&>ol]:list-decimal [&>ul]:pl-6 [&>ol]:pl-6",
         "[&>ul[data-type='taskList']]:list-none [&>ul[data-type='taskList']]:pl-0",
         "[&>ul[data-type='taskList']_li]:flex [&>ul[data-type='taskList']_li]:gap-2.5 [&>ul[data-type='taskList']_li]:items-start",
@@ -729,7 +725,7 @@ export const MarkdownEditor = ({
       extensions: [
         StarterKit.configure({
           heading: {
-            levels: [1, 2, 3, 4],
+            levels: [1, 2, 3, 4, 5, 6],
           },
           codeBlock: false,
           link: false,
@@ -1280,8 +1276,8 @@ export const MarkdownEditor = ({
         const absolutePath = await window.glyph.exportMarkdownToPDF(markdown, filename);
         showToast("PDF exported successfully", `Saved as ${filename}`);
 
-        // Auto-open PDF if setting is enabled
-        if (autoOpenPDFSetting && absolutePath) {
+        // Automatically open the exported PDF
+        if (absolutePath) {
           await window.glyph.openExternal(absolutePath);
         }
       } else {
@@ -1473,13 +1469,25 @@ export const MarkdownEditor = ({
           </div>
         </aside>
       ) : null}
-      <EditorFooter
-        wordCount={wordCount}
-        readingTime={readingTime}
-        footerMetaLabel={footerMetaLabel}
-        saveStateLabel={saveStateLabel}
-        toast={toast}
-      />
+      {toast ? (
+        <div
+          className="fixed bottom-12 right-4 z-50 flex max-w-[360px] items-start gap-3 rounded-lg border border-border bg-card px-4 py-3 shadow-lg"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="mt-0.5 text-foreground" aria-hidden="true">
+            <CheckCircleIcon size={16} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="m-0 text-sm font-medium leading-snug text-foreground">{toast.title}</p>
+            {toast.description ? (
+              <p className="m-0 mt-0.5 break-words text-xs leading-snug text-muted-foreground">
+                {toast.description}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
       <EditorDialogs
         activeDialog={activeDialog}
         onDialogChange={setActiveDialog}

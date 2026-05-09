@@ -2,7 +2,7 @@ import type { BreadcrumbItem, OutlineItem } from "@/types/navigation";
 
 import { getBaseName, getDisplayFileName, getRelativePath, normalizePath } from "./paths";
 
-const HEADING_PATTERN = /^(#{1,4})\s+(.*)$/;
+const HEADING_PATTERN = /^(#{1,6})\s+(.*)$/;
 
 export function createHeadingId(input: string) {
   const normalized = input

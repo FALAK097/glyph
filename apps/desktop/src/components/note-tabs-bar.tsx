@@ -4,6 +4,7 @@ import type { DragEvent } from "react";
 import { isSamePath } from "@/core/paths";
 import { cn } from "@/core/utils";
 import type { TabMovePosition } from "@/core/workspace";
+import { useHorizontalScroll } from "@/hooks/use-horizontal-scroll";
 
 import { XIcon } from "./icons";
 
@@ -65,7 +66,7 @@ export function NoteTabsBar({
   onSelectTab,
   tabs,
 }: NoteTabsBarProps) {
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useHorizontalScroll<HTMLDivElement>();
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const draggedTabPathRef = useRef<string | null>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);

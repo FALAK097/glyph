@@ -36,6 +36,7 @@ import type {
 } from "@/core/tasks";
 import { TASK_COLUMN_COLORS_PICKER } from "@/core/tasks";
 import { cn } from "@/core/utils";
+import { useHorizontalScroll } from "@/hooks/use-horizontal-scroll";
 import { applyTaskMutation, groupTasksByColumn, useTasksStore } from "@/store/tasks";
 import { useTasksUIStore } from "@/store/tasks-ui";
 
@@ -56,11 +57,16 @@ const COLOR_DOTS: Record<TaskColumnColor, string> = {
   blue: "border-primary",
   cyan: "border-chart-3",
   emerald: "border-chart-5",
+  coral: "border-orange-500",
+  indigo: "border-indigo-500",
   lime: "border-chart-5",
   orange: "border-chart-2",
   pink: "border-chart-4",
+  red: "border-red-600",
   rose: "border-destructive",
   slate: "border-muted-foreground",
+  sky: "border-sky-500",
+  teal: "border-teal-500",
   violet: "border-chart-4",
 };
 
@@ -69,11 +75,16 @@ const LIST_TEXT_COLORS: Record<TaskColumnColor, string> = {
   blue: "text-primary",
   cyan: "text-chart-3",
   emerald: "text-chart-5",
+  coral: "text-orange-600 dark:text-orange-400",
+  indigo: "text-indigo-600 dark:text-indigo-400",
   lime: "text-chart-5",
   orange: "text-chart-2",
   pink: "text-chart-4",
+  red: "text-red-600 dark:text-red-400",
   rose: "text-destructive",
   slate: "text-muted-foreground",
+  sky: "text-sky-600 dark:text-sky-400",
+  teal: "text-teal-600 dark:text-teal-400",
   violet: "text-chart-4",
 };
 
@@ -82,37 +93,21 @@ const LIST_BG_COLORS: Record<TaskColumnColor, string> = {
   blue: "bg-primary/10",
   cyan: "bg-chart-3/10",
   emerald: "bg-chart-5/10",
+  coral: "bg-orange-500/10",
+  indigo: "bg-indigo-500/10",
   lime: "bg-chart-5/10",
   orange: "bg-chart-2/10",
   pink: "bg-chart-4/10",
+  red: "bg-red-600/10",
   rose: "bg-destructive/10",
   slate: "bg-muted",
+  sky: "bg-sky-500/10",
+  teal: "bg-teal-500/10",
   violet: "bg-chart-4/10",
 };
 
 function getTaskColumn(task: WorkspaceTask, columns: TaskColumnModel[]) {
   return columns.find((column) => column.id === task.columnId) ?? null;
-}
-
-function useHorizontalScrollRef<T extends HTMLElement>(isDraggingRef: React.RefObject<boolean>) {
-  const ref = useRef<T>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      if (isDraggingRef.current) return;
-      if (e.deltaY === 0) return;
-      const canScrollLeft = el.scrollLeft > 0;
-      const canScrollRight = el.scrollLeft < el.scrollWidth - el.clientWidth;
-      if ((e.deltaY < 0 && canScrollLeft) || (e.deltaY > 0 && canScrollRight)) {
-        e.preventDefault();
-        el.scrollLeft += e.deltaY;
-      }
-    };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, [isDraggingRef]);
-  return ref;
 }
 
 function SortHeader({
@@ -247,7 +242,7 @@ const TableRow = memo(function TableRow({
                 {task.labels.map((label) => (
                   <span
                     key={label}
-                    className="inline-flex items-center rounded-full bg-primary/8 px-2 py-0.5 text-xs font-medium text-primary"
+                    className="inline-flex items-center text-xs font-medium text-primary"
                   >
                     #{label}
                   </span>
@@ -338,6 +333,7 @@ export function TasksView({ glyph, onOpenTaskSource: _onOpenTaskSource }: TasksV
   const setIsAddingColumn = useTasksUIStore((s) => s.setIsAddingColumn);
   const searchQuery = useTasksUIStore((s) => s.searchQuery);
   const viewMode = useTasksUIStore((s) => s.viewMode);
+  const addToTopByColumn = useTasksUIStore((s) => s.addToTopByColumn);
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const [creatingColumnId, setCreatingColumnId] = useState<string | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
@@ -346,8 +342,8 @@ export function TasksView({ glyph, onOpenTaskSource: _onOpenTaskSource }: TasksV
   const [newColumnIsDone, setNewColumnIsDone] = useState(false);
   const [sortColumn, setSortColumn] = useState<SortColumn>("task");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
-  const isDraggingRef = useRef(false);
-  const boardScrollRef = useHorizontalScrollRef<HTMLDivElement>(isDraggingRef);
+  const isDraggingRef = useRef<boolean>(false);
+  const boardScrollRef = useHorizontalScroll<HTMLDivElement>(isDraggingRef, viewMode);
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -544,12 +540,15 @@ export function TasksView({ glyph, onOpenTaskSource: _onOpenTaskSource }: TasksV
 
   const handleCreateTask = useCallback(
     async (title: string, columnId: string, labels: string[], dueDate: string | null) => {
-      const result = await runMutation(glyph.createTask({ title, columnId, labels, dueDate }));
+      const index = addToTopByColumn[columnId] ? 0 : Number.MAX_SAFE_INTEGER;
+      const result = await runMutation(
+        glyph.createTask({ title, columnId, labels, dueDate, index }),
+      );
       if (result.ok) {
         setCreatingColumnId(null);
       }
     },
-    [glyph, runMutation],
+    [glyph, runMutation, addToTopByColumn],
   );
 
   const handleCreateColumn = useCallback(
@@ -744,7 +743,7 @@ export function TasksView({ glyph, onOpenTaskSource: _onOpenTaskSource }: TasksV
                   placeholder="List name"
                   className="h-9"
                 />
-                <div className="mt-3 grid grid-cols-7 gap-2">
+                <div className="mt-3 grid grid-cols-5 gap-2">
                   {TASK_COLUMN_COLORS_PICKER.map((color) => (
                     <Tooltip key={color}>
                       <TooltipTrigger asChild>
@@ -752,12 +751,18 @@ export function TasksView({ glyph, onOpenTaskSource: _onOpenTaskSource }: TasksV
                           type="button"
                           onClick={() => setNewColumnColor(color)}
                           className={cn(
-                            "h-7 w-7 rounded-full border-2 bg-background transition-transform hover:scale-110",
-                            COLOR_DOTS[color],
-                            newColumnColor === color ? "ring-2 ring-ring/40" : "",
+                            "grid h-8 w-8 place-items-center rounded-md border border-transparent transition-transform hover:border-border hover:scale-110",
+                            newColumnColor === color ? "bg-muted" : "",
                           )}
                           aria-label={`Use ${color}`}
-                        />
+                        >
+                          <span
+                            className={cn(
+                              "h-4 w-4 rounded-full border-2 bg-background",
+                              COLOR_DOTS[color],
+                            )}
+                          />
+                        </button>
                       </TooltipTrigger>
                       <TooltipContent side="bottom">
                         {color[0].toUpperCase() + color.slice(1)}

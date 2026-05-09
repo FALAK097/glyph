@@ -13,6 +13,7 @@ import {
 import electronUpdater from "electron-updater";
 import { watch } from "chokidar";
 import fs from "node:fs/promises";
+import type { Stats } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createSkillsService } from "./skills-service.js";
@@ -25,6 +26,7 @@ import type {
   DialogKind,
   DirectoryNode,
   FileOpenResult,
+  NoteBrowserEntry,
   NoteLinkPreview,
   ResolvedLinkTarget,
   SearchResult,
@@ -70,6 +72,42 @@ const GITHUB_RELEASES_URL = "https://github.com/FALAK097/glyph/releases";
 const GITHUB_LATEST_RELEASE_API_URL = "https://api.github.com/repos/FALAK097/glyph/releases/latest";
 const MARKDOWN_PREVIEW_SUFFIX_PATTERN = /\.(md|mdx|markdown)$/i;
 const MARKDOWN_HEADING_PATTERN = /^#{1,6}\s+(.*)$/;
+const NOTE_COLLECTION_ACCENT_KEYS = [
+  "violet",
+  "indigo",
+  "blue",
+  "sky",
+  "cyan",
+  "teal",
+  "emerald",
+  "lime",
+  "amber",
+  "orange",
+  "coral",
+  "rose",
+  "pink",
+  "red",
+  "slate",
+] as const;
+const NOTE_COLLECTION_ICON_KEYS = [
+  "folder",
+  "book",
+  "briefcase",
+  "calendar",
+  "sparkles",
+  "rocket",
+  "tag",
+  "archive",
+  "leaf",
+  "layers",
+  "globe",
+  "home",
+  "camera",
+  "notebook",
+  "star",
+] as const;
+type NoteCollectionAccentValue = (typeof NOTE_COLLECTION_ACCENT_KEYS)[number];
+type NoteCollectionIconValue = (typeof NOTE_COLLECTION_ICON_KEYS)[number];
 
 type PersistedUpdateState = {
   stagedVersion: string | null;
@@ -977,6 +1015,7 @@ function getDefaultSettings(): AppSettings {
     themeMode: "light",
     hiddenFiles: [],
     pinnedFiles: [],
+    noteFolderAppearances: {},
     shortcuts: DEFAULT_SHORTCUTS,
     sidebar: {
       items: [],
@@ -1026,6 +1065,51 @@ function normalizePersistedFileList(input: unknown) {
   return Array.isArray(input)
     ? input.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
     : [];
+}
+
+function isNoteCollectionAccentValue(value: unknown): value is NoteCollectionAccentValue {
+  return (
+    typeof value === "string" &&
+    NOTE_COLLECTION_ACCENT_KEYS.includes(value as NoteCollectionAccentValue)
+  );
+}
+
+function isNoteCollectionIconValue(value: unknown): value is NoteCollectionIconValue {
+  return (
+    typeof value === "string" &&
+    NOTE_COLLECTION_ICON_KEYS.includes(value as NoteCollectionIconValue)
+  );
+}
+
+function normalizeNoteFolderAppearances(input: unknown): AppSettings["noteFolderAppearances"] {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(input).flatMap(([folderPath, appearance]) => {
+      if (
+        !folderPath ||
+        !appearance ||
+        typeof appearance !== "object" ||
+        Array.isArray(appearance)
+      ) {
+        return [];
+      }
+
+      const candidate = appearance as { accent?: unknown; icon?: unknown };
+      const normalized: AppSettings["noteFolderAppearances"][string] = {};
+
+      if (isNoteCollectionAccentValue(candidate.accent)) {
+        normalized.accent = candidate.accent;
+      }
+      if (isNoteCollectionIconValue(candidate.icon)) {
+        normalized.icon = candidate.icon;
+      }
+
+      return Object.keys(normalized).length > 0 ? [[folderPath, normalized]] : [];
+    }),
+  );
 }
 
 function normalizeEditorPreferences(
@@ -1327,6 +1411,7 @@ async function sanitizeSettingsWithFileValidation(input: unknown): Promise<AppSe
     themeMode: isThemeMode(candidate.themeMode) ? candidate.themeMode : defaults.themeMode,
     hiddenFiles: Array.from(new Set(validHiddenFiles)),
     pinnedFiles: Array.from(new Set(validPinnedFiles)),
+    noteFolderAppearances: normalizeNoteFolderAppearances(candidate.noteFolderAppearances),
     shortcuts: Array.isArray(candidate.shortcuts)
       ? normalizeShortcutSettings(
           candidate.shortcuts.filter(
@@ -1467,6 +1552,20 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
         : null;
   }
 
+  if ("noteFolderAppearances" in candidate) {
+    if (
+      !candidate.noteFolderAppearances ||
+      typeof candidate.noteFolderAppearances !== "object" ||
+      Array.isArray(candidate.noteFolderAppearances)
+    ) {
+      throw new Error("noteFolderAppearances must be an object.");
+    }
+
+    nextPatch.noteFolderAppearances = normalizeNoteFolderAppearances(
+      candidate.noteFolderAppearances,
+    );
+  }
+
   const invalidKeys = Object.keys(candidate).filter(
     (key) =>
       ![
@@ -1480,6 +1579,7 @@ function sanitizeSettingsPatch(patch: unknown): Partial<AppSettings> {
         "editorPreferences",
         "autoOpenPDF",
         "dismissedUpdateVersion",
+        "noteFolderAppearances",
       ].includes(key),
   );
 
@@ -1730,6 +1830,174 @@ async function getSidebarNode(
   }
 }
 
+function getDisplayMarkdownFileName(filePath: string): string {
+  const fileName = path.basename(filePath).trim();
+  const displayName = fileName.replace(/\.(md|mdx|markdown)$/i, "");
+  return displayName.length > 0 ? displayName : fileName || "Untitled";
+}
+
+function serializeNoteExcerptLine(line: string): string {
+  return line
+    .replace(/\\([\\`*_{}[\]()#+\-.!>])/g, "$1")
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_match, target: string, label?: string) =>
+      (label ?? target).trim(),
+    )
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/[*_~>#]/g, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\|/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractNoteExcerpt(content: string): string {
+  const lines = content.split("\n");
+  const cleanLines: string[] = [];
+  let isFrontmatter = false;
+  let isCodeBlock = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    if (trimmed === "---" && cleanLines.length === 0) {
+      isFrontmatter = true;
+      continue;
+    }
+    if (isFrontmatter) {
+      if (trimmed === "---") {
+        isFrontmatter = false;
+      }
+      continue;
+    }
+    if (trimmed.startsWith("```")) {
+      isCodeBlock = !isCodeBlock;
+      continue;
+    }
+    if (
+      !trimmed ||
+      isCodeBlock ||
+      trimmed.startsWith("#") ||
+      trimmed.startsWith("|") ||
+      /^[-:| ]+$/.test(trimmed)
+    ) {
+      continue;
+    }
+
+    const serialized = serializeNoteExcerptLine(trimmed);
+    if (serialized) {
+      cleanLines.push(serialized);
+      if (cleanLines.join(" ").length >= 150) break;
+    }
+  }
+  const excerpt = cleanLines.join(" ").slice(0, 150);
+  return excerpt.length === 150 ? excerpt + "..." : excerpt;
+}
+
+async function getAllMarkdownFiles(dirPath: string): Promise<string[]> {
+  const results: string[] = [];
+  try {
+    const entries = await fs.readdir(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dirPath, entry.name);
+      if (entry.isDirectory()) {
+        const subFiles = await getAllMarkdownFiles(fullPath);
+        results.push(...subFiles);
+      } else if (isMarkdownFile(entry.name)) {
+        results.push(fullPath);
+      }
+    }
+  } catch {
+    // Ignore inaccessible directories
+  }
+  return results;
+}
+
+function isPathWithinRoot(targetPath: string, rootPath: string): boolean {
+  const resolvedTarget = normalizePathForComparison(path.resolve(targetPath));
+  const resolvedRoot = normalizePathForComparison(path.resolve(rootPath));
+  if (resolvedTarget === resolvedRoot) {
+    return true;
+  }
+
+  const relative = path.relative(resolvedRoot, resolvedTarget);
+  return relative.length > 0 && !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
+async function resolveAllowedNoteBrowserPath(
+  targetPath: string | null,
+  settings: AppSettings,
+): Promise<string | null> {
+  const fallbackPath = targetPath ?? settings.defaultWorkspacePath;
+  if (!fallbackPath) return null;
+
+  const normalizedTarget = path.resolve(path.normalize(fallbackPath));
+  const allowedRoots = [
+    settings.defaultWorkspacePath,
+    activeWorkspaceRoot,
+    ...settings.sidebar.items.map((item) => item.path),
+  ].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+
+  const isAllowed = allowedRoots.some((rootPath) => isPathWithinRoot(normalizedTarget, rootPath));
+  return isAllowed ? normalizedTarget : null;
+}
+
+async function getNoteBrowserEntries(targetPath: string | null): Promise<NoteBrowserEntry[]> {
+  const settings = await loadSettings();
+  const rootPath = await resolveAllowedNoteBrowserPath(targetPath, settings);
+  if (!rootPath) return [];
+
+  let rootStats: Stats;
+  try {
+    rootStats = await fs.stat(rootPath);
+  } catch {
+    return [];
+  }
+
+  const mdFiles =
+    rootStats.isFile() && isMarkdownFile(rootPath)
+      ? [rootPath]
+      : rootStats.isDirectory()
+        ? await getAllMarkdownFiles(rootPath)
+        : [];
+  const entries: NoteBrowserEntry[] = [];
+
+  for (const filePath of mdFiles) {
+    try {
+      const stats = await fs.stat(filePath);
+      const content = await fs.readFile(filePath, "utf8");
+      const normalizedContent = content.replace(/\r\n?/g, "\n");
+      const wordCount = normalizedContent.split(/\s+/).filter(Boolean).length;
+
+      entries.push({
+        path: filePath,
+        title: getDisplayMarkdownFileName(filePath),
+        excerpt: extractNoteExcerpt(normalizedContent),
+        modifiedAt: stats.mtime.toISOString(),
+        createdAt: stats.birthtime.toISOString(),
+        sizeBytes: stats.size,
+        wordCount,
+      });
+    } catch {
+      // Skip files that can't be read
+    }
+  }
+
+  return entries.sort((a, b) => {
+    const aTime = a.modifiedAt ? new Date(a.modifiedAt).getTime() : 0;
+    const bTime = b.modifiedAt ? new Date(b.modifiedAt).getTime() : 0;
+    return bTime - aTime;
+  });
+}
+
+async function getNoteBrowserEntriesBatch(
+  targetPaths: Array<string | null>,
+): Promise<NoteBrowserEntry[][]> {
+  return Promise.all(targetPaths.map((targetPath) => getNoteBrowserEntries(targetPath)));
+}
+
 async function buildDirectoryTree(dirPath: string): Promise<DirectoryNode[]> {
   const entries = await fs.readdir(dirPath, { withFileTypes: true });
   const sorted = entries.sort((left, right) => {
@@ -1838,6 +2106,12 @@ async function openWorkspace(
     },
   });
 
+  // Determine if this is the default workspace before setting up watcher
+  const settingsForWorkspace = await loadSettings();
+  const isDefaultWorkspace =
+    normalizePathForComparison(dirPath) ===
+    normalizePathForComparison(settingsForWorkspace.defaultWorkspacePath);
+
   // Debounce rapid filesystem changes (e.g. git checkout) to avoid
   // redundant directory tree rebuilds. Coalesce into a single rebuild
   // after 100ms of quiet.
@@ -1870,7 +2144,7 @@ async function openWorkspace(
 
       const nextTree = await buildDirectoryTree(dirPath);
       searchableFilesCache = await collectMarkdownFiles(nextTree);
-      tasksService.setWorkspace(activeWorkspaceRoot);
+      tasksService.setWorkspace(activeWorkspaceRoot, isDefaultWorkspace);
       const taskSnapshot = await tasksService.refreshChanged();
       mainWindow.webContents.send("workspace:changed", {
         rootPath: dirPath,
@@ -1881,8 +2155,8 @@ async function openWorkspace(
     }, 100);
   });
 
-  tasksService.setWorkspace(activeWorkspaceRoot);
-  await tasksService.rebuild();
+  tasksService.setWorkspace(activeWorkspaceRoot, isDefaultWorkspace);
+  await tasksService.rebuild(isDefaultWorkspace);
 
   return {
     rootPath: dirPath,
@@ -2332,6 +2606,32 @@ ipcMain.handle("tasks:unarchive", async (_event, input: unknown) => {
 ipcMain.handle("sidebar:getNode", async (_event, kind: "file" | "directory", targetPath: string) =>
   getSidebarNode(kind, targetPath),
 );
+
+ipcMain.handle("sidebar:getNoteBrowserEntries", async (_event, targetPath: unknown) => {
+  if (targetPath !== null && typeof targetPath !== "string") {
+    throw new Error(
+      `sidebar:getNoteBrowserEntries: invalid targetPath — expected string | null, got ${typeof targetPath}`,
+    );
+  }
+  return getNoteBrowserEntries(targetPath);
+});
+
+ipcMain.handle("sidebar:getNoteBrowserEntriesBatch", async (_event, targetPaths: unknown) => {
+  if (!Array.isArray(targetPaths)) {
+    throw new Error(
+      `sidebar:getNoteBrowserEntriesBatch: invalid targetPaths — expected array, got ${typeof targetPaths}`,
+    );
+  }
+  const validated = targetPaths.map((item, i) => {
+    if (item !== null && typeof item !== "string") {
+      throw new Error(
+        `sidebar:getNoteBrowserEntriesBatch: invalid element at index ${i} — expected string | null, got ${typeof item}`,
+      );
+    }
+    return item as string | null;
+  });
+  return getNoteBrowserEntriesBatch(validated);
+});
 
 ipcMain.handle("workspace:openDocument", async () => {
   const selection = await showOpenDialog("file");

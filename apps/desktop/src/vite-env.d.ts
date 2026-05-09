@@ -6,6 +6,7 @@ import type {
   AssetSelection,
   AppSettings,
   DialogKind,
+  NoteBrowserEntry,
   UpdateState,
   FileDocument,
   FileOpenResult,
@@ -86,6 +87,10 @@ declare global {
         kind: "file" | "directory",
         targetPath: string,
       ) => Promise<WorkspaceSnapshot["tree"][number] | null>;
+      getNoteBrowserEntries: (targetPath: string | null) => Promise<NoteBrowserEntry[]>;
+      getNoteBrowserEntriesBatch: (
+        targetPaths: Array<string | null>,
+      ) => Promise<NoteBrowserEntry[][]>;
       getSettings: () => Promise<AppSettings>;
       updateSettings: (patch: Partial<AppSettings>) => Promise<AppSettings>;
       getAppInfo: () => Promise<AppInfo>;

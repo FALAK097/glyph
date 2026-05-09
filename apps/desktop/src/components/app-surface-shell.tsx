@@ -11,8 +11,8 @@ type AppSurfaceShellProps = {
 
 function BrowserResizeHandle() {
   return (
-    <Separator className="group relative flex h-full w-px items-center justify-center bg-border/55 transition-colors duration-100 hover:bg-border/80 active:bg-border">
-      <div className="absolute z-10 h-full w-2 cursor-grab active:cursor-grabbing" />
+    <Separator className="group relative flex h-full w-px touch-none select-none items-center justify-center bg-border/55 transition-colors duration-100 hover:bg-border/80 active:bg-border">
+      <div className="absolute -left-1 z-10 h-full w-3 cursor-col-resize touch-none" />
       <div className="pointer-events-none absolute left-1/2 top-1/2 h-7 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-muted-foreground/40 opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-active:opacity-100" />
     </Separator>
   );

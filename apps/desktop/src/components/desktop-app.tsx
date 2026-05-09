@@ -68,6 +68,14 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const setSelectedNoteCollectionPath = useSessionStore(
     (state) => state.setSelectedNoteCollectionPath,
   );
+  const setLastNotePathForCollection = useSessionStore(
+    (state) => state.setLastNotePathForCollection,
+  );
+  const getLastNotePathForCollection = useSessionStore(
+    (state) => state.getLastNotePathForCollection,
+  );
+  const setNoteOrderForCollection = useSessionStore((state) => state.setNoteOrderForCollection);
+  const getNoteOrderForCollection = useSessionStore((state) => state.getNoteOrderForCollection);
   const setNotesBrowserPaneWidth = useSessionStore((state) => state.setNotesBrowserPaneWidth);
   const setSelectedSkillCollectionId = useSessionStore(
     (state) => state.setSelectedSkillCollectionId,
@@ -300,6 +308,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     () => filterNoteBrowserEntries(noteBrowserEntries, "", activeNoteCollection),
     [activeNoteCollection, noteBrowserEntries],
   );
+  const activeNoteCollectionPath = activeNoteCollection?.path ?? null;
 
   const handleToggleSkillsSection = useCallback(() => {
     const nextValue = !isSkillsExpanded;
@@ -318,19 +327,26 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const handleSelectNoteCollection = useCallback(
     async (collectionPath: string) => {
       const collection = noteCollections.find((item) => item.path === collectionPath);
-      const firstNotePath = collection?.notePaths[0] ?? null;
+      const lastNotePath = getLastNotePathForCollection(collectionPath);
+      const targetNotePath =
+        lastNotePath && collection?.notePaths.some((notePath) => isSamePath(notePath, lastNotePath))
+          ? lastNotePath
+          : (collection?.notePaths[0] ?? null);
 
       setSelectedSkillCollectionId(null);
       setSelectedNoteCollectionPath(collectionPath);
       setViewerMode("note");
 
-      if (firstNotePath) {
-        await controller.openFile(firstNotePath);
+      if (targetNotePath) {
+        await controller.openFile(targetNotePath);
+        setLastNotePathForCollection(collectionPath, targetNotePath);
       }
     },
     [
       controller,
+      getLastNotePathForCollection,
       noteCollections,
+      setLastNotePathForCollection,
       setSelectedNoteCollectionPath,
       setSelectedSkillCollectionId,
       setViewerMode,
@@ -521,7 +537,30 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
               : 0;
           return bTime - aTime;
         });
-        setNoteBrowserEntries(sorted);
+        const order = getNoteOrderForCollection(activeNoteCollection.path);
+        const orderIndexes = new Map(
+          order.map((path, index) => [path.replace(/\\/g, "/").toLowerCase(), index]),
+        );
+        const ordered = sorted.sort((a, b) => {
+          const aIndex = orderIndexes.get(a.path.replace(/\\/g, "/").toLowerCase());
+          const bIndex = orderIndexes.get(b.path.replace(/\\/g, "/").toLowerCase());
+
+          if (aIndex !== undefined && bIndex !== undefined) {
+            return aIndex - bIndex;
+          }
+
+          if (aIndex !== undefined) {
+            return -1;
+          }
+
+          if (bIndex !== undefined) {
+            return 1;
+          }
+
+          return 0;
+        });
+
+        setNoteBrowserEntries(ordered);
       })
       .catch(() => {
         if (isCancelled) {
@@ -538,7 +577,13 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     return () => {
       isCancelled = true;
     };
-  }, [activeNoteCollection, glyph, noteCollections, noteBrowserRefreshNonce]);
+  }, [
+    activeNoteCollection,
+    getNoteOrderForCollection,
+    glyph,
+    noteCollections,
+    noteBrowserRefreshNonce,
+  ]);
 
   useEffect(() => {
     if (
@@ -679,15 +724,21 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         .sort((left, right) => right.sourcePath.length - left.sourcePath.length)[0];
 
       setSelectedSkillCollectionId(null);
-      if (containingCollection) {
+      if (activeNoteCollection?.isAllCollection) {
+        setSelectedNoteCollectionPath(activeNoteCollection.path);
+        setLastNotePathForCollection(activeNoteCollection.path, filePath);
+      } else if (containingCollection) {
         setSelectedNoteCollectionPath(containingCollection.path);
+        setLastNotePathForCollection(containingCollection.path, filePath);
       }
       setViewerMode("note");
       await controller.openFile(filePath);
     },
     [
+      activeNoteCollection,
       controller,
       noteCollections,
+      setLastNotePathForCollection,
       setSelectedNoteCollectionPath,
       setSelectedSkillCollectionId,
       setViewerMode,
@@ -767,11 +818,11 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       const pdfName = fileName.replace(/\.(md|mdx|markdown)$/i, ".pdf");
       const absolutePath = await glyph.exportMarkdownToPDF(markdown, pdfName);
 
-      if ((controller.settings?.autoOpenPDF ?? true) && absolutePath) {
+      if (absolutePath) {
         await glyph.openExternal(absolutePath);
       }
     },
-    [controller.settings?.autoOpenPDF, glyph],
+    [glyph],
   );
 
   const handleRenameCurrentNote = useCallback(() => {
@@ -1496,6 +1547,36 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     (filePath: string) => void handleOpenNoteFile(filePath),
     [handleOpenNoteFile],
   );
+  const handleBrowserReorderNote = useCallback(
+    (sourcePath: string, targetPath: string, position: "before" | "after") => {
+      if (!activeNoteCollectionPath) {
+        return;
+      }
+
+      setNoteBrowserEntries((current) => {
+        const sourceIndex = current.findIndex((entry) => isSamePath(entry.path, sourcePath));
+        const targetIndex = current.findIndex((entry) => isSamePath(entry.path, targetPath));
+
+        if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) {
+          return current;
+        }
+
+        const nextEntries = [...current];
+        const [moved] = nextEntries.splice(sourceIndex, 1);
+        const nextTargetIndex = nextEntries.findIndex((entry) =>
+          isSamePath(entry.path, targetPath),
+        );
+        const insertIndex = position === "before" ? nextTargetIndex : nextTargetIndex + 1;
+        nextEntries.splice(insertIndex, 0, moved);
+        setNoteOrderForCollection(
+          activeNoteCollectionPath,
+          nextEntries.map((entry) => entry.path),
+        );
+        return nextEntries;
+      });
+    },
+    [activeNoteCollectionPath, setNoteOrderForCollection],
+  );
   const handleBrowserCopyNote = useCallback(
     (entry: { path: string }) => {
       void glyph
@@ -1634,7 +1715,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       isFocusMode: controller.isFocusMode,
       showOutline: controller.showOutline,
       editorScale: controller.editorScale,
-      autoOpenPDFSetting: controller.settings?.autoOpenPDF ?? true,
       folderRevealLabel: controller.folderRevealLabel,
       updateState: controller.updateState,
       updatesMode: controller.appInfo?.updatesMode,
@@ -1677,7 +1757,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       controller.folderRevealLabel,
       controller.isFocusMode,
       controller.isSidebarCollapsed,
-      controller.settings?.autoOpenPDF,
       controller.settings?.dismissedUpdateVersion,
       controller.settings?.pinnedFiles,
       controller.shortcuts,
@@ -1951,7 +2030,11 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         footer={footerNode}
         shouldCollapseSidebar={shouldCollapseSidebar}
         tree={controller.visibleSidebarNodes}
-        activePath={viewerMode === "note" ? (controller.activeFile?.path ?? null) : null}
+        activePath={
+          viewerMode === "note" && !activeNoteCollection?.isAllCollection
+            ? (controller.activeFile?.path ?? null)
+            : null
+        }
         isSidebarCollapsed={controller.isSidebarCollapsed}
         isNotesExpanded={isNotesExpanded}
         isSkillsExpanded={isSkillsExpanded}
@@ -2104,6 +2187,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
                   onRevealNote={handleBrowserRevealNote}
                   onRemoveNote={handleBrowserRemoveNote}
                   onDeleteNote={handleBrowserDeleteNote}
+                  onReorderNote={handleBrowserReorderNote}
                 />
               ) : null
             }
@@ -2140,7 +2224,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         onChooseFolder={() => void controller.chooseFolderAndUpdateWorkspace()}
         onChangeMode={(mode: ThemeMode) => void controller.changeThemeMode(mode)}
         onChangeShortcuts={(shortcuts) => void controller.changeShortcuts(shortcuts)}
-        onChangeAutoOpenPDF={(enabled) => void controller.saveSettings({ autoOpenPDF: enabled })}
       />
       <NoteRenameDialog
         pending={pendingNoteRename}

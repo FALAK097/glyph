@@ -8,5 +8,4 @@ export type SettingsPanelProps = {
   onChooseFolder: () => void;
   onChangeMode: (mode: ThemeMode) => void;
   onChangeShortcuts: (shortcuts: ShortcutSetting[]) => void;
-  onChangeAutoOpenPDF?: (enabled: boolean) => void;
 };

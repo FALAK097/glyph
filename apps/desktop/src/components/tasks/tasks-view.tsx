@@ -242,7 +242,7 @@ const TableRow = memo(function TableRow({
                 {task.labels.map((label) => (
                   <span
                     key={label}
-                    className="inline-flex items-center rounded-full bg-primary/8 px-2 py-0.5 text-xs font-medium text-primary"
+                    className="inline-flex items-center text-xs font-medium text-primary"
                   >
                     #{label}
                   </span>
@@ -333,6 +333,7 @@ export function TasksView({ glyph, onOpenTaskSource: _onOpenTaskSource }: TasksV
   const setIsAddingColumn = useTasksUIStore((s) => s.setIsAddingColumn);
   const searchQuery = useTasksUIStore((s) => s.searchQuery);
   const viewMode = useTasksUIStore((s) => s.viewMode);
+  const addToTopByColumn = useTasksUIStore((s) => s.addToTopByColumn);
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const [creatingColumnId, setCreatingColumnId] = useState<string | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
@@ -539,12 +540,15 @@ export function TasksView({ glyph, onOpenTaskSource: _onOpenTaskSource }: TasksV
 
   const handleCreateTask = useCallback(
     async (title: string, columnId: string, labels: string[], dueDate: string | null) => {
-      const result = await runMutation(glyph.createTask({ title, columnId, labels, dueDate }));
+      const index = addToTopByColumn[columnId] ? 0 : Number.MAX_SAFE_INTEGER;
+      const result = await runMutation(
+        glyph.createTask({ title, columnId, labels, dueDate, index }),
+      );
       if (result.ok) {
         setCreatingColumnId(null);
       }
     },
-    [glyph, runMutation],
+    [glyph, runMutation, addToTopByColumn],
   );
 
   const handleCreateColumn = useCallback(

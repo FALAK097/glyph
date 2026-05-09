@@ -33,7 +33,6 @@ export const SettingsPanel = ({
   onChooseFolder,
   onChangeMode,
   onChangeShortcuts,
-  onChangeAutoOpenPDF,
 }: SettingsPanelProps) => {
   const [activeTab, setActiveTab] = useState("general");
   const [shortcuts, setShortcuts] = useState(DEFAULT_SHORTCUTS);
@@ -276,24 +275,6 @@ export const SettingsPanel = ({
                         <SelectItem value="system">System</SelectItem>
                       </SelectContent>
                     </Select>
-                  </div>
-
-                  <div className="flex flex-col justify-between gap-4 border-b border-border/40 py-4 sm:flex-row sm:items-center sm:gap-8">
-                    <div className="shrink-0 space-y-1">
-                      <p className="text-sm font-medium">PDF Export</p>
-                      <p className="text-xs text-muted-foreground">Configure PDF export behavior</p>
-                    </div>
-                    <label className="flex items-center space-x-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={settings?.autoOpenPDF ?? true}
-                        onChange={(e) => {
-                          onChangeAutoOpenPDF?.(e.target.checked);
-                        }}
-                        className="h-4 w-4 rounded border-border bg-background text-primary shadow-sm focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                      />
-                      <span className="text-sm font-medium">Automatically open exported PDF</span>
-                    </label>
                   </div>
                 </div>
               </div>

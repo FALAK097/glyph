@@ -17,7 +17,6 @@ export type SplitViewContextValue = {
   isFocusMode: boolean;
   showOutline: boolean;
   editorScale: number;
-  autoOpenPDFSetting: boolean;
   folderRevealLabel: string;
   updateState: UpdateState | null;
   updatesMode: AppInfo["updatesMode"] | undefined;

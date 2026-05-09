@@ -26,6 +26,8 @@ type SessionState = {
   isNotesExpanded: boolean;
   isSkillsExpanded: boolean;
   selectedNoteCollectionPath: string | null;
+  lastNotePathByCollection: Record<string, string>;
+  noteOrderByCollection: Record<string, string[]>;
   notesBrowserSearchQuery: string;
   notesBrowserPaneWidth: number;
   skillsBrowserPaneWidth: number;
@@ -46,6 +48,10 @@ type SessionState = {
   setNotesExpanded: (value: boolean) => void;
   setSkillsExpanded: (value: boolean) => void;
   setSelectedNoteCollectionPath: (value: string | null) => void;
+  setLastNotePathForCollection: (collectionPath: string, notePath: string) => void;
+  getLastNotePathForCollection: (collectionPath: string | null | undefined) => string | null;
+  setNoteOrderForCollection: (collectionPath: string, notePaths: string[]) => void;
+  getNoteOrderForCollection: (collectionPath: string | null | undefined) => string[];
   setNotesBrowserSearchQuery: (value: string) => void;
   setNotesBrowserPaneWidth: (value: number) => void;
   setSkillsBrowserPaneWidth: (value: number) => void;
@@ -124,6 +130,8 @@ export const useSessionStore = create<SessionState>()(
       isNotesExpanded: true,
       isSkillsExpanded: false,
       selectedNoteCollectionPath: null,
+      lastNotePathByCollection: {},
+      noteOrderByCollection: {},
       notesBrowserSearchQuery: "",
       notesBrowserPaneWidth: DEFAULT_NOTES_BROWSER_PANE_WIDTH,
       skillsBrowserPaneWidth: DEFAULT_SKILLS_BROWSER_PANE_WIDTH,
@@ -159,6 +167,39 @@ export const useSessionStore = create<SessionState>()(
             ? normalizePath(selectedNoteCollectionPath)
             : null,
         });
+      },
+      setLastNotePathForCollection: (collectionPath, notePath) => {
+        const normalizedCollectionPath = normalizePath(collectionPath);
+        const normalizedNotePath = normalizePath(notePath);
+        set((state) => ({
+          lastNotePathByCollection: {
+            ...state.lastNotePathByCollection,
+            [normalizedCollectionPath.toLowerCase()]: normalizedNotePath,
+          },
+        }));
+      },
+      getLastNotePathForCollection: (collectionPath) => {
+        if (!collectionPath) {
+          return null;
+        }
+
+        return get().lastNotePathByCollection[normalizePath(collectionPath).toLowerCase()] ?? null;
+      },
+      setNoteOrderForCollection: (collectionPath, notePaths) => {
+        const normalizedCollectionPath = normalizePath(collectionPath);
+        set((state) => ({
+          noteOrderByCollection: {
+            ...state.noteOrderByCollection,
+            [normalizedCollectionPath.toLowerCase()]: normalizeUniquePaths(notePaths),
+          },
+        }));
+      },
+      getNoteOrderForCollection: (collectionPath) => {
+        if (!collectionPath) {
+          return [];
+        }
+
+        return get().noteOrderByCollection[normalizePath(collectionPath).toLowerCase()] ?? [];
       },
       setNotesBrowserSearchQuery: (notesBrowserSearchQuery) => {
         set({ notesBrowserSearchQuery });
@@ -293,6 +334,8 @@ export const useSessionStore = create<SessionState>()(
         isNotesExpanded: state.isNotesExpanded,
         isSkillsExpanded: state.isSkillsExpanded,
         selectedNoteCollectionPath: state.selectedNoteCollectionPath,
+        lastNotePathByCollection: state.lastNotePathByCollection,
+        noteOrderByCollection: state.noteOrderByCollection,
         notesBrowserSearchQuery: state.notesBrowserSearchQuery,
         notesBrowserPaneWidth: state.notesBrowserPaneWidth,
         skillsBrowserPaneWidth: state.skillsBrowserPaneWidth,

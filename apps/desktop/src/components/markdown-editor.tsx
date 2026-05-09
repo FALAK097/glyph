@@ -231,7 +231,6 @@ export const MarkdownEditor = ({
   navigateForwardShortcut,
   canGoBack,
   canGoForward,
-  autoOpenPDFSetting,
   isActiveFilePinned,
   onOutlineJumpHandled,
   updateState,
@@ -1275,8 +1274,8 @@ export const MarkdownEditor = ({
         const absolutePath = await window.glyph.exportMarkdownToPDF(markdown, filename);
         showToast("PDF exported successfully", `Saved as ${filename}`);
 
-        // Auto-open PDF if setting is enabled
-        if (autoOpenPDFSetting && absolutePath) {
+        // Automatically open the exported PDF
+        if (absolutePath) {
           await window.glyph.openExternal(absolutePath);
         }
       } else {

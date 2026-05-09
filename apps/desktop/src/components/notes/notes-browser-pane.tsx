@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { DragEvent } from "react";
 import { createPortal } from "react-dom";
 
 import { cn } from "@/core/utils";
@@ -112,9 +113,21 @@ type NotesBrowserPaneProps = {
   onRevealNote?: (entry: NoteBrowserEntry) => void;
   onRemoveNote?: (entry: NoteBrowserEntry) => void;
   onDeleteNote?: (entry: NoteBrowserEntry) => void;
+  onReorderNote?: (sourcePath: string, targetPath: string, position: "before" | "after") => void;
 };
 
 const SKELETON_COUNT = 5;
+const NOTE_BROWSER_DRAG_MIME = "application/x-glyph-note-browser-entry";
+let globalDraggedNotePath: string | null = null;
+
+function getDropPosition(event: DragEvent<HTMLElement>) {
+  const rect = event.currentTarget.getBoundingClientRect();
+  return event.clientY < rect.top + rect.height / 2 ? "before" : "after";
+}
+
+function getDraggedNotePath(event: DragEvent<HTMLElement>) {
+  return event.dataTransfer.getData(NOTE_BROWSER_DRAG_MIME) || globalDraggedNotePath;
+}
 
 function formatModifiedAt(value: string | null) {
   if (!value) {
@@ -172,11 +185,16 @@ export function NotesBrowserPane({
   onRevealNote,
   onRemoveNote,
   onDeleteNote,
+  onReorderNote,
 }: NotesBrowserPaneProps) {
   const [actionMenu, setActionMenu] = useState<{
     entry: NoteBrowserEntry;
     left: number;
     top: number;
+  } | null>(null);
+  const [dragTarget, setDragTarget] = useState<{
+    path: string;
+    position: "before" | "after";
   } | null>(null);
   const closeActionMenu = () => setActionMenu(null);
 
@@ -209,6 +227,42 @@ export function NotesBrowserPane({
                   aria-current={isActive ? "true" : undefined}
                   role="button"
                   tabIndex={0}
+                  draggable
+                  onDragStart={(event) => {
+                    globalDraggedNotePath = entry.path;
+                    event.dataTransfer.effectAllowed = "move";
+                    event.dataTransfer.setData(NOTE_BROWSER_DRAG_MIME, entry.path);
+                    event.dataTransfer.setData("text/plain", entry.path);
+                  }}
+                  onDragOver={(event) => {
+                    const sourcePath = getDraggedNotePath(event);
+                    if (!sourcePath || sourcePath === entry.path) {
+                      return;
+                    }
+
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    setDragTarget({ path: entry.path, position: getDropPosition(event) });
+                  }}
+                  onDragLeave={() => {
+                    setDragTarget((current) => (current?.path === entry.path ? null : current));
+                  }}
+                  onDrop={(event) => {
+                    const sourcePath = getDraggedNotePath(event);
+                    if (!sourcePath || sourcePath === entry.path) {
+                      return;
+                    }
+
+                    event.preventDefault();
+                    const position = getDropPosition(event);
+                    setDragTarget(null);
+                    globalDraggedNotePath = null;
+                    onReorderNote?.(sourcePath, entry.path, position);
+                  }}
+                  onDragEnd={() => {
+                    globalDraggedNotePath = null;
+                    setDragTarget(null);
+                  }}
                   onClick={() => onOpenNote(entry.path)}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
@@ -218,6 +272,12 @@ export function NotesBrowserPane({
                   }}
                   className={cn(
                     "group/note flex w-full cursor-pointer items-start gap-2 border-b border-l-2 border-b-border/70 px-4 py-3 text-left transition-colors duration-100 ease-out",
+                    dragTarget?.path === entry.path && dragTarget.position === "before"
+                      ? "border-t-2 border-t-primary/70"
+                      : null,
+                    dragTarget?.path === entry.path && dragTarget.position === "after"
+                      ? "border-b-2 border-b-primary/70"
+                      : null,
                     isActive
                       ? cn(ACCENT_BORDER_CLASSES[accent], ACCENT_ROW_CLASSES[accent].active)
                       : cn("border-l-transparent", ACCENT_ROW_CLASSES[accent].hover),
@@ -231,6 +291,7 @@ export function NotesBrowserPane({
                       <span className="flex h-5 shrink-0 items-center">
                         <button
                           type="button"
+                          draggable={false}
                           className="grid h-5 w-5 place-items-center rounded-sm text-muted-foreground transition-colors hover:text-foreground"
                           aria-label="Note actions"
                           onPointerDownCapture={(event) => {
@@ -265,7 +326,13 @@ export function NotesBrowserPane({
                         </button>
                       </span>
                     </span>
-                    {entry.excerpt && !isActive ? (
+                    {entry.excerpt && isActive ? (
+                      <span
+                        aria-hidden="true"
+                        data-excerpt={entry.excerpt}
+                        className="mt-1.5 line-clamp-2 block text-xs leading-5 text-muted-foreground before:content-[attr(data-excerpt)]"
+                      />
+                    ) : entry.excerpt ? (
                       <span className="mt-1.5 line-clamp-2 block text-xs leading-5 text-muted-foreground">
                         {entry.excerpt}
                       </span>

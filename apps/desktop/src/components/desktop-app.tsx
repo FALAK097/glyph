@@ -32,6 +32,7 @@ import { AppSurfaceShell } from "./app-surface-shell";
 import { CommandPalette } from "./command-palette";
 import { NotesBrowserPane } from "./notes/notes-browser-pane";
 import { EditorToolbar } from "./editor-toolbar";
+import { NoteContextSidebar } from "./note-context-sidebar";
 import { NotesFooterContent } from "./notes-footer-content";
 import { NoteConfirmDialog } from "./note-confirm-dialog";
 import { NoteRenameDialog } from "./note-rename-dialog";
@@ -57,6 +58,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const viewerMode = useSessionStore((state) => state.viewerMode);
   const isNotesExpanded = useSessionStore((state) => state.isNotesExpanded);
   const isSkillsExpanded = useSessionStore((state) => state.isSkillsExpanded);
+  const workspaceRootPath = useWorkspaceStore((state) => state.rootPath);
   const selectedNoteCollectionPath = useSessionStore((state) => state.selectedNoteCollectionPath);
   const notesBrowserPaneWidth = useSessionStore((state) => state.notesBrowserPaneWidth);
   const selectedSkillCollectionId = useSessionStore((state) => state.selectedSkillCollectionId);
@@ -175,6 +177,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const [skillInitialScrollTop, setSkillInitialScrollTop] = useState(0);
   const [pendingSkillRestorePath, setPendingSkillRestorePath] = useState<string | null>(null);
   const [isInitialSkillRestorePending, setIsInitialSkillRestorePending] = useState(false);
+  const [isNoteContextOpen, setIsNoteContextOpen] = useState(false);
   const paletteSkillSearchNonceRef = useRef(0);
   const paletteFilterQuery = controller.paletteQuery.trim().toLowerCase();
   const shouldCollapseSidebar =
@@ -1272,6 +1275,17 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         },
       },
       {
+        id: "toggle-note-context",
+        title: isNoteContextOpen ? "Hide Note Context" : "Show Note Context",
+        subtitle: "Toggle properties, links, tags, and outline",
+        section: "Note",
+        kind: "command",
+        onSelect: () => {
+          setIsNoteContextOpen((current) => !current);
+          closePalette();
+        },
+      },
+      {
         id: "reveal-current-note",
         title: controller.folderRevealLabel,
         subtitle: "Show the current note in the file manager",
@@ -1353,6 +1367,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     controller.editorScale,
     controller.shortcuts,
     closePalette,
+    isNoteContextOpen,
   ]);
 
   const skillPaletteItems = useMemo<CommandPaletteItem[]>(() => {
@@ -1868,6 +1883,19 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     (controller.settings?.pinnedFiles ?? []).some((filePath) =>
       isSamePath(filePath, activeNoteFile.path),
     );
+  const noteContextPane =
+    activeNoteFile && isNoteContextOpen ? (
+      <NoteContextSidebar
+        activeFile={activeNoteFile}
+        draftContent={controller.draftContent}
+        rootPath={workspaceRootPath}
+        outlineItems={controller.outlineItems}
+        wordCount={controller.wordCount}
+        readingTime={controller.readingTime}
+        onClose={() => setIsNoteContextOpen(false)}
+        onJumpToHeading={controller.requestOutlineJump}
+      />
+    ) : null;
 
   const toolbarNode: React.ReactNode = isAppBootstrapping ? null : isTasksSurfaceVisible ? (
     <EditorToolbar
@@ -2271,6 +2299,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
               ) : null
             }
             browserPaneWidth={notesBrowserPaneWidth}
+            contextPane={noteContextPane}
             onBrowserPaneResize={setNotesBrowserPaneWidth}
           >
             <div className="flex h-full min-h-0 flex-col bg-background">

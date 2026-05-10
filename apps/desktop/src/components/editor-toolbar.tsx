@@ -16,6 +16,7 @@ import {
   FocusIcon,
   GearIcon,
   LinkIcon,
+  NotebookIcon,
   PanelLeftIcon,
   PanelRightIcon,
   PinIcon,
@@ -61,6 +62,8 @@ type EditorToolbarProps = {
   isManualReleaseButton: boolean;
   headerPaddingClass: string;
   onOpenSettings: (() => void) | undefined;
+  isNoteContextOpen?: boolean;
+  onToggleNoteContext?: (() => void) | undefined;
   headerAccessory: React.ReactNode;
   content: string;
   documentLabel: string;
@@ -110,6 +113,8 @@ export function EditorToolbar({
   isManualReleaseButton,
   headerPaddingClass,
   onOpenSettings,
+  isNoteContextOpen = false,
+  onToggleNoteContext,
   headerAccessory,
   content,
   documentLabel,
@@ -445,6 +450,30 @@ export function EditorToolbar({
             </DropdownMenuContent>
           </DropdownMenu>
         ) : null}
+        {onOpenSettings && (
+          <>
+            {onToggleNoteContext ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className={`text-muted-foreground hover:text-foreground hover:bg-transparent ${
+                      isNoteContextOpen ? "text-primary hover:text-primary" : ""
+                    }`}
+                    onClick={onToggleNoteContext}
+                    aria-pressed={isNoteContextOpen}
+                    aria-label={isNoteContextOpen ? "Hide note context" : "Show note context"}
+                    type="button"
+                  >
+                    <NotebookIcon size={16} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Note Context</TooltipContent>
+              </Tooltip>
+            ) : null}
+          </>
+        )}
         {onOpenSettings && (
           <Tooltip>
             <TooltipTrigger asChild>

@@ -1,4 +1,4 @@
-import type { AppInfo, AppSettings, ShortcutSetting, ThemeMode } from "@/core/workspace";
+import type { AppInfo, AppSettings, ShortcutSetting } from "@/core/workspace";
 
 export type SettingsPanelProps = {
   isOpen: boolean;
@@ -6,6 +6,5 @@ export type SettingsPanelProps = {
   appInfo: AppInfo | null;
   onClose: () => void;
   onChooseFolder: () => void;
-  onChangeMode: (mode: ThemeMode) => void;
   onChangeShortcuts: (shortcuts: ShortcutSetting[]) => void;
 };

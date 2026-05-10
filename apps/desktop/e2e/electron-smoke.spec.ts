@@ -349,32 +349,6 @@ test("opens a seeded markdown note from the workspace", async ({}, testInfo) => 
   }
 });
 
-test("persists theme mode changes from settings", async ({}, testInfo) => {
-  const glyph = await launchGlyph();
-
-  try {
-    await expectAppShell(glyph.window);
-    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
-    await selectPaletteItem(glyph.window, "settings", /settings/i);
-    await glyph.window.getByLabel("Theme mode").click();
-    await glyph.window.getByRole("option", { name: "Dark" }).click();
-
-    await expect
-      .poll(async () =>
-        glyph.window.evaluate(() => document.documentElement.classList.contains("dark")),
-      )
-      .toBe(true);
-
-    await expect
-      .poll(async () => {
-        const settings = await readJson<{ themeMode?: string }>(glyph.sandbox.settingsPath);
-        return settings?.themeMode ?? null;
-      })
-      .toBe("dark");
-  } finally {
-    await glyph.stop(testInfo);
-  }
-});
 
 test("toggles the current note pin action from the command palette", async ({}, testInfo) => {
   const glyph = await launchGlyph();
@@ -568,26 +542,6 @@ test("settings panel closes when Escape is pressed", async ({}, testInfo) => {
   }
 });
 
-test("theme mode persists as light in settings file", async ({}, testInfo) => {
-  const glyph = await launchGlyph();
-  try {
-    await expectAppShell(glyph.window);
-    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
-    await selectPaletteItem(glyph.window, "settings", /settings/i);
-
-    await glyph.window.getByLabel("Theme mode").click();
-    await glyph.window.getByRole("option", { name: "Light" }).click();
-
-    await expect
-      .poll(async () => {
-        const settings = await readJson<{ themeMode?: string }>(glyph.sandbox.settingsPath);
-        return settings?.themeMode ?? null;
-      })
-      .toBe("light");
-  } finally {
-    await glyph.stop(testInfo);
-  }
-});
 
 // ─── Note lifecycle ───────────────────────────────────────────────────────────
 

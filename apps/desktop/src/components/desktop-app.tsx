@@ -2332,7 +2332,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         appInfo={controller.appInfo}
         onClose={() => controller.setIsSettingsOpen(false)}
         onChooseFolder={() => void controller.chooseFolderAndUpdateWorkspace()}
-        onChangeMode={(mode: ThemeMode) => void controller.changeThemeMode(mode)}
         onChangeShortcuts={(shortcuts) => void controller.changeShortcuts(shortcuts)}
       />
       <NoteRenameDialog

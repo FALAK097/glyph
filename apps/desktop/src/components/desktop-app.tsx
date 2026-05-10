@@ -231,7 +231,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     name: string;
   } | null>(null);
   const [noteBrowserRefreshNonce, setNoteBrowserRefreshNonce] = useState(0);
-  const [knowledgeIndex, setKnowledgeIndex] = useState<NoteKnowledgeIndexSnapshot | null>(null);
+  const knowledgeIndex = useWorkspaceStore((state) => state.knowledgeIndex);
+  const setKnowledgeIndex = useWorkspaceStore((state) => state.setKnowledgeIndex);
   const [paletteSkillResultIds, setPaletteSkillResultIds] = useState<string[] | null>(null);
   const [resolvedPaletteSkillQuery, setResolvedPaletteSkillQuery] = useState("");
   const [skillInitialScrollTop, setSkillInitialScrollTop] = useState(0);

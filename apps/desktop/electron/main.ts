@@ -854,8 +854,7 @@ function parseWikiLinkHref(href: string) {
     return null;
   }
 
-  const [target] = rawTarget.split("|").map((part) => part.trim());
-  return target || null;
+  return rawTarget.trim() || null;
 }
 
 function normalizeWikiTargetName(value: string) {
@@ -906,7 +905,17 @@ async function resolveLinkTarget(
 
   const wikiTarget = parseWikiLinkHref(trimmed);
   if (wikiTarget) {
-    const existingPath = await resolveWorkspaceWikiTarget(wikiTarget);
+    // Phase 1: Try resolving the FULL string as a note title (supports filenames with pipes)
+    let existingPath = await resolveWorkspaceWikiTarget(wikiTarget);
+
+    // Phase 2: Fallback to standard Alias split if phase 1 yielded nothing
+    if (!existingPath && wikiTarget.includes("|")) {
+      const [baseTarget] = wikiTarget.split("|").map((s) => s.trim());
+      if (baseTarget) {
+        existingPath = await resolveWorkspaceWikiTarget(baseTarget);
+      }
+    }
+
     return existingPath ? { kind: "markdown-file", target: existingPath } : null;
   }
 
@@ -2222,15 +2231,15 @@ function extractKnowledgeFromMarkdown(
         continue;
       }
 
-      const [target, alias] = rawTarget.split("|").map((part) => part.trim());
-      if (!target) {
+      const [targetPart, alias] = rawTarget.split("|").map((part) => part.trim());
+      if (!rawTarget) {
         continue;
       }
 
       links.push({
         kind: "wiki",
-        target,
-        label: alias || target,
+        target: rawTarget,
+        label: alias || targetPart || rawTarget,
         resolvedPath: null,
         line: lineNumber,
       });
@@ -2287,9 +2296,28 @@ function resolveKnowledgeLink(
   documentsByNameKey: Map<string, NoteKnowledgeDocument>,
 ) {
   if (link.kind === "wiki") {
-    const targetWithoutAnchor = stripLinkAnchor(link.target);
-    const nameKey = targetWithoutAnchor.replace(MARKDOWN_PREVIEW_SUFFIX_PATTERN, "").toLowerCase();
-    return documentsByNameKey.get(nameKey)?.path ?? null;
+    // Phase 1: Direct full string lookup
+    const fullTargetWithoutAnchor = stripLinkAnchor(link.target);
+    const fullKey = fullTargetWithoutAnchor.replace(MARKDOWN_PREVIEW_SUFFIX_PATTERN, "").toLowerCase();
+    const directMatch = documentsByNameKey.get(fullKey);
+    if (directMatch) {
+      return directMatch.path;
+    }
+
+    // Phase 2: Fallback if we fail, try splitting by pipe
+    if (link.target.includes("|")) {
+      const [baseTarget] = link.target.split("|").map((part) => part.trim());
+      if (baseTarget) {
+        const baseWithoutAnchor = stripLinkAnchor(baseTarget);
+        const baseKey = baseWithoutAnchor.replace(MARKDOWN_PREVIEW_SUFFIX_PATTERN, "").toLowerCase();
+        const splitMatch = documentsByNameKey.get(baseKey);
+        if (splitMatch) {
+          return splitMatch.path;
+        }
+      }
+    }
+
+    return null;
   }
 
   for (const candidate of createMarkdownPathCandidates(sourcePath, link.target)) {

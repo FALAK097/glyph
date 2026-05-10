@@ -6,14 +6,14 @@ const WIKI_LINK_PATTERN = /!?\[\[([^\]\n]+)\]\]/g;
 
 function parseWikiLink(rawTarget: string) {
   const [target, alias] = rawTarget.split("|").map((part) => part.trim());
-  if (!target) {
+  if (!rawTarget.trim()) {
     return null;
   }
 
   return {
-    href: `[[${target}]]`,
-    label: alias || target,
-    target,
+    href: `[[${rawTarget}]]`,
+    label: alias || target || rawTarget,
+    target: rawTarget,
   };
 }
 

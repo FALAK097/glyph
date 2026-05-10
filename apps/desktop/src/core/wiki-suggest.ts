@@ -8,6 +8,7 @@ import { ReactRenderer } from "@tiptap/react";
 import tippy, { type Instance, type Props } from "tippy.js";
 import "tippy.js/dist/tippy.css";
 import { PluginKey } from "@tiptap/pm/state";
+import { useWorkspaceStore } from "@/store/workspace";
 import { WikiSuggestList } from "../components/wiki-suggest-list";
 import type {
   WikiSuggestItem,
@@ -36,10 +37,7 @@ const runCommand = ({
 
 const getSuggestionItems = async ({ query }: { query: string }): Promise<WikiSuggestItem[]> => {
   try {
-    const glyph = window.glyph;
-    if (!glyph) return [];
-
-    const index = await glyph.getKnowledgeIndex();
+    const index = useWorkspaceStore.getState().knowledgeIndex;
     if (!index || !index.notes) return [];
 
     const items: WikiSuggestItem[] = index.notes.map((note) => ({

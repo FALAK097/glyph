@@ -682,6 +682,44 @@ test("wikilinks preview, open notes, and appear as backlinks", async ({}, testIn
   }
 });
 
+test("wikilinks resolve correctly even with special characters like pipes in the filename", async ({}, testInfo) => {
+  const sandbox = await createGlyphSandbox();
+  // Create a note that specifically contains '||' in its filename
+  const weirdFileName = "Special || Pipe Note.md";
+  await fs.writeFile(path.join(sandbox.workspaceRoot, weirdFileName), "# Complex Name\nBody Content here.");
+
+  // Add a wikilink pointing to it inside Welcome note
+  const welcomePath = path.join(sandbox.workspaceRoot, "welcome.md");
+  const welcomeContent = await fs.readFile(welcomePath, "utf8");
+  await fs.writeFile(welcomePath, welcomeContent + "\n[[Special || Pipe Note]]");
+
+  const glyph = await launchGlyph(sandbox);
+  try {
+    await expectAppShell(glyph.window);
+    await openWorkspace(glyph.window, sandbox.workspaceRoot);
+
+    await selectPaletteItem(glyph.window, "welcome", /welcome\.md/i);
+    const wikiLink = glyph.window
+      .locator('[data-glyph-editor="true"] [data-wiki-link="[[Special || Pipe Note]]"]')
+      .first();
+    await expect(wikiLink).toBeVisible();
+
+    // Cmd/Ctrl-Click to navigate
+    await glyph.window.keyboard.down(modKey);
+    await wikiLink.click();
+    await glyph.window.keyboard.up(modKey);
+
+    // It should successfully land on the target note page
+    await expect(
+      glyph.window.locator('[data-glyph-editor="true"]').getByText("Body Content here."),
+    ).toBeVisible();
+  } finally {
+    await glyph.window.keyboard.up(modKey).catch(() => {});
+    await glyph.stop(testInfo);
+    await sandbox.cleanup();
+  }
+});
+
 test("opens notes in multiple tabs and switches between them with keyboard shortcuts", async ({}, testInfo) => {
   const glyph = await launchGlyph();
   try {

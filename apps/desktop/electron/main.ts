@@ -16,6 +16,7 @@ import fs from "node:fs/promises";
 import type { Stats } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { parseDocument } from "yaml";
 import { createSkillsService } from "./skills-service.js";
 import { createTasksService } from "./tasks-service.js";
 import type {
@@ -27,12 +28,18 @@ import type {
   DirectoryNode,
   FileOpenResult,
   NoteBrowserEntry,
+  NoteKnowledgeDocument,
+  NoteKnowledgeHeading,
+  NoteKnowledgeIndexSnapshot,
+  NoteKnowledgeLink,
+  NoteKnowledgeTag,
   NoteLinkPreview,
   ResolvedLinkTarget,
   SearchResult,
   UpdateState,
   WorkspaceSnapshot,
 } from "../src/core/workspace.js";
+import { parseMarkdownFrontmatter } from "../src/core/frontmatter.js";
 import type {
   TaskColumnCreateInput,
   TaskColumnDeleteInput,
@@ -72,6 +79,9 @@ const GITHUB_RELEASES_URL = "https://github.com/FALAK097/glyph/releases";
 const GITHUB_LATEST_RELEASE_API_URL = "https://api.github.com/repos/FALAK097/glyph/releases/latest";
 const MARKDOWN_PREVIEW_SUFFIX_PATTERN = /\.(md|mdx|markdown)$/i;
 const MARKDOWN_HEADING_PATTERN = /^#{1,6}\s+(.*)$/;
+const MARKDOWN_LINK_PATTERN = /!?\[([^\]\n]+)\]\(([^)\n]+)\)/g;
+const WIKI_LINK_PATTERN = /!?\[\[([^\]\n]+)\]\]/g;
+const INLINE_TAG_PATTERN = /(^|[\s([{])#([A-Za-z0-9][A-Za-z0-9_/-]*)\b/g;
 const NOTE_COLLECTION_ACCENT_KEYS = [
   "violet",
   "indigo",
@@ -1998,6 +2008,317 @@ async function getNoteBrowserEntriesBatch(
   return Promise.all(targetPaths.map((targetPath) => getNoteBrowserEntries(targetPath)));
 }
 
+function createKnowledgeHeadingId(input: string) {
+  const normalized = input
+    .toLowerCase()
+    .trim()
+    .replace(/[`*_~[\]()>#+.!?,:;'"/\\]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+
+  return normalized || "section";
+}
+
+function normalizeKnowledgeTagName(input: string) {
+  return input.trim().replace(/^#/, "").toLowerCase();
+}
+
+function extractFrontmatterTags(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .flatMap((entry) => extractFrontmatterTags(entry))
+      .map(normalizeKnowledgeTagName)
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split(/[,\s]+/)
+      .map(normalizeKnowledgeTagName)
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function getKnowledgeFrontmatterTags(frontmatter: Record<string, unknown>) {
+  const candidates = [
+    frontmatter.tags,
+    frontmatter.tag,
+    frontmatter.keywords,
+    typeof frontmatter.metadata === "object" && frontmatter.metadata
+      ? (frontmatter.metadata as Record<string, unknown>).tags
+      : null,
+  ];
+
+  return Array.from(new Set(candidates.flatMap(extractFrontmatterTags)));
+}
+
+function parseKnowledgeFrontmatter(frontmatterText: string | null): Record<string, unknown> {
+  if (!frontmatterText) {
+    return {};
+  }
+
+  const document = parseDocument(frontmatterText, {
+    merge: true,
+    prettyErrors: false,
+    strict: false,
+    uniqueKeys: false,
+  });
+
+  if (document.errors.length > 0) {
+    return {};
+  }
+
+  const parsed = document.toJSON();
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+    ? (parsed as Record<string, unknown>)
+    : {};
+}
+
+function getKnowledgeTitle(filePath: string, frontmatter: Record<string, unknown>, body: string) {
+  const frontmatterTitle = frontmatter.title;
+  if (typeof frontmatterTitle === "string" && frontmatterTitle.trim()) {
+    return frontmatterTitle.trim();
+  }
+
+  const firstHeading = body
+    .split("\n")
+    .map((line) => line.match(MARKDOWN_HEADING_PATTERN)?.[1]?.trim())
+    .find((title) => title && title.length > 0);
+
+  return firstHeading ?? getDisplayMarkdownFileName(filePath);
+}
+
+function extractKnowledgeFromMarkdown(
+  filePath: string,
+  content: string,
+  stats: Stats,
+): Omit<NoteKnowledgeDocument, "backlinks"> {
+  const normalizedContent = content.replace(/\r\n?/g, "\n");
+  const { frontmatterText, body } = parseMarkdownFrontmatter(normalizedContent);
+  const frontmatter = parseKnowledgeFrontmatter(frontmatterText);
+  const headings: NoteKnowledgeHeading[] = [];
+  const tagsByName = new Map<string, NoteKnowledgeTag>();
+  const links: NoteKnowledgeLink[] = [];
+  const headingCounts = new Map<string, number>();
+  const frontmatterTags = getKnowledgeFrontmatterTags(frontmatter);
+
+  frontmatterTags.forEach((name) => {
+    tagsByName.set(name, { name, line: 1 });
+  });
+
+  body.split("\n").forEach((line, index) => {
+    const lineNumber = index + 1;
+    const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+    if (headingMatch) {
+      const title = headingMatch[2]?.trim() ?? "";
+      if (title) {
+        const baseId = createKnowledgeHeadingId(title);
+        const instanceCount = headingCounts.get(baseId) ?? 0;
+        headingCounts.set(baseId, instanceCount + 1);
+        headings.push({
+          id: instanceCount === 0 ? baseId : `${baseId}-${instanceCount + 1}`,
+          level: headingMatch[1]?.length ?? 1,
+          title,
+          line: lineNumber,
+        });
+      }
+    }
+
+    INLINE_TAG_PATTERN.lastIndex = 0;
+    for (const match of line.matchAll(INLINE_TAG_PATTERN)) {
+      const name = normalizeKnowledgeTagName(match[2] ?? "");
+      if (name && !tagsByName.has(name)) {
+        tagsByName.set(name, { name, line: lineNumber });
+      }
+    }
+
+    MARKDOWN_LINK_PATTERN.lastIndex = 0;
+    for (const match of line.matchAll(MARKDOWN_LINK_PATTERN)) {
+      const target = (match[2] ?? "").trim();
+      if (!target) {
+        continue;
+      }
+
+      links.push({
+        kind: "markdown",
+        target,
+        label: (match[1] ?? target).trim(),
+        resolvedPath: null,
+        line: lineNumber,
+      });
+    }
+
+    WIKI_LINK_PATTERN.lastIndex = 0;
+    for (const match of line.matchAll(WIKI_LINK_PATTERN)) {
+      const rawTarget = (match[1] ?? "").trim();
+      if (!rawTarget) {
+        continue;
+      }
+
+      const [target, alias] = rawTarget.split("|").map((part) => part.trim());
+      if (!target) {
+        continue;
+      }
+
+      links.push({
+        kind: "wiki",
+        target,
+        label: alias || target,
+        resolvedPath: null,
+        line: lineNumber,
+      });
+    }
+  });
+
+  const wordCount = normalizedContent.split(/\s+/).filter(Boolean).length;
+
+  return {
+    path: filePath,
+    title: getKnowledgeTitle(filePath, frontmatter, body),
+    excerpt: extractNoteExcerpt(body),
+    frontmatter,
+    tags: Array.from(tagsByName.values()).sort((left, right) =>
+      left.name.localeCompare(right.name),
+    ),
+    headings,
+    links,
+    modifiedAt: stats.mtime.toISOString(),
+    createdAt: stats.birthtime.toISOString(),
+    sizeBytes: stats.size,
+    wordCount,
+  };
+}
+
+function stripLinkAnchor(target: string) {
+  return target.split("#", 1)[0]?.trim() ?? "";
+}
+
+function createMarkdownPathCandidates(sourcePath: string, target: string) {
+  const withoutTitle = stripLinkAnchor(target.split(/\s+"[^"]*"$/)[0] ?? target);
+  if (!withoutTitle || /^[a-z][a-z0-9+.-]*:/i.test(withoutTitle)) {
+    return [];
+  }
+
+  const sourceDir = path.dirname(sourcePath);
+  const baseTarget = withoutTitle.replace(/\\/g, "/");
+  const targetWithExtension = MARKDOWN_PREVIEW_SUFFIX_PATTERN.test(baseTarget)
+    ? baseTarget
+    : `${baseTarget}.md`;
+
+  return [
+    path.resolve(sourceDir, baseTarget),
+    path.resolve(sourceDir, targetWithExtension),
+    path.resolve(activeWorkspaceRoot ?? sourceDir, baseTarget),
+    path.resolve(activeWorkspaceRoot ?? sourceDir, targetWithExtension),
+  ];
+}
+
+function resolveKnowledgeLink(
+  sourcePath: string,
+  link: NoteKnowledgeLink,
+  documentsByPathKey: Map<string, NoteKnowledgeDocument>,
+  documentsByNameKey: Map<string, NoteKnowledgeDocument>,
+) {
+  if (link.kind === "wiki") {
+    const targetWithoutAnchor = stripLinkAnchor(link.target);
+    const nameKey = targetWithoutAnchor.replace(MARKDOWN_PREVIEW_SUFFIX_PATTERN, "").toLowerCase();
+    return documentsByNameKey.get(nameKey)?.path ?? null;
+  }
+
+  for (const candidate of createMarkdownPathCandidates(sourcePath, link.target)) {
+    const match = documentsByPathKey.get(normalizePathForComparison(candidate));
+    if (match) {
+      return match.path;
+    }
+  }
+
+  return null;
+}
+
+async function getKnowledgeIndex(): Promise<NoteKnowledgeIndexSnapshot> {
+  if (!activeWorkspaceRoot) {
+    return {
+      workspaceRoot: null,
+      notes: [],
+      tags: [],
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  const documents: NoteKnowledgeDocument[] = [];
+
+  for (const filePath of searchableFilesCache) {
+    try {
+      const stats = await fs.stat(filePath);
+      const content = await fs.readFile(filePath, "utf8");
+      documents.push({
+        ...extractKnowledgeFromMarkdown(filePath, content, stats),
+        backlinks: [],
+      });
+    } catch {
+      // Skip unreadable files.
+    }
+  }
+
+  const documentsByPathKey = new Map(
+    documents.map((document) => [normalizePathForComparison(document.path), document]),
+  );
+  const documentsByNameKey = new Map<string, NoteKnowledgeDocument>();
+  documents.forEach((document) => {
+    const baseName = path.basename(document.path).replace(MARKDOWN_PREVIEW_SUFFIX_PATTERN, "");
+    documentsByNameKey.set(baseName.toLowerCase(), document);
+    documentsByNameKey.set(document.title.toLowerCase(), document);
+  });
+
+  const backlinkSets = new Map<string, Set<string>>();
+  documents.forEach((document) => {
+    document.links = document.links.map((link) => {
+      const resolvedPath = resolveKnowledgeLink(
+        document.path,
+        link,
+        documentsByPathKey,
+        documentsByNameKey,
+      );
+
+      if (resolvedPath) {
+        const key = normalizePathForComparison(resolvedPath);
+        const linksToDocument = backlinkSets.get(key) ?? new Set<string>();
+        linksToDocument.add(document.path);
+        backlinkSets.set(key, linksToDocument);
+      }
+
+      return {
+        ...link,
+        resolvedPath,
+      };
+    });
+  });
+
+  documents.forEach((document) => {
+    document.backlinks = Array.from(
+      backlinkSets.get(normalizePathForComparison(document.path)) ?? [],
+    ).sort((left, right) => left.localeCompare(right));
+  });
+
+  const tagCounts = new Map<string, number>();
+  documents.forEach((document) => {
+    document.tags.forEach((tag) => {
+      tagCounts.set(tag.name, (tagCounts.get(tag.name) ?? 0) + 1);
+    });
+  });
+
+  return {
+    workspaceRoot: activeWorkspaceRoot,
+    notes: documents.sort((left, right) => left.title.localeCompare(right.title)),
+    tags: Array.from(tagCounts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name)),
+    generatedAt: new Date().toISOString(),
+  };
+}
+
 async function buildDirectoryTree(dirPath: string): Promise<DirectoryNode[]> {
   const entries = await fs.readdir(dirPath, { withFileTypes: true });
   const sorted = entries.sort((left, right) => {
@@ -2471,6 +2792,8 @@ ipcMain.handle("workspace:createFolder", async (_event, parentDir: string, folde
 });
 
 ipcMain.handle("workspace:search", async (_event, query: string) => searchWorkspace(query));
+
+ipcMain.handle("knowledge:getIndex", async () => getKnowledgeIndex());
 
 ipcMain.handle("tasks:list", async () => {
   if (!activeWorkspaceRoot) {

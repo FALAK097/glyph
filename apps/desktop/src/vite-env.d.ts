@@ -7,6 +7,7 @@ import type {
   AppSettings,
   DialogKind,
   NoteBrowserEntry,
+  NoteKnowledgeIndexSnapshot,
   UpdateState,
   FileDocument,
   FileOpenResult,
@@ -70,6 +71,7 @@ declare global {
         folderName: string,
       ) => Promise<WorkspaceSnapshot["tree"] | null>;
       searchWorkspace: (query: string) => Promise<SearchResult[]>;
+      getKnowledgeIndex: () => Promise<NoteKnowledgeIndexSnapshot>;
       listTasks: () => Promise<TaskIndexSnapshot>;
       refreshTasks: () => Promise<TaskIndexSnapshot>;
       updateTask: (input: TaskUpdateInput) => Promise<TaskMutationResult>;

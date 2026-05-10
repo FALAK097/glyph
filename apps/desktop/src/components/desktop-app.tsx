@@ -1,6 +1,11 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getBaseName, getDisplayFileName, isSamePath, normalizePath } from "@/core/paths";
+import {
+  formatMarkdownFrontmatter,
+  parseMarkdownFrontmatter,
+  serializeMarkdownFrontmatter,
+} from "@/core/frontmatter";
 import { buildNoteCollections, filterNoteBrowserEntries } from "@/core/note-collections";
 import { countGroupedSkills, groupSkillsForBrowse } from "@/core/skill-groups";
 import { getShortcutDisplay } from "@/core/shortcuts";
@@ -1179,6 +1184,17 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     }
 
     const query = paletteFilterQuery;
+    const headingItems: CommandPaletteItem[] = controller.outlineItems.map((item) => ({
+      id: `jump-heading-${item.id}`,
+      title: item.title,
+      subtitle: `Jump to H${item.depth} in ${controller.activeFile?.name ?? "current note"}`,
+      section: "Headings",
+      kind: "command",
+      onSelect: () => {
+        controller.requestOutlineJump(item.id);
+        closePalette();
+      },
+    }));
     const items: CommandPaletteItem[] = [
       {
         id: "find-in-current-note",
@@ -1233,6 +1249,26 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         kind: "command",
         onSelect: () => {
           void handleCopyCurrentNotePath();
+        },
+      },
+      {
+        id: "format-frontmatter",
+        title: "Format Frontmatter",
+        subtitle: "Clean up YAML metadata at the top of this note",
+        section: "Note",
+        kind: "command",
+        onSelect: () => {
+          const parsed = parseMarkdownFrontmatter(controller.draftContent);
+          const formattedFrontmatter = formatMarkdownFrontmatter(parsed.frontmatterText ?? "");
+          if (formattedFrontmatter !== null) {
+            controller.updateDraftContent(
+              serializeMarkdownFrontmatter({
+                frontmatterText: formattedFrontmatter,
+                body: parsed.body,
+              }),
+            );
+          }
+          closePalette();
         },
       },
       {
@@ -1294,13 +1330,18 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
           closePalette();
         },
       },
+      ...headingItems,
     ];
 
     return items.filter((item) => matchesPaletteQuery(query, item.title, item.subtitle));
   }, [
     controller.activeFile,
+    controller.draftContent,
     controller.folderRevealLabel,
+    controller.outlineItems,
     controller.requestFindInNote,
+    controller.requestOutlineJump,
+    controller.updateDraftContent,
     handleCopyCurrentNoteMarkdown,
     handleCopyCurrentNotePath,
     handleExportCurrentNote,

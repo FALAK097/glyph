@@ -10,6 +10,7 @@ import type {
   FileDocument,
   FileOpenResult,
   NoteLinkPreview,
+  NoteKnowledgeIndexSnapshot,
   ResolvedLinkTarget,
   SearchResult,
   WorkspaceChangeEvent,
@@ -139,6 +140,9 @@ const api = {
   },
   searchWorkspace(query: string) {
     return ipcRenderer.invoke("workspace:search", query) as Promise<SearchResult[]>;
+  },
+  getKnowledgeIndex() {
+    return ipcRenderer.invoke("knowledge:getIndex") as Promise<NoteKnowledgeIndexSnapshot>;
   },
   listTasks() {
     return ipcRenderer.invoke("tasks:list") as Promise<TaskIndexSnapshot>;

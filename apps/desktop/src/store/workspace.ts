@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 import { getBaseName, isPathInside, isSamePath, normalizePath } from "@/core/paths";
 
-import type { DirectoryNode, FileDocument, NoteTab, TabMovePosition } from "@/core/workspace";
+import type { DirectoryNode, FileDocument, NoteTab, TabMovePosition, NoteKnowledgeIndexSnapshot } from "@/core/workspace";
 
 export type NavigationEntry =
   | { kind: "note"; path: string }
@@ -105,6 +105,7 @@ type WorkspaceState = {
   isSaving: boolean;
   lastSavedAt: number | null;
   error: string | null;
+  knowledgeIndex: NoteKnowledgeIndexSnapshot | null;
   navigationHistory: NavigationEntry[];
   navigationIndex: number;
   setWorkspace: (payload: {
@@ -113,6 +114,7 @@ type WorkspaceState = {
     activeFile: FileDocument | null;
   }) => void;
   setTree: (tree: DirectoryNode[]) => void;
+  setKnowledgeIndex: (index: NoteKnowledgeIndexSnapshot | null) => void;
   setActiveFile: (file: FileDocument | null) => void;
   attachActiveFile: (file: FileDocument) => void;
   updateActiveFile: (file: FileDocument) => void;
@@ -153,6 +155,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   isSaving: false,
   lastSavedAt: null,
   error: null,
+  knowledgeIndex: null,
   navigationHistory: [],
   navigationIndex: -1,
   setWorkspace: ({ rootPath, tree, activeFile }) =>
@@ -192,6 +195,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       };
     }),
   setTree: (tree) => set({ tree }),
+  setKnowledgeIndex: (knowledgeIndex) => set({ knowledgeIndex }),
   setActiveFile: (activeFile) =>
     set((state) => {
       if (!activeFile) {

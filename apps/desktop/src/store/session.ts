@@ -25,6 +25,7 @@ type SessionState = {
   isSidebarCollapsed: boolean;
   isNotesExpanded: boolean;
   isSkillsExpanded: boolean;
+  isNoteContextOpen: boolean;
   selectedNoteCollectionPath: string | null;
   lastNotePathByCollection: Record<string, string>;
   noteOrderByCollection: Record<string, string[]>;
@@ -47,6 +48,7 @@ type SessionState = {
   setSidebarCollapsed: (value: boolean) => void;
   setNotesExpanded: (value: boolean) => void;
   setSkillsExpanded: (value: boolean) => void;
+  setNoteContextOpen: (value: boolean) => void;
   setSelectedNoteCollectionPath: (value: string | null) => void;
   setLastNotePathForCollection: (collectionPath: string, notePath: string) => void;
   getLastNotePathForCollection: (collectionPath: string | null | undefined) => string | null;
@@ -129,6 +131,7 @@ export const useSessionStore = create<SessionState>()(
       isSidebarCollapsed: false,
       isNotesExpanded: true,
       isSkillsExpanded: false,
+      isNoteContextOpen: false,
       selectedNoteCollectionPath: null,
       lastNotePathByCollection: {},
       noteOrderByCollection: {},
@@ -160,6 +163,9 @@ export const useSessionStore = create<SessionState>()(
       },
       setSkillsExpanded: (isSkillsExpanded) => {
         set({ isSkillsExpanded });
+      },
+      setNoteContextOpen: (isNoteContextOpen) => {
+        set({ isNoteContextOpen });
       },
       setSelectedNoteCollectionPath: (selectedNoteCollectionPath) => {
         set({
@@ -333,6 +339,7 @@ export const useSessionStore = create<SessionState>()(
         isSidebarCollapsed: state.isSidebarCollapsed,
         isNotesExpanded: state.isNotesExpanded,
         isSkillsExpanded: state.isSkillsExpanded,
+        isNoteContextOpen: state.isNoteContextOpen,
         selectedNoteCollectionPath: state.selectedNoteCollectionPath,
         lastNotePathByCollection: state.lastNotePathByCollection,
         noteOrderByCollection: state.noteOrderByCollection,

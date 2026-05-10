@@ -157,6 +157,7 @@ type UseDesktopAppControllerOptions = {
   sessionReady?: boolean;
   onRestoreSkill?: (path: string) => Promise<void>;
   onRestoreTasks?: () => void;
+  onToggleNoteContext?: () => void;
 };
 
 export const useDesktopAppController = (
@@ -168,6 +169,7 @@ export const useDesktopAppController = (
     sessionReady = true,
     onRestoreSkill,
     onRestoreTasks,
+    onToggleNoteContext,
   }: UseDesktopAppControllerOptions = {},
 ) => {
   const {
@@ -2201,6 +2203,7 @@ export const useDesktopAppController = (
     editorScale,
     navigateBack,
     navigateForward,
+    toggleNoteContext: () => onToggleNoteContext?.(),
   });
 
   // Boot sequence

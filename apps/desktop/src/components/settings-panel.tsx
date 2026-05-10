@@ -3,13 +3,6 @@ import { useDeferredValue, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 import {
@@ -21,7 +14,6 @@ import {
   MODIFIER_TOKENS,
 } from "@/core/shortcuts";
 
-import type { ThemeMode } from "@/core/workspace";
 import type { SettingsPanelProps } from "../types/settings-panel";
 import { GearIcon, SearchIcon, ShortcutIcon } from "./icons";
 
@@ -31,7 +23,6 @@ export const SettingsPanel = ({
   appInfo,
   onClose,
   onChooseFolder,
-  onChangeMode,
   onChangeShortcuts,
 }: SettingsPanelProps) => {
   const [activeTab, setActiveTab] = useState("general");
@@ -255,27 +246,6 @@ export const SettingsPanel = ({
                     </div>
                   </div>
 
-                  <div className="flex flex-col justify-between gap-4 border-b border-border/40 py-4 sm:flex-row sm:items-center sm:gap-8">
-                    <div className="shrink-0 space-y-1">
-                      <p className="text-sm font-medium">Appearance</p>
-                      <p className="text-xs text-muted-foreground">
-                        Customise how Glyph looks on your device
-                      </p>
-                    </div>
-                    <Select
-                      value={settings.themeMode}
-                      onValueChange={(value) => onChangeMode(value as ThemeMode)}
-                    >
-                      <SelectTrigger className="w-[140px]" aria-label="Theme mode">
-                        <SelectValue placeholder="Theme" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="light">Light</SelectItem>
-                        <SelectItem value="dark">Dark</SelectItem>
-                        <SelectItem value="system">System</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </div>
               </div>
             </div>

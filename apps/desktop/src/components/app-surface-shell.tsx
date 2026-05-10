@@ -6,6 +6,7 @@ type AppSurfaceShellProps = {
   browserPane?: ReactNode;
   browserPaneWidth?: number;
   onBrowserPaneResize?: (width: number) => void;
+  contextPane?: ReactNode;
   children: ReactNode;
 };
 
@@ -22,28 +23,47 @@ export function AppSurfaceShell({
   browserPane,
   browserPaneWidth,
   onBrowserPaneResize,
+  contextPane,
   children,
 }: AppSurfaceShellProps) {
-  if (!browserPane) {
+  if (!browserPane && !contextPane) {
     return <div className="h-full min-h-0 min-w-0">{children}</div>;
   }
 
   return (
     <Group orientation="horizontal" className="h-full min-h-0 min-w-0">
-      <Panel
-        id="surface-browser-pane"
-        defaultSize={browserPaneWidth ? `${browserPaneWidth}px` : "320px"}
-        minSize="240px"
-        maxSize="520px"
-        groupResizeBehavior="preserve-pixel-size"
-        onResize={(size) => onBrowserPaneResize?.(size.inPixels)}
-      >
-        <div className="h-full min-h-0 min-w-0 overflow-hidden">{browserPane}</div>
-      </Panel>
-      <BrowserResizeHandle />
+      {browserPane ? (
+        <>
+          <Panel
+            id="surface-browser-pane"
+            defaultSize={browserPaneWidth ? `${browserPaneWidth}px` : "320px"}
+            minSize="240px"
+            maxSize="520px"
+            groupResizeBehavior="preserve-pixel-size"
+            onResize={(size) => onBrowserPaneResize?.(size.inPixels)}
+          >
+            <div className="h-full min-h-0 min-w-0 overflow-hidden">{browserPane}</div>
+          </Panel>
+          <BrowserResizeHandle />
+        </>
+      ) : null}
       <Panel id="surface-main-pane" minSize="30%">
         <div className="h-full min-h-0 min-w-0 overflow-hidden">{children}</div>
       </Panel>
+      {contextPane ? (
+        <>
+          <BrowserResizeHandle />
+          <Panel
+            id="surface-context-pane"
+            defaultSize="320px"
+            minSize="280px"
+            maxSize="460px"
+            groupResizeBehavior="preserve-pixel-size"
+          >
+            <div className="h-full min-h-0 min-w-0 overflow-hidden">{contextPane}</div>
+          </Panel>
+        </>
+      ) : null}
     </Group>
   );
 }

@@ -42,6 +42,9 @@ import {
   SparklesIcon as SparklesSvg,
   UnfoldMoreIcon as UnfoldMoreSvg,
   Tick02Icon as Tick02Svg,
+  Sun01Icon as Sun01Svg,
+  Moon01Icon as Moon01Svg,
+  ComputerIcon as ComputerSvg,
 } from "@hugeicons/core-free-icons";
 
 import type { HugeIconProps, IconProps } from "../types/icons";
@@ -177,3 +180,7 @@ export const LeafIcon = (props: IconProps) => <HugeIcon icon={Leaf01Svg} {...pro
 export const NotebookIcon = (props: IconProps) => <HugeIcon icon={Notebook01Svg} {...props} />;
 export const RocketIcon = (props: IconProps) => <HugeIcon icon={Rocket01Svg} {...props} />;
 export const SparklesIcon = (props: IconProps) => <HugeIcon icon={SparklesSvg} {...props} />;
+
+export const SunIcon = (props: IconProps) => <HugeIcon icon={Sun01Svg} {...props} />;
+export const MoonIcon = (props: IconProps) => <HugeIcon icon={Moon01Svg} {...props} />;
+export const MonitorIcon = (props: IconProps) => <HugeIcon icon={ComputerSvg} {...props} />;

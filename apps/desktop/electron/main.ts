@@ -16,6 +16,7 @@ import fs from "node:fs/promises";
 import type { Stats } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { parseDocument } from "yaml";
 import { createSkillsService } from "./skills-service.js";
 import { createTasksService } from "./tasks-service.js";
 import type {
@@ -27,12 +28,18 @@ import type {
   DirectoryNode,
   FileOpenResult,
   NoteBrowserEntry,
+  NoteKnowledgeDocument,
+  NoteKnowledgeHeading,
+  NoteKnowledgeIndexSnapshot,
+  NoteKnowledgeLink,
+  NoteKnowledgeTag,
   NoteLinkPreview,
   ResolvedLinkTarget,
   SearchResult,
   UpdateState,
   WorkspaceSnapshot,
 } from "../src/core/workspace.js";
+import { parseMarkdownFrontmatter } from "../src/core/frontmatter.js";
 import type {
   TaskColumnCreateInput,
   TaskColumnDeleteInput,
@@ -72,6 +79,9 @@ const GITHUB_RELEASES_URL = "https://github.com/FALAK097/glyph/releases";
 const GITHUB_LATEST_RELEASE_API_URL = "https://api.github.com/repos/FALAK097/glyph/releases/latest";
 const MARKDOWN_PREVIEW_SUFFIX_PATTERN = /\.(md|mdx|markdown)$/i;
 const MARKDOWN_HEADING_PATTERN = /^#{1,6}\s+(.*)$/;
+const MARKDOWN_LINK_PATTERN = /!?\[([^\]\n]+)\]\(([^)\n]+)\)/g;
+const WIKI_LINK_PATTERN = /!?\[\[([^\]\n]+)\]\]/g;
+const INLINE_TAG_PATTERN = /(^|[\s([{])#([A-Za-z0-9][A-Za-z0-9_/-]*)\b/g;
 const NOTE_COLLECTION_ACCENT_KEYS = [
   "violet",
   "indigo",
@@ -105,6 +115,11 @@ const NOTE_COLLECTION_ICON_KEYS = [
   "camera",
   "notebook",
   "star",
+  "idea",
+  "file",
+  "sun",
+  "moon",
+  "monitor",
 ] as const;
 type NoteCollectionAccentValue = (typeof NOTE_COLLECTION_ACCENT_KEYS)[number];
 type NoteCollectionIconValue = (typeof NOTE_COLLECTION_ICON_KEYS)[number];
@@ -832,6 +847,53 @@ async function resolveWorkspaceMarkdownTarget(target: string) {
   return null;
 }
 
+function parseWikiLinkHref(href: string) {
+  const wikiMatch = href.match(/^!?\[\[([^\]\n]+)\]\]$/);
+  const rawTarget = wikiMatch?.[1] ?? (href.startsWith("wiki:") ? href.slice(5) : "");
+  if (!rawTarget.trim()) {
+    return null;
+  }
+
+  return rawTarget.trim() || null;
+}
+
+function normalizeWikiTargetName(value: string) {
+  return value
+    .replace(MARKDOWN_PREVIEW_SUFFIX_PATTERN, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+async function resolveWorkspaceWikiTarget(target: string) {
+  if (!activeWorkspaceRoot) {
+    return null;
+  }
+
+  const targetWithoutAnchor = stripLinkAnchor(target).replace(MARKDOWN_PREVIEW_SUFFIX_PATTERN, "");
+  if (!targetWithoutAnchor) {
+    return null;
+  }
+
+  const normalizedTarget = normalizePathForComparison(targetWithoutAnchor);
+  const normalizedBaseName = normalizePathForComparison(path.basename(targetWithoutAnchor));
+  const normalizedWikiName = normalizeWikiTargetName(targetWithoutAnchor);
+  const matches = searchableFilesCache.filter((filePath) => {
+    const baseName = path.basename(filePath).replace(MARKDOWN_PREVIEW_SUFFIX_PATTERN, "");
+    const relativePath = path
+      .relative(activeWorkspaceRoot as string, filePath)
+      .replace(MARKDOWN_PREVIEW_SUFFIX_PATTERN, "");
+
+    return (
+      normalizePathForComparison(baseName) === normalizedBaseName ||
+      normalizePathForComparison(relativePath) === normalizedTarget ||
+      normalizeWikiTargetName(baseName) === normalizedWikiName ||
+      normalizeWikiTargetName(relativePath) === normalizedWikiName
+    );
+  });
+
+  return matches.length === 1 ? matches[0] : null;
+}
+
 async function resolveLinkTarget(
   currentFilePath: string | null,
   href: string,
@@ -839,6 +901,22 @@ async function resolveLinkTarget(
   const trimmed = href.trim();
   if (!trimmed) {
     return null;
+  }
+
+  const wikiTarget = parseWikiLinkHref(trimmed);
+  if (wikiTarget) {
+    // Phase 1: Try resolving the FULL string as a note title (supports filenames with pipes)
+    let existingPath = await resolveWorkspaceWikiTarget(wikiTarget);
+
+    // Phase 2: Fallback to standard Alias split if phase 1 yielded nothing
+    if (!existingPath && wikiTarget.includes("|")) {
+      const [baseTarget] = wikiTarget.split("|").map((s) => s.trim());
+      if (baseTarget) {
+        existingPath = await resolveWorkspaceWikiTarget(baseTarget);
+      }
+    }
+
+    return existingPath ? { kind: "markdown-file", target: existingPath } : null;
   }
 
   if (/^https?:\/\//i.test(trimmed)) {
@@ -1969,12 +2047,18 @@ async function getNoteBrowserEntries(targetPath: string | null): Promise<NoteBro
       const stats = await fs.stat(filePath);
       const content = await fs.readFile(filePath, "utf8");
       const normalizedContent = content.replace(/\r\n?/g, "\n");
+      const { frontmatterText, body } = parseMarkdownFrontmatter(normalizedContent);
+      const frontmatter = parseKnowledgeFrontmatter(frontmatterText);
       const wordCount = normalizedContent.split(/\s+/).filter(Boolean).length;
+      const icon = typeof frontmatter.icon === "string" && frontmatter.icon.trim()
+        ? frontmatter.icon.trim()
+        : null;
 
       entries.push({
         path: filePath,
         title: getDisplayMarkdownFileName(filePath),
-        excerpt: extractNoteExcerpt(normalizedContent),
+        icon,
+        excerpt: extractNoteExcerpt(body),
         modifiedAt: stats.mtime.toISOString(),
         createdAt: stats.birthtime.toISOString(),
         sizeBytes: stats.size,
@@ -1996,6 +2080,336 @@ async function getNoteBrowserEntriesBatch(
   targetPaths: Array<string | null>,
 ): Promise<NoteBrowserEntry[][]> {
   return Promise.all(targetPaths.map((targetPath) => getNoteBrowserEntries(targetPath)));
+}
+
+function createKnowledgeHeadingId(input: string) {
+  const normalized = input
+    .toLowerCase()
+    .trim()
+    .replace(/[`*_~[\]()>#+.!?,:;'"/\\]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+
+  return normalized || "section";
+}
+
+function normalizeKnowledgeTagName(input: string) {
+  return input.trim().replace(/^#/, "").toLowerCase();
+}
+
+function extractFrontmatterTags(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .flatMap((entry) => extractFrontmatterTags(entry))
+      .map(normalizeKnowledgeTagName)
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split(/[,\s]+/)
+      .map(normalizeKnowledgeTagName)
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function getKnowledgeFrontmatterTags(frontmatter: Record<string, unknown>) {
+  const candidates = [
+    frontmatter.tags,
+    frontmatter.tag,
+    frontmatter.keywords,
+    typeof frontmatter.metadata === "object" && frontmatter.metadata
+      ? (frontmatter.metadata as Record<string, unknown>).tags
+      : null,
+  ];
+
+  return Array.from(new Set(candidates.flatMap(extractFrontmatterTags)));
+}
+
+function parseKnowledgeFrontmatter(frontmatterText: string | null): Record<string, unknown> {
+  if (!frontmatterText) {
+    return {};
+  }
+
+  const document = parseDocument(frontmatterText, {
+    merge: true,
+    prettyErrors: false,
+    strict: false,
+    uniqueKeys: false,
+  });
+
+  if (document.errors.length > 0) {
+    return {};
+  }
+
+  const parsed = document.toJSON();
+  return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+    ? (parsed as Record<string, unknown>)
+    : {};
+}
+
+function getKnowledgeTitle(filePath: string, frontmatter: Record<string, unknown>, body: string) {
+  const frontmatterTitle = frontmatter.title;
+  if (typeof frontmatterTitle === "string" && frontmatterTitle.trim()) {
+    return frontmatterTitle.trim();
+  }
+
+  const firstHeading = body
+    .split("\n")
+    .map((line) => line.match(MARKDOWN_HEADING_PATTERN)?.[1]?.trim())
+    .find((title) => title && title.length > 0);
+
+  return firstHeading ?? getDisplayMarkdownFileName(filePath);
+}
+
+function extractKnowledgeFromMarkdown(
+  filePath: string,
+  content: string,
+  stats: Stats,
+): Omit<NoteKnowledgeDocument, "backlinks"> {
+  const normalizedContent = content.replace(/\r\n?/g, "\n");
+  const { frontmatterText, body } = parseMarkdownFrontmatter(normalizedContent);
+  const frontmatter = parseKnowledgeFrontmatter(frontmatterText);
+  const headings: NoteKnowledgeHeading[] = [];
+  const tagsByName = new Map<string, NoteKnowledgeTag>();
+  const links: NoteKnowledgeLink[] = [];
+  const headingCounts = new Map<string, number>();
+  const frontmatterTags = getKnowledgeFrontmatterTags(frontmatter);
+
+  frontmatterTags.forEach((name) => {
+    tagsByName.set(name, { name, line: 1 });
+  });
+
+  body.split("\n").forEach((line, index) => {
+    const lineNumber = index + 1;
+    const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+    if (headingMatch) {
+      const title = headingMatch[2]?.trim() ?? "";
+      if (title) {
+        const baseId = createKnowledgeHeadingId(title);
+        const instanceCount = headingCounts.get(baseId) ?? 0;
+        headingCounts.set(baseId, instanceCount + 1);
+        headings.push({
+          id: instanceCount === 0 ? baseId : `${baseId}-${instanceCount + 1}`,
+          level: headingMatch[1]?.length ?? 1,
+          title,
+          line: lineNumber,
+        });
+      }
+    }
+
+    INLINE_TAG_PATTERN.lastIndex = 0;
+    for (const match of line.matchAll(INLINE_TAG_PATTERN)) {
+      const name = normalizeKnowledgeTagName(match[2] ?? "");
+      if (name && !tagsByName.has(name)) {
+        tagsByName.set(name, { name, line: lineNumber });
+      }
+    }
+
+    MARKDOWN_LINK_PATTERN.lastIndex = 0;
+    for (const match of line.matchAll(MARKDOWN_LINK_PATTERN)) {
+      const target = (match[2] ?? "").trim();
+      if (!target) {
+        continue;
+      }
+
+      links.push({
+        kind: "markdown",
+        target,
+        label: (match[1] ?? target).trim(),
+        resolvedPath: null,
+        line: lineNumber,
+      });
+    }
+
+    WIKI_LINK_PATTERN.lastIndex = 0;
+    for (const match of line.matchAll(WIKI_LINK_PATTERN)) {
+      const rawTarget = (match[1] ?? "").trim();
+      if (!rawTarget) {
+        continue;
+      }
+
+      const [targetPart, alias] = rawTarget.split("|").map((part) => part.trim());
+      if (!rawTarget) {
+        continue;
+      }
+
+      links.push({
+        kind: "wiki",
+        target: rawTarget,
+        label: alias || targetPart || rawTarget,
+        resolvedPath: null,
+        line: lineNumber,
+      });
+    }
+  });
+
+  const wordCount = normalizedContent.split(/\s+/).filter(Boolean).length;
+
+  return {
+    path: filePath,
+    title: getKnowledgeTitle(filePath, frontmatter, body),
+    excerpt: extractNoteExcerpt(body),
+    frontmatter,
+    tags: Array.from(tagsByName.values()).sort((left, right) =>
+      left.name.localeCompare(right.name),
+    ),
+    headings,
+    links,
+    modifiedAt: stats.mtime.toISOString(),
+    createdAt: stats.birthtime.toISOString(),
+    sizeBytes: stats.size,
+    wordCount,
+  };
+}
+
+function stripLinkAnchor(target: string) {
+  return target.split("#", 1)[0]?.trim() ?? "";
+}
+
+function createMarkdownPathCandidates(sourcePath: string, target: string) {
+  const withoutTitle = stripLinkAnchor(target.split(/\s+"[^"]*"$/)[0] ?? target);
+  if (!withoutTitle || /^[a-z][a-z0-9+.-]*:/i.test(withoutTitle)) {
+    return [];
+  }
+
+  const sourceDir = path.dirname(sourcePath);
+  const baseTarget = withoutTitle.replace(/\\/g, "/");
+  const targetWithExtension = MARKDOWN_PREVIEW_SUFFIX_PATTERN.test(baseTarget)
+    ? baseTarget
+    : `${baseTarget}.md`;
+
+  return [
+    path.resolve(sourceDir, baseTarget),
+    path.resolve(sourceDir, targetWithExtension),
+    path.resolve(activeWorkspaceRoot ?? sourceDir, baseTarget),
+    path.resolve(activeWorkspaceRoot ?? sourceDir, targetWithExtension),
+  ];
+}
+
+function resolveKnowledgeLink(
+  sourcePath: string,
+  link: NoteKnowledgeLink,
+  documentsByPathKey: Map<string, NoteKnowledgeDocument>,
+  documentsByNameKey: Map<string, NoteKnowledgeDocument>,
+) {
+  if (link.kind === "wiki") {
+    // Phase 1: Direct full string lookup
+    const fullTargetWithoutAnchor = stripLinkAnchor(link.target);
+    const fullKey = fullTargetWithoutAnchor.replace(MARKDOWN_PREVIEW_SUFFIX_PATTERN, "").toLowerCase();
+    const directMatch = documentsByNameKey.get(fullKey);
+    if (directMatch) {
+      return directMatch.path;
+    }
+
+    // Phase 2: Fallback if we fail, try splitting by pipe
+    if (link.target.includes("|")) {
+      const [baseTarget] = link.target.split("|").map((part) => part.trim());
+      if (baseTarget) {
+        const baseWithoutAnchor = stripLinkAnchor(baseTarget);
+        const baseKey = baseWithoutAnchor.replace(MARKDOWN_PREVIEW_SUFFIX_PATTERN, "").toLowerCase();
+        const splitMatch = documentsByNameKey.get(baseKey);
+        if (splitMatch) {
+          return splitMatch.path;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  for (const candidate of createMarkdownPathCandidates(sourcePath, link.target)) {
+    const match = documentsByPathKey.get(normalizePathForComparison(candidate));
+    if (match) {
+      return match.path;
+    }
+  }
+
+  return null;
+}
+
+async function getKnowledgeIndex(): Promise<NoteKnowledgeIndexSnapshot> {
+  if (!activeWorkspaceRoot) {
+    return {
+      workspaceRoot: null,
+      notes: [],
+      tags: [],
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  const documents: NoteKnowledgeDocument[] = [];
+
+  for (const filePath of searchableFilesCache) {
+    try {
+      const stats = await fs.stat(filePath);
+      const content = await fs.readFile(filePath, "utf8");
+      documents.push({
+        ...extractKnowledgeFromMarkdown(filePath, content, stats),
+        backlinks: [],
+      });
+    } catch {
+      // Skip unreadable files.
+    }
+  }
+
+  const documentsByPathKey = new Map(
+    documents.map((document) => [normalizePathForComparison(document.path), document]),
+  );
+  const documentsByNameKey = new Map<string, NoteKnowledgeDocument>();
+  documents.forEach((document) => {
+    const baseName = path.basename(document.path).replace(MARKDOWN_PREVIEW_SUFFIX_PATTERN, "");
+    documentsByNameKey.set(baseName.toLowerCase(), document);
+    documentsByNameKey.set(document.title.toLowerCase(), document);
+  });
+
+  const backlinkSets = new Map<string, Set<string>>();
+  documents.forEach((document) => {
+    document.links = document.links.map((link) => {
+      const resolvedPath = resolveKnowledgeLink(
+        document.path,
+        link,
+        documentsByPathKey,
+        documentsByNameKey,
+      );
+
+      if (resolvedPath) {
+        const key = normalizePathForComparison(resolvedPath);
+        const linksToDocument = backlinkSets.get(key) ?? new Set<string>();
+        linksToDocument.add(document.path);
+        backlinkSets.set(key, linksToDocument);
+      }
+
+      return {
+        ...link,
+        resolvedPath,
+      };
+    });
+  });
+
+  documents.forEach((document) => {
+    document.backlinks = Array.from(
+      backlinkSets.get(normalizePathForComparison(document.path)) ?? [],
+    ).sort((left, right) => left.localeCompare(right));
+  });
+
+  const tagCounts = new Map<string, number>();
+  documents.forEach((document) => {
+    document.tags.forEach((tag) => {
+      tagCounts.set(tag.name, (tagCounts.get(tag.name) ?? 0) + 1);
+    });
+  });
+
+  return {
+    workspaceRoot: activeWorkspaceRoot,
+    notes: documents.sort((left, right) => left.title.localeCompare(right.title)),
+    tags: Array.from(tagCounts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((left, right) => right.count - left.count || left.name.localeCompare(right.name)),
+    generatedAt: new Date().toISOString(),
+  };
 }
 
 async function buildDirectoryTree(dirPath: string): Promise<DirectoryNode[]> {
@@ -2283,6 +2697,22 @@ async function createWindow() {
     mainWindow?.show();
   });
 
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("https:") || url.startsWith("http:")) {
+      void shell.openExternal(url);
+      return { action: "deny" };
+    }
+    return { action: "allow" };
+  });
+
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    if (url.startsWith("https:") || url.startsWith("http:")) {
+      event.preventDefault();
+      void shell.openExternal(url);
+    }
+  });
+
+
   mainWindow.webContents.on("did-fail-load", (_event, code, description, validatedUrl) => {
     console.error("Renderer load failed:", {
       code,
@@ -2471,6 +2901,8 @@ ipcMain.handle("workspace:createFolder", async (_event, parentDir: string, folde
 });
 
 ipcMain.handle("workspace:search", async (_event, query: string) => searchWorkspace(query));
+
+ipcMain.handle("knowledge:getIndex", async () => getKnowledgeIndex());
 
 ipcMain.handle("tasks:list", async () => {
   if (!activeWorkspaceRoot) {

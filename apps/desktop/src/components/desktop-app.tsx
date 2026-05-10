@@ -1,15 +1,21 @@
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { getBaseName, getDisplayFileName, isSamePath, normalizePath } from "@/core/paths";
+import {
+  formatMarkdownFrontmatter,
+  parseMarkdownFrontmatter,
+  serializeMarkdownFrontmatter,
+} from "@/core/frontmatter";
 import { buildNoteCollections, filterNoteBrowserEntries } from "@/core/note-collections";
 import { countGroupedSkills, groupSkillsForBrowse } from "@/core/skill-groups";
 import { getShortcutDisplay } from "@/core/shortcuts";
 import { SKILL_AGENT_CATALOG } from "@/core/skill-agent-catalog";
 import type {
+  DirectoryNode,
   NoteCollectionAccentKey,
   NoteCollectionIconKey,
   NoteBrowserEntry,
-  ThemeMode,
+  NoteKnowledgeIndexSnapshot,
   TabMovePosition,
 } from "@/core/workspace";
 import { useLayoutStore } from "@/store/layout";
@@ -27,6 +33,7 @@ import { AppSurfaceShell } from "./app-surface-shell";
 import { CommandPalette } from "./command-palette";
 import { NotesBrowserPane } from "./notes/notes-browser-pane";
 import { EditorToolbar } from "./editor-toolbar";
+import { NoteContextSidebar } from "./note-context-sidebar";
 import { NotesFooterContent } from "./notes-footer-content";
 import { NoteConfirmDialog } from "./note-confirm-dialog";
 import { NoteRenameDialog } from "./note-rename-dialog";
@@ -47,11 +54,54 @@ import { useUpdateStateFlags } from "./update-notification";
 
 import { matchesPaletteQuery, matchesSkillPaletteFallback } from "./desktop-app/palette-utils";
 
+function collectNoteTitles(nodes: DirectoryNode[]): Array<{ title: string; icon: string | null; path: string | null }> {
+  const titles = new Map<string, { title: string; path: string }>();
+  const visit = (node: DirectoryNode) => {
+    if (node.type === "file") {
+      if (/\.md$/i.test(node.name)) {
+        const title = node.name.replace(/\.md$/i, "");
+        titles.set(title.toLowerCase(), { title, path: node.path });
+      }
+      return;
+    }
+    node.children.forEach(visit);
+  };
+  nodes.forEach(visit);
+  return Array.from(titles.values())
+    .map((entry) => ({ ...entry, icon: null }))
+    .sort((left, right) => left.title.localeCompare(right.title));
+}
+
+function getFrontmatterIcon(content: string) {
+  const parsed = parseMarkdownFrontmatter(content);
+  const match = parsed.frontmatterText?.match(/^icon:\s*(.+?)\s*$/m);
+  const icon = match?.[1]?.trim().replace(/^['"]|['"]$/g, "") ?? null;
+  return icon && icon !== "none" ? icon : null;
+}
+
+function getMetadataString(value: unknown) {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "";
+}
+
+function getMetadataStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap(getMetadataStringArray);
+  }
+  if (typeof value === "string") {
+    return value.split(/[,\s]+/).map((entry) => entry.trim().replace(/^#/, "").toLowerCase()).filter(Boolean);
+  }
+  return [];
+}
+
 export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const sessionHasHydrated = useSessionStore((state) => state.hasHydrated);
   const viewerMode = useSessionStore((state) => state.viewerMode);
   const isNotesExpanded = useSessionStore((state) => state.isNotesExpanded);
   const isSkillsExpanded = useSessionStore((state) => state.isSkillsExpanded);
+  const isNoteContextOpen = useSessionStore((state) => state.isNoteContextOpen);
+  const workspaceRootPath = useWorkspaceStore((state) => state.rootPath);
   const selectedNoteCollectionPath = useSessionStore((state) => state.selectedNoteCollectionPath);
   const notesBrowserPaneWidth = useSessionStore((state) => state.notesBrowserPaneWidth);
   const selectedSkillCollectionId = useSessionStore((state) => state.selectedSkillCollectionId);
@@ -76,6 +126,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   );
   const setNoteOrderForCollection = useSessionStore((state) => state.setNoteOrderForCollection);
   const getNoteOrderForCollection = useSessionStore((state) => state.getNoteOrderForCollection);
+  const setNoteContextOpen = useSessionStore((state) => state.setNoteContextOpen);
   const setNotesBrowserPaneWidth = useSessionStore((state) => state.setNotesBrowserPaneWidth);
   const setSelectedSkillCollectionId = useSessionStore(
     (state) => state.setSelectedSkillCollectionId,
@@ -120,6 +171,16 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   // skillsController and setViewerMode are in scope.
   const onRestoreSkillRef = useRef<(path: string) => Promise<void>>(async () => {});
   const onRestoreTasksRef = useRef<() => void>(() => {});
+  const exitFocusModeRef = useRef<() => void>(() => {});
+  const isFocusModeRef = useRef(false);
+  const handleToggleNoteContext = useCallback(() => {
+    if (isFocusModeRef.current) {
+      exitFocusModeRef.current();
+      setNoteContextOpen(true);
+      return;
+    }
+    setNoteContextOpen(!useSessionStore.getState().isNoteContextOpen);
+  }, [setNoteContextOpen]);
 
   const controller = useDesktopAppController(glyph, {
     initialFilePath: initialNoteSessionRef.current.filePath,
@@ -128,10 +189,15 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     sessionReady: sessionHasHydrated,
     onRestoreSkill: useCallback((path: string) => onRestoreSkillRef.current(path), []),
     onRestoreTasks: useCallback(() => onRestoreTasksRef.current(), []),
+    onToggleNoteContext: handleToggleNoteContext,
   });
   const skillsController = useSkillLibraryController(glyph, {
     enabled: true,
   });
+  isFocusModeRef.current = controller.isFocusMode;
+  exitFocusModeRef.current = () => {
+    void controller.toggleFocusMode();
+  };
 
   // Wire cross-surface navigation restore callbacks (populated each render so
   // the stable refs always call the latest closures).
@@ -165,6 +231,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     name: string;
   } | null>(null);
   const [noteBrowserRefreshNonce, setNoteBrowserRefreshNonce] = useState(0);
+  const knowledgeIndex = useWorkspaceStore((state) => state.knowledgeIndex);
+  const setKnowledgeIndex = useWorkspaceStore((state) => state.setKnowledgeIndex);
   const [paletteSkillResultIds, setPaletteSkillResultIds] = useState<string[] | null>(null);
   const [resolvedPaletteSkillQuery, setResolvedPaletteSkillQuery] = useState("");
   const [skillInitialScrollTop, setSkillInitialScrollTop] = useState(0);
@@ -346,6 +414,80 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     () => filterNoteBrowserEntries(noteBrowserEntries, "", activeNoteCollection),
     [activeNoteCollection, noteBrowserEntries],
   );
+  const activeNoteIcon = useMemo(
+    () => (controller.activeFile ? getFrontmatterIcon(controller.draftContent) : null),
+    [controller.activeFile, controller.draftContent],
+  );
+  const visibleNoteBrowserEntriesWithMetadata = useMemo(
+    () =>
+      visibleNoteBrowserEntries.map((entry) =>
+        controller.activeFile && isSamePath(entry.path, controller.activeFile.path)
+          ? { ...entry, icon: activeNoteIcon }
+          : entry,
+      ),
+    [activeNoteIcon, controller.activeFile, visibleNoteBrowserEntries],
+  );
+  const noteTitleSuggestions = useMemo(() => {
+    const titleMap = new Map<string, { title: string; icon: string | null; path: string | null }>();
+    collectNoteTitles(controller.visibleSidebarNodes.map((entry) => entry.node)).forEach((entry) => {
+      titleMap.set(entry.title.toLowerCase(), entry);
+    });
+    noteBrowserEntries.forEach((entry) => {
+      const icon =
+        controller.activeFile && isSamePath(entry.path, controller.activeFile.path)
+          ? activeNoteIcon
+          : entry.icon;
+      titleMap.set(entry.title.toLowerCase(), { title: entry.title, icon, path: entry.path });
+    });
+    return Array.from(titleMap.values()).sort((left, right) =>
+      left.title.localeCompare(right.title),
+    );
+  }, [activeNoteIcon, controller.activeFile, controller.visibleSidebarNodes, noteBrowserEntries]);
+  const metadataOptions = useMemo(() => {
+    const types = new Set<string>();
+    const statuses = new Set<string>();
+    const tags = new Set<string>();
+
+    knowledgeIndex?.notes.forEach((note) => {
+      const type = getMetadataString(note.frontmatter.type);
+      const status = getMetadataString(note.frontmatter.status);
+      if (type) types.add(type);
+      if (status) statuses.add(status);
+      getMetadataStringArray(note.frontmatter.tags).forEach((tag) => tags.add(tag));
+      getMetadataStringArray(note.frontmatter.tag).forEach((tag) => tags.add(tag));
+      getMetadataStringArray(note.frontmatter.keywords).forEach((tag) => tags.add(tag));
+      note.tags.forEach((tag) => tags.add(tag.name));
+    });
+
+    return {
+      statuses: Array.from(statuses).sort((left, right) => left.localeCompare(right)),
+      tags: Array.from(tags).sort((left, right) => left.localeCompare(right)),
+      types: Array.from(types).sort((left, right) => left.localeCompare(right)),
+    };
+  }, [knowledgeIndex]);
+  const activeNoteBacklinks = useMemo(() => {
+    if (!controller.activeFile || !knowledgeIndex) {
+      return [];
+    }
+
+    const notesByPath = new Map(
+      knowledgeIndex.notes.map((note) => [normalizePath(note.path).toLowerCase(), note]),
+    );
+    const activeNote = notesByPath.get(normalizePath(controller.activeFile.path).toLowerCase());
+    if (!activeNote) {
+      return [];
+    }
+
+    return activeNote.backlinks.flatMap((sourcePath) => {
+      const source = notesByPath.get(normalizePath(sourcePath).toLowerCase());
+      if (!source) {
+        return [];
+      }
+
+      const icon = getMetadataString(source.frontmatter.icon) || null;
+      return [{ path: source.path, title: source.title, icon }];
+    });
+  }, [controller.activeFile, knowledgeIndex]);
   const activeNoteCollectionPath = activeNoteCollection?.path ?? null;
 
   const handleToggleSkillsSection = useCallback(() => {
@@ -622,6 +764,30 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     noteCollections,
     noteBrowserRefreshNonce,
   ]);
+
+  useEffect(() => {
+    if (!controller.hasBooted) {
+      return;
+    }
+
+    let isCancelled = false;
+    void glyph
+      .getKnowledgeIndex()
+      .then((snapshot) => {
+        if (!isCancelled) {
+          setKnowledgeIndex(snapshot);
+        }
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setKnowledgeIndex(null);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [controller.hasBooted, controller.saveStateLabel, glyph, noteBrowserRefreshNonce]);
 
   useEffect(() => {
     if (
@@ -1179,6 +1345,17 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     }
 
     const query = paletteFilterQuery;
+    const headingItems: CommandPaletteItem[] = controller.outlineItems.map((item) => ({
+      id: `jump-heading-${item.id}`,
+      title: item.title,
+      subtitle: `Jump to H${item.depth} in ${controller.activeFile?.name ?? "current note"}`,
+      section: "Headings",
+      kind: "command",
+      onSelect: () => {
+        controller.requestOutlineJump(item.id);
+        closePalette();
+      },
+    }));
     const items: CommandPaletteItem[] = [
       {
         id: "find-in-current-note",
@@ -1233,6 +1410,37 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         kind: "command",
         onSelect: () => {
           void handleCopyCurrentNotePath();
+        },
+      },
+      {
+        id: "format-frontmatter",
+        title: "Format Frontmatter",
+        subtitle: "Clean up YAML metadata at the top of this note",
+        section: "Note",
+        kind: "command",
+        onSelect: () => {
+          const parsed = parseMarkdownFrontmatter(controller.draftContent);
+          const formattedFrontmatter = formatMarkdownFrontmatter(parsed.frontmatterText ?? "");
+          if (formattedFrontmatter !== null) {
+            controller.updateDraftContent(
+              serializeMarkdownFrontmatter({
+                frontmatterText: formattedFrontmatter,
+                body: parsed.body,
+              }),
+            );
+          }
+          closePalette();
+        },
+      },
+      {
+        id: "toggle-note-context",
+        title: isNoteContextOpen ? "Hide Note Context" : "Show Note Context",
+        subtitle: "Toggle properties, links, tags, and outline",
+        section: "Note",
+        kind: "command",
+        onSelect: () => {
+          setNoteContextOpen(!isNoteContextOpen);
+          closePalette();
         },
       },
       {
@@ -1294,13 +1502,18 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
           closePalette();
         },
       },
+      ...headingItems,
     ];
 
     return items.filter((item) => matchesPaletteQuery(query, item.title, item.subtitle));
   }, [
     controller.activeFile,
+    controller.draftContent,
     controller.folderRevealLabel,
+    controller.outlineItems,
     controller.requestFindInNote,
+    controller.requestOutlineJump,
+    controller.updateDraftContent,
     handleCopyCurrentNoteMarkdown,
     handleCopyCurrentNotePath,
     handleExportCurrentNote,
@@ -1312,6 +1525,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     controller.editorScale,
     controller.shortcuts,
     closePalette,
+    isNoteContextOpen,
   ]);
 
   const skillPaletteItems = useMemo<CommandPaletteItem[]>(() => {
@@ -1520,8 +1734,18 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   );
 
   const handleToggleSidebar = useCallback(() => {
+    if (controller.isFocusMode) {
+      void controller.toggleFocusMode();
+      controller.setIsSidebarCollapsed(false);
+      return;
+    }
     controller.setIsSidebarCollapsed(!controller.isSidebarCollapsed);
-  }, [controller.isSidebarCollapsed, controller.setIsSidebarCollapsed]);
+  }, [
+    controller.isFocusMode,
+    controller.isSidebarCollapsed,
+    controller.setIsSidebarCollapsed,
+    controller.toggleFocusMode,
+  ]);
 
   const handleOpenCommandPalette = useCallback(() => {
     controller.setIsPaletteOpen(true);
@@ -1552,8 +1776,11 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     void controller.navigateForward();
   }, [controller.navigateForward]);
   const handleToggleFocusMode = useCallback(() => {
+    if (!controller.isFocusMode) {
+      setNoteContextOpen(false);
+    }
     void controller.toggleFocusMode();
-  }, [controller.toggleFocusMode]);
+  }, [controller.isFocusMode, controller.toggleFocusMode, setNoteContextOpen]);
   const handleEditorScaleChange = useCallback(
     (scale: number) => {
       void controller.setEditorScale(scale);
@@ -1827,6 +2054,20 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     (controller.settings?.pinnedFiles ?? []).some((filePath) =>
       isSamePath(filePath, activeNoteFile.path),
     );
+  const noteContextPane =
+    activeNoteFile && isNoteContextOpen && !controller.isFocusMode ? (
+      <NoteContextSidebar
+        activeFile={activeNoteFile}
+        draftContent={controller.draftContent}
+        metadataOptions={metadataOptions}
+        backlinks={activeNoteBacklinks}
+        rootPath={workspaceRootPath}
+        noteTitleSuggestions={noteTitleSuggestions}
+        onClose={() => setNoteContextOpen(false)}
+        onOpenNote={(path) => void handleOpenLinkedFile(path)}
+        onUpdateContent={controller.updateDraftContent}
+      />
+    ) : null;
 
   const toolbarNode: React.ReactNode = isAppBootstrapping ? null : isTasksSurfaceVisible ? (
     <EditorToolbar
@@ -1858,6 +2099,13 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       filePath={null}
       shouldShowCommandPalette={true}
       onOpenCommandPalette={handleOpenCommandPalette}
+      isNoteContextOpen={isNoteContextOpen}
+      onToggleNoteContext={handleToggleNoteContext}
+      toggleNoteContextShortcut={getShortcutDisplay(
+        controller.shortcuts,
+        "toggle-note-context",
+        navigator.platform,
+      )}
       commandPaletteShortcut={getShortcutDisplay(
         controller.shortcuts,
         "command-palette",
@@ -1932,6 +2180,13 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         navigator.platform,
       )}
       commandPaletteLabel="Search notes and skills"
+      isNoteContextOpen={isNoteContextOpen}
+      onToggleNoteContext={activeNoteFile ? handleToggleNoteContext : undefined}
+      toggleNoteContextShortcut={getShortcutDisplay(
+        controller.shortcuts,
+        "toggle-note-context",
+        navigator.platform,
+      )}
       isFocusMode={undefined}
       onToggleFocusMode={undefined}
       focusModeShortcut={undefined}
@@ -2024,6 +2279,13 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       isManualReleaseButton={noteUpdateStateFlags.isManualReleaseButton}
       headerPaddingClass={noteHeaderPaddingClass}
       onOpenSettings={handleOpenSettings}
+      isNoteContextOpen={isNoteContextOpen}
+      onToggleNoteContext={activeNoteFile ? handleToggleNoteContext : undefined}
+      toggleNoteContextShortcut={getShortcutDisplay(
+        controller.shortcuts,
+        "toggle-note-context",
+        navigator.platform,
+      )}
       headerAccessory={null}
       content={controller.draftContent}
       documentLabel="note"
@@ -2066,6 +2328,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       <AppLayout
         toolbar={toolbarNode}
         footer={footerNode}
+        themeMode={controller.settings?.themeMode ?? "system"}
+        onChangeTheme={(mode) => void controller.changeThemeMode(mode)}
         shouldCollapseSidebar={shouldCollapseSidebar}
         tree={controller.visibleSidebarNodes}
         activePath={
@@ -2212,7 +2476,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
               shouldCollapseBrowserPane ? undefined : activeNoteCollection ? (
                 <NotesBrowserPane
                   activePath={controller.activeFile?.path ?? null}
-                  entries={visibleNoteBrowserEntries}
+                  entries={visibleNoteBrowserEntriesWithMetadata}
                   isLoading={isNoteBrowserLoading}
                   accent={activeNoteCollection.accent}
                   onOpenNote={handleBrowserOpenNote}
@@ -2230,6 +2494,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
               ) : null
             }
             browserPaneWidth={notesBrowserPaneWidth}
+            contextPane={noteContextPane}
             onBrowserPaneResize={setNotesBrowserPaneWidth}
           >
             <div className="flex h-full min-h-0 flex-col bg-background">
@@ -2260,7 +2525,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         appInfo={controller.appInfo}
         onClose={() => controller.setIsSettingsOpen(false)}
         onChooseFolder={() => void controller.chooseFolderAndUpdateWorkspace()}
-        onChangeMode={(mode: ThemeMode) => void controller.changeThemeMode(mode)}
         onChangeShortcuts={(shortcuts) => void controller.changeShortcuts(shortcuts)}
       />
       <NoteRenameDialog

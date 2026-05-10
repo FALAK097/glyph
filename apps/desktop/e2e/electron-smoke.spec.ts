@@ -55,6 +55,8 @@ async function createGlyphSandbox(): Promise<GlyphSandbox> {
       "Smoke test note content.",
       "",
       "Preview the [Nested Note](notes/nested-note.md).",
+      "",
+      "Wiki jump to [[Nested Note]].",
     ].join("\n"),
   );
   await fs.writeFile(
@@ -349,32 +351,6 @@ test("opens a seeded markdown note from the workspace", async ({}, testInfo) => 
   }
 });
 
-test("persists theme mode changes from settings", async ({}, testInfo) => {
-  const glyph = await launchGlyph();
-
-  try {
-    await expectAppShell(glyph.window);
-    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
-    await selectPaletteItem(glyph.window, "settings", /settings/i);
-    await glyph.window.getByLabel("Theme mode").click();
-    await glyph.window.getByRole("option", { name: "Dark" }).click();
-
-    await expect
-      .poll(async () =>
-        glyph.window.evaluate(() => document.documentElement.classList.contains("dark")),
-      )
-      .toBe(true);
-
-    await expect
-      .poll(async () => {
-        const settings = await readJson<{ themeMode?: string }>(glyph.sandbox.settingsPath);
-        return settings?.themeMode ?? null;
-      })
-      .toBe("dark");
-  } finally {
-    await glyph.stop(testInfo);
-  }
-});
 
 test("toggles the current note pin action from the command palette", async ({}, testInfo) => {
   const glyph = await launchGlyph();
@@ -568,26 +544,6 @@ test("settings panel closes when Escape is pressed", async ({}, testInfo) => {
   }
 });
 
-test("theme mode persists as light in settings file", async ({}, testInfo) => {
-  const glyph = await launchGlyph();
-  try {
-    await expectAppShell(glyph.window);
-    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
-    await selectPaletteItem(glyph.window, "settings", /settings/i);
-
-    await glyph.window.getByLabel("Theme mode").click();
-    await glyph.window.getByRole("option", { name: "Light" }).click();
-
-    await expect
-      .poll(async () => {
-        const settings = await readJson<{ themeMode?: string }>(glyph.sandbox.settingsPath);
-        return settings?.themeMode ?? null;
-      })
-      .toBe("light");
-  } finally {
-    await glyph.stop(testInfo);
-  }
-});
 
 // ─── Note lifecycle ───────────────────────────────────────────────────────────
 
@@ -690,6 +646,77 @@ test("hovering a markdown note link shows a local note preview", async ({}, test
     await expect(previewCard.getByText("Nested note body.")).toBeVisible();
   } finally {
     await glyph.stop(testInfo);
+  }
+});
+
+test("wikilinks preview, open notes, and appear as backlinks", async ({}, testInfo) => {
+  const glyph = await launchGlyph();
+  try {
+    await expectAppShell(glyph.window);
+    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
+
+    await selectPaletteItem(glyph.window, "welcome", /welcome\.md/i);
+    const wikiLink = glyph.window
+      .locator('[data-glyph-editor="true"] [data-wiki-link="[[Nested Note]]"]')
+      .first();
+    await expect(wikiLink).toBeVisible();
+
+    await wikiLink.hover();
+    const previewCard = glyph.window.getByLabel("Note link preview");
+    await expect(previewCard).toBeVisible();
+    await expect(previewCard.getByText("Nested Note", { exact: true })).toBeVisible();
+
+    await glyph.window.keyboard.down(modKey);
+    await wikiLink.click();
+    await glyph.window.keyboard.up(modKey);
+    await expect(
+      glyph.window.locator('[data-glyph-editor="true"]').getByText("Nested note body."),
+    ).toBeVisible();
+
+    await glyph.window.getByLabel("Open properties panel").click();
+    await expect(glyph.window.getByText("Backlinks")).toBeVisible();
+    await expect(glyph.window.getByRole("button", { name: /Welcome to Glyph/i })).toBeVisible();
+  } finally {
+    await glyph.window.keyboard.up(modKey).catch(() => {});
+    await glyph.stop(testInfo);
+  }
+});
+
+test("wikilinks resolve correctly even with special characters like pipes in the filename", async ({}, testInfo) => {
+  const sandbox = await createGlyphSandbox();
+  // Create a note that specifically contains '||' in its filename
+  const weirdFileName = "Special || Pipe Note.md";
+  await fs.writeFile(path.join(sandbox.workspaceRoot, weirdFileName), "# Complex Name\nBody Content here.");
+
+  // Add a wikilink pointing to it inside Welcome note
+  const welcomePath = path.join(sandbox.workspaceRoot, "welcome.md");
+  const welcomeContent = await fs.readFile(welcomePath, "utf8");
+  await fs.writeFile(welcomePath, welcomeContent + "\n[[Special || Pipe Note]]");
+
+  const glyph = await launchGlyph(sandbox);
+  try {
+    await expectAppShell(glyph.window);
+    await openWorkspace(glyph.window, sandbox.workspaceRoot);
+
+    await selectPaletteItem(glyph.window, "welcome", /welcome\.md/i);
+    const wikiLink = glyph.window
+      .locator('[data-glyph-editor="true"] [data-wiki-link="[[Special || Pipe Note]]"]')
+      .first();
+    await expect(wikiLink).toBeVisible();
+
+    // Cmd/Ctrl-Click to navigate
+    await glyph.window.keyboard.down(modKey);
+    await wikiLink.click();
+    await glyph.window.keyboard.up(modKey);
+
+    // It should successfully land on the target note page
+    await expect(
+      glyph.window.locator('[data-glyph-editor="true"]').getByText("Body Content here."),
+    ).toBeVisible();
+  } finally {
+    await glyph.window.keyboard.up(modKey).catch(() => {});
+    await glyph.stop(testInfo);
+    await sandbox.cleanup();
   }
 });
 

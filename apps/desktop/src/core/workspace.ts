@@ -106,7 +106,12 @@ export type NoteCollectionIconKey =
   | "home"
   | "camera"
   | "notebook"
-  | "star";
+  | "star"
+  | "idea"
+  | "file"
+  | "sun"
+  | "moon"
+  | "monitor";
 
 export type NoteFolderAppearance = {
   accent: NoteCollectionAccentKey;
@@ -118,11 +123,54 @@ export type NoteFolderAppearanceMap = Record<string, Partial<NoteFolderAppearanc
 export type NoteBrowserEntry = {
   path: string;
   title: string;
+  icon: string | null;
   excerpt: string;
   modifiedAt: string | null;
   createdAt: string | null;
   sizeBytes: number;
   wordCount: number;
+};
+
+export type NoteKnowledgeHeading = {
+  id: string;
+  level: number;
+  title: string;
+  line: number;
+};
+
+export type NoteKnowledgeTag = {
+  name: string;
+  line: number;
+};
+
+export type NoteKnowledgeLink = {
+  kind: "markdown" | "wiki";
+  target: string;
+  label: string;
+  resolvedPath: string | null;
+  line: number;
+};
+
+export type NoteKnowledgeDocument = {
+  path: string;
+  title: string;
+  excerpt: string;
+  frontmatter: Record<string, unknown>;
+  tags: NoteKnowledgeTag[];
+  headings: NoteKnowledgeHeading[];
+  links: NoteKnowledgeLink[];
+  backlinks: string[];
+  modifiedAt: string | null;
+  createdAt: string | null;
+  sizeBytes: number;
+  wordCount: number;
+};
+
+export type NoteKnowledgeIndexSnapshot = {
+  workspaceRoot: string | null;
+  notes: NoteKnowledgeDocument[];
+  tags: Array<{ name: string; count: number }>;
+  generatedAt: string;
 };
 
 export type ThemeMode = "light" | "dark" | "system";

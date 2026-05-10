@@ -34,13 +34,17 @@ import {
   GlobeIcon,
   HomeIcon,
   HonourStarIcon,
+  IdeaIcon,
   LayersIcon,
   LeafIcon,
+  MonitorIcon,
+  MoonIcon,
   NotebookIcon,
   PencilIcon,
   PlusIcon,
   RocketIcon,
   SparklesIcon,
+  SunIcon,
   TrashIcon,
   XIcon,
 } from "../icons";
@@ -195,6 +199,11 @@ const ICONS: Record<NoteCollectionIconKey, ComponentType<{ size?: number; classN
   camera: CameraIcon,
   notebook: NotebookIcon,
   star: HonourStarIcon,
+  idea: IdeaIcon,
+  file: FileIcon,
+  sun: SunIcon,
+  moon: MoonIcon,
+  monitor: MonitorIcon,
 };
 
 /** Human-readable label for each accent color key */
@@ -233,6 +242,11 @@ const ICON_LABELS: Record<NoteCollectionIconKey, string> = {
   camera: "Camera",
   notebook: "Notebook",
   star: "Star",
+  idea: "Idea",
+  file: "File",
+  sun: "Sun",
+  moon: "Moon",
+  monitor: "Monitor",
 };
 
 type NoteCollectionRowProps = {

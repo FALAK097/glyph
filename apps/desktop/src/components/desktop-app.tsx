@@ -1890,11 +1890,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         activeFile={activeNoteFile}
         draftContent={controller.draftContent}
         rootPath={workspaceRootPath}
-        outlineItems={controller.outlineItems}
-        wordCount={controller.wordCount}
-        readingTime={controller.readingTime}
         onClose={() => setNoteContextOpen(false)}
-        onJumpToHeading={controller.requestOutlineJump}
         onUpdateContent={controller.updateDraftContent}
       />
     ) : null;

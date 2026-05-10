@@ -339,7 +339,7 @@ function serializeFrontmatter(frontmatter: Record<string, unknown>) {
 }
 
 function detectTags(body: string, existingTags: string[]) {
-  const existing = new Set(existingTags);
+  const existing = new Set(existingTags.map((tag) => normalizeTag(tag)));
   const counts = new Map<string, number>();
   const normalizedBody = body
     .replace(/```[\s\S]*?```/g, " ")
@@ -349,14 +349,15 @@ function detectTags(body: string, existingTags: string[]) {
 
   for (const match of normalizedBody.toLowerCase().matchAll(/[a-z][a-z0-9-]{5,}/g)) {
     const tag = normalizeTag(match[0]);
-    if (STOP_WORDS.has(tag) || existing.has(tag) || tag.endsWith("ing")) continue;
+    if (STOP_WORDS.has(tag) || tag.endsWith("ing")) continue;
     counts.set(tag, (counts.get(tag) ?? 0) + 1);
   }
   return Array.from(counts.entries())
     .filter(([tag, count]) => count >= 2 && !STOP_WORDS.has(tag))
     .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
     .slice(0, 5)
-    .map(([tag]) => tag);
+    .map(([tag]) => tag)
+    .filter((tag) => !existing.has(tag));
 }
 
 function hashText(value: string) {

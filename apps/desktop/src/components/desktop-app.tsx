@@ -53,7 +53,7 @@ import { useUpdateStateFlags } from "./update-notification";
 
 import { matchesPaletteQuery, matchesSkillPaletteFallback } from "./desktop-app/palette-utils";
 
-function collectNoteTitles(nodes: DirectoryNode[]): string[] {
+function collectNoteTitles(nodes: DirectoryNode[]): Array<{ title: string; icon: string | null }> {
   const titles = new Set<string>();
   const visit = (node: DirectoryNode) => {
     if (node.type === "file") {
@@ -65,7 +65,16 @@ function collectNoteTitles(nodes: DirectoryNode[]): string[] {
     node.children.forEach(visit);
   };
   nodes.forEach(visit);
-  return Array.from(titles).sort((left, right) => left.localeCompare(right));
+  return Array.from(titles)
+    .sort((left, right) => left.localeCompare(right))
+    .map((title) => ({ title, icon: null }));
+}
+
+function getFrontmatterIcon(content: string) {
+  const parsed = parseMarkdownFrontmatter(content);
+  const match = parsed.frontmatterText?.match(/^icon:\s*(.+?)\s*$/m);
+  const icon = match?.[1]?.trim().replace(/^['"]|['"]$/g, "") ?? null;
+  return icon && icon !== "none" ? icon : null;
 }
 
 export const DesktopApp = ({ glyph }: DesktopAppProps) => {
@@ -144,7 +153,14 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   // skillsController and setViewerMode are in scope.
   const onRestoreSkillRef = useRef<(path: string) => Promise<void>>(async () => {});
   const onRestoreTasksRef = useRef<() => void>(() => {});
+  const exitFocusModeRef = useRef<() => void>(() => {});
+  const isFocusModeRef = useRef(false);
   const handleToggleNoteContext = useCallback(() => {
+    if (isFocusModeRef.current) {
+      exitFocusModeRef.current();
+      setNoteContextOpen(true);
+      return;
+    }
     setNoteContextOpen(!useSessionStore.getState().isNoteContextOpen);
   }, [setNoteContextOpen]);
 
@@ -160,6 +176,10 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const skillsController = useSkillLibraryController(glyph, {
     enabled: true,
   });
+  isFocusModeRef.current = controller.isFocusMode;
+  exitFocusModeRef.current = () => {
+    void controller.toggleFocusMode();
+  };
 
   // Wire cross-surface navigation restore callbacks (populated each render so
   // the stable refs always call the latest closures).
@@ -354,10 +374,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     setSelectedNoteCollectionPath,
     setLastNotePathForCollection,
   ]);
-  const noteTitleSuggestions = useMemo(
-    () => collectNoteTitles(controller.visibleSidebarNodes.map((entry) => entry.node)),
-    [controller.visibleSidebarNodes],
-  );
   const currentNoteDisplayName = useMemo(
     () => (controller.activeFile ? getDisplayFileName(controller.activeFile.name) : ""),
     [controller.activeFile],
@@ -378,6 +394,35 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     () => filterNoteBrowserEntries(noteBrowserEntries, "", activeNoteCollection),
     [activeNoteCollection, noteBrowserEntries],
   );
+  const activeNoteIcon = useMemo(
+    () => (controller.activeFile ? getFrontmatterIcon(controller.draftContent) : null),
+    [controller.activeFile, controller.draftContent],
+  );
+  const visibleNoteBrowserEntriesWithMetadata = useMemo(
+    () =>
+      visibleNoteBrowserEntries.map((entry) =>
+        controller.activeFile && isSamePath(entry.path, controller.activeFile.path)
+          ? { ...entry, icon: activeNoteIcon }
+          : entry,
+      ),
+    [activeNoteIcon, controller.activeFile, visibleNoteBrowserEntries],
+  );
+  const noteTitleSuggestions = useMemo(() => {
+    const titleMap = new Map<string, { title: string; icon: string | null }>();
+    collectNoteTitles(controller.visibleSidebarNodes.map((entry) => entry.node)).forEach((entry) => {
+      titleMap.set(entry.title.toLowerCase(), entry);
+    });
+    noteBrowserEntries.forEach((entry) => {
+      const icon =
+        controller.activeFile && isSamePath(entry.path, controller.activeFile.path)
+          ? activeNoteIcon
+          : entry.icon;
+      titleMap.set(entry.title.toLowerCase(), { title: entry.title, icon });
+    });
+    return Array.from(titleMap.values()).sort((left, right) =>
+      left.title.localeCompare(right.title),
+    );
+  }, [activeNoteIcon, controller.activeFile, controller.visibleSidebarNodes, noteBrowserEntries]);
   const activeNoteCollectionPath = activeNoteCollection?.path ?? null;
 
   const handleToggleSkillsSection = useCallback(() => {
@@ -1600,8 +1645,18 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   );
 
   const handleToggleSidebar = useCallback(() => {
+    if (controller.isFocusMode) {
+      void controller.toggleFocusMode();
+      controller.setIsSidebarCollapsed(false);
+      return;
+    }
     controller.setIsSidebarCollapsed(!controller.isSidebarCollapsed);
-  }, [controller.isSidebarCollapsed, controller.setIsSidebarCollapsed]);
+  }, [
+    controller.isFocusMode,
+    controller.isSidebarCollapsed,
+    controller.setIsSidebarCollapsed,
+    controller.toggleFocusMode,
+  ]);
 
   const handleOpenCommandPalette = useCallback(() => {
     controller.setIsPaletteOpen(true);
@@ -1632,8 +1687,11 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     void controller.navigateForward();
   }, [controller.navigateForward]);
   const handleToggleFocusMode = useCallback(() => {
+    if (!controller.isFocusMode) {
+      setNoteContextOpen(false);
+    }
     void controller.toggleFocusMode();
-  }, [controller.toggleFocusMode]);
+  }, [controller.isFocusMode, controller.toggleFocusMode, setNoteContextOpen]);
   const handleEditorScaleChange = useCallback(
     (scale: number) => {
       void controller.setEditorScale(scale);
@@ -1908,7 +1966,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       isSamePath(filePath, activeNoteFile.path),
     );
   const noteContextPane =
-    activeNoteFile && isNoteContextOpen ? (
+    activeNoteFile && isNoteContextOpen && !controller.isFocusMode ? (
       <NoteContextSidebar
         activeFile={activeNoteFile}
         draftContent={controller.draftContent}
@@ -2326,7 +2384,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
               shouldCollapseBrowserPane ? undefined : activeNoteCollection ? (
                 <NotesBrowserPane
                   activePath={controller.activeFile?.path ?? null}
-                  entries={visibleNoteBrowserEntries}
+                  entries={visibleNoteBrowserEntriesWithMetadata}
                   isLoading={isNoteBrowserLoading}
                   accent={activeNoteCollection.accent}
                   onOpenNote={handleBrowserOpenNote}

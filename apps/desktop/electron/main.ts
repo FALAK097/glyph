@@ -1979,12 +1979,18 @@ async function getNoteBrowserEntries(targetPath: string | null): Promise<NoteBro
       const stats = await fs.stat(filePath);
       const content = await fs.readFile(filePath, "utf8");
       const normalizedContent = content.replace(/\r\n?/g, "\n");
+      const { frontmatterText, body } = parseMarkdownFrontmatter(normalizedContent);
+      const frontmatter = parseKnowledgeFrontmatter(frontmatterText);
       const wordCount = normalizedContent.split(/\s+/).filter(Boolean).length;
+      const icon = typeof frontmatter.icon === "string" && frontmatter.icon.trim()
+        ? frontmatter.icon.trim()
+        : null;
 
       entries.push({
         path: filePath,
         title: getDisplayMarkdownFileName(filePath),
-        excerpt: extractNoteExcerpt(normalizedContent),
+        icon,
+        excerpt: extractNoteExcerpt(body),
         modifiedAt: stats.mtime.toISOString(),
         createdAt: stats.birthtime.toISOString(),
         sizeBytes: stats.size,

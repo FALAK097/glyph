@@ -11,12 +11,20 @@ import {
 import type { NoteBrowserEntry, NoteCollectionAccentKey } from "@/core/workspace";
 
 import {
+  BookIcon,
+  BriefcaseIcon,
+  CameraIcon,
   FileDownIcon,
+  HomeIcon,
+  IdeaIcon,
+  LeafIcon,
   LinkIcon,
   MoreVerticalIcon,
   PencilIcon,
   PinIcon,
   PinOffIcon,
+  RocketIcon,
+  SparklesIcon,
   TrashIcon,
   XIcon,
 } from "../icons";
@@ -124,6 +132,30 @@ type NotesBrowserPaneProps = {
 const SKELETON_COUNT = 5;
 const NOTE_BROWSER_DRAG_MIME = "application/x-glyph-note-browser-entry";
 let globalDraggedNotePath: string | null = null;
+
+const NOTE_ICON_RENDERERS = {
+  book: BookIcon,
+  camera: CameraIcon,
+  home: HomeIcon,
+  idea: IdeaIcon,
+  leaf: LeafIcon,
+  rocket: RocketIcon,
+  spark: SparklesIcon,
+  work: BriefcaseIcon,
+};
+
+function NoteEntryIcon({ icon }: { icon: string | null }) {
+  if (!icon || icon === "none") {
+    return null;
+  }
+
+  const Icon = NOTE_ICON_RENDERERS[icon as keyof typeof NOTE_ICON_RENDERERS];
+  if (!Icon) {
+    return null;
+  }
+
+  return <Icon size={14} className="mt-0.5 shrink-0 text-primary" />;
+}
 
 function getDropPosition(event: DragEvent<HTMLElement>) {
   const rect = event.currentTarget.getBoundingClientRect();
@@ -284,8 +316,11 @@ export function NotesBrowserPane({
                 >
                   <span className="min-w-0 flex-1">
                     <span className="flex items-start justify-between gap-2">
-                      <span className="line-clamp-1 min-w-0 text-sm font-medium text-foreground break-all">
-                        {entry.title}
+                      <span className="flex min-w-0 items-start gap-1.5">
+                        <NoteEntryIcon icon={entry.icon} />
+                        <span className="line-clamp-1 min-w-0 text-sm font-medium text-foreground break-all">
+                          {entry.title}
+                        </span>
                       </span>
                       <span className="flex h-5 shrink-0 items-center">
                         <DropdownMenu>

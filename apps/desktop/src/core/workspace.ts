@@ -118,6 +118,7 @@ export type NoteFolderAppearanceMap = Record<string, Partial<NoteFolderAppearanc
 export type NoteBrowserEntry = {
   path: string;
   title: string;
+  icon: string | null;
   excerpt: string;
   modifiedAt: string | null;
   createdAt: string | null;

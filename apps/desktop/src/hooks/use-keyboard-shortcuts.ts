@@ -36,6 +36,7 @@ type UseKeyboardShortcutsOptions = {
   editorScale: number;
   navigateBack: () => Promise<void>;
   navigateForward: () => Promise<void>;
+  toggleNoteContext: () => void;
 };
 
 export function useKeyboardShortcuts({
@@ -71,6 +72,7 @@ export function useKeyboardShortcuts({
   editorScale,
   navigateBack,
   navigateForward,
+  toggleNoteContext,
 }: UseKeyboardShortcutsOptions) {
   useEffect(() => {
     const onKeyDown = async (event: KeyboardEvent) => {
@@ -163,6 +165,7 @@ export function useKeyboardShortcuts({
 
       const globalShortcutIds = new Set([
         "toggle-sidebar",
+        "toggle-note-context",
         "command-palette",
         "find-in-note",
         "settings",
@@ -191,6 +194,9 @@ export function useKeyboardShortcuts({
         switch (globalShortcut.id) {
           case "toggle-sidebar":
             setIsSidebarCollapsed((prev) => !prev);
+            break;
+          case "toggle-note-context":
+            toggleNoteContext();
             break;
           case "command-palette":
             setIsPaletteOpen((value) => !value);
@@ -342,5 +348,6 @@ export function useKeyboardShortcuts({
     editorScale,
     navigateBack,
     navigateForward,
+    toggleNoteContext,
   ]);
 }

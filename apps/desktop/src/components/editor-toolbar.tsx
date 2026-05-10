@@ -64,6 +64,7 @@ type EditorToolbarProps = {
   onOpenSettings: (() => void) | undefined;
   isNoteContextOpen?: boolean;
   onToggleNoteContext?: (() => void) | undefined;
+  toggleNoteContextShortcut?: string | undefined;
   headerAccessory: React.ReactNode;
   content: string;
   documentLabel: string;
@@ -115,6 +116,7 @@ export function EditorToolbar({
   onOpenSettings,
   isNoteContextOpen = false,
   onToggleNoteContext,
+  toggleNoteContextShortcut,
   headerAccessory,
   content,
   documentLabel,
@@ -458,18 +460,21 @@ export function EditorToolbar({
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    className={`text-muted-foreground hover:text-foreground hover:bg-transparent ${
-                      isNoteContextOpen ? "text-primary hover:text-primary" : ""
+                    className={`text-muted-foreground transition-colors ${
+                      isNoteContextOpen ? "text-primary hover:text-primary/80 bg-primary/10" : "hover:text-foreground hover:bg-muted"
                     }`}
                     onClick={onToggleNoteContext}
                     aria-pressed={isNoteContextOpen}
-                    aria-label={isNoteContextOpen ? "Hide note context" : "Show note context"}
+                    aria-label={isNoteContextOpen ? "Hide properties panel" : "Open properties panel"}
                     type="button"
                   >
-                    <NotebookIcon size={16} />
+                    <PanelRightIcon size={16} />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="bottom">Note Context</TooltipContent>
+                <TooltipContent side="bottom">
+                  {isNoteContextOpen ? "Hide properties panel" : "Open properties panel"}
+                  {toggleNoteContextShortcut ? ` (${toggleNoteContextShortcut})` : ""}
+                </TooltipContent>
               </Tooltip>
             ) : null}
           </>

@@ -144,6 +144,9 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   // skillsController and setViewerMode are in scope.
   const onRestoreSkillRef = useRef<(path: string) => Promise<void>>(async () => {});
   const onRestoreTasksRef = useRef<() => void>(() => {});
+  const handleToggleNoteContext = useCallback(() => {
+    setNoteContextOpen(!useSessionStore.getState().isNoteContextOpen);
+  }, [setNoteContextOpen]);
 
   const controller = useDesktopAppController(glyph, {
     initialFilePath: initialNoteSessionRef.current.filePath,
@@ -152,6 +155,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     sessionReady: sessionHasHydrated,
     onRestoreSkill: useCallback((path: string) => onRestoreSkillRef.current(path), []),
     onRestoreTasks: useCallback(() => onRestoreTasksRef.current(), []),
+    onToggleNoteContext: handleToggleNoteContext,
   });
   const skillsController = useSkillLibraryController(glyph, {
     enabled: true,
@@ -1945,6 +1949,13 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       filePath={null}
       shouldShowCommandPalette={true}
       onOpenCommandPalette={handleOpenCommandPalette}
+      isNoteContextOpen={isNoteContextOpen}
+      onToggleNoteContext={handleToggleNoteContext}
+      toggleNoteContextShortcut={getShortcutDisplay(
+        controller.shortcuts,
+        "toggle-note-context",
+        navigator.platform,
+      )}
       commandPaletteShortcut={getShortcutDisplay(
         controller.shortcuts,
         "command-palette",
@@ -2019,6 +2030,13 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         navigator.platform,
       )}
       commandPaletteLabel="Search notes and skills"
+      isNoteContextOpen={isNoteContextOpen}
+      onToggleNoteContext={activeNoteFile ? handleToggleNoteContext : undefined}
+      toggleNoteContextShortcut={getShortcutDisplay(
+        controller.shortcuts,
+        "toggle-note-context",
+        navigator.platform,
+      )}
       isFocusMode={undefined}
       onToggleFocusMode={undefined}
       focusModeShortcut={undefined}
@@ -2033,8 +2051,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       isManualReleaseButton={false}
       headerPaddingClass={noteHeaderPaddingClass}
       onOpenSettings={handleOpenSettings}
-      isNoteContextOpen={isNoteContextOpen}
-      onToggleNoteContext={activeNoteFile ? () => setNoteContextOpen(!isNoteContextOpen) : undefined}
       headerAccessory={null}
       content={skillsController.draftContent}
       documentLabel="skill"
@@ -2113,6 +2129,13 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       isManualReleaseButton={noteUpdateStateFlags.isManualReleaseButton}
       headerPaddingClass={noteHeaderPaddingClass}
       onOpenSettings={handleOpenSettings}
+      isNoteContextOpen={isNoteContextOpen}
+      onToggleNoteContext={activeNoteFile ? handleToggleNoteContext : undefined}
+      toggleNoteContextShortcut={getShortcutDisplay(
+        controller.shortcuts,
+        "toggle-note-context",
+        navigator.platform,
+      )}
       headerAccessory={null}
       content={controller.draftContent}
       documentLabel="note"

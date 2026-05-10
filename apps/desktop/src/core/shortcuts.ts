@@ -23,7 +23,8 @@ export type ShortcutId =
   | "split-down"
   | "close-pane"
   | "focus-next-pane"
-  | "focus-previous-pane";
+  | "focus-previous-pane"
+  | "toggle-note-context";
 
 export type ShortcutDefinition = ShortcutSetting & {
   id: ShortcutId;
@@ -126,6 +127,11 @@ export const DEFAULT_SHORTCUTS: ShortcutDefinition[] = [
   { id: "save", label: "Save", keys: `${MODIFIER_TOKENS.cmdOrCtrl} S` },
   { id: "settings", label: "Settings", keys: `${MODIFIER_TOKENS.cmdOrCtrl} ,` },
   { id: "toggle-sidebar", label: "Toggle Sidebar", keys: `${MODIFIER_TOKENS.cmdOrCtrl} \\` },
+  {
+    id: "toggle-note-context",
+    label: "Toggle Note Context",
+    keys: `${MODIFIER_TOKENS.cmdOrCtrl} .`,
+  },
   {
     id: "navigate-back",
     label: "Navigate Back",

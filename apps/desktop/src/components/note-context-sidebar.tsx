@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { Popover } from "@base-ui/react/popover";
 import { parseDocument } from "yaml";
 
 import {
@@ -8,6 +9,7 @@ import {
 } from "@/core/frontmatter";
 import { getBaseName, getDirName } from "@/core/paths";
 import type { FileDocument } from "@/core/workspace";
+import { cn } from "@/core/utils";
 
 import {
   BookIcon,
@@ -114,14 +116,14 @@ const ICON_OPTIONS: IconOption[] = [
 ];
 
 const STATUS_TONE: Record<string, string> = {
-  "not started": "bg-muted text-muted-foreground",
-  active: "bg-primary/10 text-primary",
-  "in progress": "bg-primary/10 text-primary",
-  learning: "bg-accent text-accent-foreground",
-  blocked: "bg-destructive/10 text-destructive",
-  draft: "bg-muted text-foreground",
-  archived: "bg-muted text-muted-foreground",
-  paused: "bg-secondary text-secondary-foreground",
+  "not started": "text-muted-foreground",
+  active: "text-primary",
+  "in progress": "text-primary",
+  learning: "text-amber-500",
+  blocked: "text-destructive",
+  draft: "text-muted-foreground/80",
+  archived: "text-muted-foreground/60",
+  paused: "text-orange-500",
 };
 
 const TAG_TONES = [
@@ -142,6 +144,27 @@ const PROPERTY_TYPE_ICONS: Record<string, string> = {
   Text: "T",
   URL: "U",
 };
+
+type CalendarDay = {
+  day: number;
+  month: number;
+  year: number;
+};
+
+const MONTH_FORMATTER = new Intl.DateTimeFormat("en", { month: "long" });
+
+function formatDateForString(day: number, month: number, year: number) {
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function parseInputDate(dateString: string): CalendarDay | null {
+  if (!dateString) return null;
+  const parts = dateString.split("-").map(Number);
+  if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+    return { year: parts[0], month: parts[1] - 1, day: parts[2] };
+  }
+  return null;
+}
 
 function normalizeTag(input: string) {
   return input.trim().replace(/^#/, "").toLowerCase();
@@ -302,7 +325,7 @@ function FieldRow({
   children: ReactNode;
 }) {
   return (
-    <div className="group grid min-h-8 grid-cols-[18px_72px_minmax(0,1fr)] items-center gap-2 text-xs">
+    <div className="group grid min-h-[30px] grid-cols-[16px_68px_minmax(0,1fr)] items-center gap-2.5 px-1 text-[11px] leading-none">
       <span className="text-muted-foreground/75">{icon}</span>
       <span className="text-muted-foreground">{label}</span>
       <div className="min-w-0">{children}</div>
@@ -314,8 +337,48 @@ function CompactInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className={`h-7 w-full rounded-md border border-transparent bg-muted/70 px-2 text-xs text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/40 focus:bg-background ${props.className ?? ""}`}
+      className={`h-7 w-full rounded-md border border-transparent bg-transparent px-1.5 text-xs text-foreground outline-none transition-colors placeholder:text-muted-foreground/50 hover:bg-muted/30 focus:border-primary/20 focus:bg-muted/50 ${props.className ?? ""}`}
     />
+  );
+}
+
+function BasePopover({
+  open,
+  onOpenChange,
+  trigger,
+  children,
+  className,
+  align = "end",
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  trigger: React.ReactElement;
+  children: ReactNode;
+  className?: string;
+  align?: "start" | "center" | "end";
+}) {
+  return (
+    <Popover.Root open={open} onOpenChange={onOpenChange}>
+      <Popover.Trigger render={trigger} />
+      <Popover.Portal>
+        <Popover.Positioner
+          side="bottom"
+          align={align}
+          sideOffset={4}
+          className="isolate z-50 outline-none"
+        >
+          <Popover.Popup
+            className={cn(
+              "z-50 max-h-(--available-height) min-w-[200px] max-w-[calc(100vw-24px)] origin-(--transform-origin) overflow-hidden rounded-md bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/10 duration-100 outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+              "dark:bg-popover/90 dark:backdrop-blur-2xl",
+              className,
+            )}
+          >
+            {children}
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
@@ -327,6 +390,7 @@ function OptionPicker({
   allowCreate = true,
   onChange,
   renderTrigger,
+  align = "end",
 }: {
   value: string;
   options: SelectOption[];
@@ -335,6 +399,7 @@ function OptionPicker({
   allowCreate?: boolean;
   onChange: (value: string) => void;
   renderTrigger?: (option: SelectOption | null) => ReactNode;
+  align?: "start" | "center" | "end";
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -349,87 +414,212 @@ function OptionPicker({
   };
 
   return (
-    <div
-      className="relative min-w-0"
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) {
-          setOpen(false);
-          setQuery("");
-        }
+    <BasePopover
+      align={align}
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (!nextOpen) setQuery("");
       }}
+      trigger={
+        <button
+          type="button"
+          className="flex h-7 w-full min-w-0 items-center justify-between gap-1 rounded-md border border-transparent bg-transparent px-1 text-left text-xs text-foreground transition-colors hover:bg-muted/50 focus:border-primary/20 focus:bg-muted/50 focus:outline-none"
+        >
+          <span className="min-w-0 truncate">
+            {renderTrigger ? renderTrigger(selected) : selected?.label || value || placeholder}
+          </span>
+          <ArrowDownIcon size={11} className="shrink-0 opacity-40" />
+        </button>
+      }
     >
-      <button
-        type="button"
-        className="flex h-7 w-full min-w-0 items-center justify-between gap-1 rounded-md border border-transparent bg-muted/70 px-2 text-left text-xs text-foreground transition-colors hover:bg-muted focus:border-primary/40 focus:bg-background focus:outline-none"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span className="min-w-0 truncate">
-          {renderTrigger ? renderTrigger(selected) : selected?.label || value || placeholder}
-        </span>
-        <ArrowDownIcon size={12} className="shrink-0 text-muted-foreground" />
-      </button>
-      {open ? (
-        <div className="absolute right-0 top-[calc(100%+4px)] z-30 w-[220px] overflow-hidden rounded-md border border-border bg-background shadow-lg">
-          <div className="flex items-center gap-1 border-b border-border px-2 py-1.5">
-            <SearchIcon size={12} className="text-muted-foreground" />
-            <input
-              autoFocus
-              value={query}
-              placeholder={searchPlaceholder}
-              className="h-6 min-w-0 flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  setOpen(false);
-                  setQuery("");
-                }
-                if (event.key === "Enter") {
-                  const first = filteredOptions[0];
-                  selectValue(first?.value ?? query.trim());
-                }
-              }}
-            />
-          </div>
-          <div className="max-h-52 overflow-y-auto py-1" role="listbox">
-            {filteredOptions.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs text-foreground transition-colors hover:bg-muted"
-                role="option"
-                aria-selected={option.value === value}
-                onClick={() => selectValue(option.value)}
-              >
-                <span className="grid h-4 w-4 shrink-0 place-items-center text-[10px] text-muted-foreground">
-                  {option.value === value ? <TickIcon size={12} /> : option.icon}
-                </span>
-                <span className={`min-w-0 truncate ${option.className ?? ""}`}>{option.label}</span>
-              </button>
-            ))}
-            {showCreate ? (
-              <>
-                {filteredOptions.length > 0 ? <div className="my-1 h-px bg-border" /> : null}
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted"
-                  onClick={() => selectValue(query.trim())}
-                >
-                  <PlusIcon size={12} />
-                  <span className="truncate">Create {query.trim()}</span>
-                </button>
-              </>
-            ) : null}
-            {filteredOptions.length === 0 && !showCreate ? (
-              <div className="px-2 py-3 text-center text-xs text-muted-foreground">No matches</div>
-            ) : null}
-          </div>
+      <div className="flex w-[220px] flex-col overflow-hidden">
+        <div className="flex items-center gap-1.5 border-b border-border/40 px-2.5 py-2">
+          <SearchIcon size={12} className="text-muted-foreground/60" />
+          <input
+            autoFocus
+            value={query}
+            placeholder={searchPlaceholder}
+            className="h-5 min-w-0 flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/50"
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                setOpen(false);
+              }
+              if (event.key === "Enter") {
+                const first = filteredOptions[0];
+                selectValue(first?.value ?? query.trim());
+              }
+            }}
+          />
         </div>
-      ) : null}
-    </div>
+        <div className="max-h-64 overflow-y-auto p-1" role="listbox">
+          {filteredOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={cn(
+                "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs text-foreground transition-colors",
+                option.value === value ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted",
+              )}
+              role="option"
+              aria-selected={option.value === value}
+              onClick={() => selectValue(option.value)}
+            >
+              <span className="grid h-3.5 w-3.5 shrink-0 place-items-center text-muted-foreground">
+                {option.value === value ? <TickIcon size={12} className="text-primary" /> : option.icon}
+              </span>
+              <span className={`min-w-0 truncate ${option.className ?? ""}`}>{option.label}</span>
+            </button>
+          ))}
+          {showCreate ? (
+            <>
+              {filteredOptions.length > 0 ? <div className="my-1 h-px bg-border/40" /> : null}
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted"
+                onClick={() => selectValue(query.trim())}
+              >
+                <PlusIcon size={12} />
+                <span className="truncate">Create "{query.trim()}"</span>
+              </button>
+            </>
+          ) : null}
+          {filteredOptions.length === 0 && !showCreate ? (
+            <div className="px-2 py-3 text-center text-[11px] text-muted-foreground/60 italic">
+              No matches
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </BasePopover>
   );
 }
+function DatePicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (nextValue: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const parsedDay = useMemo(() => parseInputDate(value), [value]);
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    if (parsedDay) return new Date(parsedDay.year, parsedDay.month, 1);
+    return new Date();
+  });
+
+  const today = useMemo(() => {
+    const current = new Date();
+    return { day: current.getDate(), month: current.getMonth(), year: current.getFullYear() };
+  }, []);
+
+  const year = calendarMonth.getFullYear();
+  const month = calendarMonth.getMonth();
+  const firstWeekday = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthLabel = MONTH_FORMATTER.format(calendarMonth);
+
+  const emptyCells = Array.from({ length: firstWeekday }, (_, index) => index);
+
+  const handleShiftMonth = (offset: number) => {
+    setCalendarMonth((current) => {
+      const next = new Date(current);
+      next.setMonth(current.getMonth() + offset, 1);
+      return next;
+    });
+  };
+
+  const handleSelectDay = (day: number) => {
+    onChange(formatDateForString(day, month, year));
+    setOpen(false);
+  };
+
+  return (
+    <BasePopover
+      open={open}
+      onOpenChange={setOpen}
+      trigger={
+        <button
+          type="button"
+          className="flex h-7 w-full min-w-0 items-center justify-between gap-1 rounded-md border border-transparent bg-transparent px-1 text-left text-xs text-foreground transition-colors hover:bg-muted/50 focus:border-primary/20 focus:bg-muted/50 focus:outline-none"
+        >
+          <span className="min-w-0 truncate text-muted-foreground/70">
+            {value || "Set date..."}
+          </span>
+          <CalendarIcon size={11} className="shrink-0 opacity-40" />
+        </button>
+      }
+    >
+      <div className="w-52 p-2.5">
+        <div className="mb-2.5 flex items-center justify-between px-1">
+          <button
+            type="button"
+            onClick={() => handleShiftMonth(-1)}
+            className="grid h-6 w-6 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            <span className="text-xs font-bold">‹</span>
+          </button>
+          <span className="text-[11px] font-semibold tracking-tight text-foreground">
+            {monthLabel} {year}
+          </span>
+          <button
+            type="button"
+            onClick={() => handleShiftMonth(1)}
+            className="grid h-6 w-6 place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            <span className="text-xs font-bold">›</span>
+          </button>
+        </div>
+        <div className="mb-1.5 grid grid-cols-7 gap-px text-center text-[10px] font-medium text-muted-foreground/60">
+          {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+            <span key={d}>{d}</span>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-0.5 text-center">
+          {emptyCells.map((i) => (
+            <div key={`empty-${i}`} className="h-6" />
+          ))}
+          {Array.from({ length: daysInMonth }, (_, i) => i + 1).map((day) => {
+            const isToday = today.day === day && today.month === month && today.year === year;
+            const isSelected =
+              parsedDay?.day === day && parsedDay.month === month && parsedDay.year === year;
+            return (
+              <button
+                key={day}
+                type="button"
+                onClick={() => handleSelectDay(day)}
+                className={cn(
+                  "h-6 w-full rounded-md text-[10px] transition-colors font-medium",
+                  isSelected
+                    ? "bg-primary text-primary-foreground"
+                    : isToday
+                      ? "bg-primary/15 text-primary hover:bg-primary/25"
+                      : "hover:bg-muted text-foreground/80 hover:text-foreground",
+                )}
+              >
+                {day}
+              </button>
+            );
+          })}
+        </div>
+        {value && (
+          <button
+            type="button"
+            onClick={() => {
+              onChange("");
+              setOpen(false);
+            }}
+            className="mt-2.5 w-full rounded-md border border-border/40 bg-muted/10 py-1.5 text-[10px] font-medium text-muted-foreground/80 hover:bg-muted hover:text-foreground transition-colors"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+    </BasePopover>
+  );
+}
+
 
 function TagPill({ tag, onRemove }: { tag: string; onRemove?: () => void }) {
   return (
@@ -473,85 +663,85 @@ function TagPicker({
     !options.some((tag) => tag.toLowerCase() === query.trim().toLowerCase());
 
   return (
-    <div
-      className="relative"
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) {
-          setOpen(false);
-          setQuery("");
-        }
+    <BasePopover
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen);
+        if (!nextOpen) setQuery("");
       }}
+      trigger={
+        <button
+          type="button"
+          className="grid h-5 w-5 place-items-center rounded-full bg-muted/50 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+          aria-label="Add tag"
+        >
+          <PlusIcon size={12} />
+        </button>
+      }
     >
-      <button
-        type="button"
-        className="text-muted-foreground transition-colors hover:text-primary"
-        aria-label="Add tag"
-        onClick={() => setOpen((current) => !current)}
-      >
-        <PlusIcon size={13} />
-      </button>
-      {open ? (
-        <div className="absolute right-0 top-[calc(100%+6px)] z-30 w-52 overflow-hidden rounded-md border border-border bg-background shadow-lg">
-          <div className="flex items-center gap-1 border-b border-border px-2 py-1.5">
-            <SearchIcon size={12} className="text-muted-foreground" />
-            <input
-              autoFocus
-              value={query}
-              placeholder="Type tag..."
-              className="h-6 min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") setOpen(false);
-                if (event.key === "Enter" && query.trim()) {
+      <div className="flex w-56 flex-col overflow-hidden">
+        <div className="flex items-center gap-1.5 border-b border-border/40 px-2.5 py-2">
+          <SearchIcon size={12} className="text-muted-foreground/60" />
+          <input
+            autoFocus
+            value={query}
+            placeholder="Type tag..."
+            className="h-5 min-w-0 flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground/50"
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") setOpen(false);
+              if (event.key === "Enter" && query.trim()) {
+                onToggle(query.trim());
+                setQuery("");
+              }
+            }}
+          />
+        </div>
+        <div className="max-h-56 overflow-y-auto p-1">
+          {filtered.length > 0 ? (
+            <div>
+              <div className="px-2 py-1.5 text-[9px] font-semibold text-muted-foreground/60 uppercase tracking-wider">
+                Known Tags
+              </div>
+              {filtered.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left transition-colors hover:bg-muted"
+                  onClick={() => onToggle(tag)}
+                >
+                  <span className="grid w-3.5 shrink-0 place-items-center text-primary">
+                    {selected.has(tag) ? <TickIcon size={12} /> : null}
+                  </span>
+                  <TagPill tag={tag} />
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {showCreate ? (
+            <>
+              {filtered.length > 0 ? <div className="my-1 h-px bg-border/40" /> : null}
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs text-foreground transition-colors hover:bg-muted"
+                onClick={() => {
                   onToggle(query.trim());
                   setQuery("");
-                }
-              }}
-            />
-          </div>
-          <div className="max-h-52 overflow-y-auto py-1">
-            {filtered.length > 0 ? (
-              <div>
-                <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground">
-                  From vault
-                </div>
-                {filtered.map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    className="flex w-full items-center gap-2 px-2 py-1.5 text-left transition-colors hover:bg-muted"
-                    onClick={() => onToggle(tag)}
-                  >
-                    <span className="grid w-3 place-items-center text-primary">
-                      {selected.has(tag) ? <TickIcon size={11} /> : null}
-                    </span>
-                    <TagPill tag={tag} />
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            {showCreate ? (
-              <>
-                {filtered.length > 0 ? <div className="my-1 h-px bg-border" /> : null}
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted"
-                  onClick={() => {
-                    onToggle(query.trim());
-                    setQuery("");
-                  }}
-                >
-                  Create <TagPill tag={query.trim()} />
-                </button>
-              </>
-            ) : null}
-            {filtered.length === 0 && !showCreate ? (
-              <div className="px-2 py-3 text-center text-xs text-muted-foreground">No tags</div>
-            ) : null}
-          </div>
+                }}
+              >
+                <span className="text-muted-foreground">Create</span>
+                <TagPill tag={query.trim()} />
+              </button>
+            </>
+          ) : null}
+          {filtered.length === 0 && !showCreate ? (
+            <div className="px-2 py-3 text-center text-[11px] text-muted-foreground/60 italic">
+              No matching tags
+            </div>
+          ) : null}
         </div>
-      ) : null}
-    </div>
+      </div>
+    </BasePopover>
   );
 }
 
@@ -608,9 +798,13 @@ function PropertyValueEditor({
     );
   }
 
+  if (type === "Date") {
+    return <DatePicker value={value} onChange={onChange} />;
+  }
+
   return (
     <CompactInput
-      type={type === "Number" ? "number" : type === "Date" ? "date" : type === "URL" ? "url" : "text"}
+      type={type === "Number" ? "number" : type === "URL" ? "url" : "text"}
       value={value}
       placeholder="Value"
       onChange={(event) => onChange(event.target.value)}
@@ -629,7 +823,6 @@ export function NoteContextSidebar({
   const [newProperty, setNewProperty] = useState({ name: "", type: "Text", value: "" });
   const [newRelation, setNewRelation] = useState({ name: "Related to", note: "" });
   const [showAddProperty, setShowAddProperty] = useState(false);
-  const [editingRelationship, setEditingRelationship] = useState<string | null>(null);
 
   const parsed = useMemo(() => parseMarkdownFrontmatter(draftContent), [draftContent]);
   const frontmatter = useMemo(
@@ -669,16 +862,17 @@ export function NoteContextSidebar({
     icon: type === "None" ? <FileIcon size={12} /> : <SparklesIcon size={12} />,
     className: type === "None" ? "text-muted-foreground" : "text-primary",
   }));
-  const statusOptions = knownStatuses.map((status) => ({
-    value: status,
-    label: status,
-    icon: (
-      <span
-        className={`h-1.5 w-1.5 rounded-full ${STATUS_TONE[status.toLowerCase()] ?? "bg-muted"}`}
-      />
-    ),
-    className: STATUS_TONE[status.toLowerCase()] ?? "bg-muted text-foreground",
-  }));
+  const statusOptions = knownStatuses.map((status) => {
+    const textClass = STATUS_TONE[status.toLowerCase()] ?? "text-muted-foreground";
+    // Transform 'text-blue-500' into 'bg-blue-500' to style the dot.
+    const bgClass = textClass.replace("text-", "bg-");
+    return {
+      value: status,
+      label: status,
+      icon: <span className={cn("h-1.5 w-1.5 rounded-full", bgClass)} />,
+      className: textClass,
+    };
+  });
   const iconOptions = ICON_OPTIONS.map((option) => ({
     value: option.key,
     label: option.label,
@@ -757,11 +951,9 @@ export function NoteContextSidebar({
               searchPlaceholder="Search types..."
               onChange={(value) => updateFrontmatter({ type: value === "None" ? "" : value })}
               renderTrigger={(option) => (
-                <span
-                  className={`inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${option?.className ?? "bg-primary/10 text-primary"}`}
-                >
-                  {option?.icon}
-                  <span className="truncate">{option?.label ?? model.type}</span>
+                <span className="inline-flex items-center gap-1.5 text-foreground/80">
+                  <span className="opacity-70">{option?.icon}</span>
+                  <span className="truncate font-medium">{option?.label ?? model.type}</span>
                 </span>
               )}
             />
@@ -778,11 +970,11 @@ export function NoteContextSidebar({
               searchPlaceholder="Type status..."
               onChange={(value) => updateFrontmatter({ status: value === "None" ? "" : value })}
               renderTrigger={(option) => (
-                <span
-                  className={`inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${option?.className ?? "bg-muted text-foreground"}`}
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                  <span className="truncate">{option?.label ?? model.status}</span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className={cn("h-1.5 w-1.5 rounded-full bg-current", option?.className?.replace('text-', 'bg-') || 'bg-muted-foreground')} />
+                  <span className={cn("truncate font-medium", option?.className || "text-foreground/80")}>
+                    {option?.label ?? model.status}
+                  </span>
                 </span>
               )}
             />
@@ -806,10 +998,9 @@ export function NoteContextSidebar({
           </FieldRow>
 
           <FieldRow icon={<CalendarIcon size={13} />} label="Date">
-            <CompactInput
-              type="date"
+            <DatePicker
               value={model.date}
-              onChange={(event) => updateFrontmatter({ date: event.target.value })}
+              onChange={(nextDate) => updateFrontmatter({ date: nextDate })}
             />
           </FieldRow>
 
@@ -821,12 +1012,108 @@ export function NoteContextSidebar({
               onChange={(event) => updateFrontmatter({ url: event.target.value })}
             />
           </FieldRow>
+
+          {/* Inline Custom Properties following URL */}
+          {model.customProperties.map((property, index) => (
+            <FieldRow
+              key={`${property.name}-${index}`}
+              icon={<span>{PROPERTY_TYPE_ICONS[property.type] ?? "T"}</span>}
+              label={property.name}
+            >
+              <div className="flex min-w-0 items-center gap-1">
+                <PropertyValueEditor
+                  type={property.type}
+                  value={property.value}
+                  statusOptions={statusOptions}
+                  tagOptions={knownTags}
+                  onChange={(value) => {
+                    const nextProperties = model.customProperties.map((entry, propertyIndex) =>
+                      propertyIndex === index ? { ...entry, value } : entry,
+                    );
+                    updateFrontmatter({ properties: nextProperties });
+                  }}
+                />
+                <button
+                  type="button"
+                  className="grid h-7 w-6 shrink-0 place-items-center text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                  aria-label={`Delete ${property.name}`}
+                  onClick={() =>
+                    updateFrontmatter({
+                      properties: model.customProperties.filter(
+                        (_entry, propertyIndex) => propertyIndex !== index,
+                      ),
+                    })
+                  }
+                >
+                  x
+                </button>
+              </div>
+            </FieldRow>
+          ))}
+
+          {!showAddProperty ? (
+            <button
+              type="button"
+              className="flex h-7 w-full items-center gap-2 px-1.5 text-left text-xs text-muted-foreground/50 transition-colors hover:text-muted-foreground"
+              onClick={() => setShowAddProperty(true)}
+            >
+              <PlusIcon size={12} />
+              <span>Add property</span>
+            </button>
+          ) : (
+            <div className="grid grid-cols-[1fr_auto] gap-1.5 items-start mt-1 border border-border/30 p-1.5 rounded-md bg-muted/10">
+              <div className="grid grid-cols-2 gap-1.5">
+                <CompactInput
+                  value={newProperty.name}
+                  placeholder="Property name"
+                  autoFocus
+                  onChange={(event) =>
+                    setNewProperty((current) => ({ ...current, name: event.target.value }))
+                  }
+                />
+                <OptionPicker
+                  value={newProperty.type}
+                  options={propertyTypeOptions}
+                  placeholder="Type"
+                  searchPlaceholder="Type..."
+                  allowCreate={false}
+                  onChange={(value) => setNewProperty((current) => ({ ...current, type: value }))}
+                  renderTrigger={(option) => (
+                    <span className="inline-flex items-center gap-1 truncate">
+                      {option?.icon}
+                      {option?.label ?? newProperty.type}
+                    </span>
+                  )}
+                />
+              </div>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  className="grid h-7 w-7 place-items-center rounded-md bg-primary/10 text-primary hover:bg-primary/20"
+                  disabled={!newProperty.name.trim()}
+                  onClick={() => {
+                    addCustomProperty();
+                    setShowAddProperty(false);
+                  }}
+                >
+                  <TickIcon size={13} />
+                </button>
+                <button
+                  type="button"
+                  className="grid h-7 w-7 place-items-center rounded-md hover:bg-muted text-muted-foreground"
+                  onClick={() => setShowAddProperty(false)}
+                >
+                  <XIcon size={12} />
+                </button>
+              </div>
+            </div>
+          )}
         </section>
 
-        <div className="my-4 h-px bg-border/70" />
+        <div className="my-3 h-px bg-border/30" />
 
         <section>
-          <div className="mb-2 flex items-center justify-between gap-2 text-[11px] font-medium text-muted-foreground">
+          <div className="mb-2 flex items-center justify-between gap-2 text-[11px] font-medium text-muted-foreground/70">
             <span className="flex items-center gap-1.5">
               <DiscountTagIcon size={12} />
               Tags
@@ -845,7 +1132,7 @@ export function NoteContextSidebar({
               }}
             />
           </div>
-          <div className="mb-2 flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1.5 min-h-[24px]">
             {model.tags.length > 0 ? (
               model.tags.map((tag) => (
                 <TagPill
@@ -857,186 +1144,65 @@ export function NoteContextSidebar({
                 />
               ))
             ) : (
-              <span className="text-xs text-muted-foreground">No tags</span>
+              <span className="text-[10px] text-muted-foreground/40 italic">No tags yet</span>
             )}
           </div>
-          {model.suggestedTags.length > 0 ? (
-            <div className="mt-2 flex flex-wrap gap-1">
+          {model.suggestedTags.length > 0 && (
+            <div className="mt-2 pt-2 border-t border-border/20 flex flex-wrap gap-1">
+              <span className="w-full text-[9px] text-muted-foreground/60 uppercase tracking-wider">Suggested</span>
               {model.suggestedTags.map((tag) => (
                 <button
                   key={tag}
                   type="button"
-                  className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:text-primary"
+                  className="rounded px-1.5 py-0.5 text-[10px] text-muted-foreground/70 bg-muted/50 transition-colors hover:bg-muted hover:text-foreground"
                   onClick={() => addTag(tag)}
                 >
                   + {tag}
                 </button>
               ))}
             </div>
-          ) : null}
-        </section>
-
-        <div className="my-4 h-px bg-border/70" />
-
-        <section>
-          <div className="mb-2 text-[11px] font-medium text-muted-foreground">Properties</div>
-          <div className="space-y-1.5">
-            {model.customProperties.map((property, index) => (
-              <FieldRow
-                key={`${property.name}-${index}`}
-                icon={<span>{PROPERTY_TYPE_ICONS[property.type] ?? "T"}</span>}
-                label={property.name}
-              >
-                <div className="flex min-w-0 items-center gap-1">
-                  <PropertyValueEditor
-                    type={property.type}
-                  value={property.value}
-                    statusOptions={statusOptions}
-                    tagOptions={knownTags}
-                    onChange={(value) => {
-                      const nextProperties = model.customProperties.map((entry, propertyIndex) =>
-                        propertyIndex === index ? { ...entry, value } : entry,
-                      );
-                      updateFrontmatter({ properties: nextProperties });
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="grid h-7 w-6 shrink-0 place-items-center text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
-                    aria-label={`Delete ${property.name}`}
-                    onClick={() =>
-                      updateFrontmatter({
-                        properties: model.customProperties.filter(
-                          (_entry, propertyIndex) => propertyIndex !== index,
-                        ),
-                      })
-                    }
-                  >
-                    x
-                  </button>
-                </div>
-              </FieldRow>
-            ))}
-          </div>
-          {!showAddProperty ? (
-            <button
-              type="button"
-              className="mt-2 flex h-7 w-full items-center gap-2 rounded-md px-1.5 text-left text-xs text-muted-foreground/60 transition-colors hover:bg-muted hover:text-muted-foreground"
-              onClick={() => setShowAddProperty(true)}
-            >
-              <PlusIcon size={12} />
-              Add property
-            </button>
-          ) : (
-            <div className="mt-2 grid grid-cols-[minmax(0,1fr)_86px_minmax(0,1fr)_28px_28px] gap-1.5">
-              <CompactInput
-                value={newProperty.name}
-                placeholder="Property"
-                autoFocus
-                onChange={(event) =>
-                  setNewProperty((current) => ({ ...current, name: event.target.value }))
-                }
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") setShowAddProperty(false);
-                  if (event.key === "Enter" && newProperty.name.trim()) addCustomProperty();
-                }}
-              />
-              <OptionPicker
-                value={newProperty.type}
-                options={propertyTypeOptions}
-                placeholder="Type"
-                searchPlaceholder="Type..."
-                allowCreate={false}
-                onChange={(value) => setNewProperty((current) => ({ ...current, type: value }))}
-                renderTrigger={(option) => (
-                  <span className="inline-flex items-center gap-1">
-                    {option?.icon}
-                    {option?.label ?? newProperty.type}
-                  </span>
-                )}
-              />
-              <PropertyValueEditor
-                type={newProperty.type}
-                value={newProperty.value}
-                statusOptions={statusOptions}
-                tagOptions={knownTags}
-                onChange={(value) => setNewProperty((current) => ({ ...current, value }))}
-              />
-              <button
-                type="button"
-                className="grid h-7 place-items-center rounded-md bg-primary text-primary-foreground disabled:bg-muted disabled:text-muted-foreground"
-                disabled={!newProperty.name.trim()}
-                onClick={() => {
-                  addCustomProperty();
-                  setShowAddProperty(false);
-                }}
-                aria-label="Add property"
-              >
-                <TickIcon size={13} />
-              </button>
-              <button
-                type="button"
-                className="grid h-7 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:text-foreground"
-                onClick={() => setShowAddProperty(false)}
-                aria-label="Cancel property"
-              >
-                <XIcon size={12} />
-              </button>
-            </div>
           )}
         </section>
 
-        <div className="my-4 h-px bg-border/70" />
+        <div className="my-3 h-px bg-border/30" />
 
         <section>
-          <div className="mb-2 text-[11px] font-medium text-muted-foreground">Relationships</div>
-          <div className="space-y-2">
-            {DEFAULT_RELATIONSHIPS.map((relationshipName) => (
-              <div key={relationshipName}>
-                <div className="mb-1 text-[11px] text-muted-foreground">{relationshipName}</div>
-                {editingRelationship === relationshipName ? (
-                  <div className="grid grid-cols-[minmax(0,1fr)_28px] gap-1.5">
-                    <OptionPicker
-                      value=""
-                      options={noteTitleOptions}
-                      placeholder="Add note title"
-                      searchPlaceholder="Search notes..."
-                      onChange={(value) => {
-                        addRelationship(relationshipName, value);
-                        setEditingRelationship(null);
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="grid h-7 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:text-foreground"
-                      onClick={() => setEditingRelationship(null)}
-                      aria-label="Cancel relationship"
-                    >
-                      <XIcon size={12} />
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    className="h-7 w-full rounded-md border border-dashed border-border bg-background px-2 text-left text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
-                    onClick={() => setEditingRelationship(relationshipName)}
-                  >
-                    Add
-                  </button>
-                )}
-              </div>
-            ))}
+          <div className="mb-2 text-[11px] font-medium text-muted-foreground/70">Relationships</div>
+          <div className="space-y-1">
             {model.relationships.map((relationship, index) => (
               <div
                 key={`${relationship.name}-${relationship.note}-${index}`}
-                className="flex items-center justify-between gap-2 rounded-md bg-muted px-2 py-1.5 text-xs"
+                className="group grid grid-cols-[80px_minmax(0,1fr)_20px] gap-2 items-center p-1 rounded-md transition-colors hover:bg-muted/40 min-h-8"
               >
-                <span className="min-w-0 truncate text-muted-foreground">{relationship.name}</span>
-                <span className="min-w-0 truncate text-foreground">{relationship.note}</span>
+                <span className="truncate text-[10px] font-medium text-muted-foreground/70 px-1">
+                  {relationship.name}
+                </span>
+                <div className="truncate text-xs text-foreground/90 flex items-center gap-1.5">
+                  <FileIcon size={12} className="opacity-50 shrink-0" />
+                  <span className="truncate font-medium">{relationship.note}</span>
+                </div>
+                <button
+                  type="button"
+                  className="opacity-0 group-hover:opacity-100 grid h-5 w-5 place-items-center text-muted-foreground hover:text-destructive transition-opacity"
+                  aria-label="Remove relationship"
+                  onClick={() =>
+                    updateFrontmatter({
+                      relationships: model.relationships.filter((_, i) => i !== index),
+                    })
+                  }
+                >
+                  <XIcon size={12} />
+                </button>
               </div>
             ))}
-            <div className="grid grid-cols-[100px_minmax(0,1fr)_28px] gap-1.5">
+
+            {model.relationships.length === 0 && (
+               <div className="text-[10px] text-muted-foreground/40 italic px-1 mb-1">No relationships defined</div>
+            )}
+
+            <div className="mt-2 grid grid-cols-[85px_minmax(0,1fr)_28px] gap-1.5 items-center">
               <OptionPicker
+                align="start"
                 value={newRelation.name}
                 options={Array.from(
                   new Set([
@@ -1044,23 +1210,22 @@ export function NoteContextSidebar({
                     ...model.relationships.map((relationship) => relationship.name),
                   ]),
                 ).map((name) => ({ value: name, label: name }))}
-                placeholder="Relation"
-                searchPlaceholder="Relation..."
+                placeholder="Rel..."
+                searchPlaceholder="Search type..."
                 onChange={(value) => setNewRelation((current) => ({ ...current, name: value }))}
               />
               <OptionPicker
                 value={newRelation.note}
                 options={noteTitleOptions}
-                placeholder="Note title"
+                placeholder="Pick note..."
                 searchPlaceholder="Search notes..."
                 onChange={(value) => setNewRelation((current) => ({ ...current, note: value }))}
               />
               <button
                 type="button"
-                className="grid h-7 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:text-primary disabled:opacity-50"
+                className="grid h-7 w-7 place-items-center rounded-md border border-border/50 text-muted-foreground hover:text-primary hover:border-primary/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 disabled={!newRelation.name.trim() || !newRelation.note.trim()}
                 onClick={() => addRelationship(newRelation.name, newRelation.note)}
-                aria-label="Add relationship"
               >
                 <PlusIcon size={13} />
               </button>

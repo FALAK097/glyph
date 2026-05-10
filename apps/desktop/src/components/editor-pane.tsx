@@ -218,15 +218,7 @@ export const EditorPane = memo(function EditorPane({ paneId }: EditorPaneProps) 
         footerMetaLabel={footerMetaLabel}
         wordCount={wordCount}
         readingTime={readingTime}
-        topContent={
-          parsedContent.frontmatterText ? (
-            <FrontmatterBlock
-              value={parsedContent.frontmatterText}
-              isEditable={isEditorEditable}
-              onChange={handleFrontmatterChange}
-            />
-          ) : null
-        }
+        topContent={null}
         subheaderContent={
           noteTabItems.length > 0 ? (
             <NoteTabsBar

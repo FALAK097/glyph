@@ -11,10 +11,10 @@ import { countGroupedSkills, groupSkillsForBrowse } from "@/core/skill-groups";
 import { getShortcutDisplay } from "@/core/shortcuts";
 import { SKILL_AGENT_CATALOG } from "@/core/skill-agent-catalog";
 import type {
+  DirectoryNode,
   NoteCollectionAccentKey,
   NoteCollectionIconKey,
   NoteBrowserEntry,
-  ThemeMode,
   TabMovePosition,
 } from "@/core/workspace";
 import { useLayoutStore } from "@/store/layout";
@@ -52,6 +52,21 @@ import { TooltipProvider } from "./ui/tooltip";
 import { useUpdateStateFlags } from "./update-notification";
 
 import { matchesPaletteQuery, matchesSkillPaletteFallback } from "./desktop-app/palette-utils";
+
+function collectNoteTitles(nodes: DirectoryNode[]): string[] {
+  const titles = new Set<string>();
+  const visit = (node: DirectoryNode) => {
+    if (node.type === "file") {
+      if (/\.md$/i.test(node.name)) {
+        titles.add(node.name.replace(/\.md$/i, ""));
+      }
+      return;
+    }
+    node.children.forEach(visit);
+  };
+  nodes.forEach(visit);
+  return Array.from(titles).sort((left, right) => left.localeCompare(right));
+}
 
 export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const sessionHasHydrated = useSessionStore((state) => state.hasHydrated);
@@ -335,6 +350,10 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     setSelectedNoteCollectionPath,
     setLastNotePathForCollection,
   ]);
+  const noteTitleSuggestions = useMemo(
+    () => collectNoteTitles(controller.visibleSidebarNodes.map((entry) => entry.node)),
+    [controller.visibleSidebarNodes],
+  );
   const currentNoteDisplayName = useMemo(
     () => (controller.activeFile ? getDisplayFileName(controller.activeFile.name) : ""),
     [controller.activeFile],
@@ -1890,6 +1909,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         activeFile={activeNoteFile}
         draftContent={controller.draftContent}
         rootPath={workspaceRootPath}
+        noteTitleSuggestions={noteTitleSuggestions}
         onClose={() => setNoteContextOpen(false)}
         onUpdateContent={controller.updateDraftContent}
       />

@@ -336,13 +336,16 @@ body {
   background: var(--accent);
 }
 
-.tiptap-editor a {
+.tiptap-editor a,
+.tiptap-editor .wiki-link {
   color: var(--editor-link);
+  cursor: pointer;
   text-decoration-thickness: 1.5px;
   text-decoration-color: color-mix(in oklch, var(--editor-link) 46%, transparent);
 }
 
-.tiptap-editor a:hover {
+.tiptap-editor a:hover,
+.tiptap-editor .wiki-link:hover {
   color: color-mix(in oklch, var(--editor-link) 88%, var(--foreground) 12%);
 }
 

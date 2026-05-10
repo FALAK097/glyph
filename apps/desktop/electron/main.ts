@@ -847,6 +847,54 @@ async function resolveWorkspaceMarkdownTarget(target: string) {
   return null;
 }
 
+function parseWikiLinkHref(href: string) {
+  const wikiMatch = href.match(/^!?\[\[([^\]\n]+)\]\]$/);
+  const rawTarget = wikiMatch?.[1] ?? (href.startsWith("wiki:") ? href.slice(5) : "");
+  if (!rawTarget.trim()) {
+    return null;
+  }
+
+  const [target] = rawTarget.split("|").map((part) => part.trim());
+  return target || null;
+}
+
+function normalizeWikiTargetName(value: string) {
+  return value
+    .replace(MARKDOWN_PREVIEW_SUFFIX_PATTERN, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+async function resolveWorkspaceWikiTarget(target: string) {
+  if (!activeWorkspaceRoot) {
+    return null;
+  }
+
+  const targetWithoutAnchor = stripLinkAnchor(target).replace(MARKDOWN_PREVIEW_SUFFIX_PATTERN, "");
+  if (!targetWithoutAnchor) {
+    return null;
+  }
+
+  const normalizedTarget = normalizePathForComparison(targetWithoutAnchor);
+  const normalizedBaseName = normalizePathForComparison(path.basename(targetWithoutAnchor));
+  const normalizedWikiName = normalizeWikiTargetName(targetWithoutAnchor);
+  const matches = searchableFilesCache.filter((filePath) => {
+    const baseName = path.basename(filePath).replace(MARKDOWN_PREVIEW_SUFFIX_PATTERN, "");
+    const relativePath = path
+      .relative(activeWorkspaceRoot as string, filePath)
+      .replace(MARKDOWN_PREVIEW_SUFFIX_PATTERN, "");
+
+    return (
+      normalizePathForComparison(baseName) === normalizedBaseName ||
+      normalizePathForComparison(relativePath) === normalizedTarget ||
+      normalizeWikiTargetName(baseName) === normalizedWikiName ||
+      normalizeWikiTargetName(relativePath) === normalizedWikiName
+    );
+  });
+
+  return matches.length === 1 ? matches[0] : null;
+}
+
 async function resolveLinkTarget(
   currentFilePath: string | null,
   href: string,
@@ -854,6 +902,12 @@ async function resolveLinkTarget(
   const trimmed = href.trim();
   if (!trimmed) {
     return null;
+  }
+
+  const wikiTarget = parseWikiLinkHref(trimmed);
+  if (wikiTarget) {
+    const existingPath = await resolveWorkspaceWikiTarget(wikiTarget);
+    return existingPath ? { kind: "markdown-file", target: existingPath } : null;
   }
 
   if (/^https?:\/\//i.test(trimmed)) {
@@ -2614,6 +2668,22 @@ async function createWindow() {
   mainWindow.once("ready-to-show", () => {
     mainWindow?.show();
   });
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith("https:") || url.startsWith("http:")) {
+      void shell.openExternal(url);
+      return { action: "deny" };
+    }
+    return { action: "allow" };
+  });
+
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    if (url.startsWith("https:") || url.startsWith("http:")) {
+      event.preventDefault();
+      void shell.openExternal(url);
+    }
+  });
+
 
   mainWindow.webContents.on("did-fail-load", (_event, code, description, validatedUrl) => {
     console.error("Renderer load failed:", {

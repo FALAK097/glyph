@@ -55,6 +55,8 @@ async function createGlyphSandbox(): Promise<GlyphSandbox> {
       "Smoke test note content.",
       "",
       "Preview the [Nested Note](notes/nested-note.md).",
+      "",
+      "Wiki jump to [[Nested Note]].",
     ].join("\n"),
   );
   await fs.writeFile(
@@ -643,6 +645,39 @@ test("hovering a markdown note link shows a local note preview", async ({}, test
     await expect(previewCard.getByText("Nested Note", { exact: true })).toBeVisible();
     await expect(previewCard.getByText("Nested note body.")).toBeVisible();
   } finally {
+    await glyph.stop(testInfo);
+  }
+});
+
+test("wikilinks preview, open notes, and appear as backlinks", async ({}, testInfo) => {
+  const glyph = await launchGlyph();
+  try {
+    await expectAppShell(glyph.window);
+    await openWorkspace(glyph.window, glyph.sandbox.workspaceRoot);
+
+    await selectPaletteItem(glyph.window, "welcome", /welcome\.md/i);
+    const wikiLink = glyph.window
+      .locator('[data-glyph-editor="true"] [data-wiki-link="[[Nested Note]]"]')
+      .first();
+    await expect(wikiLink).toBeVisible();
+
+    await wikiLink.hover();
+    const previewCard = glyph.window.getByLabel("Note link preview");
+    await expect(previewCard).toBeVisible();
+    await expect(previewCard.getByText("Nested Note", { exact: true })).toBeVisible();
+
+    await glyph.window.keyboard.down(modKey);
+    await wikiLink.click();
+    await glyph.window.keyboard.up(modKey);
+    await expect(
+      glyph.window.locator('[data-glyph-editor="true"]').getByText("Nested note body."),
+    ).toBeVisible();
+
+    await glyph.window.getByLabel("Open properties panel").click();
+    await expect(glyph.window.getByText("Backlinks")).toBeVisible();
+    await expect(glyph.window.getByRole("button", { name: /Welcome to Glyph/i })).toBeVisible();
+  } finally {
+    await glyph.window.keyboard.up(modKey).catch(() => {});
     await glyph.stop(testInfo);
   }
 });

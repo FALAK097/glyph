@@ -26,6 +26,7 @@ import {
 } from "./tiptap-extension/find-highlight";
 import { MarkdownShortcuts } from "./tiptap-extension/markdown-shortcuts";
 import { TaskTokenHighlight } from "./tiptap-extension/task-token-highlight";
+import { WikiLink } from "./tiptap-extension/wiki-link";
 
 import { Button } from "@/components/ui/button";
 
@@ -761,6 +762,7 @@ export const MarkdownEditor = ({
         SlashCommand,
         FindHighlightExtension,
         TaskTokenHighlight,
+        WikiLink,
         Placeholder.configure({
           placeholder: "Start with a title, then let markdown shortcuts shape the page.",
         }),
@@ -782,13 +784,14 @@ export const MarkdownEditor = ({
         },
         handleClick: (_view, _pos, event) => {
           const target = event.target;
-          const link = target instanceof HTMLElement ? target.closest("a") : null;
+          const link =
+            target instanceof HTMLElement ? target.closest("a, [data-wiki-link]") : null;
 
           if (!link) {
             return false;
           }
 
-          const href = link.getAttribute("href");
+          const href = link.getAttribute("href") ?? link.getAttribute("data-wiki-link");
           if (!href) {
             return false;
           }
@@ -807,13 +810,14 @@ export const MarkdownEditor = ({
         handleDOMEvents: {
           mouseover: (_view, event) => {
             const target = event.target;
-            const link = target instanceof HTMLElement ? target.closest("a") : null;
+            const link =
+              target instanceof HTMLElement ? target.closest("a, [data-wiki-link]") : null;
 
             if (!link) {
               return false;
             }
 
-            const href = link.getAttribute("href");
+            const href = link.getAttribute("href") ?? link.getAttribute("data-wiki-link");
             if (!href) {
               return false;
             }

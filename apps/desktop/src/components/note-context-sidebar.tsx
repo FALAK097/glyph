@@ -1137,14 +1137,6 @@ export function NoteContextSidebar({
 
   return (
     <aside className="flex h-full min-h-0 flex-col border-l border-border bg-background">
-      <button
-        type="button"
-        className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
-        aria-label="Close context sidebar"
-        onClick={onClose}
-      >
-        <XIcon size={14} />
-      </button>
       <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto px-3 py-4">
         <section className="space-y-1.5">
           <FieldRow icon={<FileIcon size={13} />} label="Type">

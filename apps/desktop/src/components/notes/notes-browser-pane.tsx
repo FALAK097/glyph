@@ -1,8 +1,13 @@
 import { useState } from "react";
 import type { DragEvent } from "react";
-import { createPortal } from "react-dom";
 
 import { cn } from "@/core/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { NoteBrowserEntry, NoteCollectionAccentKey } from "@/core/workspace";
 
 import {
@@ -187,16 +192,10 @@ export function NotesBrowserPane({
   onDeleteNote,
   onReorderNote,
 }: NotesBrowserPaneProps) {
-  const [actionMenu, setActionMenu] = useState<{
-    entry: NoteBrowserEntry;
-    left: number;
-    top: number;
-  } | null>(null);
   const [dragTarget, setDragTarget] = useState<{
     path: string;
     position: "before" | "after";
   } | null>(null);
-  const closeActionMenu = () => setActionMenu(null);
 
   return (
     <>
@@ -289,41 +288,103 @@ export function NotesBrowserPane({
                         {entry.title}
                       </span>
                       <span className="flex h-5 shrink-0 items-center">
-                        <button
-                          type="button"
-                          draggable={false}
-                          className="grid h-5 w-5 place-items-center rounded-sm text-muted-foreground transition-colors hover:text-foreground"
-                          aria-label="Note actions"
-                          onPointerDownCapture={(event) => {
-                            event.stopPropagation();
-                            const rect = event.currentTarget.getBoundingClientRect();
-                            setActionMenu({
-                              entry,
-                              left: rect.left,
-                              top: rect.bottom + 6,
-                            });
-                          }}
-                          onMouseDown={(event) => {
-                            event.stopPropagation();
-                            const rect = event.currentTarget.getBoundingClientRect();
-                            setActionMenu({
-                              entry,
-                              left: rect.left,
-                              top: rect.bottom + 6,
-                            });
-                          }}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            const rect = event.currentTarget.getBoundingClientRect();
-                            setActionMenu({
-                              entry,
-                              left: rect.left,
-                              top: rect.bottom + 6,
-                            });
-                          }}
-                        >
-                          <MoreVerticalIcon size={14} />
-                        </button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            draggable={false}
+                            className="grid h-5 w-5 place-items-center rounded-sm text-muted-foreground transition-colors hover:text-foreground focus:outline-none"
+                            aria-label="Note actions"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                            }}
+                            onPointerDown={(event) => {
+                              event.stopPropagation();
+                            }}
+                            onMouseDown={(event) => {
+                              event.stopPropagation();
+                            }}
+                          >
+                            <MoreVerticalIcon size={14} />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-52">
+                            <DropdownMenuItem
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onCopyNote?.(entry);
+                              }}
+                            >
+                              <LinkIcon size={14} className="opacity-70" />
+                              Copy as Markdown
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onCopyNotePath?.(entry);
+                              }}
+                            >
+                              <LinkIcon size={14} className="opacity-70" />
+                              Copy note path
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onRevealNote?.(entry);
+                              }}
+                            >
+                              <FileManagerLogo label="Reveal in Finder" size={14} className="opacity-70" />
+                              Reveal in Finder
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onExportNote?.(entry);
+                              }}
+                            >
+                              <FileDownIcon size={14} className="opacity-70" />
+                              Export as PDF
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onTogglePinnedNote?.(entry);
+                              }}
+                            >
+                              {isNotePinned?.(entry) ? (
+                                <PinOffIcon size={14} className="opacity-70" />
+                              ) : (
+                                <PinIcon size={14} className="opacity-70" />
+                              )}
+                              {isNotePinned?.(entry) ? "Unpin note" : "Pin note"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onRenameNote?.(entry);
+                              }}
+                            >
+                              <PencilIcon size={14} className="opacity-70" />
+                              Rename
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onRemoveNote?.(entry);
+                              }}
+                            >
+                              <XIcon size={14} className="opacity-70" />
+                              Remove
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                onDeleteNote?.(entry);
+                              }}
+                            >
+                              <TrashIcon size={14} className="opacity-70" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </span>
                     </span>
                     {entry.excerpt && isActive ? (
@@ -352,116 +413,6 @@ export function NotesBrowserPane({
           )}
         </div>
       </aside>
-      {actionMenu
-        ? createPortal(
-            <>
-              <button
-                type="button"
-                aria-label="Close note actions"
-                className="fixed inset-0 z-40 cursor-default bg-transparent"
-                onClick={closeActionMenu}
-              />
-              <div
-                className="fixed z-50 w-52 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"
-                style={{ left: actionMenu.left, top: actionMenu.top }}
-              >
-                <button
-                  type="button"
-                  className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden hover:bg-accent"
-                  onClick={() => {
-                    onCopyNote?.(actionMenu.entry);
-                    closeActionMenu();
-                  }}
-                >
-                  <LinkIcon size={14} className="opacity-70" />
-                  Copy as Markdown
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden hover:bg-accent"
-                  onClick={() => {
-                    onCopyNotePath?.(actionMenu.entry);
-                    closeActionMenu();
-                  }}
-                >
-                  <LinkIcon size={14} className="opacity-70" />
-                  Copy note path
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden hover:bg-accent"
-                  onClick={() => {
-                    onRevealNote?.(actionMenu.entry);
-                    closeActionMenu();
-                  }}
-                >
-                  <FileManagerLogo label="Reveal in Finder" size={14} className="opacity-70" />
-                  Reveal in Finder
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden hover:bg-accent"
-                  onClick={() => {
-                    onExportNote?.(actionMenu.entry);
-                    closeActionMenu();
-                  }}
-                >
-                  <FileDownIcon size={14} className="opacity-70" />
-                  Export as PDF
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden hover:bg-accent"
-                  onClick={() => {
-                    onTogglePinnedNote?.(actionMenu.entry);
-                    closeActionMenu();
-                  }}
-                >
-                  {isNotePinned?.(actionMenu.entry) ? (
-                    <PinOffIcon size={14} className="opacity-70" />
-                  ) : (
-                    <PinIcon size={14} className="opacity-70" />
-                  )}
-                  {isNotePinned?.(actionMenu.entry) ? "Unpin note" : "Pin note"}
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden hover:bg-accent"
-                  onClick={() => {
-                    onRenameNote?.(actionMenu.entry);
-                    closeActionMenu();
-                  }}
-                >
-                  <PencilIcon size={14} className="opacity-70" />
-                  Rename
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-hidden hover:bg-accent"
-                  onClick={() => {
-                    onRemoveNote?.(actionMenu.entry);
-                    closeActionMenu();
-                  }}
-                >
-                  <XIcon size={14} className="opacity-70" />
-                  Remove
-                </button>
-                <button
-                  type="button"
-                  className="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-destructive outline-hidden hover:bg-destructive/10 [&_svg]:text-destructive"
-                  onClick={() => {
-                    onDeleteNote?.(actionMenu.entry);
-                    closeActionMenu();
-                  }}
-                >
-                  <TrashIcon size={14} className="opacity-70" />
-                  Delete
-                </button>
-              </div>
-            </>,
-            document.body,
-          )
-        : null}
     </>
   );
 }

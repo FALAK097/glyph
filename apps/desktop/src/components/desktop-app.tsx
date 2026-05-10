@@ -53,21 +53,22 @@ import { useUpdateStateFlags } from "./update-notification";
 
 import { matchesPaletteQuery, matchesSkillPaletteFallback } from "./desktop-app/palette-utils";
 
-function collectNoteTitles(nodes: DirectoryNode[]): Array<{ title: string; icon: string | null }> {
-  const titles = new Set<string>();
+function collectNoteTitles(nodes: DirectoryNode[]): Array<{ title: string; icon: string | null; path: string | null }> {
+  const titles = new Map<string, { title: string; path: string }>();
   const visit = (node: DirectoryNode) => {
     if (node.type === "file") {
       if (/\.md$/i.test(node.name)) {
-        titles.add(node.name.replace(/\.md$/i, ""));
+        const title = node.name.replace(/\.md$/i, "");
+        titles.set(title.toLowerCase(), { title, path: node.path });
       }
       return;
     }
     node.children.forEach(visit);
   };
   nodes.forEach(visit);
-  return Array.from(titles)
-    .sort((left, right) => left.localeCompare(right))
-    .map((title) => ({ title, icon: null }));
+  return Array.from(titles.values())
+    .map((entry) => ({ ...entry, icon: null }))
+    .sort((left, right) => left.title.localeCompare(right.title));
 }
 
 function getFrontmatterIcon(content: string) {
@@ -408,7 +409,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     [activeNoteIcon, controller.activeFile, visibleNoteBrowserEntries],
   );
   const noteTitleSuggestions = useMemo(() => {
-    const titleMap = new Map<string, { title: string; icon: string | null }>();
+    const titleMap = new Map<string, { title: string; icon: string | null; path: string | null }>();
     collectNoteTitles(controller.visibleSidebarNodes.map((entry) => entry.node)).forEach((entry) => {
       titleMap.set(entry.title.toLowerCase(), entry);
     });
@@ -417,7 +418,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         controller.activeFile && isSamePath(entry.path, controller.activeFile.path)
           ? activeNoteIcon
           : entry.icon;
-      titleMap.set(entry.title.toLowerCase(), { title: entry.title, icon });
+      titleMap.set(entry.title.toLowerCase(), { title: entry.title, icon, path: entry.path });
     });
     return Array.from(titleMap.values()).sort((left, right) =>
       left.title.localeCompare(right.title),
@@ -1973,6 +1974,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         rootPath={workspaceRootPath}
         noteTitleSuggestions={noteTitleSuggestions}
         onClose={() => setNoteContextOpen(false)}
+        onOpenNote={(path) => void handleOpenLinkedFile(path)}
         onUpdateContent={controller.updateDraftContent}
       />
     ) : null;

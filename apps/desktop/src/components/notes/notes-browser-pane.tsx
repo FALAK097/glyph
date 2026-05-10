@@ -11,20 +11,31 @@ import {
 import type { NoteBrowserEntry, NoteCollectionAccentKey } from "@/core/workspace";
 
 import {
+  ArchiveIcon,
   BookIcon,
   BriefcaseIcon,
+  CalendarIcon,
   CameraIcon,
+  DiscountTagIcon,
   FileDownIcon,
+  FileIcon,
+  GlobeIcon,
   HomeIcon,
+  HonourStarIcon,
   IdeaIcon,
+  LayersIcon,
   LeafIcon,
   LinkIcon,
+  MonitorIcon,
+  MoonIcon,
+  NotebookIcon,
   MoreVerticalIcon,
   PencilIcon,
   PinIcon,
   PinOffIcon,
   RocketIcon,
   SparklesIcon,
+  SunIcon,
   TrashIcon,
   XIcon,
 } from "../icons";
@@ -134,13 +145,24 @@ const NOTE_BROWSER_DRAG_MIME = "application/x-glyph-note-browser-entry";
 let globalDraggedNotePath: string | null = null;
 
 const NOTE_ICON_RENDERERS = {
+  archive: ArchiveIcon,
   book: BookIcon,
+  calendar: CalendarIcon,
   camera: CameraIcon,
+  file: FileIcon,
+  globe: GlobeIcon,
   home: HomeIcon,
   idea: IdeaIcon,
+  layers: LayersIcon,
   leaf: LeafIcon,
+  monitor: MonitorIcon,
+  moon: MoonIcon,
+  notebook: NotebookIcon,
   rocket: RocketIcon,
   spark: SparklesIcon,
+  star: HonourStarIcon,
+  sun: SunIcon,
+  tag: DiscountTagIcon,
   work: BriefcaseIcon,
 };
 

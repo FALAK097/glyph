@@ -48,6 +48,11 @@ export const NOTE_COLLECTION_ICON_KEYS: NoteCollectionIconKey[] = [
   "camera",
   "notebook",
   "star",
+  "idea",
+  "file",
+  "sun",
+  "moon",
+  "monitor",
 ];
 
 export type NoteCollectionItem = {

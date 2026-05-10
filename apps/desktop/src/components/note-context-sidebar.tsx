@@ -13,21 +13,29 @@ import { cn } from "@/core/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import {
+  ArchiveIcon,
+  ArrowDownIcon,
   BookIcon,
   BriefcaseIcon,
   CalendarIcon,
   CameraIcon,
   DiscountTagIcon,
   FileIcon,
-  ArrowDownIcon,
+  GlobeIcon,
   HomeIcon,
+  HonourStarIcon,
   IdeaIcon,
+  LayersIcon,
   LeafIcon,
   LinkIcon,
+  MonitorIcon,
+  MoonIcon,
+  NotebookIcon,
   PlusIcon,
   RocketIcon,
   SearchIcon,
   SparklesIcon,
+  SunIcon,
   TickIcon,
   XIcon,
 } from "./icons";
@@ -36,15 +44,10 @@ type NoteContextSidebarProps = {
   activeFile: FileDocument;
   draftContent: string;
   rootPath: string | null;
-  noteTitleSuggestions: Array<{ title: string; icon: string | null }>;
+  noteTitleSuggestions: Array<{ title: string; icon: string | null; path: string | null }>;
   onClose: () => void;
+  onOpenNote: (path: string) => void;
   onUpdateContent: (content: string) => void;
-};
-
-type CustomProperty = {
-  name: string;
-  type: string;
-  value: string;
 };
 
 type Relationship = {
@@ -77,7 +80,6 @@ const DEFAULT_STATUSES = [
   "Archived",
   "Paused",
 ];
-const PROPERTY_TYPES = ["Text", "Number", "Date", "Boolean", "Status", "URL", "Tags", "Color"];
 const DEFAULT_RELATIONSHIPS = ["Belongs to", "Related to", "Has"];
 const STOP_WORDS = new Set([
   "about",
@@ -123,10 +125,21 @@ const ICON_OPTIONS: IconOption[] = [
   { key: "idea", label: "Idea", icon: <IdeaIcon size={13} /> },
   { key: "book", label: "Book", icon: <BookIcon size={13} /> },
   { key: "work", label: "Work", icon: <BriefcaseIcon size={13} /> },
+  { key: "calendar", label: "Calendar", icon: <CalendarIcon size={13} /> },
+  { key: "tag", label: "Tag", icon: <DiscountTagIcon size={13} /> },
+  { key: "archive", label: "Archive", icon: <ArchiveIcon size={13} /> },
   { key: "home", label: "Home", icon: <HomeIcon size={13} /> },
+  { key: "globe", label: "Globe", icon: <GlobeIcon size={13} /> },
+  { key: "layers", label: "Layers", icon: <LayersIcon size={13} /> },
+  { key: "notebook", label: "Notebook", icon: <NotebookIcon size={13} /> },
+  { key: "star", label: "Star", icon: <HonourStarIcon size={13} /> },
   { key: "leaf", label: "Leaf", icon: <LeafIcon size={13} /> },
   { key: "camera", label: "Camera", icon: <CameraIcon size={13} /> },
   { key: "rocket", label: "Rocket", icon: <RocketIcon size={13} /> },
+  { key: "file", label: "File", icon: <FileIcon size={13} /> },
+  { key: "sun", label: "Sun", icon: <SunIcon size={13} /> },
+  { key: "moon", label: "Moon", icon: <MoonIcon size={13} /> },
+  { key: "monitor", label: "Monitor", icon: <MonitorIcon size={13} /> },
 ];
 
 const STATUS_STYLES: Record<string, { dot: string; text: string; chip: string }> = {
@@ -187,17 +200,6 @@ const TAG_TONES = [
   "bg-lime-500/10 text-lime-700 dark:text-lime-300",
   "bg-orange-500/10 text-orange-700 dark:text-orange-300",
 ];
-
-const PROPERTY_TYPE_ICONS: Record<string, ReactNode> = {
-  Boolean: <span className="h-3 w-3 rounded-full border border-current" />,
-  Color: <span className="h-3 w-3 rounded-full bg-primary/70" />,
-  Date: <CalendarIcon size={12} />,
-  Number: <span className="font-mono text-[10px]">#</span>,
-  Status: <span className="h-2.5 w-2.5 rounded-full bg-primary/70" />,
-  Tags: <DiscountTagIcon size={12} />,
-  Text: <span className="font-mono text-[10px]">T</span>,
-  URL: <LinkIcon size={12} />,
-};
 
 type CalendarDay = {
   day: number;
@@ -260,17 +262,6 @@ function getStringArray(value: unknown): string[] {
     return value.split(/[,\s]+/).map(normalizeTag).filter(Boolean);
   }
   return [];
-}
-
-function getCustomProperties(value: unknown): CustomProperty[] {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((entry) => {
-    if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
-    const record = entry as Record<string, unknown>;
-    const name = getString(record.name).trim();
-    if (!name) return [];
-    return [{ name, type: getString(record.type) || "Text", value: getString(record.value) }];
-  });
 }
 
 function getRelationships(value: unknown): Relationship[] {
@@ -349,7 +340,7 @@ function detectTags(body: string, existingTags: string[]) {
   return Array.from(counts.entries())
     .filter(([tag, count]) => count >= 2 && !STOP_WORDS.has(tag))
     .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
-    .slice(0, 4)
+    .slice(0, 5)
     .map(([tag]) => tag);
 }
 
@@ -392,12 +383,23 @@ function NoteGlyph({ iconKey, fallbackClassName }: { iconKey?: string | null; fa
 
 function getSuggestionIcon(
   note: string,
-  noteTitleSuggestions: Array<{ title: string; icon: string | null }>,
+  noteTitleSuggestions: Array<{ title: string; icon: string | null; path: string | null }>,
 ) {
   return (
     noteTitleSuggestions.find(
       (entry) => entry.title.toLowerCase() === note.toLowerCase(),
     )?.icon ?? null
+  );
+}
+
+function getSuggestionPath(
+  note: string,
+  noteTitleSuggestions: Array<{ title: string; icon: string | null; path: string | null }>,
+) {
+  return (
+    noteTitleSuggestions.find(
+      (entry) => entry.title.toLowerCase() === note.toLowerCase(),
+    )?.path ?? null
   );
 }
 
@@ -489,6 +491,7 @@ function OptionPicker({
   renderTrigger,
   align = "end",
   widthClassName = "w-[200px]",
+  defaultOpen = false,
 }: {
   value: string;
   options: SelectOption[];
@@ -499,8 +502,9 @@ function OptionPicker({
   renderTrigger?: (option: SelectOption | null) => ReactNode;
   align?: "start" | "center" | "end";
   widthClassName?: string;
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [query, setQuery] = useState("");
   const selected = options.find((option) => option.value === value) ?? null;
   const filteredOptions = filterOptions(options, query);
@@ -568,7 +572,7 @@ function OptionPicker({
               <span className="grid h-3.5 w-3.5 shrink-0 place-items-center text-muted-foreground">
                 {option.value === value ? <TickIcon size={12} className="text-primary" /> : option.icon}
               </span>
-              <span className={`min-w-0 truncate ${option.className ?? ""}`}>{option.label}</span>
+              <span className={cn("min-w-0 truncate", option.className)}>{option.label}</span>
             </button>
           ))}
           {showCreate ? (
@@ -772,7 +776,7 @@ function IconPicker({
         </button>
       }
     >
-      <div className="w-[168px] p-1.5">
+      <div className="w-[180px] p-1.5">
         <div className="mb-1 grid grid-cols-5 gap-1.5">
           {ICON_OPTIONS.filter((option) => option.key !== "none").map((option) => (
             <Tooltip key={option.key}>
@@ -785,7 +789,7 @@ function IconPicker({
                   }}
                   className={cn(
                     "grid h-7 w-7 place-items-center rounded-md border border-transparent text-muted-foreground transition-colors hover:border-border hover:text-foreground",
-                    value === option.key ? "bg-muted text-primary" : "",
+                    value === option.key ? "text-primary" : "",
                   )}
                   aria-label={`Use ${option.label} icon`}
                 >
@@ -841,7 +845,7 @@ function TagPicker({
       trigger={
         <button
           type="button"
-          className="grid h-5 w-5 place-items-center rounded-full bg-muted/50 text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+          className="grid h-5 w-5 place-items-center rounded-full text-muted-foreground transition-colors hover:text-primary"
           aria-label="Add tag"
         >
           <PlusIcon size={12} />
@@ -914,86 +918,28 @@ function TagPicker({
   );
 }
 
-function PropertyValueEditor({
-  type,
-  value,
-  statusOptions,
-  tagOptions,
-  onChange,
-}: {
-  type: string;
-  value: string;
-  statusOptions: SelectOption[];
-  tagOptions: string[];
-  onChange: (value: string) => void;
-}) {
-  if (type === "Boolean") {
-    const isTrue = value.toLowerCase() === "true";
-    return (
-      <button
-        type="button"
-        className="h-7 rounded-md bg-muted/70 px-2 text-xs text-foreground transition-colors hover:bg-muted"
-        onClick={() => onChange(isTrue ? "false" : "true")}
-      >
-        {isTrue ? "Yes" : "No"}
-      </button>
-    );
-  }
-
-  if (type === "Status") {
-    return (
-      <OptionPicker
-        value={value}
-        options={statusOptions}
-        placeholder="Status"
-        searchPlaceholder="Type status..."
-        onChange={onChange}
-        renderTrigger={(option) => (
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${option?.className ?? ""}`}>
-            {option?.label || value || "Status"}
-          </span>
-        )}
-      />
-    );
-  }
-
-  if (type === "Tags") {
-    return (
-      <CompactInput
-        value={value}
-        placeholder={tagOptions.slice(0, 2).join(", ") || "tag1, tag2"}
-        onChange={(event) => onChange(event.target.value)}
-      />
-    );
-  }
-
-  if (type === "Date") {
-    return <DatePicker value={value} onChange={onChange} />;
-  }
-
-  return (
-    <CompactInput
-      type={type === "Number" ? "number" : type === "URL" ? "url" : "text"}
-      value={value}
-      placeholder="Value"
-      onChange={(event) => onChange(event.target.value)}
-    />
-  );
-}
-
 function RelationshipNoteChip({
   note,
   icon,
+  onOpen,
   onRemove,
 }: {
   note: string;
   icon: string | null;
+  onOpen?: () => void;
   onRemove: () => void;
 }) {
   return (
     <div className="group/relationship-note flex min-h-8 items-center gap-2 rounded-md bg-muted/70 px-2.5 text-xs text-foreground transition-colors hover:bg-muted">
-      <NoteGlyph iconKey={icon} />
-      <span className="min-w-0 flex-1 truncate font-medium">{note}</span>
+      <button
+        type="button"
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
+        onClick={onOpen}
+        disabled={!onOpen}
+      >
+        <NoteGlyph iconKey={icon} />
+        <span className="min-w-0 flex-1 truncate font-medium">{note}</span>
+      </button>
       <button
         type="button"
         className="grid h-5 w-5 shrink-0 place-items-center rounded text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/relationship-note:opacity-100"
@@ -1012,11 +958,10 @@ export function NoteContextSidebar({
   rootPath: _rootPath,
   noteTitleSuggestions,
   onClose,
+  onOpenNote,
   onUpdateContent,
 }: NoteContextSidebarProps) {
-  const [newProperty, setNewProperty] = useState({ name: "", type: "Text", value: "" });
   const [newRelation, setNewRelation] = useState({ name: "", note: "" });
-  const [showAddProperty, setShowAddProperty] = useState(false);
   const [editingRelationshipName, setEditingRelationshipName] = useState<string | null>(null);
   const [showCustomRelationship, setShowCustomRelationship] = useState(false);
 
@@ -1034,7 +979,6 @@ export function NoteContextSidebar({
       ]),
     );
     return {
-      customProperties: getCustomProperties(frontmatter.properties),
       date: getString(frontmatter.date),
       icon: getString(frontmatter.icon) || "none",
       relationships: getRelationships(frontmatter.relationships),
@@ -1064,25 +1008,16 @@ export function NoteContextSidebar({
       value: status,
       label: status,
       icon: <span className={cn("h-1.5 w-1.5 rounded-full", style.dot)} />,
-      className: style.chip,
+      className: style.text,
     };
   });
-  const propertyTypeOptions = PROPERTY_TYPES.map((type) => ({
-    value: type,
-    label: type,
-    icon: (
-      <span className="grid h-4 w-4 shrink-0 place-items-center text-muted-foreground">
-        {PROPERTY_TYPE_ICONS[type]}
-      </span>
-    ),
-  }));
   const noteTitleOptions = [
-    { title, icon: model.icon === "none" ? null : model.icon },
-    { title: folderName, icon: null },
+    { title, icon: model.icon === "none" ? null : model.icon, path: activeFile.path },
+    { title: folderName, icon: null, path: null },
     ...noteTitleSuggestions,
   ]
     .filter((entry) => entry.title)
-    .reduce<Array<{ title: string; icon: string | null }>>((accumulator, entry) => {
+    .reduce<Array<{ title: string; icon: string | null; path: string | null }>>((accumulator, entry) => {
       if (!accumulator.some((existing) => existing.title.toLowerCase() === entry.title.toLowerCase())) {
         accumulator.push(entry);
       }
@@ -1108,15 +1043,6 @@ export function NoteContextSidebar({
     const tag = normalizeTag(tagInput);
     if (!tag || model.tags.includes(tag)) return;
     updateFrontmatter({ tags: [...model.tags, tag] });
-  };
-
-  const addCustomProperty = () => {
-    const name = newProperty.name.trim();
-    if (!name) return;
-    updateFrontmatter({
-      properties: [...model.customProperties, { ...newProperty, name }],
-    });
-    setNewProperty({ name: "", type: "Text", value: "" });
   };
 
   const addRelationship = (nameInput: string, noteInput: string) => {
@@ -1221,103 +1147,6 @@ export function NoteContextSidebar({
               ) : null}
             </div>
           </FieldRow>
-
-          {/* Inline Custom Properties following URL */}
-          {model.customProperties.map((property, index) => (
-            <FieldRow
-              key={`${property.name}-${index}`}
-              icon={PROPERTY_TYPE_ICONS[property.type] ?? PROPERTY_TYPE_ICONS.Text}
-              label={property.name}
-            >
-              <div className="flex min-w-0 items-center gap-1">
-                <PropertyValueEditor
-                  type={property.type}
-                  value={property.value}
-                  statusOptions={statusOptions}
-                  tagOptions={knownTags}
-                  onChange={(value) => {
-                    const nextProperties = model.customProperties.map((entry, propertyIndex) =>
-                      propertyIndex === index ? { ...entry, value } : entry,
-                    );
-                    updateFrontmatter({ properties: nextProperties });
-                  }}
-                />
-                <button
-                  type="button"
-                  className="grid h-7 w-6 shrink-0 place-items-center text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
-                  aria-label={`Delete ${property.name}`}
-                  onClick={() =>
-                    updateFrontmatter({
-                      properties: model.customProperties.filter(
-                        (_entry, propertyIndex) => propertyIndex !== index,
-                      ),
-                    })
-                  }
-                >
-                  x
-                </button>
-              </div>
-            </FieldRow>
-          ))}
-
-          {!showAddProperty ? (
-            <button
-              type="button"
-              className="flex h-7 w-full items-center gap-2 px-1.5 text-left text-xs text-muted-foreground/50 transition-colors hover:text-muted-foreground"
-              onClick={() => setShowAddProperty(true)}
-            >
-              <PlusIcon size={12} />
-              <span>Add property</span>
-            </button>
-          ) : (
-            <div className="grid grid-cols-[1fr_auto] gap-1.5 items-start mt-1 border border-border/30 p-1.5 rounded-md bg-muted/10">
-              <div className="grid grid-cols-2 gap-1.5">
-                <CompactInput
-                  value={newProperty.name}
-                  placeholder="Property name"
-                  autoFocus
-                  onChange={(event) =>
-                    setNewProperty((current) => ({ ...current, name: event.target.value }))
-                  }
-                />
-                <OptionPicker
-                  value={newProperty.type}
-                  options={propertyTypeOptions}
-                  placeholder="Type"
-                  searchPlaceholder="Type..."
-                  allowCreate={false}
-                  widthClassName="w-[148px]"
-                  onChange={(value) => setNewProperty((current) => ({ ...current, type: value }))}
-                  renderTrigger={(option) => (
-                    <span className="inline-flex items-center gap-1 truncate">
-                      {option?.icon}
-                      {option?.label ?? newProperty.type}
-                    </span>
-                  )}
-                />
-              </div>
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  className="grid h-7 w-7 place-items-center rounded-md bg-primary/10 text-primary hover:bg-primary/20"
-                  disabled={!newProperty.name.trim()}
-                  onClick={() => {
-                    addCustomProperty();
-                    setShowAddProperty(false);
-                  }}
-                >
-                  <TickIcon size={13} />
-                </button>
-                <button
-                  type="button"
-                  className="grid h-7 w-7 place-items-center rounded-md hover:bg-muted text-muted-foreground"
-                  onClick={() => setShowAddProperty(false)}
-                >
-                  <XIcon size={12} />
-                </button>
-              </div>
-            </div>
-          )}
         </section>
 
         <div className="my-3 h-px bg-border/30" />
@@ -1397,11 +1226,13 @@ export function NoteContextSidebar({
                   </div>
                   {matchingRelationships.map((relationship) => {
                     const iconKey = getSuggestionIcon(relationship.note, noteTitleSuggestions);
+                    const notePath = getSuggestionPath(relationship.note, noteTitleSuggestions);
                     return (
                       <RelationshipNoteChip
                         key={`${relationship.name}-${relationship.note}-${relationship.index}`}
                         note={relationship.note}
                         icon={iconKey}
+                        onOpen={notePath ? () => onOpenNote(notePath) : undefined}
                         onRemove={() =>
                           updateFrontmatter({
                             relationships: model.relationships.filter(
@@ -1420,6 +1251,7 @@ export function NoteContextSidebar({
                         placeholder="Add note title"
                         searchPlaceholder="Search notes..."
                         onChange={(value) => addRelationship(relationshipName, value)}
+                        defaultOpen
                         renderTrigger={() => <span className="text-muted-foreground">Add</span>}
                       />
                       <button
@@ -1465,11 +1297,13 @@ export function NoteContextSidebar({
                     <div className="text-xs text-muted-foreground">{group.name}</div>
                     {group.items.map((relationship) => {
                       const iconKey = getSuggestionIcon(relationship.note, noteTitleSuggestions);
+                      const notePath = getSuggestionPath(relationship.note, noteTitleSuggestions);
                       return (
                         <RelationshipNoteChip
                           key={`${relationship.name}-${relationship.note}-${relationship.index}`}
                           note={relationship.note}
                           icon={iconKey}
+                          onOpen={notePath ? () => onOpenNote(notePath) : undefined}
                           onRemove={() =>
                             updateFrontmatter({
                               relationships: model.relationships.filter(

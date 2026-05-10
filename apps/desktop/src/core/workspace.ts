@@ -106,7 +106,12 @@ export type NoteCollectionIconKey =
   | "home"
   | "camera"
   | "notebook"
-  | "star";
+  | "star"
+  | "idea"
+  | "file"
+  | "sun"
+  | "moon"
+  | "monitor";
 
 export type NoteFolderAppearance = {
   accent: NoteCollectionAccentKey;

@@ -115,6 +115,11 @@ const NOTE_COLLECTION_ICON_KEYS = [
   "camera",
   "notebook",
   "star",
+  "idea",
+  "file",
+  "sun",
+  "moon",
+  "monitor",
 ] as const;
 type NoteCollectionAccentValue = (typeof NOTE_COLLECTION_ACCENT_KEYS)[number];
 type NoteCollectionIconValue = (typeof NOTE_COLLECTION_ICON_KEYS)[number];

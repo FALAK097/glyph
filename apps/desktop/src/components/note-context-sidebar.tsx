@@ -43,6 +43,12 @@ import {
 type NoteContextSidebarProps = {
   activeFile: FileDocument;
   draftContent: string;
+  metadataOptions: {
+    statuses: string[];
+    tags: string[];
+    types: string[];
+  };
+  backlinks: Array<{ path: string; title: string; icon: string | null }>;
   rootPath: string | null;
   noteTitleSuggestions: Array<{ title: string; icon: string | null; path: string | null }>;
   onClose: () => void;
@@ -86,6 +92,7 @@ const STOP_WORDS = new Set([
   "after",
   "again",
   "always",
+  "around",
   "being",
   "also",
   "because",
@@ -94,6 +101,8 @@ const STOP_WORDS = new Set([
   "could",
   "doing",
   "every",
+  "field",
+  "fields",
   "from",
   "have",
   "never",
@@ -107,6 +116,8 @@ const STOP_WORDS = new Set([
   "more",
   "notes",
   "only",
+  "option",
+  "options",
   "right",
   "should",
   "that",
@@ -115,6 +126,10 @@ const STOP_WORDS = new Set([
   "these",
   "this",
   "with",
+  "workspace",
+  "workspaces",
+  "worskpace",
+  "worskpaces",
   "would",
   "your",
 ]);
@@ -332,9 +347,9 @@ function detectTags(body: string, existingTags: string[]) {
     .replace(/\[[^\]]+\]\([^)]+\)/g, " ")
     .replace(/https?:\/\/\S+/g, " ");
 
-  for (const match of normalizedBody.toLowerCase().matchAll(/[a-z][a-z0-9-]{4,}/g)) {
+  for (const match of normalizedBody.toLowerCase().matchAll(/[a-z][a-z0-9-]{5,}/g)) {
     const tag = normalizeTag(match[0]);
-    if (STOP_WORDS.has(tag) || existing.has(tag)) continue;
+    if (STOP_WORDS.has(tag) || existing.has(tag) || tag.endsWith("ing")) continue;
     counts.set(tag, (counts.get(tag) ?? 0) + 1);
   }
   return Array.from(counts.entries())
@@ -492,6 +507,7 @@ function OptionPicker({
   align = "end",
   widthClassName = "w-[200px]",
   defaultOpen = false,
+  onClear,
 }: {
   value: string;
   options: SelectOption[];
@@ -503,10 +519,12 @@ function OptionPicker({
   align?: "start" | "center" | "end";
   widthClassName?: string;
   defaultOpen?: boolean;
+  onClear?: () => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [query, setQuery] = useState("");
   const selected = options.find((option) => option.value === value) ?? null;
+  const isClearable = Boolean(onClear && value && value !== "None");
   const filteredOptions = filterOptions(options, query);
   const showCreate = allowCreate && isCreateOptionVisible(query, options);
 
@@ -527,12 +545,35 @@ function OptionPicker({
       trigger={
         <button
           type="button"
-          className="flex h-7 w-full min-w-0 items-center justify-between gap-1 rounded-md border border-transparent bg-transparent px-1 text-left text-xs text-foreground transition-colors hover:bg-muted/50 focus:border-primary/20 focus:bg-muted/50 focus:outline-none"
+          className="group/field-trigger flex h-7 w-full min-w-0 items-center justify-between gap-1 rounded-md border border-transparent bg-transparent px-1 text-left text-xs text-foreground transition-colors hover:bg-muted/50 focus:border-primary/20 focus:bg-muted/50 focus:outline-none"
         >
           <span className="min-w-0 truncate">
             {renderTrigger ? renderTrigger(selected) : selected?.label || value || placeholder}
           </span>
-          <ArrowDownIcon size={11} className="shrink-0 opacity-40" />
+          {isClearable ? (
+            <span
+              role="button"
+              tabIndex={0}
+              aria-label="Clear value"
+              className="grid h-5 w-5 shrink-0 place-items-center rounded text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/field-trigger:opacity-100"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onClear?.();
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onClear?.();
+                }
+              }}
+            >
+              <XIcon size={11} />
+            </span>
+          ) : (
+            <ArrowDownIcon size={11} className="shrink-0 opacity-40" />
+          )}
         </button>
       }
     >
@@ -563,7 +604,7 @@ function OptionPicker({
               type="button"
               className={cn(
                 "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-xs text-foreground transition-colors",
-                option.value === value ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted",
+                option.value === value ? "text-primary font-medium" : "hover:bg-muted",
               )}
               role="option"
               aria-selected={option.value === value}
@@ -645,12 +686,37 @@ function DatePicker({
       trigger={
         <button
           type="button"
-          className="flex h-7 w-full min-w-0 items-center justify-between gap-1 rounded-md border border-transparent bg-transparent px-1 text-left text-xs text-foreground transition-colors hover:bg-muted/50 focus:border-primary/20 focus:bg-muted/50 focus:outline-none"
+          className="group/field-trigger flex h-7 w-full min-w-0 items-center justify-between gap-1 rounded-md border border-transparent bg-transparent px-1 text-left text-xs text-foreground transition-colors hover:bg-muted/50 focus:border-primary/20 focus:bg-muted/50 focus:outline-none"
         >
           <span className="min-w-0 truncate text-muted-foreground/70">
             {value || "Set date..."}
           </span>
-          <CalendarIcon size={11} className="shrink-0 opacity-40" />
+          {value ? (
+            <span
+              role="button"
+              tabIndex={0}
+              aria-label="Clear date"
+              className="grid h-5 w-5 shrink-0 place-items-center rounded text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/field-trigger:opacity-100"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onChange("");
+                setOpen(false);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onChange("");
+                  setOpen(false);
+                }
+              }}
+            >
+              <XIcon size={11} />
+            </span>
+          ) : (
+            <CalendarIcon size={11} className="shrink-0 opacity-40" />
+          )}
         </button>
       }
     >
@@ -764,7 +830,7 @@ function IconPicker({
         <button
           type="button"
           aria-haspopup="menu"
-          className="flex h-7 w-full min-w-0 items-center gap-2 rounded-md border border-transparent bg-transparent px-1 text-left text-xs text-foreground transition-colors hover:bg-muted/50 focus:border-primary/20 focus:bg-muted/50 focus:outline-none"
+          className="group/field-trigger flex h-7 w-full min-w-0 items-center gap-2 rounded-md border border-transparent bg-transparent px-1 text-left text-xs text-foreground transition-colors hover:bg-muted/50 focus:border-primary/20 focus:bg-muted/50 focus:outline-none"
         >
           {selected ? (
             <span className="text-primary">{selected.icon}</span>
@@ -772,12 +838,35 @@ function IconPicker({
             <span className="h-3.5 w-3.5 shrink-0" />
           )}
           <span className="min-w-0 flex-1 truncate">{selected?.label ?? "None"}</span>
-          <span className="text-muted-foreground">›</span>
+          {selected ? (
+            <span
+              role="button"
+              tabIndex={0}
+              aria-label="Clear icon"
+              className="grid h-5 w-5 shrink-0 place-items-center rounded text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/field-trigger:opacity-100"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onChange("none");
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  onChange("none");
+                }
+              }}
+            >
+              <XIcon size={11} />
+            </span>
+          ) : (
+            <span className="text-muted-foreground">›</span>
+          )}
         </button>
       }
     >
       <div className="w-[180px] p-1.5">
-        <div className="mb-1 grid grid-cols-5 gap-1.5">
+        <div className="grid grid-cols-5 gap-1.5">
           {ICON_OPTIONS.filter((option) => option.key !== "none").map((option) => (
             <Tooltip key={option.key}>
               <TooltipTrigger asChild>
@@ -800,16 +889,6 @@ function IconPicker({
             </Tooltip>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            onChange("none");
-            setOpen(false);
-          }}
-          className="mt-1 flex h-7 w-full items-center justify-center rounded-md text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          None
-        </button>
       </div>
     </BasePopover>
   );
@@ -955,6 +1034,8 @@ function RelationshipNoteChip({
 export function NoteContextSidebar({
   activeFile,
   draftContent,
+  metadataOptions,
+  backlinks,
   rootPath: _rootPath,
   noteTitleSuggestions,
   onClose,
@@ -992,10 +1073,9 @@ export function NoteContextSidebar({
 
   const folderName = getBaseName(getDirName(activeFile.path)) || "Workspace";
   const title = activeFile.name.replace(/\.md$/i, "");
-  const selectedIcon = ICON_OPTIONS.find((option) => option.key === model.icon) ?? ICON_OPTIONS[0];
-  const knownTypes = Array.from(new Set([...DEFAULT_TYPES, model.type])).filter(Boolean);
-  const knownStatuses = Array.from(new Set([...DEFAULT_STATUSES, model.status])).filter(Boolean);
-  const knownTags = Array.from(new Set([...model.tags, ...model.suggestedTags])).sort();
+  const knownTypes = Array.from(new Set([...DEFAULT_TYPES, ...metadataOptions.types, model.type])).filter(Boolean);
+  const knownStatuses = Array.from(new Set([...DEFAULT_STATUSES, ...metadataOptions.statuses, model.status])).filter(Boolean);
+  const knownTags = Array.from(new Set([...metadataOptions.tags, ...model.tags, ...model.suggestedTags])).sort();
   const typeOptions = knownTypes.map((type) => ({
     value: type,
     label: type,
@@ -1057,22 +1137,15 @@ export function NoteContextSidebar({
 
   return (
     <aside className="flex h-full min-h-0 flex-col border-l border-border bg-background">
-      <header className="flex h-11 shrink-0 items-center justify-between border-b border-border/70 px-3">
-        <div className="flex min-w-0 items-center gap-2">
-          {model.icon !== "none" ? <span className="text-primary">{selectedIcon.icon}</span> : null}
-          <span className="truncate text-xs font-semibold text-foreground">{title}</span>
-        </div>
-        <button
-          type="button"
-          className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
-          aria-label="Close context sidebar"
-          onClick={onClose}
-        >
-          <XIcon size={14} />
-        </button>
-      </header>
-
-      <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto px-3 py-3">
+      <button
+        type="button"
+        className="absolute right-2 top-2 z-10 grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition-colors hover:text-foreground"
+        aria-label="Close context sidebar"
+        onClick={onClose}
+      >
+        <XIcon size={14} />
+      </button>
+      <div className="scrollbar-hide min-h-0 flex-1 overflow-y-auto px-3 py-4">
         <section className="space-y-1.5">
           <FieldRow icon={<FileIcon size={13} />} label="Type">
             <OptionPicker
@@ -1081,6 +1154,7 @@ export function NoteContextSidebar({
               placeholder="None"
               searchPlaceholder="Search types..."
               onChange={(value) => updateFrontmatter({ type: value === "None" ? "" : value })}
+              onClear={() => updateFrontmatter({ type: "" })}
               renderTrigger={(option) => (
                 <span className="inline-flex items-center gap-1.5 text-foreground/80">
                   <span className="opacity-70">{option?.icon}</span>
@@ -1100,6 +1174,7 @@ export function NoteContextSidebar({
               placeholder="None"
               searchPlaceholder="Type status..."
               onChange={(value) => updateFrontmatter({ status: value === "None" ? "" : value })}
+              onClear={() => updateFrontmatter({ status: "" })}
               renderTrigger={(option) => (
                 <span className="inline-flex items-center gap-1.5">
                   <span className={cn("h-1.5 w-1.5 rounded-full", getStatusStyle(option?.value ?? model.status).dot)} />
@@ -1126,24 +1201,34 @@ export function NoteContextSidebar({
           </FieldRow>
 
           <FieldRow icon={<LinkIcon size={13} />} label="URL">
-            <div className="flex min-w-0 items-center gap-1">
-              <CompactInput
-                type="url"
-                value={model.url}
-                placeholder="-"
-                className={model.url ? "text-primary" : ""}
-                onChange={(event) => updateFrontmatter({ url: event.target.value })}
-              />
+            <div className="group/field-trigger flex min-w-0 items-center gap-1">
               {model.url ? (
                 <a
                   href={model.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-primary transition-colors hover:bg-primary/10"
-                  aria-label="Open URL"
+                  className="min-w-0 flex-1 truncate rounded-md px-1.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/10 hover:text-primary/80"
+                  title={model.url}
                 >
-                  <LinkIcon size={13} />
+                  {model.url}
                 </a>
+              ) : (
+              <CompactInput
+                type="url"
+                value={model.url}
+                placeholder="-"
+                onChange={(event) => updateFrontmatter({ url: event.target.value })}
+              />
+              )}
+              {model.url ? (
+                <button
+                  type="button"
+                  className="grid h-5 w-5 shrink-0 place-items-center rounded text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover/field-trigger:opacity-100"
+                  aria-label="Clear URL"
+                  onClick={() => updateFrontmatter({ url: "" })}
+                >
+                  <XIcon size={11} />
+                </button>
               ) : null}
             </div>
           </FieldRow>
@@ -1369,6 +1454,36 @@ export function NoteContextSidebar({
               >
                 + Add relationship
               </button>
+            )}
+          </div>
+        </section>
+
+        <div className="my-3 h-px bg-border/30" />
+
+        <section>
+          <div className="mb-2 flex items-center justify-between gap-2 text-[11px] font-medium text-muted-foreground/70">
+            <span>Backlinks</span>
+            <span className="text-[10px] tabular-nums text-muted-foreground/50">
+              {backlinks.length}
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            {backlinks.length > 0 ? (
+              backlinks.map((backlink) => (
+                <button
+                  key={backlink.path}
+                  type="button"
+                  className="flex min-h-8 w-full cursor-pointer items-center gap-2 rounded-md bg-muted/50 px-2.5 text-left text-xs text-foreground transition-colors hover:bg-muted"
+                  onClick={() => onOpenNote(backlink.path)}
+                >
+                  <NoteGlyph iconKey={backlink.icon} />
+                  <span className="min-w-0 flex-1 truncate font-medium">{backlink.title}</span>
+                </button>
+              ))
+            ) : (
+              <div className="rounded-md border border-dashed border-border px-2.5 py-2 text-xs text-muted-foreground/50">
+                No backlinks yet
+              </div>
             )}
           </div>
         </section>

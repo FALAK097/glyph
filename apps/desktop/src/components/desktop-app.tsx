@@ -15,6 +15,7 @@ import type {
   NoteCollectionAccentKey,
   NoteCollectionIconKey,
   NoteBrowserEntry,
+  NoteKnowledgeIndexSnapshot,
   TabMovePosition,
 } from "@/core/workspace";
 import { useLayoutStore } from "@/store/layout";
@@ -76,6 +77,22 @@ function getFrontmatterIcon(content: string) {
   const match = parsed.frontmatterText?.match(/^icon:\s*(.+?)\s*$/m);
   const icon = match?.[1]?.trim().replace(/^['"]|['"]$/g, "") ?? null;
   return icon && icon !== "none" ? icon : null;
+}
+
+function getMetadataString(value: unknown) {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return "";
+}
+
+function getMetadataStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap(getMetadataStringArray);
+  }
+  if (typeof value === "string") {
+    return value.split(/[,\s]+/).map((entry) => entry.trim().replace(/^#/, "").toLowerCase()).filter(Boolean);
+  }
+  return [];
 }
 
 export const DesktopApp = ({ glyph }: DesktopAppProps) => {
@@ -214,6 +231,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     name: string;
   } | null>(null);
   const [noteBrowserRefreshNonce, setNoteBrowserRefreshNonce] = useState(0);
+  const [knowledgeIndex, setKnowledgeIndex] = useState<NoteKnowledgeIndexSnapshot | null>(null);
   const [paletteSkillResultIds, setPaletteSkillResultIds] = useState<string[] | null>(null);
   const [resolvedPaletteSkillQuery, setResolvedPaletteSkillQuery] = useState("");
   const [skillInitialScrollTop, setSkillInitialScrollTop] = useState(0);
@@ -424,6 +442,51 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       left.title.localeCompare(right.title),
     );
   }, [activeNoteIcon, controller.activeFile, controller.visibleSidebarNodes, noteBrowserEntries]);
+  const metadataOptions = useMemo(() => {
+    const types = new Set<string>();
+    const statuses = new Set<string>();
+    const tags = new Set<string>();
+
+    knowledgeIndex?.notes.forEach((note) => {
+      const type = getMetadataString(note.frontmatter.type);
+      const status = getMetadataString(note.frontmatter.status);
+      if (type) types.add(type);
+      if (status) statuses.add(status);
+      getMetadataStringArray(note.frontmatter.tags).forEach((tag) => tags.add(tag));
+      getMetadataStringArray(note.frontmatter.tag).forEach((tag) => tags.add(tag));
+      getMetadataStringArray(note.frontmatter.keywords).forEach((tag) => tags.add(tag));
+      note.tags.forEach((tag) => tags.add(tag.name));
+    });
+
+    return {
+      statuses: Array.from(statuses).sort((left, right) => left.localeCompare(right)),
+      tags: Array.from(tags).sort((left, right) => left.localeCompare(right)),
+      types: Array.from(types).sort((left, right) => left.localeCompare(right)),
+    };
+  }, [knowledgeIndex]);
+  const activeNoteBacklinks = useMemo(() => {
+    if (!controller.activeFile || !knowledgeIndex) {
+      return [];
+    }
+
+    const notesByPath = new Map(
+      knowledgeIndex.notes.map((note) => [normalizePath(note.path).toLowerCase(), note]),
+    );
+    const activeNote = notesByPath.get(normalizePath(controller.activeFile.path).toLowerCase());
+    if (!activeNote) {
+      return [];
+    }
+
+    return activeNote.backlinks.flatMap((sourcePath) => {
+      const source = notesByPath.get(normalizePath(sourcePath).toLowerCase());
+      if (!source) {
+        return [];
+      }
+
+      const icon = getMetadataString(source.frontmatter.icon) || null;
+      return [{ path: source.path, title: source.title, icon }];
+    });
+  }, [controller.activeFile, knowledgeIndex]);
   const activeNoteCollectionPath = activeNoteCollection?.path ?? null;
 
   const handleToggleSkillsSection = useCallback(() => {
@@ -700,6 +763,30 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
     noteCollections,
     noteBrowserRefreshNonce,
   ]);
+
+  useEffect(() => {
+    if (!controller.hasBooted) {
+      return;
+    }
+
+    let isCancelled = false;
+    void glyph
+      .getKnowledgeIndex()
+      .then((snapshot) => {
+        if (!isCancelled) {
+          setKnowledgeIndex(snapshot);
+        }
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setKnowledgeIndex(null);
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [controller.hasBooted, controller.saveStateLabel, glyph, noteBrowserRefreshNonce]);
 
   useEffect(() => {
     if (
@@ -1971,6 +2058,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       <NoteContextSidebar
         activeFile={activeNoteFile}
         draftContent={controller.draftContent}
+        metadataOptions={metadataOptions}
+        backlinks={activeNoteBacklinks}
         rootPath={workspaceRootPath}
         noteTitleSuggestions={noteTitleSuggestions}
         onClose={() => setNoteContextOpen(false)}

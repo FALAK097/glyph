@@ -34,6 +34,7 @@ import { EditorToolbar } from "./editor-toolbar";
 import { EditorDialogs } from "./editor-dialogs";
 import { useUpdateStateFlags } from "./update-notification";
 import { SlashCommand } from "@/core/slash-command";
+import { WikiLinkSuggest } from "@/core/wiki-suggest";
 import { TableOfContents } from "./table-of-contents";
 import { TableControls } from "./table-controls";
 import { FindPanel } from "./find-panel";
@@ -760,6 +761,7 @@ export const MarkdownEditor = ({
         TableHeader,
         TableCell,
         SlashCommand,
+        WikiLinkSuggest,
         FindHighlightExtension,
         TaskTokenHighlight,
         WikiLink,

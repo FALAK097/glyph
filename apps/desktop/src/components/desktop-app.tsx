@@ -58,6 +58,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const viewerMode = useSessionStore((state) => state.viewerMode);
   const isNotesExpanded = useSessionStore((state) => state.isNotesExpanded);
   const isSkillsExpanded = useSessionStore((state) => state.isSkillsExpanded);
+  const isNoteContextOpen = useSessionStore((state) => state.isNoteContextOpen);
   const workspaceRootPath = useWorkspaceStore((state) => state.rootPath);
   const selectedNoteCollectionPath = useSessionStore((state) => state.selectedNoteCollectionPath);
   const notesBrowserPaneWidth = useSessionStore((state) => state.notesBrowserPaneWidth);
@@ -83,6 +84,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   );
   const setNoteOrderForCollection = useSessionStore((state) => state.setNoteOrderForCollection);
   const getNoteOrderForCollection = useSessionStore((state) => state.getNoteOrderForCollection);
+  const setNoteContextOpen = useSessionStore((state) => state.setNoteContextOpen);
   const setNotesBrowserPaneWidth = useSessionStore((state) => state.setNotesBrowserPaneWidth);
   const setSelectedSkillCollectionId = useSessionStore(
     (state) => state.setSelectedSkillCollectionId,
@@ -177,7 +179,6 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
   const [skillInitialScrollTop, setSkillInitialScrollTop] = useState(0);
   const [pendingSkillRestorePath, setPendingSkillRestorePath] = useState<string | null>(null);
   const [isInitialSkillRestorePending, setIsInitialSkillRestorePending] = useState(false);
-  const [isNoteContextOpen, setIsNoteContextOpen] = useState(false);
   const paletteSkillSearchNonceRef = useRef(0);
   const paletteFilterQuery = controller.paletteQuery.trim().toLowerCase();
   const shouldCollapseSidebar =
@@ -1281,7 +1282,7 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         section: "Note",
         kind: "command",
         onSelect: () => {
-          setIsNoteContextOpen((current) => !current);
+          setNoteContextOpen(!isNoteContextOpen);
           closePalette();
         },
       },
@@ -1892,8 +1893,9 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
         outlineItems={controller.outlineItems}
         wordCount={controller.wordCount}
         readingTime={controller.readingTime}
-        onClose={() => setIsNoteContextOpen(false)}
+        onClose={() => setNoteContextOpen(false)}
         onJumpToHeading={controller.requestOutlineJump}
+        onUpdateContent={controller.updateDraftContent}
       />
     ) : null;
 
@@ -2015,6 +2017,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       isManualReleaseButton={false}
       headerPaddingClass={noteHeaderPaddingClass}
       onOpenSettings={handleOpenSettings}
+      isNoteContextOpen={isNoteContextOpen}
+      onToggleNoteContext={activeNoteFile ? () => setNoteContextOpen(!isNoteContextOpen) : undefined}
       headerAccessory={null}
       content={skillsController.draftContent}
       documentLabel="skill"
@@ -2135,6 +2139,8 @@ export const DesktopApp = ({ glyph }: DesktopAppProps) => {
       <AppLayout
         toolbar={toolbarNode}
         footer={footerNode}
+        themeMode={controller.settings?.themeMode ?? "system"}
+        onChangeTheme={(mode) => void controller.changeThemeMode(mode)}
         shouldCollapseSidebar={shouldCollapseSidebar}
         tree={controller.visibleSidebarNodes}
         activePath={

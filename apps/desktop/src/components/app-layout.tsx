@@ -1,5 +1,5 @@
 import type { NoteCollectionItem } from "@/core/note-collections";
-import type { NoteCollectionAccentKey, NoteCollectionIconKey } from "@/core/workspace";
+import type { NoteCollectionAccentKey, NoteCollectionIconKey, ThemeMode } from "@/core/workspace";
 import type { NoteShortcutItem } from "@/types/navigation";
 import type {
   DragPosition,
@@ -47,6 +47,8 @@ type AppLayoutProps = {
   onCreateFolderInCollection?: (collectionPath: string) => void;
   onChangeNoteCollectionAccent?: (collectionPath: string, accent: NoteCollectionAccentKey) => void;
   onChangeNoteCollectionIcon?: (collectionPath: string, icon: NoteCollectionIconKey) => void;
+  themeMode: ThemeMode;
+  onChangeTheme: (mode: ThemeMode) => void;
   children: React.ReactNode;
 };
 
@@ -87,6 +89,8 @@ export function AppLayout({
   onCreateFolderInCollection,
   onChangeNoteCollectionAccent,
   onChangeNoteCollectionIcon,
+  themeMode,
+  onChangeTheme,
   children,
 }: AppLayoutProps) {
   return (
@@ -139,7 +143,9 @@ export function AppLayout({
 
         <main className="relative flex-1 min-h-0 overflow-hidden bg-background">{children}</main>
       </div>
-      {footer ? <AppFooter content={footer} /> : null}
+      {footer ? (
+        <AppFooter content={footer} themeMode={themeMode} onChangeTheme={onChangeTheme} />
+      ) : null}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import Suggestion, {
   type SuggestionProps,
 } from "@tiptap/suggestion";
 import { ReactRenderer } from "@tiptap/react";
+import { PluginKey } from "@tiptap/pm/state";
 import tippy, { type Instance, type Props } from "tippy.js";
 import "tippy.js/dist/tippy.css";
 import { SlashCommandList } from "../components/slash-command-list";
@@ -14,6 +15,8 @@ import type {
   SlashCommandWithKey,
 } from "../types/slash-command";
 import { MODIFIER_TOKENS } from "./shortcuts";
+
+export const SlashCommandPluginKey = new PluginKey("slash-command");
 
 /**
  * Hardcoded TipTap/StarterKit default shortcuts displayed as hints in the
@@ -354,6 +357,12 @@ const slashSuggestion: Omit<SuggestionOptions<SlashCommandWithKey>, "editor"> = 
 export const SlashCommand = Extension.create({
   name: "slash-command",
   addProseMirrorPlugins() {
-    return [Suggestion({ editor: this.editor, ...slashSuggestion })];
+    return [
+      Suggestion({
+        pluginKey: SlashCommandPluginKey,
+        editor: this.editor,
+        ...slashSuggestion,
+      }),
+    ];
   },
 });

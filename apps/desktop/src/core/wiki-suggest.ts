@@ -7,11 +7,14 @@ import Suggestion, {
 import { ReactRenderer } from "@tiptap/react";
 import tippy, { type Instance, type Props } from "tippy.js";
 import "tippy.js/dist/tippy.css";
+import { PluginKey } from "@tiptap/pm/state";
 import { WikiSuggestList } from "../components/wiki-suggest-list";
 import type {
   WikiSuggestItem,
   WikiSuggestListHandle,
 } from "../types/wiki-suggest";
+
+export const WikiLinkSuggestPluginKey = new PluginKey("wiki-link-suggest");
 
 const runCommand = ({
   editor,
@@ -130,6 +133,12 @@ const wikiSuggestion: Omit<SuggestionOptions<WikiSuggestItem>, "editor"> = {
 export const WikiLinkSuggest = Extension.create({
   name: "wiki-link-suggest",
   addProseMirrorPlugins() {
-    return [Suggestion({ editor: this.editor, ...wikiSuggestion })];
+    return [
+      Suggestion({
+        pluginKey: WikiLinkSuggestPluginKey,
+        editor: this.editor,
+        ...wikiSuggestion,
+      }),
+    ];
   },
 });
